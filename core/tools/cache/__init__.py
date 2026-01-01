@@ -27,23 +27,10 @@ pkg/cache - 공통 캐시 경로 관리
     # → {project_root}/temp/ip/azure_servicetags_cache.json
 """
 
+from .path import CACHE_ROOT, get_cache_dir, get_cache_path
+
 __all__ = [
     "get_cache_dir",
     "get_cache_path",
     "CACHE_ROOT",
 ]
-
-
-def __getattr__(name: str):
-    """Lazy import - 실제 사용 시점에만 모듈 로드"""
-    if name in ("get_cache_dir", "get_cache_path", "CACHE_ROOT"):
-        from .path import CACHE_ROOT, get_cache_dir, get_cache_path
-
-        if name == "get_cache_dir":
-            return get_cache_dir
-        elif name == "get_cache_path":
-            return get_cache_path
-        elif name == "CACHE_ROOT":
-            return CACHE_ROOT
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

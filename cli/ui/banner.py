@@ -25,7 +25,7 @@ def get_version() -> str:
                     return f.read().strip()
     except Exception:
         pass
-    return "1.0.0"
+    return "0.0.1"
 
 
 # 컴팩트한 배너 (AWS 오렌지 그라디언트)
@@ -95,21 +95,3 @@ def print_simple_banner(console: Console) -> None:
     console.print()
     console.print(f"[bold #FF9900]AA[/] [dim]v{version}[/] [dim]|[/] {context}")
     console.print()
-
-
-def print_tool_header(
-    console: Console, tool_name: str, category: str, description: Optional[str] = None
-) -> None:
-    """도구 실행 헤더 출력
-
-    Args:
-        console: Rich Console 인스턴스
-        tool_name: 도구 이름
-        category: 카테고리 이름
-        description: 도구 설명 (선택)
-    """
-    console.print()
-    console.print(f"[bold #FF9900]▶[/] [bold white]{tool_name}[/] [dim]({category})[/]")
-    if description:
-        console.print(f"  [dim]{description}[/]")
-    console.print("[dim]" + "─" * 50 + "[/]")

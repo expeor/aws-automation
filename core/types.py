@@ -367,10 +367,3 @@ def is_tool_metadata(obj: Any) -> bool:
     if not isinstance(obj, dict):
         return False
     return all(key in obj for key in ("name", "description", "permission"))
-
-
-def is_category_metadata(obj: Any) -> bool:
-    """CategoryMetadata 타입인지 확인"""
-    if not isinstance(obj, dict):
-        return False
-    return all(key in obj for key in ("name", "description"))

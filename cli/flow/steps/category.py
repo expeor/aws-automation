@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from cli.ui.console import print_box_end, print_box_line, print_box_start
+from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
 
 from ..context import ExecutionContext, ToolInfo
 
@@ -25,22 +26,6 @@ PERMISSION_COLORS = {
     "update": "yellow",
     "delete": "red",  # 위험 - 삭제
 }
-
-# 영역별 색상 (AWS Trusted Advisor 5대 영역)
-AREA_DISPLAY = {
-    "security": {"label": "보안", "color": "red"},
-    "cost": {"label": "비용", "color": "yellow"},
-    "fault_tolerance": {"label": "내결함성", "color": "blue"},
-    "performance": {"label": "성능", "color": "magenta"},
-    "operational": {"label": "운영", "color": "cyan"},
-}
-
-
-def _print_section_header(title: str) -> None:
-    """섹션 헤더 출력"""
-    console.print()
-    console.print(f"[bold underline cyan]{title}[/bold underline cyan]")
-    console.print()
 
 
 def _load_categories() -> List[Dict[str, Any]]:

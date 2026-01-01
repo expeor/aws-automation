@@ -51,8 +51,9 @@ if str(_project_root) not in sys.path:
 import click
 
 # Keep lightweight, centralized logging config
+# WARNING 레벨로 설정하여 INFO 로그가 도구 출력에 섞이지 않도록 함
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )

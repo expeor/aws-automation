@@ -411,37 +411,3 @@ def is_not_found(error: Exception) -> bool:
         return error_code in not_found_codes
 
     return False
-
-
-def format_error_for_user(error: Exception) -> str:
-    """사용자에게 표시할 에러 메시지 포맷팅
-
-    민감한 정보(계정 ID 등)를 마스킹하고 친절한 메시지로 변환합니다.
-
-    Args:
-        error: 예외
-
-    Returns:
-        사용자 친화적인 에러 메시지
-    """
-    if isinstance(error, AAError):
-        # 커스텀 예외는 이미 포맷팅됨
-        return str(error)
-
-    # boto3 ClientError
-    if hasattr(error, "response"):
-        error_info = error.response.get("Error", {})
-        code = error_info.get("Code", "UnknownError")
-        message = error_info.get("Message", str(error))
-
-        # 사용자 친화적 메시지 매핑
-        friendly_messages = {
-            "AccessDenied": "권한이 없습니다. IAM 정책을 확인하세요.",
-            "ExpiredToken": "인증 토큰이 만료되었습니다. 다시 로그인하세요.",
-            "InvalidClientTokenId": "잘못된 자격 증명입니다.",
-            "Throttling": "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
-        }
-
-        return friendly_messages.get(code, f"{code}: {message}")
-
-    return str(error)

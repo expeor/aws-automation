@@ -1,9 +1,14 @@
 # internal/flow/steps/__init__.py
-"""Flow Steps 모듈
+"""Flow Steps 모듈"""
 
-Note:
-    이 모듈은 Lazy Import 패턴을 사용합니다.
-"""
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .account import AccountStep
+    from .category import CategoryStep
+    from .profile import ProfileStep
+    from .region import RegionStep
+    from .role import RoleStep
 
 __all__ = [
     "CategoryStep",

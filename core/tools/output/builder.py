@@ -142,17 +142,26 @@ class OutputPath:
 
     @staticmethod
     def _get_project_root() -> str:
-        """프로젝트 루트 경로 반환"""
-        # core/tools/output/builder.py에서 프로젝트 루트 찾기
-        current = Path(__file__).resolve()
+        """프로젝트 루트 경로 반환
 
-        # pyproject.toml 또는 .git 디렉토리로 프로젝트 루트 탐색
-        for parent in current.parents:
+        우선순위:
+        1. 환경 변수 AA_OUTPUT_ROOT
+        2. CWD에서 pyproject.toml 또는 .git 탐색
+        3. Fallback: CWD
+        """
+        # 1. 환경 변수 체크
+        env_root = os.environ.get("AA_OUTPUT_ROOT")
+        if env_root and Path(env_root).exists():
+            return env_root
+
+        # 2. CWD 기준으로 프로젝트 루트 탐색
+        cwd = Path.cwd().resolve()
+        for parent in [cwd, *cwd.parents]:
             if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
                 return str(parent)
 
-        # Fallback: 4단계 상위 (core/tools/output/builder.py → root)
-        return str(current.parent.parent.parent.parent)
+        # 3. Fallback: CWD
+        return str(cwd)
 
     @staticmethod
     def _get_date_parts(pattern: DatePattern) -> List[str]:

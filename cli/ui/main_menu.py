@@ -36,55 +36,8 @@ SHORTCUTS = {
     "exit": "exit",
 }
 
-# Area 한글 키워드 매핑 (검색용)
-# 키워드 → area 값
-AREA_KEYWORDS = {
-    # security
-    "보안": "security",
-    "취약": "security",
-    "암호화": "security",
-    "퍼블릭": "security",
-    # cost
-    "비용": "cost",
-    "미사용": "cost",
-    "절감": "cost",
-    "유휴": "cost",
-    # operational
-    "운영": "operational",
-    "보고서": "operational",
-    "리포트": "operational",
-    "현황": "operational",
-    # inventory
-    "목록": "inventory",
-    "인벤토리": "inventory",
-    "조회": "inventory",
-    # fault_tolerance
-    "가용성": "fault_tolerance",
-    "백업": "fault_tolerance",
-    "복구": "fault_tolerance",
-    # log
-    "로그": "log",
-    # network
-    "네트워크": "network",
-    # performance
-    "성능": "performance",
-}
-
-# /command 스타일 필터 (빠른 영역 필터)
-AREA_COMMANDS = {
-    "/security": "security",
-    "/sec": "security",
-    "/cost": "cost",
-    "/op": "operational",
-    "/ops": "operational",
-    "/inv": "inventory",
-    "/inventory": "inventory",
-    "/log": "log",
-    "/net": "network",
-    "/network": "network",
-    "/perf": "performance",
-    "/ft": "fault_tolerance",
-}
+# Area 정의는 core/tools/types.py에서 import (단일 소스)
+from core.tools.types import AREA_COMMANDS, AREA_KEYWORDS, AREA_REGISTRY
 
 
 class MainMenu:
@@ -328,6 +281,18 @@ class MainMenu:
             self.console.print("[red]검색 엔진이 초기화되지 않았습니다.[/]")
             return
 
+        query_lower = query.lower()
+
+        # /command 스타일 필터 처리
+        if query_lower in AREA_COMMANDS:
+            self._handle_area_search(query, AREA_COMMANDS[query_lower])
+            return
+
+        # Area 키워드 매칭 처리
+        if query in AREA_KEYWORDS:
+            self._handle_area_search(query, AREA_KEYWORDS[query])
+            return
+
         results = self._search_engine.search(query, limit=15)
 
         if not results:
@@ -381,6 +346,78 @@ class MainMenu:
                 if 1 <= idx <= len(results):
                     selected = results[idx - 1]
                     self._run_tool_directly(selected.category, selected.tool_module)
+                    return
+
+            self.console.print(f"[red]0-{len(results)} 범위의 번호를 입력하세요.[/]")
+
+    def _handle_area_search(self, query: str, area: str) -> None:
+        """영역(area) 기반 검색 처리"""
+        from rich.table import Table
+
+        # 모든 도구를 flat list로
+        all_tools = []
+        for cat in self._categories:
+            cat_name = cat.get("name", "")
+            cat_display = cat.get("display_name", cat_name)
+            for tool in cat.get("tools", []):
+                all_tools.append({
+                    "category": cat_name,
+                    "category_display": cat_display,
+                    "tool_module": tool.get("module", ""),
+                    **tool
+                })
+
+        # area 필터링
+        results = [(i, t) for i, t in enumerate(all_tools, 1) if t.get("area") == area]
+
+        if not results:
+            self.console.print()
+            self.console.print(f"[yellow]'{query}' 검색 결과 없음[/]")
+            wait_for_any_key()
+            return
+
+        # 결과 표시
+        self.console.print()
+        table = Table(
+            title=f"[bold]{query}[/bold] ({len(results)}건)",
+            show_header=True,
+            header_style="dim",
+            box=None,
+            padding=(0, 1),
+            title_justify="left",
+        )
+        table.add_column("#", style="dim", width=3, justify="right")
+        table.add_column("카테고리", width=12)
+        table.add_column("도구", width=25)
+        table.add_column("설명", style="dim")
+
+        for i, (_, tool) in enumerate(results, 1):
+            table.add_row(
+                str(i),
+                tool.get("category_display", tool.get("category", "")).upper(),
+                tool.get("name", ""),
+                (tool.get("description", "") or "")[:40],
+            )
+
+        self.console.print(table)
+        self.console.print()
+        self.console.print("[dim]0: 돌아가기[/dim]")
+
+        # 선택
+        while True:
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(results):
+                    _, selected = results[idx - 1]
+                    self._run_tool_directly(selected["category"], selected["tool_module"])
                     return
 
             self.console.print(f"[red]0-{len(results)} 범위의 번호를 입력하세요.[/]")
@@ -589,40 +626,41 @@ class MainMenu:
         self.console.print("[bold cyan]═══ AWS Automation CLI 도움말 ═══[/bold cyan]")
         self.console.print()
 
-        # CLI 직접 실행
-        self.console.print("[bold]CLI 직접 실행[/bold]")
-        self.console.print("  aa                    대화형 메뉴 실행")
-        self.console.print("  aa rds                RDS 도구 목록")
-        self.console.print("  aa ec2                EC2 도구 목록")
-        self.console.print("  aa <서비스> --help    서비스별 도움말")
+        # 메뉴 탐색
+        self.console.print("[bold yellow]메뉴 명령어[/bold yellow]")
+        self.console.print("  [cyan]a[/cyan]  전체 도구      모든 도구를 한 화면에 표시")
+        self.console.print("  [cyan]b[/cyan]  카테고리       AWS 서비스별 카테고리 메뉴")
+        self.console.print("  [cyan]f[/cyan]  즐겨찾기       자주 사용하는 도구 추가/제거")
+        self.console.print("  [cyan]p[/cyan]  프로필         AWS 프로필 전환 (SSO/Access Key)")
+        self.console.print("  [cyan]h[/cyan]  도움말         이 화면 표시")
+        self.console.print("  [cyan]q[/cyan]  종료           프로그램 종료")
+        self.console.print("  [cyan]1-5[/cyan]               즐겨찾기 바로 실행")
         self.console.print()
 
         # 검색
-        self.console.print("[bold]검색 (메뉴에서)[/bold]")
-        self.console.print("  rds, ec2, iam ...     AWS 서비스명으로 검색")
-        self.console.print("  미사용, 보안, 비용    한글 키워드로 검색")
-        self.console.print("  snapshot, backup      영문 키워드로 검색")
+        self.console.print("[bold yellow]검색[/bold yellow]")
+        self.console.print("  [white]rds, ec2, iam ...[/white]     AWS 서비스명")
+        self.console.print("  [white]미사용, 보안, 비용[/white]    한글 키워드")
+        self.console.print("  [white]snapshot, backup[/white]      영문 키워드")
         self.console.print()
 
-        # /command 필터
-        self.console.print("[bold]영역별 필터 (/command)[/bold]")
-        self.console.print("  /cost      미사용 리소스, 비용 절감 (21개)")
-        self.console.print("  /security  보안 취약점, 암호화 점검 (28개)")
-        self.console.print("  /ops       운영 보고서, 모니터링 (28개)")
-        self.console.print("  /inv       리소스 인벤토리, 목록 (10개)")
-        self.console.print("  /ft        가용성, 백업, Multi-AZ (5개)")
-        self.console.print("  /log       로그 분석 (2개)")
-        self.console.print("  /net       네트워크 분석 (2개)")
+        # /command 필터 (AREA_REGISTRY에서 생성)
+        self.console.print("[bold yellow]도메인 필터[/bold yellow]")
+        for area in AREA_REGISTRY:
+            cmd = area["command"].ljust(12)
+            self.console.print(f"  [green]{cmd}[/green] {area['label']}, {area['desc']}")
         self.console.print()
 
-        # 탐색
-        self.console.print("[bold]메뉴 탐색[/bold]")
-        self.console.print("  a           전체 도구 목록 (페이지네이션)")
-        self.console.print("  b           카테고리별 탐색")
-        self.console.print("  f           즐겨찾기 관리")
-        self.console.print("  1-5         즐겨찾기 바로 실행")
-        self.console.print("  h           이 도움말")
-        self.console.print("  q           종료")
+        # CLI 직접 실행
+        self.console.print("[bold yellow]CLI 직접 실행[/bold yellow]")
+        self.console.print("  [dim]$[/dim] aa                   대화형 메뉴")
+        self.console.print("  [dim]$[/dim] aa rds                RDS 도구 목록")
+        self.console.print("  [dim]$[/dim] aa ec2 --help         EC2 도움말")
+        self.console.print()
+
+        # 출력
+        self.console.print("[bold yellow]출력 경로[/bold yellow]")
+        self.console.print("  결과 파일: [dim]~/aa-output/<account>/<date>/[/dim]")
         self.console.print()
 
         wait_for_any_key()

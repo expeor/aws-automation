@@ -381,18 +381,3 @@ def validate_tool_metadata(tool: Dict) -> List[str]:
             errors.append(f"{bool_field}는 bool 타입이어야 함: {type(value).__name__}")
 
     return errors
-
-
-def get_tool_constraints(tool: Dict) -> Dict[str, bool]:
-    """도구의 실행 제약 조건 반환
-
-    Args:
-        tool: 도구 메타데이터 딕셔너리
-
-    Returns:
-        {"single_region_only": bool, "single_account_only": bool}
-    """
-    return {
-        "single_region_only": tool.get("single_region_only", False),
-        "single_account_only": tool.get("single_account_only", False),
-    }

@@ -1,4 +1,66 @@
 # core/auth/__init__.py
+from typing import TYPE_CHECKING
+
+# Pylance/타입 체커용 정적 임포트
+if TYPE_CHECKING:
+    from .account import (
+        format_account_identifier,
+        get_account_alias,
+        get_account_display_name,
+        get_account_display_name_from_ctx,
+        get_account_id,
+        get_account_info,
+    )
+    from .auth import Manager, create_manager
+    from .cache import (
+        AccountCache,
+        CacheEntry,
+        CredentialsCache,
+        TokenCache,
+        TokenCacheManager,
+    )
+    from .config import (
+        AWSProfile,
+        AWSSession,
+        Loader,
+        ParsedConfig,
+        detect_provider_type,
+        list_profiles,
+        list_sso_sessions,
+        load_config,
+    )
+    from .provider import (
+        BaseProvider,
+        SSOProfileConfig,
+        SSOProfileProvider,
+        SSOSessionConfig,
+        SSOSessionProvider,
+        StaticCredentialsConfig,
+        StaticCredentialsProvider,
+    )
+    from .session import (
+        SessionIterator,
+        clear_cache,
+        get_context_session,
+        get_current_context_info,
+        get_session,
+        iter_context_sessions,
+        iter_profiles,
+        iter_regions,
+        iter_sessions,
+    )
+    from .types import (
+        AccountInfo,
+        AccountNotFoundError,
+        AuthError,
+        ConfigurationError,
+        NotAuthenticatedError,
+        Provider,
+        ProviderError,
+        ProviderType,
+        TokenExpiredError,
+    )
+
 """
 AWS 통합 인증 모듈 (core/auth)
 

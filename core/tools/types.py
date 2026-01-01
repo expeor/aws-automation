@@ -1,85 +1,85 @@
 """
 core/tools/types.py - 도구 메타데이터 타입 정의
 
-Trusted Advisor 스타일의 영역(Area) 분류 및 도구 타입 정의.
+Area(영역) 분류의 단일 소스.
+UI 레이어(main_menu, category step)는 이 모듈을 import해서 사용.
 """
 
-from enum import Enum
-from typing import List, Optional, TypedDict
+from typing import Dict, List, TypedDict
 
 
-class ToolArea(str, Enum):
-    """도구 영역 분류 (Trusted Advisor 스타일)
+class AreaInfo(TypedDict):
+    """Area 메타데이터"""
 
-    각 도구가 어떤 관점의 검사/분석을 수행하는지 나타냅니다.
-    """
-
-    # 보안 (Security) - 취약점, 노출, 암호화, 접근 제어
-    SECURITY = "security"
-
-    # 비용 최적화 (Cost Optimization) - 미사용 리소스, 비용 절감
-    COST = "cost"
-
-    # 성능 (Performance) - 성능 병목, 최적화 기회
-    PERFORMANCE = "performance"
-
-    # 내결함성/고가용성 (Fault Tolerance) - 복원력, 가용성, 백업
-    FAULT_TOLERANCE = "fault_tolerance"
-
-    # 서비스 할당량 (Service Limits) - 쿼터, 한도 모니터링
-    SERVICE_LIMITS = "service_limits"
-
-    # 운영 우수성 (Operational Excellence) - 베스트 프랙티스, 거버넌스
-    OPERATIONAL = "operational"
-
-    # 인벤토리/정보 수집 (Inventory) - 리소스 목록, 현황 파악
-    INVENTORY = "inventory"
+    key: str  # 내부 키 (security, cost 등)
+    command: str  # CLI 명령어 (/cost, /security)
+    label: str  # 한글 라벨
+    desc: str  # 설명
+    color: str  # Rich 색상
+    icon: str  # 이모지 아이콘
 
 
-# 영역별 아이콘 및 한글명
-AREA_DISPLAY = {
-    ToolArea.SECURITY: {"icon": "🔒", "name": "보안", "color": "red"},
-    ToolArea.COST: {"icon": "💰", "name": "비용 최적화", "color": "green"},
-    ToolArea.PERFORMANCE: {"icon": "⚡", "name": "성능", "color": "yellow"},
-    ToolArea.FAULT_TOLERANCE: {"icon": "🛡️", "name": "내결함성", "color": "blue"},
-    ToolArea.SERVICE_LIMITS: {"icon": "📊", "name": "서비스 한도", "color": "magenta"},
-    ToolArea.OPERATIONAL: {"icon": "📋", "name": "운영 우수성", "color": "cyan"},
-    ToolArea.INVENTORY: {"icon": "📦", "name": "인벤토리", "color": "white"},
+# Area 정의 (단일 소스) - 순서대로 UI에 표시
+AREA_REGISTRY: List[AreaInfo] = [
+    {"key": "cost", "command": "/cost", "label": "비용 절감", "desc": "미사용 리소스 탐지", "color": "yellow", "icon": "💰"},
+    {"key": "security", "command": "/security", "label": "보안", "desc": "취약점, 암호화 점검", "color": "red", "icon": "🔒"},
+    {"key": "operational", "command": "/ops", "label": "운영", "desc": "보고서, 모니터링", "color": "cyan", "icon": "📋"},
+    {"key": "inventory", "command": "/inv", "label": "인벤토리", "desc": "리소스 목록", "color": "white", "icon": "📦"},
+    {"key": "fault_tolerance", "command": "/ft", "label": "가용성", "desc": "백업, Multi-AZ", "color": "blue", "icon": "🛡️"},
+    {"key": "log", "command": "/log", "label": "로그", "desc": "로그 분석", "color": "green", "icon": "📝"},
+    {"key": "network", "command": "/net", "label": "네트워크", "desc": "네트워크 분석", "color": "magenta", "icon": "🌐"},
+    {"key": "performance", "command": "/perf", "label": "성능", "desc": "성능 최적화", "color": "yellow", "icon": "⚡"},
+    {"key": "service_limits", "command": "/limits", "label": "서비스 한도", "desc": "쿼터 모니터링", "color": "magenta", "icon": "📊"},
+]
+
+# /command → internal key 매핑 (자동 생성)
+AREA_COMMANDS: Dict[str, str] = {}
+for _area in AREA_REGISTRY:
+    AREA_COMMANDS[_area["command"]] = _area["key"]
+# 추가 별칭
+AREA_COMMANDS["/sec"] = "security"
+AREA_COMMANDS["/op"] = "operational"
+AREA_COMMANDS["/inventory"] = "inventory"
+AREA_COMMANDS["/network"] = "network"
+
+# 한글 키워드 → internal key 매핑
+AREA_KEYWORDS: Dict[str, str] = {
+    # security
+    "보안": "security",
+    "취약": "security",
+    "암호화": "security",
+    "퍼블릭": "security",
+    # cost
+    "비용": "cost",
+    "미사용": "cost",
+    "절감": "cost",
+    "유휴": "cost",
+    # operational
+    "운영": "operational",
+    "보고서": "operational",
+    "리포트": "operational",
+    "현황": "operational",
+    # inventory
+    "목록": "inventory",
+    "인벤토리": "inventory",
+    "조회": "inventory",
+    # fault_tolerance
+    "가용성": "fault_tolerance",
+    "백업": "fault_tolerance",
+    "복구": "fault_tolerance",
+    # log
+    "로그": "log",
+    # network
+    "네트워크": "network",
+    # performance
+    "성능": "performance",
 }
 
-
-def get_area_display(area: str | ToolArea) -> dict:
-    """영역 표시 정보 반환
-
-    Args:
-        area: 영역 문자열 또는 ToolArea enum
-
-    Returns:
-        {"icon": "🔒", "name": "보안", "color": "red"}
-    """
-    if isinstance(area, str):
-        try:
-            area = ToolArea(area)
-        except ValueError:
-            return {"icon": "❓", "name": area, "color": "white"}
-
-    return AREA_DISPLAY.get(area, {"icon": "❓", "name": str(area), "color": "white"})
-
-
-def format_area_badge(area: str | ToolArea) -> str:
-    """영역 배지 문자열 생성 (Rich 마크업)
-
-    Args:
-        area: 영역 문자열 또는 ToolArea enum
-
-    Returns:
-        "[red]🔒 보안[/red]" 형태의 문자열
-    """
-    display = get_area_display(area)
-    return (
-        f"[{display['color']}]{display['icon']} {display['name']}[/{display['color']}]"
-    )
-
+# 문자열 키 기반 AREA_DISPLAY (category.py 호환)
+AREA_DISPLAY_BY_KEY: Dict[str, Dict[str, str]] = {
+    a["key"]: {"label": a["label"], "color": a["color"], "icon": a["icon"]}
+    for a in AREA_REGISTRY
+}
 
 class ToolMeta(TypedDict, total=False):
     """도구 메타데이터 타입"""
@@ -120,15 +120,3 @@ class CategoryMeta(TypedDict, total=False):
 
     # 컬렉션 전용
     collection: bool  # 컬렉션 여부 (True면 다른 도구 참조)
-
-
-# 영역별 권장 조치 설명
-AREA_RECOMMENDATIONS = {
-    ToolArea.SECURITY: "보안 취약점을 즉시 해결하여 데이터 유출 및 무단 접근을 방지하세요.",
-    ToolArea.COST: "미사용 리소스를 정리하고 적절한 크기로 조정하여 비용을 절감하세요.",
-    ToolArea.PERFORMANCE: "병목 지점을 해소하고 최신 세대로 업그레이드하여 성능을 개선하세요.",
-    ToolArea.FAULT_TOLERANCE: "Multi-AZ 구성 및 백업을 활성화하여 장애 복원력을 확보하세요.",
-    ToolArea.SERVICE_LIMITS: "서비스 한도에 도달하기 전에 미리 증가를 요청하세요.",
-    ToolArea.OPERATIONAL: "AWS 모범 사례를 따라 운영 효율성과 거버넌스를 강화하세요.",
-    ToolArea.INVENTORY: "리소스 현황을 파악하여 관리 및 계획 수립에 활용하세요.",
-}
