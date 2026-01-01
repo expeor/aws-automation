@@ -47,6 +47,7 @@ temp/
 .DS_Store
 Thumbs.db
 Desktop.ini
+nul
 
 # Generated Reports
 *.xlsx

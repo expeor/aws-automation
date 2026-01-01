@@ -349,3 +349,52 @@ def get_aws_category_for_service(service_name: str) -> str:
         AWS 카테고리 키 또는 "other"
     """
     return SERVICE_TO_CATEGORY.get(service_name, "other")
+
+
+def get_aws_category_view() -> List[Dict]:
+    """AWS 카테고리별로 플러그인을 그룹핑하여 반환
+
+    discovery에서 발견된 플러그인을 AWS 공식 카테고리로 그룹핑합니다.
+    플러그인이 있는 카테고리만 반환합니다.
+
+    Returns:
+        [
+            {
+                "key": "compute",
+                "name": "Compute",
+                "name_ko": "컴퓨팅",
+                "icon": "🖥️",
+                "plugins": [<ec2 카테고리>, <lambda 카테고리>, ...],
+                "tool_count": 15
+            },
+            ...
+        ]
+    """
+    from core.tools.discovery import discover_categories
+
+    # 모든 플러그인 가져오기
+    all_plugins = discover_categories(include_aws_services=True)
+
+    # 플러그인 이름으로 빠른 조회용 맵 생성
+    plugin_map = {p.get("name", ""): p for p in all_plugins}
+
+    result = []
+    for cat_key, cat_info in AWS_SERVICE_CATEGORIES.items():
+        services_in_cat = cat_info.get("services", [])
+        matched_plugins = []
+
+        for service_name in services_in_cat:
+            if service_name in plugin_map:
+                matched_plugins.append(plugin_map[service_name])
+
+        # 플러그인이 있는 카테고리만 추가
+        if matched_plugins:
+            result.append({
+                "key": cat_key,
+                "name": cat_info["name"],
+                "name_ko": cat_info["name_ko"],
+                "plugins": matched_plugins,
+                "tool_count": sum(len(p.get("tools", [])) for p in matched_plugins),
+            })
+
+    return result

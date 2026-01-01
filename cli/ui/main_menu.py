@@ -28,6 +28,7 @@ SHORTCUTS = {
     "?": "help",
     "a": "all_tools",
     "b": "browse",
+    "c": "aws_category",
     "f": "favorites",
     "p": "profiles",
     "0": "exit",
@@ -143,12 +144,12 @@ class MainMenu:
 
         cmd_table.add_row(
             "[dim]a[/dim]", "전체 도구",
-            "[dim]b[/dim]", "카테고리",
-            "[dim]f[/dim]", "즐겨찾기",
+            "[dim]b[/dim]", "서비스별",
+            "[dim]c[/dim]", "카테고리",
         )
         cmd_table.add_row(
+            "[dim]f[/dim]", "즐겨찾기",
             "[dim]p[/dim]", "프로필",
-            "[dim]h[/dim]", "도움말",
             "[dim]q[/dim]", "종료",
         )
 
@@ -233,11 +234,16 @@ class MainMenu:
             return True
 
         if action == "browse":
-            # 카테고리 탐색 (FlowRunner로 위임)
+            # 서비스별 탐색 (FlowRunner로 위임)
             from cli.flow import create_flow_runner
 
             runner = create_flow_runner()
             runner.run()
+            return True
+
+        if action == "aws_category":
+            # AWS 카테고리별 탐색
+            self._show_aws_category_view()
             return True
 
         if action == "favorite_select":
@@ -629,7 +635,8 @@ class MainMenu:
         # 메뉴 탐색
         self.console.print("[bold yellow]메뉴 명령어[/bold yellow]")
         self.console.print("  [cyan]a[/cyan]  전체 도구      모든 도구를 한 화면에 표시")
-        self.console.print("  [cyan]b[/cyan]  카테고리       AWS 서비스별 카테고리 메뉴")
+        self.console.print("  [cyan]b[/cyan]  서비스별       AWS 서비스별 목록 (EC2, RDS...)")
+        self.console.print("  [cyan]c[/cyan]  카테고리       AWS 카테고리별 탐색 (Compute, Storage...)")
         self.console.print("  [cyan]f[/cyan]  즐겨찾기       자주 사용하는 도구 추가/제거")
         self.console.print("  [cyan]p[/cyan]  프로필         AWS 프로필 전환 (SSO/Access Key)")
         self.console.print("  [cyan]h[/cyan]  도움말         이 화면 표시")
@@ -908,6 +915,182 @@ class MainMenu:
 
         cache_dir = get_cache_dir("history")
         self.console.print(f"[dim]이력: {cache_dir}[/dim]")
+
+    def _show_aws_category_view(self) -> None:
+        """AWS 카테고리별 탐색 뷰"""
+        from rich.table import Table
+
+        from core.tools.aws_categories import get_aws_category_view
+
+        aws_categories = get_aws_category_view()
+
+        if not aws_categories:
+            self.console.print()
+            self.console.print("[yellow]AWS 카테고리에 매핑된 플러그인이 없습니다.[/]")
+            wait_for_any_key()
+            return
+
+        while True:
+            self.console.print()
+            table = Table(
+                title="[bold]AWS 카테고리[/bold]",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column("카테고리", width=30)
+            table.add_column("서비스", width=6, justify="right")
+            table.add_column("도구", width=6, justify="right")
+
+            for i, cat in enumerate(aws_categories, 1):
+                table.add_row(
+                    str(i),
+                    f"{cat['name']} ({cat['name_ko']})",
+                    str(len(cat["plugins"])),
+                    str(cat["tool_count"]),
+                )
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print("[dim]0: 돌아가기[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(aws_categories):
+                    selected_cat = aws_categories[idx - 1]
+                    self._show_services_in_category(selected_cat)
+                else:
+                    self.console.print(f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]")
+
+    def _show_services_in_category(self, aws_category: Dict) -> None:
+        """AWS 카테고리 내 서비스(플러그인) 목록 표시"""
+        from rich.table import Table
+
+        plugins = aws_category.get("plugins", [])
+
+        if not plugins:
+            self.console.print("[yellow]이 카테고리에 서비스가 없습니다.[/]")
+            wait_for_any_key()
+            return
+
+        while True:
+            self.console.print()
+            table = Table(
+                title=f"[bold]{aws_category['name']}[/bold] ({aws_category['name_ko']})",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column("서비스", width=20)
+            table.add_column("도구", width=6, justify="right")
+            table.add_column("설명", style="dim")
+
+            for i, plugin in enumerate(plugins, 1):
+                display_name = plugin.get("display_name", plugin.get("name", ""))
+                tool_count = len(plugin.get("tools", []))
+                desc = plugin.get("description", "")[:40]
+                table.add_row(str(i), display_name.upper(), str(tool_count), desc)
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print("[dim]0: 돌아가기[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(plugins):
+                    selected_plugin = plugins[idx - 1]
+                    self._show_tools_in_service(selected_plugin)
+                else:
+                    self.console.print(f"[red]1-{len(plugins)} 범위의 번호를 입력하세요.[/]")
+
+    def _show_tools_in_service(self, plugin: Dict) -> None:
+        """서비스 내 도구 목록 표시 및 선택"""
+        from rich.table import Table
+
+        from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
+
+        tools = plugin.get("tools", [])
+        category_name = plugin.get("name", "")
+
+        if not tools:
+            self.console.print("[yellow]이 서비스에 도구가 없습니다.[/]")
+            wait_for_any_key()
+            return
+
+        while True:
+            self.console.print()
+            display_name = plugin.get("display_name", category_name).upper()
+            table = Table(
+                title=f"[bold]{display_name}[/bold] ({len(tools)}개)",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column("도구", width=25)
+            table.add_column("권한", width=6)
+            table.add_column("영역", width=10)
+            table.add_column("설명", style="dim")
+
+            for i, tool in enumerate(tools, 1):
+                perm = tool.get("permission", "read")
+                perm_color = PERMISSION_COLORS.get(perm, "green")
+                area = tool.get("area", "")
+                area_info = AREA_DISPLAY.get(area, {"label": area, "color": "dim"})
+
+                table.add_row(
+                    str(i),
+                    tool.get("name", ""),
+                    f"[{perm_color}]{perm}[/{perm_color}]",
+                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
+                    (tool.get("description", "") or "")[:35],
+                )
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print("[dim]0: 돌아가기[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(tools):
+                    selected_tool = tools[idx - 1]
+                    tool_module = selected_tool.get("module", "")
+                    self._run_tool_directly(category_name, tool_module)
+                    return
+                else:
+                    self.console.print(f"[red]1-{len(tools)} 범위의 번호를 입력하세요.[/]")
 
 
 def show_main_menu() -> None:
