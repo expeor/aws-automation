@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual Environment
+.venv/
+venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+.claude/
+*.swp
+*~
+
+# Testing
+.coverage
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+
+# AWS & Secrets
+.aws/
+*.pem
+*.key
+secrets.json
+.secrets/
+
+# Application Output
+/output/
+*.log
+*.duckdb
+
+# Cache
+.cache/
+.tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Generated Reports
+*.xlsx
+*.gz
+*.zip

@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aws-automation"
+dynamic = ["version", "readme", "dependencies"]
+description = "AWS 운영 자동화 CLI 도구"
+license = "MIT"
+authors = [{name = "Euncheol Hong", email = "where906@gmail.com"}]
+keywords = ["aws", "automation", "cli", "devops", "cloud"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/expeor/aws-automation"
+Issues = "https://github.com/expeor/aws-automation/issues"
+
+[project.scripts]
+aa = "cli.app:cli"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "moto>=5.0.0",
+    "black>=24.0.0",
+    "flake8>=7.0.0",
+    "mypy>=1.10.0",
+]
+
+[tool.setuptools]
+packages = {find = {exclude = ["tests*", "scripts*", "output*"]}}
+
+[tool.setuptools.dynamic]
+version = {file = "version.txt"}
+readme = {file = "README.md", content-type = "text/markdown"}
+dependencies = {file = "requirements.txt"}
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--tb=short", "-q"]
