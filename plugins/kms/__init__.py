@@ -6,6 +6,7 @@ KMS 키 관리 및 미사용 키 탐지
 
 CATEGORY = {
     "name": "kms",
+    "display_name": "KMS",
     "description": "KMS 키 관리",
     "aliases": ["key", "cmk"],
 }

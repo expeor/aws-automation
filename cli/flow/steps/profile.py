@@ -71,17 +71,27 @@ class ProfileStep:
         # 타입별로 그룹핑
         profiles_by_type = self._group_by_type(profiles)
 
-        # 사용 가능한 타입이 1개면 타입 선택 생략
+        # 사용 가능한 타입이 1개면 타입 선택 생략 (그룹이 없을 때만)
+        from core.tools.history import ProfileGroupsManager
+
+        group_manager = ProfileGroupsManager()
+        saved_groups = group_manager.get_all()
+
         available_types = [k for k, v in profiles_by_type.items() if v]
-        if len(available_types) == 1:
+        if len(available_types) == 1 and not saved_groups:
             selected_type = available_types[0]
             type_info = AUTH_TYPE_INFO.get(selected_type, {})
             name = type_info.get("name", selected_type)
             console.print()
             console.print(f"[dim]인증:[/dim] {name}")
         else:
-            # 1단계: 인증 타입 선택
+            # 1단계: 인증 타입 선택 (또는 그룹 선택)
             selected_type = self._select_auth_type(profiles_by_type)
+
+        # 그룹 선택인 경우
+        if isinstance(selected_type, str) and selected_type.startswith("group:"):
+            group_name = selected_type[6:]  # "group:" 제거
+            return self._handle_group_selection(ctx, group_name, profiles)
 
         # 2단계: 프로파일 선택
         type_profiles = profiles_by_type[selected_type]
@@ -108,9 +118,20 @@ class ProfileStep:
 
     def _select_auth_type(
         self, profiles_by_type: Dict[ProviderKind, List[dict]]
-    ) -> ProviderKind:
-        """인증 타입 선택 (1단계)"""
+    ) -> ProviderKind | str:
+        """인증 타입 선택 (1단계)
+
+        Returns:
+            ProviderKind: 선택된 인증 타입
+            str: 프로파일 그룹 이름 (그룹 선택 시 "group:그룹명" 형태)
+        """
         from cli.ui.console import print_box_end, print_box_line, print_box_start
+
+        from core.tools.history import ProfileGroupsManager
+
+        # 저장된 프로파일 그룹 확인
+        group_manager = ProfileGroupsManager()
+        saved_groups = group_manager.get_all()
 
         # 표시 순서 (AUTH_TYPE_INFO 키 순서)
         type_order = list(AUTH_TYPE_INFO.keys())
@@ -123,15 +144,28 @@ class ProfileStep:
 
         print_box_start("인증 방식 선택")
 
+        menu_idx = 1
+
+        # 저장된 그룹이 있으면 맨 위에 표시
+        if saved_groups:
+            print_box_line(
+                f" {menu_idx}) [cyan]★ 저장된 프로파일 그룹[/cyan] [dim]({len(saved_groups)}개)[/dim]"
+            )
+            menu_idx += 1
+            print_box_line(" ────────────────────────")
+
         # 선택지 표시
-        for idx, (kind, type_profiles) in enumerate(available_types, 1):
+        for kind, type_profiles in available_types:
             info = AUTH_TYPE_INFO[kind]
             count = len(type_profiles)
             print_box_line(
-                f" {idx}) {info['name']}{info['badge']} [dim]({count}개)[/dim]"
+                f" {menu_idx}) {info['name']}{info['badge']} [dim]({count}개)[/dim]"
             )
+            menu_idx += 1
 
         print_box_end()
+
+        total_options = (1 if saved_groups else 0) + len(available_types)
 
         # 번호 입력
         while True:
@@ -142,12 +176,63 @@ class ProfileStep:
 
             try:
                 idx = int(choice)
-                if 1 <= idx <= len(available_types):
-                    selected_kind, _ = available_types[idx - 1]
-                    info = AUTH_TYPE_INFO[selected_kind]
-                    console.print(f"[dim]인증:[/dim] {info['name']}")
-                    return selected_kind
-                console.print(f"[dim]1-{len(available_types)} 범위[/dim]")
+                if not 1 <= idx <= total_options:
+                    console.print(f"[dim]1-{total_options} 범위[/dim]")
+                    continue
+
+                # 그룹 선택
+                if saved_groups and idx == 1:
+                    selected_group = self._select_profile_group(saved_groups)
+                    if selected_group:
+                        return f"group:{selected_group.name}"
+                    # 그룹 선택 취소 시 다시 표시
+                    return self._select_auth_type(profiles_by_type)
+
+                # 인증 타입 선택
+                type_idx = idx - (1 if saved_groups else 0) - 1
+                selected_kind, _ = available_types[type_idx]
+                info = AUTH_TYPE_INFO[selected_kind]
+                console.print(f"[dim]인증:[/dim] {info['name']}")
+                return selected_kind
+
+            except ValueError:
+                console.print("[dim]숫자 입력[/dim]")
+
+    def _select_profile_group(self, groups):
+        """프로파일 그룹 선택"""
+        from cli.ui.console import print_box_end, print_box_line, print_box_start
+
+        kind_labels = {"sso_profile": "SSO", "static": "Key"}
+
+        print_box_start("프로파일 그룹 선택")
+
+        for idx, g in enumerate(groups, 1):
+            kind_label = kind_labels.get(g.kind, g.kind)
+            profiles_preview = ", ".join(g.profiles[:2])
+            if len(g.profiles) > 2:
+                profiles_preview += f" 외 {len(g.profiles) - 2}개"
+            print_box_line(f" {idx}) [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]")
+
+        print_box_line("")
+        print_box_line(" [dim]0) 뒤로[/dim]")
+        print_box_end()
+
+        while True:
+            choice = console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0":
+                return None
+
+            try:
+                idx = int(choice)
+                if 1 <= idx <= len(groups):
+                    selected = groups[idx - 1]
+                    console.print(f"[dim]그룹:[/dim] {selected.name}")
+                    return selected
+                console.print(f"[dim]0-{len(groups)} 범위[/dim]")
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
@@ -176,7 +261,10 @@ class ProfileStep:
         name = info.get("name", "프로파일")
 
         # STATIC_CREDENTIALS, SSO_PROFILE은 다중 선택 옵션 제공
-        supports_multi = kind in (ProviderKind.STATIC_CREDENTIALS, ProviderKind.SSO_PROFILE)
+        supports_multi = kind in (
+            ProviderKind.STATIC_CREDENTIALS,
+            ProviderKind.SSO_PROFILE,
+        )
         if supports_multi and len(sorted_profiles) > 1:
             console.print()
             console.print("[dim]1) 단일 선택  2) 다중 선택[/dim]")
@@ -524,6 +612,47 @@ class ProfileStep:
         ctx.profile_name = selected["name"]
         ctx.profiles = [selected["name"]]
         return ctx
+
+    def _handle_group_selection(
+        self, ctx: ExecutionContext, group_name: str, all_profiles: list
+    ) -> ExecutionContext:
+        """프로파일 그룹 선택 처리
+
+        그룹에 저장된 프로파일 이름으로 실제 프로파일 정보를 찾아서
+        멀티 프로파일 플로우로 진입합니다.
+        """
+        from core.tools.history import ProfileGroupsManager
+
+        manager = ProfileGroupsManager()
+        group = manager.get_by_name(group_name)
+
+        if not group:
+            console.print(f"[red]그룹을 찾을 수 없습니다: {group_name}[/red]")
+            raise RuntimeError("그룹 없음")
+
+        # 그룹에 저장된 프로파일 이름으로 실제 프로파일 정보 찾기
+        profile_names = set(group.profiles)
+        matched_profiles = []
+
+        for p in all_profiles:
+            if p["name"] in profile_names:
+                matched_profiles.append(p)
+
+        if not matched_profiles:
+            console.print(f"[red]그룹 '{group_name}'의 프로파일을 찾을 수 없습니다.[/red]")
+            console.print("[dim]프로파일이 삭제되었거나 이름이 변경되었을 수 있습니다.[/dim]")
+            raise RuntimeError("프로파일 없음")
+
+        # 찾지 못한 프로파일 경고
+        found_names = {p["name"] for p in matched_profiles}
+        missing = profile_names - found_names
+        if missing:
+            console.print(f"[yellow]일부 프로파일을 찾을 수 없음: {', '.join(missing)}[/yellow]")
+
+        console.print(f"[dim]그룹 '{group_name}': {len(matched_profiles)}개 프로파일[/dim]")
+
+        # 멀티 프로파일 플로우로 진입
+        return self._handle_multi_profile_flow(ctx, matched_profiles)
 
     def _handle_multi_profile_flow(
         self, ctx: ExecutionContext, selected_profiles: List[dict]

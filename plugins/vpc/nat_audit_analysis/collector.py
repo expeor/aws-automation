@@ -9,10 +9,12 @@ NAT Gateway 데이터 수집기
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from botocore.exceptions import ClientError
+
+from core.parallel import ErrorSeverity, get_client, try_or_default
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ class NATGateway:
 
     # CloudWatch 메트릭 (14일간)
     bytes_out_total: float = 0.0  # BytesOutToDestination 합계
-    bytes_in_total: float = 0.0   # BytesInFromSource 합계
+    bytes_in_total: float = 0.0  # BytesInFromSource 합계
     packets_out_total: float = 0.0
     packets_in_total: float = 0.0
     active_connection_count: float = 0.0
@@ -106,8 +108,8 @@ class NATCollector:
         )
 
         try:
-            ec2 = session.client("ec2", region_name=region)
-            cloudwatch = session.client("cloudwatch", region_name=region)
+            ec2 = get_client(session, "ec2", region_name=region)
+            cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
             # 1. NAT Gateway 목록 수집
             nat_gateways = self._collect_nat_gateways(
@@ -170,7 +172,9 @@ class NATCollector:
                     create_time = nat_data.get("CreateTime")
                     if create_time:
                         nat.create_time = create_time
-                        nat.age_days = (now - create_time.replace(tzinfo=timezone.utc)).days
+                        nat.age_days = (
+                            now - create_time.replace(tzinfo=timezone.utc)
+                        ).days
 
                     # IP 주소
                     addresses = nat_data.get("NatGatewayAddresses", [])
@@ -211,9 +215,7 @@ class NATCollector:
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(days=self.METRIC_PERIOD_DAYS)
 
-        dimensions = [
-            {"Name": "NatGatewayId", "Value": nat.nat_gateway_id}
-        ]
+        dimensions = [{"Name": "NatGatewayId", "Value": nat.nat_gateway_id}]
 
         # 메트릭 목록
         metrics_to_fetch = [
@@ -248,7 +250,9 @@ class NATCollector:
                         # 날짜순 정렬
                         sorted_points = sorted(datapoints, key=lambda x: x["Timestamp"])
                         nat.daily_bytes_out = [dp.get("Sum", 0) for dp in sorted_points]
-                        nat.days_with_traffic = sum(1 for dp in datapoints if dp.get("Sum", 0) > 0)
+                        nat.days_with_traffic = sum(
+                            1 for dp in datapoints if dp.get("Sum", 0) > 0
+                        )
 
             except ClientError as e:
                 logger.debug(f"메트릭 조회 실패 [{nat.nat_gateway_id}/{metric_name}]: {e}")
@@ -258,16 +262,18 @@ class NATCollector:
 
     def _calculate_costs(self, nat: NATGateway) -> None:
         """비용 계산"""
-        from plugins.cost.pricing import get_nat_monthly_fixed_cost, get_nat_data_price
+        from plugins.cost.pricing import get_nat_data_price, get_nat_monthly_fixed_cost
 
         # 월간 고정 비용
         nat.monthly_fixed_cost = get_nat_monthly_fixed_cost(nat.region)
 
         # 데이터 처리 비용 (14일 데이터를 월간으로 환산)
         if nat.bytes_out_total > 0:
-            daily_avg_gb = (nat.bytes_out_total / (1024 ** 3)) / self.METRIC_PERIOD_DAYS
+            daily_avg_gb = (nat.bytes_out_total / (1024**3)) / self.METRIC_PERIOD_DAYS
             monthly_gb = daily_avg_gb * 30
             data_price = get_nat_data_price(nat.region)
             nat.monthly_data_cost = round(monthly_gb * data_price, 2)
 
-        nat.total_monthly_cost = round(nat.monthly_fixed_cost + nat.monthly_data_cost, 2)
+        nat.total_monthly_cost = round(
+            nat.monthly_fixed_cost + nat.monthly_data_cost, 2
+        )

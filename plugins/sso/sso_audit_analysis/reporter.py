@@ -8,51 +8,120 @@ SSO Excel Reporter - IAM Identity Center 감사 보고서 생성
 4. Groups: 그룹 목록 및 할당 현황
 5. Admin Summary: 계정별 Admin 권한 현황
 6. Issues: 전체 이슈 목록
+
+Note:
+    이 모듈은 Lazy Import 패턴을 사용합니다.
+    openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+if TYPE_CHECKING:
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill
 
-from .analyzer import SSOAnalysisResult, Severity
+from .analyzer import Severity, SSOAnalysisResult
 
 
 class SSOExcelReporter:
     """SSO Excel 보고서 생성기"""
 
-    # 스타일 정의
-    HEADER_FILL = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
-    THIN_BORDER = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-    CENTER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    LEFT_ALIGN = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    # 스타일 캐시 (lazy initialization)
+    _styles_initialized: bool = False
+    _HEADER_FILL: Optional["PatternFill"] = None
+    _HEADER_FONT: Optional["Font"] = None
+    _THIN_BORDER: Optional["Border"] = None
+    _CENTER_ALIGN: Optional["Alignment"] = None
+    _LEFT_ALIGN: Optional["Alignment"] = None
+    _SEVERITY_FILLS: Optional[Dict[Severity, "PatternFill"]] = None
 
-    # Severity 색상
-    SEVERITY_FILLS = {
-        Severity.CRITICAL: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
-        Severity.HIGH: PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid"),
-        Severity.MEDIUM: PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid"),
-        Severity.LOW: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
-        Severity.INFO: PatternFill(start_color="87CEEB", end_color="87CEEB", fill_type="solid"),
-    }
+    @classmethod
+    def _init_styles(cls) -> None:
+        """스타일 lazy 초기화"""
+        if cls._styles_initialized:
+            return
+
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+        cls._HEADER_FILL = PatternFill(
+            start_color="4472C4", end_color="4472C4", fill_type="solid"
+        )
+        cls._HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
+        cls._THIN_BORDER = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+        cls._CENTER_ALIGN = Alignment(
+            horizontal="center", vertical="center", wrap_text=True
+        )
+        cls._LEFT_ALIGN = Alignment(
+            horizontal="left", vertical="center", wrap_text=True
+        )
+        cls._SEVERITY_FILLS = {
+            Severity.CRITICAL: PatternFill(
+                start_color="FF0000", end_color="FF0000", fill_type="solid"
+            ),
+            Severity.HIGH: PatternFill(
+                start_color="FFA500", end_color="FFA500", fill_type="solid"
+            ),
+            Severity.MEDIUM: PatternFill(
+                start_color="FFFF00", end_color="FFFF00", fill_type="solid"
+            ),
+            Severity.LOW: PatternFill(
+                start_color="90EE90", end_color="90EE90", fill_type="solid"
+            ),
+            Severity.INFO: PatternFill(
+                start_color="87CEEB", end_color="87CEEB", fill_type="solid"
+            ),
+        }
+        cls._styles_initialized = True
+
+    @property
+    def HEADER_FILL(self) -> "PatternFill":
+        self._init_styles()
+        return self._HEADER_FILL  # type: ignore
+
+    @property
+    def HEADER_FONT(self) -> "Font":
+        self._init_styles()
+        return self._HEADER_FONT  # type: ignore
+
+    @property
+    def THIN_BORDER(self) -> "Border":
+        self._init_styles()
+        return self._THIN_BORDER  # type: ignore
+
+    @property
+    def CENTER_ALIGN(self) -> "Alignment":
+        self._init_styles()
+        return self._CENTER_ALIGN  # type: ignore
+
+    @property
+    def LEFT_ALIGN(self) -> "Alignment":
+        self._init_styles()
+        return self._LEFT_ALIGN  # type: ignore
+
+    @property
+    def SEVERITY_FILLS(self) -> Dict[Severity, "PatternFill"]:
+        self._init_styles()
+        return self._SEVERITY_FILLS  # type: ignore
 
     def __init__(
         self,
         results: List[SSOAnalysisResult],
         stats_list: List[Dict[str, Any]],
     ):
+        from openpyxl import Workbook as _Workbook
+
+        self._init_styles()
         self.results = results
         self.stats_list = stats_list
-        self.wb = Workbook()
+        self.wb = _Workbook()
 
     def generate(self, output_dir: str) -> str:
         """Excel 보고서 생성"""
@@ -87,8 +156,12 @@ class SSOExcelReporter:
 
     def _auto_column_width(self, ws, min_width: int = 10, max_width: int = 50) -> None:
         """열 너비 자동 조정"""
+        from openpyxl.utils import get_column_letter
+
         for column_cells in ws.columns:
-            length = max(len(str(cell.value) if cell.value else "") for cell in column_cells)
+            length = max(
+                len(str(cell.value) if cell.value else "") for cell in column_cells
+            )
             adjusted_width = min(max(length + 2, min_width), max_width)
             column_letter = get_column_letter(column_cells[0].column)
             ws.column_dimensions[column_letter].width = adjusted_width
@@ -109,13 +182,25 @@ class SSOExcelReporter:
         totals = {
             "total_users": sum(s.get("total_users", 0) for s in self.stats_list),
             "total_groups": sum(s.get("total_groups", 0) for s in self.stats_list),
-            "total_permission_sets": sum(s.get("total_permission_sets", 0) for s in self.stats_list),
-            "users_with_admin": sum(s.get("users_with_admin", 0) for s in self.stats_list),
-            "users_no_assignment": sum(s.get("users_no_assignment", 0) for s in self.stats_list),
-            "admin_permission_sets": sum(s.get("admin_permission_sets", 0) for s in self.stats_list),
-            "high_risk_permission_sets": sum(s.get("high_risk_permission_sets", 0) for s in self.stats_list),
+            "total_permission_sets": sum(
+                s.get("total_permission_sets", 0) for s in self.stats_list
+            ),
+            "users_with_admin": sum(
+                s.get("users_with_admin", 0) for s in self.stats_list
+            ),
+            "users_no_assignment": sum(
+                s.get("users_no_assignment", 0) for s in self.stats_list
+            ),
+            "admin_permission_sets": sum(
+                s.get("admin_permission_sets", 0) for s in self.stats_list
+            ),
+            "high_risk_permission_sets": sum(
+                s.get("high_risk_permission_sets", 0) for s in self.stats_list
+            ),
             "empty_groups": sum(s.get("empty_groups", 0) for s in self.stats_list),
-            "critical_issues": sum(s.get("critical_issues", 0) for s in self.stats_list),
+            "critical_issues": sum(
+                s.get("critical_issues", 0) for s in self.stats_list
+            ),
             "high_issues": sum(s.get("high_issues", 0) for s in self.stats_list),
             "medium_issues": sum(s.get("medium_issues", 0) for s in self.stats_list),
             "low_issues": sum(s.get("low_issues", 0) for s in self.stats_list),
@@ -126,12 +211,28 @@ class SSOExcelReporter:
             ("항목", "값", "설명"),
             ("전체 사용자", totals["total_users"], "Identity Center에 등록된 총 사용자 수"),
             ("전체 그룹", totals["total_groups"], "Identity Center에 등록된 총 그룹 수"),
-            ("전체 Permission Sets", totals["total_permission_sets"], "정의된 Permission Set 수"),
+            (
+                "전체 Permission Sets",
+                totals["total_permission_sets"],
+                "정의된 Permission Set 수",
+            ),
             ("", "", ""),
-            ("Admin 권한 사용자", totals["users_with_admin"], "Admin Permission Set이 할당된 사용자"),
+            (
+                "Admin 권한 사용자",
+                totals["users_with_admin"],
+                "Admin Permission Set이 할당된 사용자",
+            ),
             ("미할당 사용자", totals["users_no_assignment"], "어떤 계정에도 권한이 없는 사용자"),
-            ("Admin Permission Sets", totals["admin_permission_sets"], "관리자 권한을 가진 Permission Set"),
-            ("위험 Permission Sets", totals["high_risk_permission_sets"], "위험 관리형 정책이 연결된 PS"),
+            (
+                "Admin Permission Sets",
+                totals["admin_permission_sets"],
+                "관리자 권한을 가진 Permission Set",
+            ),
+            (
+                "위험 Permission Sets",
+                totals["high_risk_permission_sets"],
+                "위험 관리형 정책이 연결된 PS",
+            ),
             ("빈 그룹", totals["empty_groups"], "멤버가 없는 그룹"),
             ("", "", ""),
             ("CRITICAL 이슈", totals["critical_issues"], "즉시 조치 필요"),
@@ -242,9 +343,9 @@ class SSOExcelReporter:
                 user = user_analysis.user
 
                 # 할당된 계정 목록
-                assigned_accounts = list(set(
-                    a.get("account_name", "") for a in user.assignments
-                ))
+                assigned_accounts = list(
+                    set(a.get("account_name", "") for a in user.assignments)
+                )
 
                 row = [
                     user.display_name or user.user_name,
@@ -297,9 +398,9 @@ class SSOExcelReporter:
                 group = group_analysis.group
 
                 # 할당된 계정 목록
-                assigned_accounts = list(set(
-                    a.get("account_name", "") for a in group.assignments
-                ))
+                assigned_accounts = list(
+                    set(a.get("account_name", "") for a in group.assignments)
+                )
 
                 row = [
                     group.group_name,
@@ -385,7 +486,9 @@ class SSOExcelReporter:
         for result in self.results:
             all_issues.extend(result.all_issues)
 
-        sorted_issues = sorted(all_issues, key=lambda x: severity_order.get(x.severity, 5))
+        sorted_issues = sorted(
+            all_issues, key=lambda x: severity_order.get(x.severity, 5)
+        )
 
         for issue in sorted_issues:
             row = [

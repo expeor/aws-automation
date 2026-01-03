@@ -28,17 +28,18 @@ def get_version() -> str:
     return "0.0.1"
 
 
-# 컴팩트한 배너 (AWS 오렌지 그라디언트)
+# 컴팩트한 배너 (ANSI Regular 스타일, AWS 오렌지 그라디언트)
 COMPACT_LOGO = """
-[bold #FF9900]█████   █████[/]   [bold white]AWS Automation CLI[/] [dim]v{version}[/]
-[bold #FF9900]██   ██ ██   ██[/]  {context}
+[bold #FF9900] █████   █████[/]    [bold white]AWS Automation CLI[/] [dim]v{version}[/]
+[bold #FF9900]██   ██ ██   ██[/]   {context}
 [bold #CC7700]███████ ███████[/]
-[bold #CC7700]██   ██ ██   ██[/]  [dim]{hint}[/]
+[bold #CC7700]██   ██ ██   ██[/]   [dim]{hint}[/]
+[bold #995500]██   ██ ██   ██[/]
 """
 
-# 풀 배너 (메인 메뉴용)
+# 풀 배너 (메인 메뉴용, ANSI Regular 스타일)
 FULL_LOGO = """
-[bold #FF9900]█████   █████[/]
+[bold #FF9900] █████   █████[/]
 [bold #FF9900]██   ██ ██   ██[/]   [bold white]AWS Automation CLI[/]
 [bold #CC7700]███████ ███████[/]   [dim]v{version}[/]
 [bold #CC7700]██   ██ ██   ██[/]

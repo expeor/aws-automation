@@ -9,16 +9,16 @@ Private 모드: AWS ENI 기반 사설 IP 검색
 """
 
 import csv
+import os
 from datetime import datetime
 from enum import Enum
 from typing import List
 
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
 
-from core.auth import SessionIterator
+from core.parallel import parallel_collect
 from core.tools.output.builder import OutputPath
 
 console = Console()
@@ -31,29 +31,15 @@ console = Console()
 
 class SearchMode(Enum):
     """검색 모드"""
-    PRIVATE_BASIC = "private_basic"      # 사설 IP 기본 검색
+
+    PRIVATE_BASIC = "private_basic"  # 사설 IP 기본 검색
     PRIVATE_DETAILED = "private_detailed"  # 사설 IP 상세 검색
-    PUBLIC = "public"                     # 공인 IP 범위 검색
+    PUBLIC = "public"  # 공인 IP 범위 검색
 
 
 # =============================================================================
 # UI 함수
 # =============================================================================
-
-
-ASCII_LOGO = r"""
- ██╗██████╗     ███████╗███████╗ █████╗ ██████╗  ██████╗██╗  ██╗
- ██║██╔══██╗    ██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝██║  ██║
- ██║██████╔╝    ███████╗█████╗  ███████║██████╔╝██║     ███████║
- ██║██╔═══╝     ╚════██║██╔══╝  ██╔══██║██╔══██╗██║     ██╔══██║
- ██║██║         ███████║███████╗██║  ██║██║  ██║╚██████╗██║  ██║
- ╚═╝╚═╝         ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-"""
-
-
-def show_logo():
-    """로고 표시"""
-    console.print(Panel(ASCII_LOGO, style="cyan", border_style="blue"))
 
 
 def select_mode() -> SearchMode:
@@ -73,7 +59,9 @@ def select_mode() -> SearchMode:
     return mode_map[choice]
 
 
-def get_ip_input(save_csv: bool, mode: SearchMode, cache=None) -> tuple[List[str], bool, str]:
+def get_ip_input(
+    save_csv: bool, mode: SearchMode, cache=None
+) -> tuple[List[str], bool, str]:
     """
     IP 입력 받기
 
@@ -116,12 +104,7 @@ _current_session_name = "default"
 
 def _get_output_dir() -> str:
     """출력 디렉토리 경로: output/{session_name}/ip_search/{date}/"""
-    return (
-        OutputPath(_current_session_name)
-        .sub("ip_search")
-        .with_date("daily")
-        .build()
-    )
+    return OutputPath(_current_session_name).sub("ip_search").with_date("daily").build()
 
 
 def save_public_results_csv(results) -> str:
@@ -139,14 +122,16 @@ def save_public_results_csv(results) -> str:
 
         for r in results:
             extra = ", ".join(f"{k}={v}" for k, v in r.extra.items()) if r.extra else ""
-            writer.writerow([
-                r.ip_address,
-                r.provider,
-                r.service,
-                r.ip_prefix,
-                r.region,
-                extra,
-            ])
+            writer.writerow(
+                [
+                    r.ip_address,
+                    r.provider,
+                    r.service,
+                    r.ip_prefix,
+                    r.region,
+                    extra,
+                ]
+            )
 
     return filepath
 
@@ -162,32 +147,50 @@ def save_private_results_csv(results) -> str:
 
     with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "IP 주소", "계정 ID", "계정명", "리전", "ENI ID", "VPC ID", "Subnet ID",
-            "Private IP", "Public IP", "인터페이스 타입", "상태", "설명",
-            "Security Groups", "이름", "관리형", "관리자", "리소스"
-        ])
+        writer.writerow(
+            [
+                "IP 주소",
+                "계정 ID",
+                "계정명",
+                "리전",
+                "ENI ID",
+                "VPC ID",
+                "Subnet ID",
+                "Private IP",
+                "Public IP",
+                "인터페이스 타입",
+                "상태",
+                "설명",
+                "Security Groups",
+                "이름",
+                "관리형",
+                "관리자",
+                "리소스",
+            ]
+        )
 
         for r in results:
-            writer.writerow([
-                r.ip_address,
-                r.account_id,
-                r.account_name,
-                r.region,
-                r.eni_id,
-                r.vpc_id,
-                r.subnet_id,
-                r.private_ip,
-                r.public_ip,
-                r.interface_type,
-                r.status,
-                r.description,
-                ", ".join(r.security_groups),
-                r.name,
-                "Yes" if r.is_managed else "No",
-                r.managed_by,
-                r.mapped_resource,
-            ])
+            writer.writerow(
+                [
+                    r.ip_address,
+                    r.account_id,
+                    r.account_name,
+                    r.region,
+                    r.eni_id,
+                    r.vpc_id,
+                    r.subnet_id,
+                    r.private_ip,
+                    r.public_ip,
+                    r.interface_type,
+                    r.status,
+                    r.description,
+                    ", ".join(r.security_groups),
+                    r.name,
+                    "Yes" if r.is_managed else "No",
+                    r.managed_by,
+                    r.mapped_resource,
+                ]
+            )
 
     return filepath
 
@@ -306,9 +309,22 @@ def run_public_search(ip_list: List[str], save_csv: bool = False):
     return results
 
 
+def _collect_enis(session, account_id: str, account_name: str, region: str) -> List:
+    """단일 계정/리전의 ENI 수집 (병렬 실행용)"""
+    from plugins.vpc.ip_search_private import fetch_enis_from_account
+
+    interfaces = fetch_enis_from_account(
+        session=session,
+        account_id=account_id,
+        account_name=account_name,
+        regions=[region],
+    )
+    return interfaces if interfaces else []
+
+
 def _prepare_private_cache(ctx, session_name: str, force_refresh: bool = False):
     """Private 모드용 ENI 캐시 준비 (검색 전 수집)"""
-    from plugins.vpc.ip_search_private import ENICache, fetch_enis_from_account
+    from plugins.vpc.ip_search_private import ENICache
 
     cache = ENICache(session_name=session_name)
 
@@ -324,32 +340,27 @@ def _prepare_private_cache(ctx, session_name: str, force_refresh: bool = False):
     else:
         console.print("\n[cyan]ENI 데이터를 수집 중...[/cyan]")
 
-    total_count = 0
     with console.status("[bold green]모든 리전에서 ENI 수집 중..."):
-        with SessionIterator(ctx) as sessions:
-            for session, identifier, region in sessions:
-                try:
-                    sts = session.client("sts")
-                    account_id = sts.get_caller_identity()["Account"]
+        result = parallel_collect(ctx, _collect_enis, max_workers=20, service="ec2")
 
-                    interfaces = fetch_enis_from_account(
-                        session=session,
-                        account_id=account_id,
-                        account_name=identifier,
-                        regions=[region],
-                    )
-                    cache.update(interfaces)
-                    total_count += len(interfaces)
-                except Exception:
-                    continue
+    total_count = 0
+    for interfaces in result.get_data():
+        if interfaces:
+            cache.update(interfaces)
+            total_count += len(interfaces)
 
     cache.save()
     console.print(f"[green]✓ {total_count}개 ENI 캐시 완료[/green]")
 
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+
     return cache
 
 
-def _run_private_search_with_cache(ip_list: List[str], cache, detailed: bool, save_csv: bool = False):
+def _run_private_search_with_cache(
+    ip_list: List[str], cache, detailed: bool, save_csv: bool = False
+):
     """캐시를 사용한 사설 IP 검색"""
     from plugins.vpc.ip_search_private import search_private_ip
 
@@ -371,8 +382,6 @@ def run(ctx):
     """
     global _current_session_name
 
-    show_logo()
-
     # 모드 선택
     mode = select_mode()
 
@@ -385,7 +394,7 @@ def run(ctx):
 
     # Private 모드: 캐시 먼저 수집
     cache = None
-    detailed = (mode == SearchMode.PRIVATE_DETAILED)
+    detailed = mode == SearchMode.PRIVATE_DETAILED
 
     if mode in (SearchMode.PRIVATE_BASIC, SearchMode.PRIVATE_DETAILED):
         cache = _prepare_private_cache(ctx, session_name)

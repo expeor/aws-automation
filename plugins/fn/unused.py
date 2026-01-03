@@ -17,23 +17,16 @@ from datetime import datetime
 from enum import Enum
 from typing import List
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import (
     get_lambda_monthly_cost,
     get_lambda_provisioned_monthly_cost,
 )
 
-from .common.collector import (
-    LambdaFunctionInfo,
-    collect_functions_with_metrics,
-)
+from .common.collector import LambdaFunctionInfo, collect_functions_with_metrics
 
 console = Console()
 
@@ -41,10 +34,10 @@ console = Console()
 class UsageStatus(Enum):
     """사용 상태"""
 
-    UNUSED = "unused"               # 30일간 호출 없음
+    UNUSED = "unused"  # 30일간 호출 없음
     UNUSED_PROVISIONED = "unused_provisioned"  # 미사용 + PC 설정됨
-    LOW_USAGE = "low_usage"         # 저사용 (월 100회 미만)
-    NORMAL = "normal"               # 정상 사용
+    LOW_USAGE = "low_usage"  # 저사용 (월 100회 미만)
+    NORMAL = "normal"  # 정상 사용
 
 
 @dataclass
@@ -186,14 +179,22 @@ def _analyze_single_function(func: LambdaFunctionInfo, region: str) -> LambdaFin
 
 def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
+    yellow_fill = PatternFill(
+        start_color="FFE66D", end_color="FFE66D", fill_type="solid"
+    )
 
     # Summary
     ws = wb.create_sheet("Summary")
@@ -228,14 +229,25 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
     ws.cell(row=row, column=1, value="합계").font = Font(bold=True)
     ws.cell(row=row, column=3, value=total_functions).font = Font(bold=True)
     ws.cell(row=row, column=4, value=total_unused).font = Font(bold=True)
-    ws.cell(row=row, column=7, value=f"${total_waste:,.2f}").font = Font(bold=True, color="FF0000")
+    ws.cell(row=row, column=7, value=f"${total_waste:,.2f}").font = Font(
+        bold=True, color="FF0000"
+    )
 
     # Unused Functions
     ws_unused = wb.create_sheet("Unused")
     unused_headers = [
-        "Account", "Region", "Function Name", "Runtime", "Memory (MB)",
-        "Timeout (s)", "Code Size (MB)", "Last Modified", "Provisioned Concurrency",
-        "상태", "월간 낭비", "권장 조치"
+        "Account",
+        "Region",
+        "Function Name",
+        "Runtime",
+        "Memory (MB)",
+        "Timeout (s)",
+        "Code Size (MB)",
+        "Last Modified",
+        "Provisioned Concurrency",
+        "상태",
+        "월간 낭비",
+        "권장 조치",
     ]
     for col, h in enumerate(unused_headers, 1):
         ws_unused.cell(row=1, column=col, value=h).fill = header_fill
@@ -244,7 +256,11 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
     unused_row = 1
     for r in results:
         for f in r.findings:
-            if f.status in (UsageStatus.UNUSED, UsageStatus.UNUSED_PROVISIONED, UsageStatus.LOW_USAGE):
+            if f.status in (
+                UsageStatus.UNUSED,
+                UsageStatus.UNUSED_PROVISIONED,
+                UsageStatus.LOW_USAGE,
+            ):
                 unused_row += 1
                 fn = f.function
                 ws_unused.cell(row=unused_row, column=1, value=fn.account_name)
@@ -253,11 +269,25 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
                 ws_unused.cell(row=unused_row, column=4, value=fn.runtime)
                 ws_unused.cell(row=unused_row, column=5, value=fn.memory_mb)
                 ws_unused.cell(row=unused_row, column=6, value=fn.timeout_seconds)
-                ws_unused.cell(row=unused_row, column=7, value=round(fn.code_size_mb, 2))
-                ws_unused.cell(row=unused_row, column=8, value=fn.last_modified.strftime("%Y-%m-%d") if fn.last_modified else "-")
-                ws_unused.cell(row=unused_row, column=9, value=fn.provisioned_concurrency or "-")
+                ws_unused.cell(
+                    row=unused_row, column=7, value=round(fn.code_size_mb, 2)
+                )
+                ws_unused.cell(
+                    row=unused_row,
+                    column=8,
+                    value=fn.last_modified.strftime("%Y-%m-%d")
+                    if fn.last_modified
+                    else "-",
+                )
+                ws_unused.cell(
+                    row=unused_row, column=9, value=fn.provisioned_concurrency or "-"
+                )
                 ws_unused.cell(row=unused_row, column=10, value=f.status.value)
-                ws_unused.cell(row=unused_row, column=11, value=f"${f.monthly_waste:,.2f}" if f.monthly_waste > 0 else "-")
+                ws_unused.cell(
+                    row=unused_row,
+                    column=11,
+                    value=f"${f.monthly_waste:,.2f}" if f.monthly_waste > 0 else "-",
+                )
                 ws_unused.cell(row=unused_row, column=12, value=f.recommendation)
 
                 # 상태별 색상
@@ -271,9 +301,21 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
     # All Functions
     ws_all = wb.create_sheet("All Functions")
     all_headers = [
-        "Account", "Region", "Function Name", "Runtime", "Memory (MB)",
-        "Timeout (s)", "Code Size (MB)", "Invocations (30d)", "Avg Duration (ms)",
-        "Errors", "Throttles", "PC", "Reserved", "상태", "추정 월 비용"
+        "Account",
+        "Region",
+        "Function Name",
+        "Runtime",
+        "Memory (MB)",
+        "Timeout (s)",
+        "Code Size (MB)",
+        "Invocations (30d)",
+        "Avg Duration (ms)",
+        "Errors",
+        "Throttles",
+        "PC",
+        "Reserved",
+        "상태",
+        "추정 월 비용",
     ]
     for col, h in enumerate(all_headers, 1):
         ws_all.cell(row=1, column=col, value=h).fill = header_fill
@@ -293,14 +335,34 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
             ws_all.cell(row=all_row, column=5, value=fn.memory_mb)
             ws_all.cell(row=all_row, column=6, value=fn.timeout_seconds)
             ws_all.cell(row=all_row, column=7, value=round(fn.code_size_mb, 2))
-            ws_all.cell(row=all_row, column=8, value=metrics.invocations if metrics else 0)
-            ws_all.cell(row=all_row, column=9, value=round(metrics.duration_avg_ms, 2) if metrics else 0)
+            ws_all.cell(
+                row=all_row, column=8, value=metrics.invocations if metrics else 0
+            )
+            ws_all.cell(
+                row=all_row,
+                column=9,
+                value=round(metrics.duration_avg_ms, 2) if metrics else 0,
+            )
             ws_all.cell(row=all_row, column=10, value=metrics.errors if metrics else 0)
-            ws_all.cell(row=all_row, column=11, value=metrics.throttles if metrics else 0)
+            ws_all.cell(
+                row=all_row, column=11, value=metrics.throttles if metrics else 0
+            )
             ws_all.cell(row=all_row, column=12, value=fn.provisioned_concurrency or "-")
-            ws_all.cell(row=all_row, column=13, value=fn.reserved_concurrency if fn.reserved_concurrency is not None else "-")
+            ws_all.cell(
+                row=all_row,
+                column=13,
+                value=fn.reserved_concurrency
+                if fn.reserved_concurrency is not None
+                else "-",
+            )
             ws_all.cell(row=all_row, column=14, value=f.status.value)
-            ws_all.cell(row=all_row, column=15, value=f"${fn.estimated_monthly_cost:,.4f}" if fn.estimated_monthly_cost > 0 else "-")
+            ws_all.cell(
+                row=all_row,
+                column=15,
+                value=f"${fn.estimated_monthly_cost:,.4f}"
+                if fn.estimated_monthly_cost > 0
+                else "-",
+            )
 
     # 열 너비
     for sheet in wb.worksheets:
@@ -308,7 +370,9 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 40
+                )
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -325,58 +389,31 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> LambdaAnalysisResult:
+    """단일 계정/리전의 Lambda 수집 및 분석 (병렬 실행용)"""
+    functions = collect_functions_with_metrics(
+        session, account_id, account_name, region
+    )
+    return analyze_functions(functions, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """Lambda 미사용 분석 실행"""
     console.print("[bold]Lambda 미사용 분석 시작...[/bold]\n")
 
-    results: List[LambdaAnalysisResult] = []
-    collected = set()
+    # 병렬 수집 및 분석
+    result = parallel_collect(
+        ctx, _collect_and_analyze, max_workers=20, service="lambda"
+    )
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
+    results: List[LambdaAnalysisResult] = result.get_data()
 
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                # 함수 수집 (메트릭 포함)
-                functions = collect_functions_with_metrics(
-                    session, account_id, account_name, region
-                )
-
-                if not functions:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                # 분석
-                result = analyze_functions(functions, account_id, account_name, region)
-                results.append(result)
-
-                if result.unused_count > 0:
-                    waste_str = f" (${result.unused_monthly_cost:,.2f}/월)" if result.unused_monthly_cost > 0 else ""
-                    console.print(f"전체 {result.total_count}개 / [red]미사용 {result.unused_count}개{waste_str}[/red]")
-                else:
-                    console.print(f"[green]{result.total_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")

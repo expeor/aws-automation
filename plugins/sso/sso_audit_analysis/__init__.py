@@ -7,8 +7,8 @@ IAM Identity Center(SSO) 보안 감사:
 - Reporter: Excel 보고서 생성
 """
 
+from .analyzer import SSOAnalysisResult, SSOAnalyzer
 from .collector import SSOCollector, SSOData
-from .analyzer import SSOAnalyzer, SSOAnalysisResult
 from .reporter import SSOExcelReporter
 
 __all__ = [

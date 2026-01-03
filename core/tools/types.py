@@ -19,17 +19,52 @@ class AreaInfo(TypedDict):
     icon: str  # 이모지 아이콘
 
 
-# Area 정의 (단일 소스) - 순서대로 UI에 표시
+# ============================================================================
+# AWS Trusted Advisor 5대 영역만 사용
+# - 새로운 영역을 추가하지 마세요
+# - 참조: https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor.html
+# ============================================================================
 AREA_REGISTRY: List[AreaInfo] = [
-    {"key": "cost", "command": "/cost", "label": "비용 절감", "desc": "미사용 리소스 탐지", "color": "yellow", "icon": "💰"},
-    {"key": "security", "command": "/security", "label": "보안", "desc": "취약점, 암호화 점검", "color": "red", "icon": "🔒"},
-    {"key": "operational", "command": "/ops", "label": "운영", "desc": "보고서, 모니터링", "color": "cyan", "icon": "📋"},
-    {"key": "inventory", "command": "/inv", "label": "인벤토리", "desc": "리소스 목록", "color": "white", "icon": "📦"},
-    {"key": "fault_tolerance", "command": "/ft", "label": "가용성", "desc": "백업, Multi-AZ", "color": "blue", "icon": "🛡️"},
-    {"key": "log", "command": "/log", "label": "로그", "desc": "로그 분석", "color": "green", "icon": "📝"},
-    {"key": "network", "command": "/net", "label": "네트워크", "desc": "네트워크 분석", "color": "magenta", "icon": "🌐"},
-    {"key": "performance", "command": "/perf", "label": "성능", "desc": "성능 최적화", "color": "yellow", "icon": "⚡"},
-    {"key": "service_limits", "command": "/limits", "label": "서비스 한도", "desc": "쿼터 모니터링", "color": "magenta", "icon": "📊"},
+    {
+        "key": "security",
+        "command": "/security",
+        "label": "보안",
+        "desc": "취약점, 암호화 점검",
+        "color": "magenta",
+        "icon": "🔒",
+    },
+    {
+        "key": "cost",
+        "command": "/cost",
+        "label": "비용",
+        "desc": "미사용 리소스 탐지",
+        "color": "cyan",
+        "icon": "💰",
+    },
+    {
+        "key": "fault_tolerance",
+        "command": "/ft",
+        "label": "내결함성",
+        "desc": "백업, Multi-AZ",
+        "color": "blue",
+        "icon": "🛡️",
+    },
+    {
+        "key": "performance",
+        "command": "/perf",
+        "label": "성능",
+        "desc": "성능 최적화",
+        "color": "purple",
+        "icon": "⚡",
+    },
+    {
+        "key": "operational",
+        "command": "/ops",
+        "label": "운영",
+        "desc": "보고서, 모니터링",
+        "color": "bright_blue",
+        "icon": "📋",
+    },
 ]
 
 # /command → internal key 매핑 (자동 생성)
@@ -39,8 +74,6 @@ for _area in AREA_REGISTRY:
 # 추가 별칭
 AREA_COMMANDS["/sec"] = "security"
 AREA_COMMANDS["/op"] = "operational"
-AREA_COMMANDS["/inventory"] = "inventory"
-AREA_COMMANDS["/network"] = "network"
 
 # 한글 키워드 → internal key 매핑
 AREA_KEYWORDS: Dict[str, str] = {
@@ -54,25 +87,18 @@ AREA_KEYWORDS: Dict[str, str] = {
     "미사용": "cost",
     "절감": "cost",
     "유휴": "cost",
+    # fault_tolerance
+    "내결함성": "fault_tolerance",
+    "가용성": "fault_tolerance",
+    "백업": "fault_tolerance",
+    "복구": "fault_tolerance",
+    # performance
+    "성능": "performance",
     # operational
     "운영": "operational",
     "보고서": "operational",
     "리포트": "operational",
     "현황": "operational",
-    # inventory
-    "목록": "inventory",
-    "인벤토리": "inventory",
-    "조회": "inventory",
-    # fault_tolerance
-    "가용성": "fault_tolerance",
-    "백업": "fault_tolerance",
-    "복구": "fault_tolerance",
-    # log
-    "로그": "log",
-    # network
-    "네트워크": "network",
-    # performance
-    "성능": "performance",
 }
 
 # 문자열 키 기반 AREA_DISPLAY (category.py 호환)
@@ -80,6 +106,7 @@ AREA_DISPLAY_BY_KEY: Dict[str, Dict[str, str]] = {
     a["key"]: {"label": a["label"], "color": a["color"], "icon": a["icon"]}
     for a in AREA_REGISTRY
 }
+
 
 class ToolMeta(TypedDict, total=False):
     """도구 메타데이터 타입"""
@@ -92,6 +119,9 @@ class ToolMeta(TypedDict, total=False):
 
     # 영역 분류
     area: str  # ToolArea 값 (security, cost, performance 등)
+
+    # 하위 서비스 분류 (예: elb→alb/nlb/gwlb, elasticache→redis/memcached)
+    sub_service: str  # 하위 서비스명 (예: "alb", "nlb", "redis")
 
     # 참조 (컬렉션용)
     ref: str  # 다른 카테고리 도구 참조 ("iam/unused_role")
@@ -117,6 +147,11 @@ class CategoryMeta(TypedDict, total=False):
     aliases: List[str]  # 별칭 (예: ["gov"])
     group: str  # 그룹 ("aws" | "special" | "collection")
     icon: str  # 아이콘 (메뉴 표시용)
+
+    # 하위 서비스 (예: elb→["alb", "nlb", "gwlb", "clb"])
+    # sub_services에 정의된 이름으로 CLI 명령어 자동 등록
+    # 각 도구의 sub_service 필드와 매칭되어 필터링됨
+    sub_services: List[str]
 
     # 컬렉션 전용
     collection: bool  # 컬렉션 여부 (True면 다른 도구 참조)

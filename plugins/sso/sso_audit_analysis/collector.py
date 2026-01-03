@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 from botocore.exceptions import ClientError
 from rich.console import Console
 
+from core.parallel import get_client
+
 console = Console()
 
 
@@ -152,8 +154,8 @@ class SSOCollector:
         """
         try:
             # SSO 인스턴스 정보 조회
-            sso_admin = session.client("sso-admin")
-            identity_store = session.client("identitystore")
+            sso_admin = get_client(session, "sso-admin")
+            identity_store = get_client(session, "identitystore")
 
             instances = sso_admin.list_instances().get("Instances", [])
             if not instances:
@@ -210,7 +212,7 @@ class SSOCollector:
     def _cache_account_names(self, session) -> None:
         """Organizations에서 계정 이름 캐싱"""
         try:
-            org = session.client("organizations")
+            org = get_client(session, "organizations")
             paginator = org.get_paginator("list_accounts")
             for page in paginator.paginate():
                 for account in page.get("Accounts", []):
@@ -265,15 +267,18 @@ class SSOCollector:
                     InstanceArn=instance_arn, PermissionSetArn=ps_arn
                 )
                 ps.managed_policies = [
-                    p.get("Arn", "") for p in managed_resp.get("AttachedManagedPolicies", [])
+                    p.get("Arn", "")
+                    for p in managed_resp.get("AttachedManagedPolicies", [])
                 ]
             except ClientError:
                 pass
 
             # Customer Managed Policies
             try:
-                customer_resp = sso_admin.list_customer_managed_policy_references_in_permission_set(
-                    InstanceArn=instance_arn, PermissionSetArn=ps_arn
+                customer_resp = (
+                    sso_admin.list_customer_managed_policy_references_in_permission_set(
+                        InstanceArn=instance_arn, PermissionSetArn=ps_arn
+                    )
                 )
                 ps.customer_managed_policies = [
                     {"Name": p.get("Name", ""), "Path": p.get("Path", "/")}
@@ -396,7 +401,8 @@ class SSOCollector:
 
                     for dangerous in dangerous_actions:
                         if dangerous.lower() == action_lower or (
-                            "*" in dangerous and action_lower.startswith(dangerous.split("*")[0])
+                            "*" in dangerous
+                            and action_lower.startswith(dangerous.split("*")[0])
                         ):
                             ps.dangerous_permissions.append(action)
                             break
@@ -404,9 +410,7 @@ class SSOCollector:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    def _collect_users(
-        self, identity_store, identity_store_id: str
-    ) -> List[SSOUser]:
+    def _collect_users(self, identity_store, identity_store_id: str) -> List[SSOUser]:
         """Identity Store Users 수집"""
         users = []
 
@@ -437,9 +441,7 @@ class SSOCollector:
 
         return users
 
-    def _collect_groups(
-        self, identity_store, identity_store_id: str
-    ) -> List[SSOGroup]:
+    def _collect_groups(self, identity_store, identity_store_id: str) -> List[SSOGroup]:
         """Identity Store Groups 수집"""
         groups = []
 
@@ -518,12 +520,16 @@ class SSOCollector:
                             if principal_type == "USER":
                                 cached_user = self._user_cache.get(principal_id)
                                 principal_name = (
-                                    cached_user.display_name if cached_user else principal_id
+                                    cached_user.display_name
+                                    if cached_user
+                                    else principal_id
                                 )
                             elif principal_type == "GROUP":
                                 cached_group = self._group_cache.get(principal_id)
                                 principal_name = (
-                                    cached_group.group_name if cached_group else principal_id
+                                    cached_group.group_name
+                                    if cached_group
+                                    else principal_id
                                 )
 
                             assignment = SSOAccountAssignment(
@@ -582,4 +588,6 @@ class SSOCollector:
                             if member:
                                 member.has_admin_access = True
                                 if assignment.account_name not in member.admin_accounts:
-                                    member.admin_accounts.append(assignment.account_name)
+                                    member.admin_accounts.append(
+                                        assignment.account_name
+                                    )

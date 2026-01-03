@@ -22,7 +22,7 @@ import msgpack
 from botocore.exceptions import ClientError
 
 from core.auth import SessionIterator
-
+from core.parallel import get_client
 
 # =============================================================================
 # 데이터 구조
@@ -78,7 +78,9 @@ class ENICache:
             self.cache_dir = cache_dir
         else:
             # plugins/vpc -> plugins -> project_root
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            project_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
             self.cache_dir = os.path.join(project_root, "temp", "eni")
 
         os.makedirs(self.cache_dir, exist_ok=True)
@@ -89,7 +91,9 @@ class ENICache:
         self.expiry = timedelta(hours=expiry_hours)
 
         # 캐시 데이터
-        self.cache: Dict[str, Dict[str, Any]] = {}  # IP -> {interfaces: [], last_accessed: float}
+        self.cache: Dict[
+            str, Dict[str, Any]
+        ] = {}  # IP -> {interfaces: [], last_accessed: float}
         self.sorted_ips: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = []
         self.lock = threading.Lock()
 
@@ -99,6 +103,7 @@ class ENICache:
     def _sanitize_filename(self, name: str) -> str:
         """파일명에 안전한 문자열로 변환"""
         import re
+
         safe = re.sub(r'[<>:"/\\|?*]', "_", name)
         safe = re.sub(r"_+", "_", safe).strip(" ._")
         return safe[:100] if safe else "default"
@@ -275,7 +280,7 @@ def fetch_enis_from_account(
 
     for region in regions:
         try:
-            ec2 = session.client("ec2", region_name=region)
+            ec2 = get_client(session, "ec2", region_name=region)
             paginator = ec2.get_paginator("describe_network_interfaces")
 
             for page in paginator.paginate():
@@ -439,7 +444,9 @@ def map_eni_to_resource(eni: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def eni_to_result(ip: str, eni: Dict[str, Any], detailed: bool = False) -> PrivateIPResult:
+def eni_to_result(
+    ip: str, eni: Dict[str, Any], detailed: bool = False
+) -> PrivateIPResult:
     """ENI 데이터를 검색 결과로 변환"""
     # 태그에서 Name 추출
     name = ""

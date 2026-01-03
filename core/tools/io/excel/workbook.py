@@ -3,26 +3,27 @@ pkg/io/excel/workbook.py - Excel Workbook 래퍼 클래스
 
 일관된 Excel 출력을 위한 Workbook, Sheet, ColumnDef 클래스
 및 워크시트 포맷팅 유틸리티 함수들
+
+Note:
+    이 모듈은 Lazy Import 패턴을 사용합니다.
+    openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+from __future__ import annotations
 
 import csv
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 
-from openpyxl import Workbook as OpenpyxlWorkbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.worksheet import Worksheet
+if TYPE_CHECKING:
+    from openpyxl import Workbook as OpenpyxlWorkbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.worksheet.worksheet import Worksheet
 
+# 문자열 상수와 함수만 모듈 레벨에서 import (openpyxl 필요 없음)
 from .styles import (
-    ALIGN_CENTER,
-    ALIGN_CENTER_WRAP,
-    ALIGN_LEFT,
-    ALIGN_RIGHT_WRAP,
-    ALIGN_WRAP,
     NUMBER_FORMAT_CURRENCY,
     NUMBER_FORMAT_INTEGER,
     NUMBER_FORMAT_PERCENT,
@@ -35,6 +36,38 @@ from .styles import (
     get_header_font,
     get_thin_border,
 )
+
+
+# Alignment 상수는 lazy import (사용 시점에 로드)
+def _get_align_center() -> "Alignment":
+    from .styles import ALIGN_CENTER
+
+    return ALIGN_CENTER
+
+
+def _get_align_center_wrap() -> "Alignment":
+    from .styles import ALIGN_CENTER_WRAP
+
+    return ALIGN_CENTER_WRAP
+
+
+def _get_align_left() -> "Alignment":
+    from .styles import ALIGN_LEFT
+
+    return ALIGN_LEFT
+
+
+def _get_align_right_wrap() -> "Alignment":
+    from .styles import ALIGN_RIGHT_WRAP
+
+    return ALIGN_RIGHT_WRAP
+
+
+def _get_align_wrap() -> "Alignment":
+    from .styles import ALIGN_WRAP
+
+    return ALIGN_WRAP
+
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +146,8 @@ class SummarySheet:
         Returns:
             self (메서드 체이닝)
         """
+        from openpyxl.styles import Alignment, Font, PatternFill
+
         ws = self._ws
         ws.merge_cells(f"A{self._current_row}:B{self._current_row}")
         cell = ws.cell(row=self._current_row, column=1, value=title)
@@ -137,6 +172,8 @@ class SummarySheet:
         Returns:
             self (메서드 체이닝)
         """
+        from openpyxl.styles import Alignment, Font, PatternFill
+
         ws = self._ws
         ws.merge_cells(f"A{self._current_row}:B{self._current_row}")
         cell = ws.cell(row=self._current_row, column=1, value=section_name)
@@ -168,6 +205,8 @@ class SummarySheet:
         Returns:
             self (메서드 체이닝)
         """
+        from openpyxl.styles import Alignment, Font, PatternFill
+
         ws = self._ws
         border = get_thin_border()
         label_font = Font(name="맑은 고딕", size=11, bold=True)
@@ -230,6 +269,8 @@ class SummarySheet:
         Returns:
             self (메서드 체이닝)
         """
+        from openpyxl.styles import Alignment, Font
+
         ws = self._ws
         border = get_thin_border()
         value_font = Font(name="맑은 고딕", size=11)
@@ -344,16 +385,18 @@ class Sheet:
     def _apply_cell_style(self, cell, col_def: ColumnDef) -> None:
         """컬럼 정의에 따른 셀 스타일 적용 (자동 줄바꿈 포함)"""
         style_map = {
-            "data": (ALIGN_WRAP, None),  # 줄바꿈 적용
-            "center": (ALIGN_CENTER_WRAP, None),  # 줄바꿈 적용
-            "wrap": (ALIGN_WRAP, None),
-            "number": (ALIGN_RIGHT_WRAP, NUMBER_FORMAT_INTEGER),  # 줄바꿈 적용
-            "currency": (ALIGN_RIGHT_WRAP, NUMBER_FORMAT_CURRENCY),  # 줄바꿈 적용
-            "percent": (ALIGN_RIGHT_WRAP, NUMBER_FORMAT_PERCENT),  # 줄바꿈 적용
-            "text": (ALIGN_WRAP, NUMBER_FORMAT_TEXT),  # 텍스트 강제 + 줄바꿈
+            "data": (_get_align_wrap(), None),  # 줄바꿈 적용
+            "center": (_get_align_center_wrap(), None),  # 줄바꿈 적용
+            "wrap": (_get_align_wrap(), None),
+            "number": (_get_align_right_wrap(), NUMBER_FORMAT_INTEGER),  # 줄바꿈 적용
+            "currency": (_get_align_right_wrap(), NUMBER_FORMAT_CURRENCY),  # 줄바꿈 적용
+            "percent": (_get_align_right_wrap(), NUMBER_FORMAT_PERCENT),  # 줄바꿈 적용
+            "text": (_get_align_wrap(), NUMBER_FORMAT_TEXT),  # 텍스트 강제 + 줄바꿈
         }
 
-        alignment, number_format = style_map.get(col_def.style, (ALIGN_WRAP, None))
+        alignment, number_format = style_map.get(
+            col_def.style, (_get_align_wrap(), None)
+        )
         cell.alignment = alignment
 
         if number_format and cell.value is not None:
@@ -396,7 +439,9 @@ class Workbook:
 
     def __init__(self):
         """Workbook 초기화"""
-        self._wb = OpenpyxlWorkbook()
+        from openpyxl import Workbook as _OpenpyxlWorkbook
+
+        self._wb = _OpenpyxlWorkbook()
         # 기본 시트 제거
         if "Sheet" in self._wb.sheetnames:
             del self._wb["Sheet"]
@@ -421,6 +466,8 @@ class Workbook:
         Returns:
             Sheet 인스턴스
         """
+        from openpyxl.utils import get_column_letter
+
         ws = self._wb.create_sheet(title=name)
 
         # 헤더 행 설정
@@ -432,7 +479,7 @@ class Workbook:
             cell = ws.cell(row=1, column=col_idx, value=col_def.header)
             cell.font = header_font
             cell.fill = header_fill
-            cell.alignment = ALIGN_CENTER
+            cell.alignment = _get_align_center()
             cell.border = border
 
             # 컬럼 너비 설정
@@ -613,7 +660,7 @@ def calculate_optimal_row_height(
 
 
 def apply_detail_sheet_formatting(
-    worksheet: Worksheet,
+    worksheet: "Worksheet",
     has_header: bool = True,
 ) -> None:
     """상세 시트용 포맷팅 적용
@@ -628,6 +675,8 @@ def apply_detail_sheet_formatting(
         worksheet: 대상 워크시트
         has_header: 헤더 행 존재 여부
     """
+    from openpyxl.utils import get_column_letter
+
     try:
         worksheet.auto_filter.ref = worksheet.dimensions
         if has_header:
@@ -793,6 +842,7 @@ def save_dict_list_to_excel(
         save_dict_list_to_excel(results, "output.xlsx")
     """
     from openpyxl import Workbook as OpenpyxlWorkbook
+    from openpyxl.utils import get_column_letter
 
     wb = OpenpyxlWorkbook()
     ws = wb.active
@@ -838,11 +888,11 @@ def save_dict_list_to_excel(
 
 
 def add_sheet_from_dict_list(
-    workbook: OpenpyxlWorkbook,
+    workbook: "OpenpyxlWorkbook",
     data: List[Dict[str, Any]],
     sheet_name: str,
     columns: Optional[List[str]] = None,
-) -> Worksheet:
+) -> "Worksheet":
     """기존 Workbook에 딕셔너리 리스트로 새 시트 추가 (pandas 대체용)
 
     pd.DataFrame(data).to_excel(writer, sheet_name=...) 패턴을 대체합니다.
@@ -868,6 +918,8 @@ def add_sheet_from_dict_list(
         add_sheet_from_dict_list(wb, data2, "Sheet2")
         wb.save("output.xlsx")
     """
+    from openpyxl.utils import get_column_letter
+
     ws = workbook.create_sheet(title=sheet_name)
 
     if not data:

@@ -62,10 +62,11 @@ Usage:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
+    from core.filter import AccountFilter
 
 # core.exceptions에서 BackToMenuError 재사용
 from core.exceptions import BackToMenuError
@@ -255,6 +256,7 @@ class ExecutionContext:
         accounts: 대상 계정 목록 (SSO용)
         regions: 대상 리전 목록
         options: 도구별 추가 옵션
+        target_filter: 계정 필터 (Headless CLI용, glob 패턴 매칭)
     """
 
     # Step 1: 카테고리/도구 선택
@@ -278,6 +280,9 @@ class ExecutionContext:
 
     # Step 5: 도구별 추가 옵션
     options: Dict[str, Any] = field(default_factory=dict)
+
+    # Step 6: 계정 필터 (Headless CLI용)
+    target_filter: Optional["AccountFilter"] = None
 
     # 실행 결과
     result: Optional[Any] = None
@@ -354,12 +359,24 @@ class ExecutionContext:
         return None
 
     def get_target_accounts(self) -> List["AccountInfo"]:
-        """실제 실행 대상 계정 목록 반환 (스킵 계정 제외)"""
-        if not self.role_selection:
-            return self.accounts
+        """실제 실행 대상 계정 목록 반환 (스킵 계정 + 필터 적용)
 
-        skipped = set(self.role_selection.skipped_accounts)
-        return [acc for acc in self.accounts if acc.id not in skipped]
+        적용 순서:
+        1. role_selection의 skipped_accounts 제외
+        2. target_filter 패턴 매칭 (설정된 경우)
+        """
+        accounts = self.accounts
+
+        # 1. 스킵 계정 제외
+        if self.role_selection:
+            skipped = set(self.role_selection.skipped_accounts)
+            accounts = [acc for acc in accounts if acc.id not in skipped]
+
+        # 2. 타겟 필터 적용
+        if self.target_filter:
+            accounts = self.target_filter.apply(accounts)
+
+        return accounts
 
 
 @dataclass

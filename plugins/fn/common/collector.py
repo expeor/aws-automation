@@ -6,10 +6,10 @@ Lambda 함수 정보 및 CloudWatch 메트릭 수집 공통 로직
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
-from botocore.exceptions import ClientError
+from core.parallel import ErrorSeverity, get_client, try_or_default
 
 logger = logging.getLogger(__name__)
 
@@ -111,10 +111,12 @@ def collect_functions(
     Returns:
         Lambda 함수 정보 리스트
     """
+    from botocore.exceptions import ClientError
+
     functions = []
 
     try:
-        lambda_client = session.client("lambda", region_name=region)
+        lambda_client = get_client(session, "lambda", region_name=region)
 
         # 함수 목록 조회
         paginator = lambda_client.get_paginator("list_functions")
@@ -123,13 +125,18 @@ def collect_functions(
                 # 기본 정보
                 function_name = fn.get("FunctionName", "")
 
-                # 태그 조회
-                tags = {}
-                try:
-                    tag_response = lambda_client.list_tags(Resource=fn.get("FunctionArn", ""))
-                    tags = tag_response.get("Tags", {})
-                except ClientError:
-                    pass
+                # 태그 조회 (옵션 - 실패해도 계속)
+                tags = try_or_default(
+                    lambda: lambda_client.list_tags(
+                        Resource=fn.get("FunctionArn", "")
+                    ).get("Tags", {}),
+                    default={},
+                    account_id=account_id,
+                    account_name=account_name,
+                    region=region,
+                    operation="list_tags",
+                    severity=ErrorSeverity.DEBUG,
+                )
 
                 # VPC 설정
                 vpc_config = fn.get("VpcConfig")
@@ -145,7 +152,9 @@ def collect_functions(
                 if lm_str:
                     try:
                         # ISO 8601 형식 파싱
-                        last_modified = datetime.fromisoformat(lm_str.replace("Z", "+00:00"))
+                        last_modified = datetime.fromisoformat(
+                            lm_str.replace("Z", "+00:00")
+                        )
                     except ValueError:
                         pass
 
@@ -168,27 +177,43 @@ def collect_functions(
                     tags=tags,
                 )
 
-                # Provisioned Concurrency 조회
-                try:
-                    pc_response = lambda_client.list_provisioned_concurrency_configs(
+                # Provisioned Concurrency 조회 (옵션)
+                pc_configs = try_or_default(
+                    lambda: lambda_client.list_provisioned_concurrency_configs(
                         FunctionName=function_name
+                    ).get("ProvisionedConcurrencyConfigs", []),
+                    default=[],
+                    account_id=account_id,
+                    account_name=account_name,
+                    region=region,
+                    operation="list_provisioned_concurrency_configs",
+                    severity=ErrorSeverity.DEBUG,
+                )
+                for pc in pc_configs:
+                    func_info.provisioned_concurrency += pc.get(
+                        "AllocatedProvisionedConcurrentExecutions", 0
                     )
-                    for pc in pc_response.get("ProvisionedConcurrencyConfigs", []):
-                        func_info.provisioned_concurrency += pc.get("AllocatedProvisionedConcurrentExecutions", 0)
-                except ClientError:
-                    pass
 
-                # Reserved Concurrency 조회
-                try:
-                    concurrency = lambda_client.get_function_concurrency(FunctionName=function_name)
-                    func_info.reserved_concurrency = concurrency.get("ReservedConcurrentExecutions")
-                except ClientError:
-                    pass
+                # Reserved Concurrency 조회 (옵션)
+                func_info.reserved_concurrency = try_or_default(
+                    lambda: lambda_client.get_function_concurrency(
+                        FunctionName=function_name
+                    ).get("ReservedConcurrentExecutions"),
+                    default=None,
+                    account_id=account_id,
+                    account_name=account_name,
+                    region=region,
+                    operation="get_function_concurrency",
+                    severity=ErrorSeverity.DEBUG,
+                )
 
                 functions.append(func_info)
 
     except ClientError as e:
-        logger.warning(f"Lambda 함수 수집 실패 [{account_id}/{region}]: {e}")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        logger.warning(
+            f"[{account_name}/{region}] Lambda list_functions 실패: {error_code}"
+        )
 
     return functions
 
@@ -210,10 +235,12 @@ def collect_function_metrics(
     Returns:
         Lambda 메트릭
     """
+    from botocore.exceptions import ClientError
+
     metrics = LambdaMetrics(period_days=days)
 
     try:
-        cloudwatch = session.client("cloudwatch", region_name=region)
+        cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(days=days)
@@ -311,7 +338,8 @@ def collect_function_metrics(
                     break
 
     except ClientError as e:
-        logger.warning(f"Lambda 메트릭 수집 실패 [{function_name}]: {e}")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        logger.warning(f"Lambda 메트릭 수집 실패 [{function_name}]: {error_code}")
 
     return metrics
 
@@ -338,6 +366,8 @@ def collect_functions_with_metrics(
     functions = collect_functions(session, account_id, account_name, region)
 
     for func in functions:
-        func.metrics = collect_function_metrics(session, region, func.function_name, metric_days)
+        func.metrics = collect_function_metrics(
+            session, region, func.function_name, metric_days
+        )
 
     return functions

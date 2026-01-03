@@ -9,17 +9,13 @@ plugins/ecr/unused.py - ECR 미사용 이미지 분석
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_ecr_storage_price
 
@@ -31,6 +27,7 @@ UNUSED_DAYS_THRESHOLD = 90
 
 class ECRRepoStatus(Enum):
     """ECR 리포지토리 상태"""
+
     NORMAL = "normal"
     EMPTY = "empty"
     OLD_IMAGES = "old_images"
@@ -40,6 +37,7 @@ class ECRRepoStatus(Enum):
 @dataclass
 class ECRRepoInfo:
     """ECR 리포지토리 정보"""
+
     account_id: str
     account_name: str
     region: str
@@ -55,11 +53,11 @@ class ECRRepoInfo:
 
     @property
     def total_size_gb(self) -> float:
-        return self.total_size_bytes / (1024 ** 3)
+        return self.total_size_bytes / (1024**3)
 
     @property
     def old_images_size_gb(self) -> float:
-        return self.old_images_size_bytes / (1024 ** 3)
+        return self.old_images_size_bytes / (1024**3)
 
     @property
     def monthly_cost(self) -> float:
@@ -73,6 +71,7 @@ class ECRRepoInfo:
 @dataclass
 class ECRRepoFinding:
     """ECR 리포지토리 분석 결과"""
+
     repo: ECRRepoInfo
     status: ECRRepoStatus
     recommendation: str
@@ -81,6 +80,7 @@ class ECRRepoFinding:
 @dataclass
 class ECRAnalysisResult:
     """ECR 분석 결과 집계"""
+
     account_id: str
     account_name: str
     region: str
@@ -96,9 +96,13 @@ class ECRAnalysisResult:
     findings: List[ECRRepoFinding] = field(default_factory=list)
 
 
-def collect_ecr_repos(session, account_id: str, account_name: str, region: str) -> List[ECRRepoInfo]:
+def collect_ecr_repos(
+    session, account_id: str, account_name: str, region: str
+) -> List[ECRRepoInfo]:
     """ECR 리포지토리 수집"""
-    ecr = session.client("ecr", region_name=region)
+    from botocore.exceptions import ClientError
+
+    ecr = get_client(session, "ecr", region_name=region)
     repos = []
 
     paginator = ecr.get_paginator("describe_repositories")
@@ -158,10 +162,7 @@ def collect_ecr_repos(session, account_id: str, account_name: str, region: str) 
 
 
 def analyze_ecr_repos(
-    repos: List[ECRRepoInfo],
-    account_id: str,
-    account_name: str,
-    region: str
+    repos: List[ECRRepoInfo], account_id: str, account_name: str, region: str
 ) -> ECRAnalysisResult:
     """ECR 리포지토리 분석"""
     result = ECRAnalysisResult(
@@ -181,21 +182,25 @@ def analyze_ecr_repos(
         # 빈 리포지토리
         if repo.image_count == 0:
             result.empty_repos += 1
-            result.findings.append(ECRRepoFinding(
-                repo=repo,
-                status=ECRRepoStatus.EMPTY,
-                recommendation="빈 리포지토리 - 삭제 검토",
-            ))
+            result.findings.append(
+                ECRRepoFinding(
+                    repo=repo,
+                    status=ECRRepoStatus.EMPTY,
+                    recommendation="빈 리포지토리 - 삭제 검토",
+                )
+            )
             continue
 
         # 오래된 이미지가 있는 경우
         if repo.old_image_count > 0:
             result.repos_with_old_images += 1
-            result.findings.append(ECRRepoFinding(
-                repo=repo,
-                status=ECRRepoStatus.OLD_IMAGES,
-                recommendation=f"{repo.old_image_count}개 오래된 이미지 ({repo.old_images_size_gb:.2f} GB)",
-            ))
+            result.findings.append(
+                ECRRepoFinding(
+                    repo=repo,
+                    status=ECRRepoStatus.OLD_IMAGES,
+                    recommendation=f"{repo.old_image_count}개 오래된 이미지 ({repo.old_images_size_gb:.2f} GB)",
+                )
+            )
 
             # 라이프사이클 정책 없는 경우 추가 경고
             if not repo.has_lifecycle_policy:
@@ -205,32 +210,44 @@ def analyze_ecr_repos(
         # 라이프사이클 정책 없는 경우
         if not repo.has_lifecycle_policy:
             result.no_lifecycle_repos += 1
-            result.findings.append(ECRRepoFinding(
-                repo=repo,
-                status=ECRRepoStatus.NO_LIFECYCLE,
-                recommendation="라이프사이클 정책 없음 - 설정 권장",
-            ))
+            result.findings.append(
+                ECRRepoFinding(
+                    repo=repo,
+                    status=ECRRepoStatus.NO_LIFECYCLE,
+                    recommendation="라이프사이클 정책 없음 - 설정 권장",
+                )
+            )
             continue
 
-        result.findings.append(ECRRepoFinding(
-            repo=repo,
-            status=ECRRepoStatus.NORMAL,
-            recommendation="정상",
-        ))
+        result.findings.append(
+            ECRRepoFinding(
+                repo=repo,
+                status=ECRRepoStatus.NORMAL,
+                recommendation="정상",
+            )
+        )
 
     return result
 
 
 def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
+    yellow_fill = PatternFill(
+        start_color="FFE066", end_color="FFE066", fill_type="solid"
+    )
 
     ws = wb.create_sheet("Summary")
     ws["A1"] = "ECR 분석 보고서"
@@ -257,7 +274,18 @@ def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
             ws.cell(row=row, column=5).fill = yellow_fill
 
     ws_detail = wb.create_sheet("Repositories")
-    detail_headers = ["Account", "Region", "Repository", "상태", "이미지수", "오래된", "크기", "낭비", "Lifecycle", "권장 조치"]
+    detail_headers = [
+        "Account",
+        "Region",
+        "Repository",
+        "상태",
+        "이미지수",
+        "오래된",
+        "크기",
+        "낭비",
+        "Lifecycle",
+        "권장 조치",
+    ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill
         ws_detail.cell(row=1, column=col).font = header_font
@@ -274,9 +302,19 @@ def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
                 ws_detail.cell(row=detail_row, column=4, value=f.status.value)
                 ws_detail.cell(row=detail_row, column=5, value=repo.image_count)
                 ws_detail.cell(row=detail_row, column=6, value=repo.old_image_count)
-                ws_detail.cell(row=detail_row, column=7, value=f"{repo.total_size_gb:.2f} GB")
-                ws_detail.cell(row=detail_row, column=8, value=f"${repo.old_images_monthly_cost:.2f}")
-                ws_detail.cell(row=detail_row, column=9, value="있음" if repo.has_lifecycle_policy else "없음")
+                ws_detail.cell(
+                    row=detail_row, column=7, value=f"{repo.total_size_gb:.2f} GB"
+                )
+                ws_detail.cell(
+                    row=detail_row,
+                    column=8,
+                    value=f"${repo.old_images_monthly_cost:.2f}",
+                )
+                ws_detail.cell(
+                    row=detail_row,
+                    column=9,
+                    value="있음" if repo.has_lifecycle_policy else "없음",
+                )
                 ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
 
     for sheet in wb.worksheets:
@@ -284,7 +322,9 @@ def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 40
+                )
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -294,53 +334,25 @@ def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[ECRAnalysisResult]:
+    """단일 계정/리전의 ECR 리포지토리 수집 및 분석 (병렬 실행용)"""
+    repos = collect_ecr_repos(session, account_id, account_name, region)
+    if not repos:
+        return None
+    return analyze_ecr_repos(repos, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """ECR 미사용 이미지 분석"""
     console.print("[bold]ECR 분석 시작...[/bold]\n")
 
-    results: List[ECRAnalysisResult] = []
-    collected = set()
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ecr")
+    results: List[ECRAnalysisResult] = [r for r in result.get_data() if r is not None]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                repos = collect_ecr_repos(session, account_id, account_name, region)
-                if not repos:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                result = analyze_ecr_repos(repos, account_id, account_name, region)
-                results.append(result)
-
-                issue_count = result.empty_repos + result.repos_with_old_images
-                if issue_count > 0:
-                    console.print(f"Repos {result.total_repos}개 / [yellow]이슈 {issue_count}개[/yellow]")
-                else:
-                    console.print(f"[green]{result.total_repos}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")

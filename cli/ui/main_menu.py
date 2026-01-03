@@ -13,7 +13,12 @@ from rich.console import Console
 
 from cli.ui.banner import print_banner
 from cli.ui.console import console as default_console
-from cli.ui.console import print_box_end, print_box_line, print_box_start, wait_for_any_key
+from cli.ui.console import (
+    print_box_end,
+    print_box_line,
+    print_box_start,
+    wait_for_any_key,
+)
 
 # 권한별 색상
 PERMISSION_COLORS = {
@@ -27,9 +32,11 @@ SHORTCUTS = {
     "h": "help",
     "?": "help",
     "a": "all_tools",
-    "b": "browse",
-    "c": "aws_category",
+    "s": "browse",  # 서비스별 (EC2, ELB, VPC...)
+    "c": "aws_category",  # AWS 카테고리 (Compute, Storage...)
+    "t": "trusted_advisor",  # Trusted Advisor 영역 (보안, 비용, 성능...)
     "f": "favorites",
+    "g": "profile_groups",
     "p": "profiles",
     "0": "exit",
     "q": "exit",
@@ -126,7 +133,7 @@ class MainMenu:
         from rich.table import Table
 
         self.console.print()
-        self.console.print("[bold]명령어[/bold]")
+        self.console.print("[bold]도구 탐색[/bold]")
 
         # Rich Table로 정렬
         cmd_table = Table(
@@ -136,26 +143,64 @@ class MainMenu:
             pad_edge=False,
         )
         cmd_table.add_column(width=2)  # 키
-        cmd_table.add_column(width=10)  # 설명
+        cmd_table.add_column(width=14)  # 설명
         cmd_table.add_column(width=2)  # 키
-        cmd_table.add_column(width=10)  # 설명
+        cmd_table.add_column(width=14)  # 설명
         cmd_table.add_column(width=2)  # 키
-        cmd_table.add_column(width=10)  # 설명
+        cmd_table.add_column(width=14)  # 설명
 
         cmd_table.add_row(
-            "[dim]a[/dim]", "전체 도구",
-            "[dim]b[/dim]", "서비스별",
-            "[dim]c[/dim]", "카테고리",
+            "[dim]a[/dim]",
+            "전체 도구",
+            "[dim]s[/dim]",
+            "AWS 서비스",
+            "[dim]c[/dim]",
+            "AWS 분류",
         )
         cmd_table.add_row(
-            "[dim]f[/dim]", "즐겨찾기",
-            "[dim]p[/dim]", "프로필",
-            "[dim]q[/dim]", "종료",
+            "[dim]t[/dim]",
+            "점검 유형",
+            "",
+            "",
+            "",
+            "",
         )
-
         self.console.print(cmd_table)
+
         self.console.print()
-        self.console.print("[dim]검색: 키워드 또는 /cost /security /ops /inv[/dim]")
+        self.console.print("[bold]설정[/bold]")
+        cmd_table2 = Table(
+            show_header=False,
+            box=None,
+            padding=(0, 1),
+            pad_edge=False,
+        )
+        cmd_table2.add_column(width=2)
+        cmd_table2.add_column(width=14)
+        cmd_table2.add_column(width=2)
+        cmd_table2.add_column(width=14)
+        cmd_table2.add_column(width=2)
+        cmd_table2.add_column(width=14)
+        cmd_table2.add_row(
+            "[dim]f[/dim]",
+            "즐겨찾기",
+            "[dim]p[/dim]",
+            "프로필",
+            "[dim]g[/dim]",
+            "프로필그룹",
+        )
+        cmd_table2.add_row(
+            "[dim]q[/dim]",
+            "종료",
+            "",
+            "",
+            "",
+            "",
+        )
+        self.console.print(cmd_table2)
+
+        self.console.print()
+        self.console.print("[dim]검색: 키워드 입력[/dim]")
 
     def _print_footer(self) -> None:
         """하단 안내 출력"""
@@ -246,6 +291,11 @@ class MainMenu:
             self._show_aws_category_view()
             return True
 
+        if action == "trusted_advisor":
+            # Trusted Advisor 영역별 탐색
+            self._show_trusted_advisor_view()
+            return True
+
         if action == "favorite_select":
             # 즐겨찾기 도구 직접 실행
             self._run_tool_directly(data.category, data.tool_module)
@@ -266,6 +316,10 @@ class MainMenu:
 
         if action == "profiles":
             self._show_profiles()
+            return True
+
+        if action == "profile_groups":
+            self._manage_profile_groups()
             return True
 
         return True
@@ -366,12 +420,14 @@ class MainMenu:
             cat_name = cat.get("name", "")
             cat_display = cat.get("display_name", cat_name)
             for tool in cat.get("tools", []):
-                all_tools.append({
-                    "category": cat_name,
-                    "category_display": cat_display,
-                    "tool_module": tool.get("module", ""),
-                    **tool
-                })
+                all_tools.append(
+                    {
+                        "category": cat_name,
+                        "category_display": cat_display,
+                        "tool_module": tool.get("module", ""),
+                        **tool,
+                    }
+                )
 
         # area 필터링
         results = [(i, t) for i, t in enumerate(all_tools, 1) if t.get("area") == area]
@@ -423,7 +479,9 @@ class MainMenu:
                 idx = int(choice)
                 if 1 <= idx <= len(results):
                     _, selected = results[idx - 1]
-                    self._run_tool_directly(selected["category"], selected["tool_module"])
+                    self._run_tool_directly(
+                        selected["category"], selected["tool_module"]
+                    )
                     return
 
             self.console.print(f"[red]0-{len(results)} 범위의 번호를 입력하세요.[/]")
@@ -443,7 +501,12 @@ class MainMenu:
             tools = cat.get("tools", [])
             for tool in tools:
                 all_tools.append(
-                    {"category": cat_name, "category_display": cat_display, "category_desc": cat_desc, **tool}
+                    {
+                        "category": cat_name,
+                        "category_display": cat_display,
+                        "category_desc": cat_desc,
+                        **tool,
+                    }
                 )
 
         total_count = len(all_tools)
@@ -633,11 +696,19 @@ class MainMenu:
         self.console.print()
 
         # 메뉴 탐색
-        self.console.print("[bold yellow]메뉴 명령어[/bold yellow]")
+        self.console.print("[bold yellow]도구 탐색[/bold yellow]")
         self.console.print("  [cyan]a[/cyan]  전체 도구      모든 도구를 한 화면에 표시")
-        self.console.print("  [cyan]b[/cyan]  서비스별       AWS 서비스별 목록 (EC2, RDS...)")
-        self.console.print("  [cyan]c[/cyan]  카테고리       AWS 카테고리별 탐색 (Compute, Storage...)")
+        self.console.print("  [cyan]s[/cyan]  AWS 서비스     서비스별 목록 (EC2, ELB, VPC...)")
+        self.console.print(
+            "  [cyan]c[/cyan]  AWS 분류       카테고리별 탐색 (Compute, Storage...)"
+        )
+        self.console.print(
+            "  [cyan]t[/cyan]  점검 유형      TA 영역별 (보안, 비용, 성능...)"
+        )
         self.console.print("  [cyan]f[/cyan]  즐겨찾기       자주 사용하는 도구 추가/제거")
+        self.console.print()
+        self.console.print("[bold yellow]설정[/bold yellow]")
+        self.console.print("  [cyan]g[/cyan]  프로필그룹     프로필 그룹 관리")
         self.console.print("  [cyan]p[/cyan]  프로필         AWS 프로필 전환 (SSO/Access Key)")
         self.console.print("  [cyan]h[/cyan]  도움말         이 화면 표시")
         self.console.print("  [cyan]q[/cyan]  종료           프로그램 종료")
@@ -655,7 +726,9 @@ class MainMenu:
         self.console.print("[bold yellow]도메인 필터[/bold yellow]")
         for area in AREA_REGISTRY:
             cmd = area["command"].ljust(12)
-            self.console.print(f"  [green]{cmd}[/green] {area['label']}, {area['desc']}")
+            self.console.print(
+                f"  [green]{cmd}[/green] {area['label']}, {area['desc']}"
+            )
         self.console.print()
 
         # CLI 직접 실행
@@ -881,7 +954,9 @@ class MainMenu:
 
                 # Static 프로파일
                 if static_profiles:
-                    self.console.print("[bold]IAM Access Key[/bold] [dim](정적 자격 증명)[/dim]")
+                    self.console.print(
+                        "[bold]IAM Access Key[/bold] [dim](정적 자격 증명)[/dim]"
+                    )
                     for name, cfg in static_profiles:
                         region_info = f" ({cfg.region})" if cfg and cfg.region else ""
                         self.console.print(f"  [yellow]●[/yellow] {name}{region_info}")
@@ -897,7 +972,9 @@ class MainMenu:
             if not sso_sessions and not profiles:
                 self.console.print("[dim]설정된 프로필이 없습니다.[/dim]")
                 self.console.print()
-                self.console.print("[dim]~/.aws/config 또는 ~/.aws/credentials를 확인하세요.[/dim]")
+                self.console.print(
+                    "[dim]~/.aws/config 또는 ~/.aws/credentials를 확인하세요.[/dim]"
+                )
 
         except Exception as e:
             self.console.print(f"[red]프로필 로드 실패: {e}[/red]")
@@ -915,6 +992,140 @@ class MainMenu:
 
         cache_dir = get_cache_dir("history")
         self.console.print(f"[dim]이력: {cache_dir}[/dim]")
+
+    def _show_trusted_advisor_view(self) -> None:
+        """Trusted Advisor 영역별 탐색 뷰"""
+        from rich.table import Table
+
+        # 모든 도구를 flat list로
+        all_tools = []
+        for cat in self._categories:
+            cat_name = cat.get("name", "")
+            cat_display = cat.get("display_name", cat_name)
+            for tool in cat.get("tools", []):
+                all_tools.append(
+                    {
+                        "category": cat_name,
+                        "category_display": cat_display,
+                        "tool_module": tool.get("module", ""),
+                        **tool,
+                    }
+                )
+
+        # 영역별 도구 수 계산
+        area_tool_counts = {}
+        for tool in all_tools:
+            area = tool.get("area", "")
+            if area:
+                area_tool_counts[area] = area_tool_counts.get(area, 0) + 1
+
+        while True:
+            self.console.print()
+            table = Table(
+                title="[bold]Trusted Advisor 영역[/bold]",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column("영역", width=12)
+            table.add_column("설명", width=25)
+            table.add_column("도구", width=6, justify="right")
+
+            for i, area in enumerate(AREA_REGISTRY, 1):
+                tool_count = area_tool_counts.get(area["key"], 0)
+                table.add_row(
+                    str(i),
+                    f"[{area['color']}]{area['label']}[/{area['color']}]",
+                    area["desc"],
+                    str(tool_count),
+                )
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print("[dim]0: 돌아가기[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(AREA_REGISTRY):
+                    selected_area = AREA_REGISTRY[idx - 1]
+                    self._show_tools_in_area(selected_area, all_tools)
+                else:
+                    self.console.print(
+                        f"[red]1-{len(AREA_REGISTRY)} 범위의 번호를 입력하세요.[/]"
+                    )
+
+    def _show_tools_in_area(self, area: dict, all_tools: list) -> None:
+        """영역 내 도구 목록 표시 및 선택"""
+        from rich.table import Table
+
+        area_key = area["key"]
+        tools = [t for t in all_tools if t.get("area") == area_key]
+
+        if not tools:
+            self.console.print(f"[yellow]{area['label']} 영역에 도구가 없습니다.[/]")
+            wait_for_any_key()
+            return
+
+        while True:
+            self.console.print()
+            table = Table(
+                title=f"[bold][{area['color']}]{area['label']}[/{area['color']}][/bold] ({len(tools)}개)",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column("서비스", width=12)
+            table.add_column("도구", width=25)
+            table.add_column("권한", width=6)
+            table.add_column("설명", style="dim")
+
+            for i, tool in enumerate(tools, 1):
+                perm = tool.get("permission", "read")
+                perm_color = PERMISSION_COLORS.get(perm, "green")
+                table.add_row(
+                    str(i),
+                    tool.get("category_display", tool["category"]).upper(),
+                    tool.get("name", ""),
+                    f"[{perm_color}]{perm}[/{perm_color}]",
+                    (tool.get("description", "") or "")[:35],
+                )
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print("[dim]0: 돌아가기[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(tools):
+                    selected_tool = tools[idx - 1]
+                    self._run_tool_directly(
+                        selected_tool["category"], selected_tool["tool_module"]
+                    )
+                    return
+                else:
+                    self.console.print(f"[red]1-{len(tools)} 범위의 번호를 입력하세요.[/]")
 
     def _show_aws_category_view(self) -> None:
         """AWS 카테고리별 탐색 뷰"""
@@ -971,7 +1182,9 @@ class MainMenu:
                     selected_cat = aws_categories[idx - 1]
                     self._show_services_in_category(selected_cat)
                 else:
-                    self.console.print(f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(
+                        f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]"
+                    )
 
     def _show_services_in_category(self, aws_category: Dict) -> None:
         """AWS 카테고리 내 서비스(플러그인) 목록 표시"""
@@ -1066,7 +1279,9 @@ class MainMenu:
                     str(i),
                     tool.get("name", ""),
                     f"[{perm_color}]{perm}[/{perm_color}]",
-                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
+                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]"
+                    if area
+                    else "",
                     (tool.get("description", "") or "")[:35],
                 )
 
@@ -1091,6 +1306,297 @@ class MainMenu:
                     return
                 else:
                     self.console.print(f"[red]1-{len(tools)} 범위의 번호를 입력하세요.[/]")
+
+    def _get_profiles_by_kind(self, kind: str) -> list:
+        """인증 타입별 프로파일 목록 조회
+
+        Args:
+            kind: "sso_profile" 또는 "static"
+
+        Returns:
+            프로파일 이름 목록
+        """
+        from core.auth import detect_provider_type, list_profiles, load_config
+        from core.auth.types import ProviderType
+
+        result = []
+        try:
+            config_data = load_config()
+
+            for profile_name in list_profiles():
+                profile_config = config_data.profiles.get(profile_name)
+                if not profile_config:
+                    continue
+
+                provider_type = detect_provider_type(profile_config)
+
+                if kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE:
+                    result.append(profile_name)
+                elif kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS:
+                    result.append(profile_name)
+        except Exception:
+            pass
+
+        return result
+
+    def _manage_profile_groups(self) -> None:
+        """프로파일 그룹 관리"""
+        from core.tools.history import ProfileGroupsManager
+
+        manager = ProfileGroupsManager()
+
+        while True:
+            self.console.print()
+            self.console.print("[bold]프로파일 그룹 관리[/bold]")
+            self.console.print()
+
+            groups = manager.get_all()
+
+            if groups:
+                kind_labels = {"sso_profile": "SSO", "static": "Key"}
+                for i, g in enumerate(groups, 1):
+                    kind_label = kind_labels.get(g.kind, g.kind)
+                    profiles_preview = ", ".join(g.profiles[:2])
+                    if len(g.profiles) > 2:
+                        profiles_preview += f" 외 {len(g.profiles) - 2}개"
+                    self.console.print(
+                        f"  {i:>2}. [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]"
+                    )
+                self.console.print()
+            else:
+                self.console.print("[dim]저장된 그룹이 없습니다.[/dim]")
+                self.console.print()
+
+            # 메뉴 옵션
+            self.console.print(
+                "[dim]a[/dim] 추가"
+                + (
+                    "  [dim]d[/dim] 삭제  [dim]e[/dim] 수정  [dim]u[/dim] 위로  [dim]n[/dim] 아래로"
+                    if groups
+                    else ""
+                )
+                + "  [dim]0[/dim] 돌아가기"
+            )
+            self.console.print()
+
+            choice = self.console.input("[bold]선택:[/bold] ").strip().lower()
+
+            if choice == "0" or choice == "":
+                return
+
+            if choice == "a":
+                self._add_profile_group_interactive(manager)
+            elif choice == "d" and groups:
+                self._remove_profile_group_interactive(manager, groups)
+            elif choice == "e" and groups:
+                self._edit_profile_group_interactive(manager, groups)
+            elif choice == "u" and groups:
+                self._reorder_profile_group_interactive(manager, groups, "up")
+            elif choice == "n" and groups:
+                self._reorder_profile_group_interactive(manager, groups, "down")
+
+    def _add_profile_group_interactive(self, manager) -> None:
+        """프로파일 그룹 추가"""
+        self.console.print()
+        self.console.print("[bold]프로파일 그룹 추가[/bold]")
+        self.console.print()
+
+        # 1. 인증 타입 선택
+        self.console.print("그룹에 포함할 인증 타입을 선택하세요:")
+        self.console.print("  [cyan]1)[/cyan] SSO 프로파일")
+        self.console.print("  [cyan]2)[/cyan] IAM Access Key")
+        self.console.print("  [dim]0) 취소[/dim]")
+        self.console.print()
+
+        choice = self.console.input("선택: ").strip()
+        if choice == "0" or not choice:
+            return
+        if choice not in ("1", "2"):
+            self.console.print("[red]1 또는 2를 입력하세요.[/red]")
+            return
+
+        kind = "sso_profile" if choice == "1" else "static"
+
+        # 2. 해당 타입의 프로파일 목록 가져오기
+        available = self._get_profiles_by_kind(kind)
+        type_label = "SSO 프로파일" if kind == "sso_profile" else "IAM Access Key"
+
+        if not available:
+            self.console.print(f"\n[red]사용 가능한 {type_label}이 없습니다.[/red]")
+            return
+
+        # 3. 프로파일 선택 (멀티)
+        self.console.print()
+        self.console.print(f"[bold]{type_label} 선택[/bold] (2개 이상 선택)")
+        self.console.print()
+        for i, p in enumerate(available, 1):
+            self.console.print(f"  [cyan]{i:2})[/cyan] {p}")
+        self.console.print()
+        self.console.print("[dim]예: 1 2 3 또는 1,2,3 또는 1-3[/dim]")
+        self.console.print("[dim]0) 취소[/dim]")
+
+        selection = self.console.input("선택: ").strip()
+        if selection == "0" or not selection:
+            return
+
+        selected = self._parse_multi_selection(selection, len(available))
+        if len(selected) < 2:
+            self.console.print("[red]그룹은 2개 이상 프로파일이 필요합니다. (1개면 단일 선택 사용)[/red]")
+            return
+
+        selected_profiles = [available[i] for i in selected]
+
+        # 4. 그룹 이름 입력
+        self.console.print()
+        self.console.print(f"선택된 프로파일: {', '.join(selected_profiles)}")
+        self.console.print()
+        name = self.console.input("그룹 이름 (취소: Enter): ").strip()
+
+        if not name:
+            return
+
+        # 5. 저장
+        if manager.add(name, kind, selected_profiles):
+            self.console.print(
+                f"[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]"
+            )
+        else:
+            self.console.print("[red]저장 실패 (이름 중복 또는 최대 개수 초과)[/red]")
+
+    def _parse_multi_selection(self, selection: str, max_count: int) -> list:
+        """선택 문자열 파싱 (1 2 3, 1,2,3, 1-3 지원)"""
+        result = set()
+        selection = selection.strip()
+
+        parts = selection.replace(",", " ").split()
+
+        for part in parts:
+            if "-" in part and not part.startswith("-"):
+                try:
+                    start, end = part.split("-", 1)
+                    start, end = int(start), int(end)
+                    for i in range(start, end + 1):
+                        if 1 <= i <= max_count:
+                            result.add(i - 1)
+                except ValueError:
+                    continue
+            else:
+                try:
+                    num = int(part)
+                    if 1 <= num <= max_count:
+                        result.add(num - 1)
+                except ValueError:
+                    continue
+
+        return sorted(result)
+
+    def _remove_profile_group_interactive(self, manager, groups) -> None:
+        """프로파일 그룹 삭제"""
+        self.console.print()
+        self.console.print("[bold]삭제할 번호[/bold] [dim](취소: Enter)[/dim]")
+
+        choice = self.console.input("번호: ").strip()
+
+        if not choice:
+            return
+
+        if choice.isdigit():
+            idx = int(choice)
+            if 1 <= idx <= len(groups):
+                group = groups[idx - 1]
+                manager.remove(group.name)
+                self.console.print(f"[dim]'{group.name}' 삭제됨[/dim]")
+            else:
+                self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
+
+    def _edit_profile_group_interactive(self, manager, groups) -> None:
+        """프로파일 그룹 수정"""
+        self.console.print()
+        self.console.print("[bold]수정할 번호[/bold] [dim](취소: Enter)[/dim]")
+
+        choice = self.console.input("번호: ").strip()
+
+        if not choice:
+            return
+
+        if not choice.isdigit():
+            return
+
+        idx = int(choice)
+        if not 1 <= idx <= len(groups):
+            self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
+            return
+
+        group = groups[idx - 1]
+
+        self.console.print()
+        self.console.print(f"[bold]'{group.name}' 수정[/bold]")
+        self.console.print()
+        self.console.print("  1) 이름 변경")
+        self.console.print("  2) 프로파일 변경")
+        self.console.print("  [dim]0) 취소[/dim]")
+
+        edit_choice = self.console.input("선택: ").strip()
+
+        if edit_choice == "1":
+            new_name = self.console.input("새 이름: ").strip()
+            if new_name:
+                if manager.update(group.name, new_name=new_name):
+                    self.console.print(f"[dim]이름 변경됨: {new_name}[/dim]")
+                else:
+                    self.console.print("[red]변경 실패 (이름 중복)[/red]")
+
+        elif edit_choice == "2":
+            available = self._get_profiles_by_kind(group.kind)
+
+            if not available:
+                self.console.print("[red]사용 가능한 프로파일이 없습니다.[/red]")
+                return
+
+            self.console.print()
+            for i, p in enumerate(available, 1):
+                marker = " *" if p in group.profiles else ""
+                self.console.print(f"  [cyan]{i:2})[/cyan] {p}{marker}")
+            self.console.print()
+            self.console.print("[dim]예: 1 2 3 또는 1,2,3 또는 1-3[/dim]")
+
+            selection = self.console.input("새 프로파일 선택: ").strip()
+            if not selection:
+                return
+
+            selected = self._parse_multi_selection(selection, len(available))
+            if selected:
+                new_profiles = [available[i] for i in selected]
+                if manager.update(group.name, profiles=new_profiles):
+                    self.console.print(f"[dim]프로파일 변경됨 ({len(new_profiles)}개)[/dim]")
+
+    def _reorder_profile_group_interactive(self, manager, groups, direction: str) -> None:
+        """프로파일 그룹 순서 변경"""
+        self.console.print()
+        label = "위로" if direction == "up" else "아래로"
+        self.console.print(f"[bold]{label} 이동할 번호[/bold] [dim](취소: Enter)[/dim]")
+
+        choice = self.console.input("번호: ").strip()
+
+        if not choice:
+            return
+
+        if choice.isdigit():
+            idx = int(choice)
+            if 1 <= idx <= len(groups):
+                group = groups[idx - 1]
+                if direction == "up":
+                    success = manager.move_up(group.name)
+                else:
+                    success = manager.move_down(group.name)
+
+                if success:
+                    self.console.print(f"[dim]'{group.name}' 이동됨[/dim]")
+                else:
+                    pos = "최상위" if direction == "up" else "최하위"
+                    self.console.print(f"[dim]이미 {pos}[/dim]")
+            else:
+                self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
 
 
 def show_main_menu() -> None:

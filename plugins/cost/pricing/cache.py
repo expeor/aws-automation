@@ -133,15 +133,17 @@ class PriceCache:
                         data = json.load(fp)
                     cached_at = datetime.fromisoformat(data.get("cached_at", ""))
                     age_days = (datetime.now() - cached_at).days
-                    info["files"].append({
-                        "name": f.name,
-                        "service": data.get("service"),
-                        "region": data.get("region"),
-                        "cached_at": data.get("cached_at"),
-                        "age_days": age_days,
-                        "expired": age_days > self.ttl_days,
-                        "item_count": len(data.get("prices", {})),
-                    })
+                    info["files"].append(
+                        {
+                            "name": f.name,
+                            "service": data.get("service"),
+                            "region": data.get("region"),
+                            "cached_at": data.get("cached_at"),
+                            "age_days": age_days,
+                            "expired": age_days > self.ttl_days,
+                            "item_count": len(data.get("prices", {})),
+                        }
+                    )
                 except Exception:
                     info["files"].append({"name": f.name, "error": True})
 

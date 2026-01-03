@@ -92,7 +92,13 @@ class CategoryStep:
             # 도구 선택 (이전 메뉴 시 전체 메뉴로)
             while True:
                 ctx.category = category["name"]
-                tool = self._select_tool(category)
+                # sub_services가 있고 이미 필터링되지 않은 경우 서브메뉴 표시
+                display_category = self._apply_sub_service_menu(category)
+                if display_category is None:
+                    # 이전 메뉴 선택
+                    category = self._select_category(categories)
+                    continue
+                tool = self._select_tool(display_category)
                 if tool is not None:
                     break
                 # 이전 메뉴 선택 시 전체 카테고리 메뉴로
@@ -102,7 +108,12 @@ class CategoryStep:
             while True:
                 category = self._select_category(categories)
                 ctx.category = category["name"]
-                tool = self._select_tool(category)
+                # sub_services가 있으면 서브메뉴 표시
+                display_category = self._apply_sub_service_menu(category)
+                if display_category is None:
+                    # 이전 메뉴 선택 시 카테고리 선택으로 돌아감
+                    continue
+                tool = self._select_tool(display_category)
                 if tool is not None:
                     break
                 # 이전 메뉴 선택 시 카테고리 선택으로 돌아감
@@ -110,12 +121,119 @@ class CategoryStep:
         ctx.tool = _convert_to_tool_info(tool, category["name"])
         return ctx
 
+    def _apply_sub_service_menu(self, category: Dict) -> Optional[Dict]:
+        """sub_services가 있으면 서브메뉴 표시, 없으면 원본 반환
+
+        Returns:
+            선택된 카테고리 (필터링됨), 또는 None (이전 메뉴)
+        """
+        sub_services = category.get("sub_services", [])
+
+        # sub_services가 없거나 이미 필터링된 경우 (CLI에서 직접 aa alb 실행)
+        if not sub_services or category.get("_sub_service_filter"):
+            return category
+
+        # 도구가 있는 sub_service만 필터링
+        tools = category.get("tools", [])
+        sub_svc_with_tools = []
+        for sub_svc in sub_services:
+            count = len([t for t in tools if t.get("sub_service") == sub_svc])
+            if count > 0:
+                sub_svc_with_tools.append((sub_svc, count))
+
+        # sub_service에 도구가 하나도 없으면 서브메뉴 스킵
+        if not sub_svc_with_tools:
+            return category
+
+        return self._select_sub_service(category, sub_svc_with_tools)
+
     def _find_category(self, categories: List[Dict], name: str) -> Optional[Dict]:
-        """이름으로 카테고리 검색"""
-        for cat in categories:
-            if cat["name"] == name:
-                return cat
-        return None
+        """이름, 별칭, 또는 하위 서비스명으로 카테고리 검색
+
+        하위 서비스명으로 검색 시 해당 sub_service 도구만 필터링됨.
+        예: "alb" → elb 카테고리 + sub_service=="alb"인 도구만
+        """
+        from core.tools.discovery import resolve_category
+
+        return resolve_category(name)
+
+    def _select_sub_service(
+        self, category: Dict, sub_svc_with_tools: List[tuple]
+    ) -> Optional[Dict]:
+        """하위 서비스 선택 UI
+
+        Args:
+            category: 원본 카테고리
+            sub_svc_with_tools: [(sub_service_name, tool_count), ...]
+
+        Returns:
+            선택된 카테고리 (필터링됨), 또는 None (이전 메뉴)
+        """
+        display_name = category.get("display_name", category["name"]).upper()
+        tools = category.get("tools", [])
+
+        # 공통 도구 수 (sub_service 미지정)
+        common_count = len([t for t in tools if not t.get("sub_service")])
+
+        console.print()
+        print_box_start(f"{display_name} 하위 서비스")
+
+        # 전체 옵션
+        total_count = len(tools)
+        print_box_line(f" [cyan]1[/cyan]  전체 ({total_count}개)")
+
+        # 공통 도구가 있으면 표시
+        if common_count > 0:
+            print_box_line(f" [cyan]2[/cyan]  공통 ({common_count}개)")
+            offset = 2
+        else:
+            offset = 1
+
+        # 하위 서비스 옵션
+        for i, (sub_svc, count) in enumerate(sub_svc_with_tools, offset + 1):
+            print_box_line(f" [cyan]{i}[/cyan]  {sub_svc.upper()} ({count}개)")
+
+        print_box_line()
+        print_box_line(" [dim]0[/dim] 돌아가기")
+        print_box_end()
+
+        max_choice = offset + len(sub_svc_with_tools)
+
+        while True:
+            choice = console.input("> ").strip()
+            if not choice:
+                continue
+
+            try:
+                num = int(choice)
+                if num == 0:
+                    return None  # 이전 메뉴
+
+                if num == 1:
+                    # 전체 선택 → 원본 그대로
+                    return category
+
+                if common_count > 0 and num == 2:
+                    # 공통만 선택 → sub_service 없는 도구만
+                    filtered = category.copy()
+                    filtered["tools"] = [t for t in tools if not t.get("sub_service")]
+                    filtered["_sub_service_filter"] = "_common"
+                    return filtered
+
+                # 하위 서비스 선택
+                sub_idx = num - offset - 1
+                if 0 <= sub_idx < len(sub_svc_with_tools):
+                    selected_sub_svc = sub_svc_with_tools[sub_idx][0]
+                    filtered = category.copy()
+                    filtered["tools"] = [
+                        t for t in tools if t.get("sub_service") == selected_sub_svc
+                    ]
+                    filtered["_sub_service_filter"] = selected_sub_svc
+                    return filtered
+
+                console.print(f"[dim]0-{max_choice} 범위[/dim]")
+            except ValueError:
+                console.print("[dim]숫자 입력[/dim]")
 
     def _select_category(self, categories: List[Dict]) -> Dict:
         """카테고리 선택 UI (페이지네이션, 3열 지원)"""
@@ -155,7 +273,7 @@ class CategoryStep:
 
             # 테이블 생성
             console.print()
-            title = f"[bold]카테고리 선택[/bold] ({total_count}개)"
+            title = f"[bold]AWS 서비스[/bold] ({total_count}개)"
             if total_pages > 1:
                 title += f" - 페이지 {current_page}/{total_pages}"
 
@@ -182,7 +300,9 @@ class CategoryStep:
                     if item_idx < page_count:
                         global_idx = start_idx + item_idx + 1
                         item = page_items[item_idx]
-                        row_data.extend([str(global_idx), item["name"], str(item["count"])])
+                        row_data.extend(
+                            [str(global_idx), item["name"], str(item["count"])]
+                        )
                     else:
                         row_data.extend(["", "", ""])
                 table.add_row(*row_data)
@@ -314,7 +434,9 @@ class CategoryStep:
         table.add_column("설명", style="dim")
 
         for i, r in enumerate(results, 1):
-            table.add_row(str(i), r.category_display.upper(), r.tool_name, r.description[:30])
+            table.add_row(
+                str(i), r.category_display.upper(), r.tool_name, r.description[:30]
+            )
 
         console.print(table)
         console.print()

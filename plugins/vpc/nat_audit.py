@@ -10,101 +10,56 @@ NAT Gateway 비용 최적화:
     - run(ctx): 필수. 실행 함수.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from botocore.exceptions import ClientError
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
-from .nat_audit_analysis import (
-    NATCollector,
-    NATAnalyzer,
-    NATExcelReporter,
-)
+from .nat_audit_analysis import NATAnalyzer, NATCollector, NATExcelReporter
 
 console = Console()
+
+
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[Tuple[Any, Dict[str, Any]]]:
+    """단일 계정/리전의 NAT Gateway 수집 및 분석 (병렬 실행용)"""
+    collector = NATCollector()
+    audit_data = collector.collect(session, account_id, account_name, region)
+
+    if not audit_data.nat_gateways:
+        return None
+
+    analyzer = NATAnalyzer(audit_data)
+    analysis_result = analyzer.analyze()
+    stats = analyzer.get_summary_stats()
+
+    return (analysis_result, stats)
 
 
 def run(ctx) -> None:
     """NAT Gateway 미사용 분석 실행"""
     console.print("[bold]NAT Gateway 미사용 분석 시작...[/bold]")
 
-    # 1. 데이터 수집
+    # 병렬 수집 및 분석
     console.print("[cyan]Step 1: NAT Gateway 데이터 수집 중...[/cyan]")
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
-    collector = NATCollector()
+    # None 필터링 및 결과 분리
     all_results = []
     all_stats = []
+    for data in result.get_data():
+        if data is not None:
+            analysis_result, stats = data
+            all_results.append(analysis_result)
+            all_stats.append(stats)
 
-    # 계정/리전별 수집 추적
-    collected_pairs = set()
-
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                # STS로 Account ID 조회
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                # 계정+리전 조합 중복 방지
-                pair_key = f"{account_id}:{region}"
-                if pair_key in collected_pairs:
-                    continue
-                collected_pairs.add(pair_key)
-
-                # Account Name 결정
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} / {region}[/dim]")
-
-                # 데이터 수집
-                audit_data = collector.collect(session, account_id, account_name, region)
-
-                if not audit_data.nat_gateways:
-                    console.print(f"    [dim](NAT Gateway 없음)[/dim]")
-                    continue
-
-                # 분석
-                analyzer = NATAnalyzer(audit_data)
-                analysis_result = analyzer.analyze()
-                stats = analyzer.get_summary_stats()
-
-                all_results.append(analysis_result)
-                all_stats.append(stats)
-
-                # 간단 요약 출력
-                if stats["unused_count"] > 0:
-                    console.print(
-                        f"    [red]미사용: {stats['unused_count']}개[/red] "
-                        f"(월 ${stats['total_monthly_waste']:,.0f} 낭비)"
-                    )
-                elif stats["low_usage_count"] > 0:
-                    console.print(
-                        f"    [yellow]저사용: {stats['low_usage_count']}개[/yellow]"
-                    )
-                else:
-                    console.print(
-                        f"    [green]{stats['total_nat_count']}개 정상[/green]"
-                    )
-
-            except ClientError as e:
-                error_code = e.response.get("Error", {}).get("Code", "Unknown")
-                console.print(f"    [yellow]오류: {error_code}[/yellow]")
-                continue
-            except Exception as e:
-                console.print(f"    [red]오류: {e}[/red]")
-                continue
-
-    # 오류 출력
-    if collector.errors:
-        console.print(f"[dim]  (오류 {len(collector.errors)}건)[/dim]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not all_results:
         console.print("[yellow]분석할 NAT Gateway가 없습니다.[/yellow]")
@@ -124,14 +79,6 @@ def run(ctx) -> None:
     console.print("[bold green]보고서 생성 완료![/bold green]")
     console.print(f"  경로: {filepath}")
 
-    # 오류 출력
-    if collector.errors:
-        console.print(f"\n[yellow]수집 중 오류 {len(collector.errors)}건:[/yellow]")
-        for err in collector.errors[:5]:
-            console.print(f"  - {err}")
-        if len(collector.errors) > 5:
-            console.print(f"  ... 외 {len(collector.errors) - 5}건")
-
     # 폴더 열기
     open_in_explorer(output_path)
 
@@ -146,7 +93,9 @@ def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
         "normal_count": sum(s.get("normal_count", 0) for s in stats_list),
         "total_monthly_cost": sum(s.get("total_monthly_cost", 0) for s in stats_list),
         "total_monthly_waste": sum(s.get("total_monthly_waste", 0) for s in stats_list),
-        "total_annual_savings": sum(s.get("total_annual_savings", 0) for s in stats_list),
+        "total_annual_savings": sum(
+            s.get("total_annual_savings", 0) for s in stats_list
+        ),
     }
 
     console.print(f"\n  [bold]NAT Gateway:[/bold] 총 {totals['total_nat_count']}개")
@@ -156,21 +105,15 @@ def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
             f"    [red bold]미사용 (삭제 권장): {totals['unused_count']}개[/red bold]"
         )
     if totals["low_usage_count"] > 0:
-        console.print(
-            f"    [yellow]저사용 (검토 필요): {totals['low_usage_count']}개[/yellow]"
-        )
+        console.print(f"    [yellow]저사용 (검토 필요): {totals['low_usage_count']}개[/yellow]")
     if totals["normal_count"] > 0:
-        console.print(
-            f"    [green]정상 사용: {totals['normal_count']}개[/green]"
-        )
+        console.print(f"    [green]정상 사용: {totals['normal_count']}개[/green]")
 
     console.print(f"\n  [bold]비용:[/bold]")
     console.print(f"    월간 총 비용: ${totals['total_monthly_cost']:,.2f}")
 
     if totals["total_monthly_waste"] > 0:
-        console.print(
-            f"    [red]월간 낭비 추정: ${totals['total_monthly_waste']:,.2f}[/red]"
-        )
+        console.print(f"    [red]월간 낭비 추정: ${totals['total_monthly_waste']:,.2f}[/red]")
         console.print(
             f"    [red]연간 절감 가능: ${totals['total_annual_savings']:,.2f}[/red]"
         )

@@ -31,8 +31,8 @@ class CriticalPort:
 # AWS Trusted Advisor RED 포트 (9개)
 # 이 포트들이 0.0.0.0/0에 노출되면 HIGH
 TRUSTED_ADVISOR_RED_PORTS: Set[int] = {
-    20,    # FTP Data
-    21,    # FTP Control
+    20,  # FTP Data
+    21,  # FTP Control
     1433,  # MS SQL Server
     1434,  # MS SQL Server Browser
     3306,  # MySQL/MariaDB
@@ -45,8 +45,8 @@ TRUSTED_ADVISOR_RED_PORTS: Set[int] = {
 # AWS Trusted Advisor GREEN 포트 (4개)
 # 이 포트들은 0.0.0.0/0에 노출되어도 일반적으로 허용 (웹 서비스)
 WEB_PORTS: Set[int] = {
-    25,   # SMTP
-    80,   # HTTP
+    25,  # SMTP
+    80,  # HTTP
     443,  # HTTPS
     465,  # SMTPS
 }
@@ -54,19 +54,19 @@ WEB_PORTS: Set[int] = {
 # 추가 위험 포트 (CIS/NIST 기준)
 # AWS Trusted Advisor에는 없지만 보안 기준상 위험한 포트
 ADDITIONAL_RISKY_PORTS: Set[int] = {
-    22,     # SSH (AWS Trusted Advisor에서는 YELLOW지만 CIS에서는 제한 권장)
-    23,     # Telnet (평문 전송)
-    111,    # RPC Portmapper
-    135,    # MS RPC
-    137,    # NetBIOS NS
-    138,    # NetBIOS DGM
-    139,    # NetBIOS SSN
-    445,    # SMB/CIFS
-    1521,   # Oracle
-    2049,   # NFS
-    5900,   # VNC
-    6379,   # Redis
-    9200,   # Elasticsearch
+    22,  # SSH (AWS Trusted Advisor에서는 YELLOW지만 CIS에서는 제한 권장)
+    23,  # Telnet (평문 전송)
+    111,  # RPC Portmapper
+    135,  # MS RPC
+    137,  # NetBIOS NS
+    138,  # NetBIOS DGM
+    139,  # NetBIOS SSN
+    445,  # SMB/CIFS
+    1521,  # Oracle
+    2049,  # NFS
+    5900,  # VNC
+    6379,  # Redis
+    9200,  # Elasticsearch
     27017,  # MongoDB
 }
 
@@ -334,11 +334,7 @@ def check_port_range(from_port: int, to_port: int) -> List[CriticalPort]:
 
 def check_port_range_all(from_port: int, to_port: int) -> List[CriticalPort]:
     """포트 범위 내 모든 정의된 포트 조회 (웹 포트 포함)"""
-    return [
-        info
-        for port, info in PORT_INFO.items()
-        if from_port <= port <= to_port
-    ]
+    return [info for port, info in PORT_INFO.items() if from_port <= port <= to_port]
 
 
 # 하위 호환성을 위한 alias

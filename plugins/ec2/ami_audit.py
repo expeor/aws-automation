@@ -20,14 +20,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
-from botocore.exceptions import ClientError
 from dateutil.parser import parse
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_snapshot_monthly_cost
 
@@ -50,8 +46,8 @@ RECENT_DAYS = 14
 class UsageStatus(Enum):
     """사용 상태"""
 
-    UNUSED = "unused"       # 미사용
-    NORMAL = "normal"       # 사용 중
+    UNUSED = "unused"  # 미사용
+    NORMAL = "normal"  # 사용 중
 
 
 class Severity(Enum):
@@ -154,10 +150,12 @@ def collect_amis(
     session, account_id: str, account_name: str, region: str
 ) -> List[AMIInfo]:
     """AMI 목록 수집 (자체 소유만)"""
+    from botocore.exceptions import ClientError
+
     amis = []
 
     try:
-        ec2 = session.client("ec2", region_name=region)
+        ec2 = get_client(session, "ec2", region_name=region)
 
         # 자체 소유 AMI 조회
         response = ec2.describe_images(Owners=["self"])
@@ -215,17 +213,23 @@ def collect_amis(
             amis.append(ami)
 
     except ClientError as e:
-        console.print(f"    [yellow]AMI 수집 오류: {e}[/yellow]")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if not is_quiet():
+            console.print(
+                f"    [yellow]{account_name}/{region} AMI 수집 오류: {error_code}[/yellow]"
+            )
 
     return amis
 
 
 def get_used_ami_ids(session, region: str) -> Set[str]:
     """EC2 인스턴스에서 사용 중인 AMI ID 목록"""
+    from botocore.exceptions import ClientError
+
     used_ids = set()
 
     try:
-        ec2 = session.client("ec2", region_name=region)
+        ec2 = get_client(session, "ec2", region_name=region)
         paginator = ec2.get_paginator("describe_instances")
 
         for page in paginator.paginate():
@@ -249,7 +253,9 @@ def get_used_ami_ids(session, region: str) -> Set[str]:
 def analyze_amis(
     amis: List[AMIInfo],
     used_ami_ids: Set[str],
-    account_id: str, account_name: str, region: str
+    account_id: str,
+    account_name: str,
+    region: str,
 ) -> AMIAnalysisResult:
     """AMI 미사용 분석"""
     result = AMIAnalysisResult(
@@ -325,17 +331,27 @@ def _analyze_single_ami(ami: AMIInfo) -> AMIFinding:
 
 def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
-        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
+        UsageStatus.UNUSED: PatternFill(
+            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
+        ),
+        UsageStatus.NORMAL: PatternFill(
+            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
+        ),
     }
 
     # Summary
@@ -375,9 +391,21 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
 
     # Findings
     ws2 = wb.create_sheet("Findings")
-    headers = ["Account", "Region", "AMI ID", "Name", "Usage", "Severity",
-               "Size (GB)", "Age (days)", "Monthly Cost ($)", "Architecture",
-               "Created", "Description", "Recommendation"]
+    headers = [
+        "Account",
+        "Region",
+        "AMI ID",
+        "Name",
+        "Usage",
+        "Severity",
+        "Size (GB)",
+        "Age (days)",
+        "Monthly Cost ($)",
+        "Architecture",
+        "Created",
+        "Description",
+        "Recommendation",
+    ]
     ws2.append(headers)
 
     for cell in ws2[1]:
@@ -396,13 +424,23 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
 
     for f in all_findings:
         ami = f.ami
-        ws2.append([
-            ami.account_name, ami.region, ami.id, ami.name,
-            f.usage_status.value, f.severity.value, ami.total_size_gb,
-            ami.age_days, round(ami.monthly_cost, 2), ami.architecture,
-            ami.creation_date.strftime("%Y-%m-%d") if ami.creation_date else "",
-            f.description, f.recommendation,
-        ])
+        ws2.append(
+            [
+                ami.account_name,
+                ami.region,
+                ami.id,
+                ami.name,
+                f.usage_status.value,
+                f.severity.value,
+                ami.total_size_gb,
+                ami.age_days,
+                round(ami.monthly_cost, 2),
+                ami.architecture,
+                ami.creation_date.strftime("%Y-%m-%d") if ami.creation_date else "",
+                f.description,
+                f.recommendation,
+            ]
+        )
 
         fill = status_fills.get(f.usage_status)
         if fill:
@@ -412,7 +450,9 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
+                max(max_len + 2, 10), 50
+            )
 
     ws2.freeze_panes = "A2"
 
@@ -430,62 +470,40 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[AMIAnalysisResult]:
+    """단일 계정/리전의 AMI 수집 및 분석 (병렬 실행용)"""
+    # 수집
+    amis = collect_amis(session, account_id, account_name, region)
+
+    if not amis:
+        return None
+
+    # 사용 중인 AMI 조회
+    used_ami_ids = get_used_ami_ids(session, region)
+
+    # 분석
+    return analyze_amis(amis, used_ami_ids, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """AMI 미사용 분석 실행"""
     console.print("[bold]AMI 미사용 분석 시작...[/bold]")
     console.print(f"  [dim]기준: {RECENT_DAYS}일 이내 생성은 제외[/dim]")
 
-    all_results: List[AMIAnalysisResult] = []
-    collected = set()
+    # 병렬 수집 및 분석
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
+    # None 결과 필터링
+    all_results: List[AMIAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                # 계정명
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} / {region}[/dim]")
-
-                # 수집
-                amis = collect_amis(session, account_id, account_name, region)
-
-                if not amis:
-                    console.print(f"    [dim](없음)[/dim]")
-                    continue
-
-                # 사용 중인 AMI 조회
-                used_ami_ids = get_used_ami_ids(session, region)
-
-                # 분석
-                result = analyze_amis(amis, used_ami_ids, account_id, account_name, region)
-                all_results.append(result)
-
-                # 요약
-                if result.unused_count > 0:
-                    cost_str = f" (${result.unused_monthly_cost:.2f}/월)" if result.unused_monthly_cost > 0 else ""
-                    console.print(f"    [red]미사용 {result.unused_count}개 ({result.unused_size_gb}GB){cost_str}[/red]")
-                else:
-                    console.print(f"    [green]정상 {result.normal_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"    [yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"    [red]{e}[/red]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not all_results:
         console.print("[yellow]분석할 AMI 없음[/yellow]")
@@ -501,9 +519,13 @@ def run(ctx) -> None:
         "unused_cost": sum(r.unused_monthly_cost for r in all_results),
     }
 
-    console.print(f"\n[bold]전체 AMI: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
+    console.print(
+        f"\n[bold]전체 AMI: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
+    )
     if totals["unused"] > 0:
-        console.print(f"  [red bold]미사용: {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]")
+        console.print(
+            f"  [red bold]미사용: {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]"
+        )
     console.print(f"  [green]사용 중: {totals['normal']}개[/green]")
 
     # 보고서

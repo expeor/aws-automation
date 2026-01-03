@@ -6,6 +6,7 @@ plugins/secretsmanager - Secrets Manager 분석 도구
 
 CATEGORY = {
     "name": "secretsmanager",
+    "display_name": "Secrets Manager",
     "description": "Secrets Manager 시크릿 관리",
     "aliases": ["secrets", "sm"],
 }

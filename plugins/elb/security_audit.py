@@ -35,14 +35,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
 from core.config import settings
+from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
@@ -82,6 +78,8 @@ class SSLPolicyAnalyzer:
 
     def get_policy_details(self, policy_name: str) -> Optional[Dict]:
         """AWS API로 정책 상세 정보 조회"""
+        from botocore.exceptions import ClientError
+
         if policy_name in self._policy_cache:
             return self._policy_cache[policy_name]
 
@@ -205,15 +203,17 @@ class SSLPolicyAnalyzer:
 
 class RiskLevel(Enum):
     """위험 수준"""
-    CRITICAL = "critical"   # 즉시 조치 필요
-    HIGH = "high"           # 높은 위험
-    MEDIUM = "medium"       # 중간 위험
-    LOW = "low"             # 낮은 위험
-    INFO = "info"           # 참고
+
+    CRITICAL = "critical"  # 즉시 조치 필요
+    HIGH = "high"  # 높은 위험
+    MEDIUM = "medium"  # 중간 위험
+    LOW = "low"  # 낮은 위험
+    INFO = "info"  # 참고
 
 
 class FindingCategory(Enum):
     """발견 항목 카테고리"""
+
     SSL_TLS = "ssl_tls"
     WAF = "waf"
     ACCESS_LOG = "access_log"
@@ -225,6 +225,7 @@ class FindingCategory(Enum):
 @dataclass
 class SecurityFinding:
     """보안 발견 항목"""
+
     category: FindingCategory
     risk_level: RiskLevel
     title: str
@@ -236,6 +237,7 @@ class SecurityFinding:
 @dataclass
 class ListenerInfo:
     """리스너 정보"""
+
     arn: str
     protocol: str
     port: int
@@ -247,11 +249,12 @@ class ListenerInfo:
 @dataclass
 class LBSecurityInfo:
     """LB 보안 정보"""
+
     # 기본 정보
     arn: str
     name: str
     lb_type: str  # application, network, gateway, classic
-    scheme: str   # internet-facing, internal
+    scheme: str  # internet-facing, internal
     dns_name: str
     vpc_id: str
     state: str
@@ -301,6 +304,7 @@ class LBSecurityInfo:
 @dataclass
 class SecurityAuditResult:
     """보안 감사 결과"""
+
     account_id: str
     account_name: str
     region: str
@@ -323,10 +327,12 @@ def collect_v2_lb_security(
     session, account_id: str, account_name: str, region: str
 ) -> List[LBSecurityInfo]:
     """ALB/NLB/GWLB 보안 정보 수집"""
+    from botocore.exceptions import ClientError
+
     load_balancers = []
 
     try:
-        elbv2 = session.client("elbv2", region_name=region)
+        elbv2 = get_client(session, "elbv2", region_name=region)
 
         # Load Balancers 조회
         paginator = elbv2.get_paginator("describe_load_balancers")
@@ -369,7 +375,7 @@ def collect_v2_lb_security(
                 # WAF WebACL 조회 (ALB만)
                 if lb.lb_type == "application":
                     try:
-                        wafv2 = session.client("wafv2", region_name=region)
+                        wafv2 = get_client(session, "wafv2", region_name=region)
                         waf_resp = wafv2.get_web_acl_for_resource(ResourceArn=lb_arn)
                         if waf_resp.get("WebACL"):
                             lb.waf_web_acl_arn = waf_resp["WebACL"].get("ARN")
@@ -382,13 +388,19 @@ def collect_v2_lb_security(
                 load_balancers.append(lb)
 
     except ClientError as e:
-        console.print(f"    [yellow]ELBv2 수집 오류: {e}[/yellow]")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if not is_quiet():
+            console.print(
+                f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]"
+            )
 
     return load_balancers
 
 
 def _get_listeners(elbv2, lb_arn: str) -> List[ListenerInfo]:
     """리스너 정보 조회"""
+    from botocore.exceptions import ClientError
+
     listeners = []
 
     try:
@@ -401,8 +413,7 @@ def _get_listeners(elbv2, lb_arn: str) -> List[ListenerInfo]:
                 port=data.get("Port", 0),
                 ssl_policy=data.get("SslPolicy"),
                 certificates=[
-                    c.get("CertificateArn", "")
-                    for c in data.get("Certificates", [])
+                    c.get("CertificateArn", "") for c in data.get("Certificates", [])
                 ],
                 default_actions=data.get("DefaultActions", []),
             )
@@ -418,10 +429,12 @@ def collect_classic_lb_security(
     session, account_id: str, account_name: str, region: str
 ) -> List[LBSecurityInfo]:
     """CLB 보안 정보 수집"""
+    from botocore.exceptions import ClientError
+
     load_balancers = []
 
     try:
-        elb = session.client("elb", region_name=region)
+        elb = get_client(session, "elb", region_name=region)
 
         response = elb.describe_load_balancers()
 
@@ -444,10 +457,10 @@ def collect_classic_lb_security(
 
             # 속성 조회
             try:
-                attrs = elb.describe_load_balancer_attributes(
-                    LoadBalancerName=lb_name
+                attrs = elb.describe_load_balancer_attributes(LoadBalancerName=lb_name)
+                access_log = attrs.get("LoadBalancerAttributes", {}).get(
+                    "AccessLog", {}
                 )
-                access_log = attrs.get("LoadBalancerAttributes", {}).get("AccessLog", {})
                 lb.access_logs_enabled = access_log.get("Enabled", False)
                 lb.access_logs_bucket = access_log.get("S3BucketName", "")
             except ClientError:
@@ -468,7 +481,11 @@ def collect_classic_lb_security(
 
     except ClientError as e:
         if "not available" not in str(e).lower():
-            console.print(f"    [yellow]CLB 수집 오류: {e}[/yellow]")
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if not is_quiet():
+                console.print(
+                    f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]"
+                )
 
     return load_balancers
 
@@ -480,12 +497,13 @@ def collect_classic_lb_security(
 
 def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
     """개별 LB 보안 분석"""
+    from botocore.exceptions import ClientError
 
     # SSL 정책 분석기 생성 (ALB/NLB만, CLB는 None)
     ssl_analyzer: Optional[SSLPolicyAnalyzer] = None
     if lb.lb_type != "classic":
         try:
-            elbv2 = session.client("elbv2", region_name=region)
+            elbv2 = get_client(session, "elbv2", region_name=region)
             ssl_analyzer = SSLPolicyAnalyzer(elbv2)
         except ClientError:
             pass
@@ -509,7 +527,9 @@ def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
     _analyze_listener_security(lb)
 
 
-def _analyze_ssl_policy(lb: LBSecurityInfo, ssl_analyzer: Optional[SSLPolicyAnalyzer]) -> None:
+def _analyze_ssl_policy(
+    lb: LBSecurityInfo, ssl_analyzer: Optional[SSLPolicyAnalyzer]
+) -> None:
     """SSL/TLS 정책 분석 (AWS API 기반 동적 분석)"""
     for listener in lb.listeners:
         if listener.protocol not in ("HTTPS", "TLS"):
@@ -539,19 +559,21 @@ def _analyze_ssl_policy(lb: LBSecurityInfo, ssl_analyzer: Optional[SSLPolicyAnal
         }
         risk_level = risk_map.get(analysis["risk_level"], RiskLevel.MEDIUM)
 
-        lb.findings.append(SecurityFinding(
-            category=FindingCategory.SSL_TLS,
-            risk_level=risk_level,
-            title="취약한 TLS 정책 사용",
-            description=f"리스너 :{listener.port} - {', '.join(analysis['issues'])}",
-            recommendation=analysis["recommendation"],
-            details={
-                "listener_port": listener.port,
-                "current_policy": policy,
-                "protocols": analysis.get("protocols", []),
-                "weak_ciphers": analysis.get("weak_ciphers", []),
-            }
-        ))
+        lb.findings.append(
+            SecurityFinding(
+                category=FindingCategory.SSL_TLS,
+                risk_level=risk_level,
+                title="취약한 TLS 정책 사용",
+                description=f"리스너 :{listener.port} - {', '.join(analysis['issues'])}",
+                recommendation=analysis["recommendation"],
+                details={
+                    "listener_port": listener.port,
+                    "current_policy": policy,
+                    "protocols": analysis.get("protocols", []),
+                    "weak_ciphers": analysis.get("weak_ciphers", []),
+                },
+            )
+        )
 
 
 def _fallback_policy_analysis(policy_name: str) -> Dict[str, Any]:
@@ -586,6 +608,8 @@ def _fallback_policy_analysis(policy_name: str) -> Dict[str, Any]:
 
 def _analyze_certificates(lb: LBSecurityInfo, session, region: str) -> None:
     """인증서 분석"""
+    from botocore.exceptions import ClientError
+
     cert_arns: Set[str] = set()
     for listener in lb.listeners:
         cert_arns.update(listener.certificates)
@@ -594,7 +618,7 @@ def _analyze_certificates(lb: LBSecurityInfo, session, region: str) -> None:
         return
 
     try:
-        acm = session.client("acm", region_name=region)
+        acm = get_client(session, "acm", region_name=region)
 
         for cert_arn in cert_arns:
             try:
@@ -609,57 +633,65 @@ def _analyze_certificates(lb: LBSecurityInfo, session, region: str) -> None:
 
                     # 중앙 설정의 임계값 사용
                     if days_until_expiry < 0:
-                        lb.findings.append(SecurityFinding(
-                            category=FindingCategory.CERTIFICATE,
-                            risk_level=RiskLevel.CRITICAL,
-                            title="만료된 인증서",
-                            description=f"인증서가 {abs(days_until_expiry)}일 전에 만료됨",
-                            recommendation="즉시 인증서 갱신 필요",
-                            details={
-                                "certificate_arn": cert_arn,
-                                "expired_days_ago": abs(days_until_expiry),
-                                "domain": cert_detail.get("DomainName", ""),
-                            }
-                        ))
+                        lb.findings.append(
+                            SecurityFinding(
+                                category=FindingCategory.CERTIFICATE,
+                                risk_level=RiskLevel.CRITICAL,
+                                title="만료된 인증서",
+                                description=f"인증서가 {abs(days_until_expiry)}일 전에 만료됨",
+                                recommendation="즉시 인증서 갱신 필요",
+                                details={
+                                    "certificate_arn": cert_arn,
+                                    "expired_days_ago": abs(days_until_expiry),
+                                    "domain": cert_detail.get("DomainName", ""),
+                                },
+                            )
+                        )
                     elif days_until_expiry <= CERT_EXPIRY_CRITICAL:
-                        lb.findings.append(SecurityFinding(
-                            category=FindingCategory.CERTIFICATE,
-                            risk_level=RiskLevel.CRITICAL,
-                            title=f"인증서 만료 임박 ({CERT_EXPIRY_CRITICAL}일 이내)",
-                            description=f"인증서가 {days_until_expiry}일 후 만료 예정",
-                            recommendation="즉시 인증서 갱신",
-                            details={
-                                "certificate_arn": cert_arn,
-                                "days_until_expiry": days_until_expiry,
-                                "domain": cert_detail.get("DomainName", ""),
-                            }
-                        ))
+                        lb.findings.append(
+                            SecurityFinding(
+                                category=FindingCategory.CERTIFICATE,
+                                risk_level=RiskLevel.CRITICAL,
+                                title=f"인증서 만료 임박 ({CERT_EXPIRY_CRITICAL}일 이내)",
+                                description=f"인증서가 {days_until_expiry}일 후 만료 예정",
+                                recommendation="즉시 인증서 갱신",
+                                details={
+                                    "certificate_arn": cert_arn,
+                                    "days_until_expiry": days_until_expiry,
+                                    "domain": cert_detail.get("DomainName", ""),
+                                },
+                            )
+                        )
                     elif days_until_expiry <= CERT_EXPIRY_HIGH:
-                        lb.findings.append(SecurityFinding(
-                            category=FindingCategory.CERTIFICATE,
-                            risk_level=RiskLevel.HIGH,
-                            title=f"인증서 만료 임박 ({CERT_EXPIRY_HIGH}일 이내)",
-                            description=f"인증서가 {days_until_expiry}일 후 만료 예정",
-                            recommendation="인증서 갱신 계획 수립",
-                            details={
-                                "certificate_arn": cert_arn,
-                                "days_until_expiry": days_until_expiry,
-                                "domain": cert_detail.get("DomainName", ""),
-                            }
-                        ))
+                        lb.findings.append(
+                            SecurityFinding(
+                                category=FindingCategory.CERTIFICATE,
+                                risk_level=RiskLevel.HIGH,
+                                title=f"인증서 만료 임박 ({CERT_EXPIRY_HIGH}일 이내)",
+                                description=f"인증서가 {days_until_expiry}일 후 만료 예정",
+                                recommendation="인증서 갱신 계획 수립",
+                                details={
+                                    "certificate_arn": cert_arn,
+                                    "days_until_expiry": days_until_expiry,
+                                    "domain": cert_detail.get("DomainName", ""),
+                                },
+                            )
+                        )
                     elif days_until_expiry <= CERT_EXPIRY_MEDIUM:
-                        lb.findings.append(SecurityFinding(
-                            category=FindingCategory.CERTIFICATE,
-                            risk_level=RiskLevel.MEDIUM,
-                            title=f"인증서 만료 예정 ({CERT_EXPIRY_MEDIUM}일 이내)",
-                            description=f"인증서가 {days_until_expiry}일 후 만료 예정",
-                            recommendation="인증서 갱신 준비",
-                            details={
-                                "certificate_arn": cert_arn,
-                                "days_until_expiry": days_until_expiry,
-                                "domain": cert_detail.get("DomainName", ""),
-                            }
-                        ))
+                        lb.findings.append(
+                            SecurityFinding(
+                                category=FindingCategory.CERTIFICATE,
+                                risk_level=RiskLevel.MEDIUM,
+                                title=f"인증서 만료 예정 ({CERT_EXPIRY_MEDIUM}일 이내)",
+                                description=f"인증서가 {days_until_expiry}일 후 만료 예정",
+                                recommendation="인증서 갱신 준비",
+                                details={
+                                    "certificate_arn": cert_arn,
+                                    "days_until_expiry": days_until_expiry,
+                                    "domain": cert_detail.get("DomainName", ""),
+                                },
+                            )
+                        )
             except ClientError:
                 pass
     except ClientError:
@@ -672,42 +704,48 @@ def _analyze_waf(lb: LBSecurityInfo) -> None:
         return
 
     if lb.is_internet_facing and not lb.waf_web_acl_arn:
-        lb.findings.append(SecurityFinding(
-            category=FindingCategory.WAF,
-            risk_level=RiskLevel.HIGH,
-            title="WAF 미연결 (인터넷 페이싱)",
-            description="인터넷에 노출된 ALB에 WAF WebACL이 연결되지 않음",
-            recommendation="AWS WAF WebACL 연결하여 OWASP Top 10 공격 방어",
-            details={
-                "scheme": lb.scheme,
-                "dns_name": lb.dns_name,
-            }
-        ))
+        lb.findings.append(
+            SecurityFinding(
+                category=FindingCategory.WAF,
+                risk_level=RiskLevel.HIGH,
+                title="WAF 미연결 (인터넷 페이싱)",
+                description="인터넷에 노출된 ALB에 WAF WebACL이 연결되지 않음",
+                recommendation="AWS WAF WebACL 연결하여 OWASP Top 10 공격 방어",
+                details={
+                    "scheme": lb.scheme,
+                    "dns_name": lb.dns_name,
+                },
+            )
+        )
     elif not lb.is_internet_facing and not lb.waf_web_acl_arn:
-        lb.findings.append(SecurityFinding(
-            category=FindingCategory.WAF,
-            risk_level=RiskLevel.INFO,
-            title="WAF 미연결 (내부용)",
-            description="내부 ALB에 WAF WebACL 미연결",
-            recommendation="내부 트래픽도 WAF 보호 검토",
-            details={}
-        ))
+        lb.findings.append(
+            SecurityFinding(
+                category=FindingCategory.WAF,
+                risk_level=RiskLevel.INFO,
+                title="WAF 미연결 (내부용)",
+                description="내부 ALB에 WAF WebACL 미연결",
+                recommendation="내부 트래픽도 WAF 보호 검토",
+                details={},
+            )
+        )
 
 
 def _analyze_access_logs(lb: LBSecurityInfo) -> None:
     """액세스 로그 분석"""
     if not lb.access_logs_enabled:
         risk = RiskLevel.HIGH if lb.is_internet_facing else RiskLevel.MEDIUM
-        lb.findings.append(SecurityFinding(
-            category=FindingCategory.ACCESS_LOG,
-            risk_level=risk,
-            title="액세스 로그 비활성화",
-            description="액세스 로그가 활성화되지 않아 감사 추적 불가",
-            recommendation="S3 버킷에 액세스 로그 활성화",
-            details={
-                "scheme": lb.scheme,
-            }
-        ))
+        lb.findings.append(
+            SecurityFinding(
+                category=FindingCategory.ACCESS_LOG,
+                risk_level=risk,
+                title="액세스 로그 비활성화",
+                description="액세스 로그가 활성화되지 않아 감사 추적 불가",
+                recommendation="S3 버킷에 액세스 로그 활성화",
+                details={
+                    "scheme": lb.scheme,
+                },
+            )
+        )
 
 
 def _analyze_deletion_protection(lb: LBSecurityInfo) -> None:
@@ -718,22 +756,23 @@ def _analyze_deletion_protection(lb: LBSecurityInfo) -> None:
     if not lb.deletion_protection:
         # 중앙 설정의 패턴으로 프로덕션 판단
         is_production = any(
-            keyword in lb.name.lower()
-            for keyword in DELETION_PROTECTION_PATTERNS
+            keyword in lb.name.lower() for keyword in DELETION_PROTECTION_PATTERNS
         )
         risk = RiskLevel.HIGH if is_production else RiskLevel.LOW
 
-        lb.findings.append(SecurityFinding(
-            category=FindingCategory.DELETION_PROTECTION,
-            risk_level=risk,
-            title="삭제 보호 미설정",
-            description="실수로 인한 삭제 위험" + (" (프로덕션 추정)" if is_production else ""),
-            recommendation="삭제 보호 활성화",
-            details={
-                "is_production_suspected": is_production,
-                "matched_patterns": DELETION_PROTECTION_PATTERNS,
-            }
-        ))
+        lb.findings.append(
+            SecurityFinding(
+                category=FindingCategory.DELETION_PROTECTION,
+                risk_level=risk,
+                title="삭제 보호 미설정",
+                description="실수로 인한 삭제 위험" + (" (프로덕션 추정)" if is_production else ""),
+                recommendation="삭제 보호 활성화",
+                details={
+                    "is_production_suspected": is_production,
+                    "matched_patterns": DELETION_PROTECTION_PATTERNS,
+                },
+            )
+        )
 
 
 def _analyze_listener_security(lb: LBSecurityInfo) -> None:
@@ -746,37 +785,41 @@ def _analyze_listener_security(lb: LBSecurityInfo) -> None:
 
     # HTTP만 있고 HTTPS 없는 인터넷 페이싱 LB
     if lb.is_internet_facing and has_http and not has_https:
-        lb.findings.append(SecurityFinding(
-            category=FindingCategory.LISTENER,
-            risk_level=RiskLevel.CRITICAL,
-            title="HTTPS 리스너 없음 (인터넷 페이싱)",
-            description="인터넷에 노출된 LB가 HTTPS 없이 HTTP만 사용",
-            recommendation="HTTPS 리스너 추가 및 인증서 적용",
-            details={
-                "protocols": [l.protocol for l in lb.listeners],
-            }
-        ))
+        lb.findings.append(
+            SecurityFinding(
+                category=FindingCategory.LISTENER,
+                risk_level=RiskLevel.CRITICAL,
+                title="HTTPS 리스너 없음 (인터넷 페이싱)",
+                description="인터넷에 노출된 LB가 HTTPS 없이 HTTP만 사용",
+                recommendation="HTTPS 리스너 추가 및 인증서 적용",
+                details={
+                    "protocols": [l.protocol for l in lb.listeners],
+                },
+            )
+        )
 
     # HTTP와 HTTPS 모두 있지만 리다이렉트 미설정
     if has_http and has_https and lb.lb_type == "application":
         http_listeners = [l for l in lb.listeners if l.protocol == "HTTP"]
         for http_listener in http_listeners:
             has_redirect = any(
-                action.get("Type") == "redirect" and
-                action.get("RedirectConfig", {}).get("Protocol") == "HTTPS"
+                action.get("Type") == "redirect"
+                and action.get("RedirectConfig", {}).get("Protocol") == "HTTPS"
                 for action in http_listener.default_actions
             )
             if not has_redirect:
-                lb.findings.append(SecurityFinding(
-                    category=FindingCategory.LISTENER,
-                    risk_level=RiskLevel.MEDIUM,
-                    title="HTTP→HTTPS 리다이렉트 미설정",
-                    description=f"HTTP :{http_listener.port} 리스너에 HTTPS 리다이렉트 없음",
-                    recommendation="HTTP 요청을 HTTPS로 리다이렉트하도록 설정",
-                    details={
-                        "http_port": http_listener.port,
-                    }
-                ))
+                lb.findings.append(
+                    SecurityFinding(
+                        category=FindingCategory.LISTENER,
+                        risk_level=RiskLevel.MEDIUM,
+                        title="HTTP→HTTPS 리다이렉트 미설정",
+                        description=f"HTTP :{http_listener.port} 리스너에 HTTPS 리다이렉트 없음",
+                        recommendation="HTTP 요청을 HTTPS로 리다이렉트하도록 설정",
+                        details={
+                            "http_port": http_listener.port,
+                        },
+                    )
+                )
 
 
 def analyze_all(
@@ -784,7 +827,7 @@ def analyze_all(
     session,
     region: str,
     account_id: str,
-    account_name: str
+    account_name: str,
 ) -> SecurityAuditResult:
     """전체 LB 보안 분석"""
     result = SecurityAuditResult(
@@ -819,24 +862,42 @@ def analyze_all(
 
 def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="2C3E50", end_color="2C3E50", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     risk_fills = {
-        RiskLevel.CRITICAL: PatternFill(start_color="C0392B", end_color="C0392B", fill_type="solid"),
-        RiskLevel.HIGH: PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid"),
-        RiskLevel.MEDIUM: PatternFill(start_color="F39C12", end_color="F39C12", fill_type="solid"),
-        RiskLevel.LOW: PatternFill(start_color="3498DB", end_color="3498DB", fill_type="solid"),
-        RiskLevel.INFO: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
+        RiskLevel.CRITICAL: PatternFill(
+            start_color="C0392B", end_color="C0392B", fill_type="solid"
+        ),
+        RiskLevel.HIGH: PatternFill(
+            start_color="E74C3C", end_color="E74C3C", fill_type="solid"
+        ),
+        RiskLevel.MEDIUM: PatternFill(
+            start_color="F39C12", end_color="F39C12", fill_type="solid"
+        ),
+        RiskLevel.LOW: PatternFill(
+            start_color="3498DB", end_color="3498DB", fill_type="solid"
+        ),
+        RiskLevel.INFO: PatternFill(
+            start_color="95A5A6", end_color="95A5A6", fill_type="solid"
+        ),
     }
 
     risk_fonts = {
@@ -889,8 +950,18 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
 
     # Findings 시트
     ws2 = wb.create_sheet("Findings")
-    headers = ["Account", "Region", "LB Name", "Type", "Scheme", "Category",
-               "Risk", "Title", "Description", "Recommendation"]
+    headers = [
+        "Account",
+        "Region",
+        "LB Name",
+        "Type",
+        "Scheme",
+        "Category",
+        "Risk",
+        "Title",
+        "Description",
+        "Recommendation",
+    ]
     for col, h in enumerate(headers, 1):
         cell = ws2.cell(row=1, column=col, value=h)
         cell.fill = header_fill
@@ -905,8 +976,13 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
                 all_findings.append((lb, finding))
 
     # 위험도순 정렬 (CRITICAL > HIGH > MEDIUM > LOW > INFO)
-    risk_order = {RiskLevel.CRITICAL: 0, RiskLevel.HIGH: 1, RiskLevel.MEDIUM: 2,
-                  RiskLevel.LOW: 3, RiskLevel.INFO: 4}
+    risk_order = {
+        RiskLevel.CRITICAL: 0,
+        RiskLevel.HIGH: 1,
+        RiskLevel.MEDIUM: 2,
+        RiskLevel.LOW: 3,
+        RiskLevel.INFO: 4,
+    }
     all_findings.sort(key=lambda x: risk_order.get(x[1].risk_level, 99))
 
     for lb, finding in all_findings:
@@ -930,9 +1006,20 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
 
     # Load Balancers 시트
     ws3 = wb.create_sheet("Load Balancers")
-    lb_headers = ["Account", "Region", "Name", "Type", "Scheme", "State",
-                  "Risk Score", "Findings", "Access Logs", "Deletion Protection",
-                  "WAF", "HTTPS"]
+    lb_headers = [
+        "Account",
+        "Region",
+        "Name",
+        "Type",
+        "Scheme",
+        "State",
+        "Risk Score",
+        "Findings",
+        "Access Logs",
+        "Deletion Protection",
+        "WAF",
+        "HTTPS",
+    ]
     for col, h in enumerate(lb_headers, 1):
         cell = ws3.cell(row=1, column=col, value=h)
         cell.fill = header_fill
@@ -950,10 +1037,18 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
             ws3.cell(row=row, column=6, value=lb.state).border = thin_border
             ws3.cell(row=row, column=7, value=lb.risk_score).border = thin_border
             ws3.cell(row=row, column=8, value=len(lb.findings)).border = thin_border
-            ws3.cell(row=row, column=9, value="Yes" if lb.access_logs_enabled else "No").border = thin_border
-            ws3.cell(row=row, column=10, value="Yes" if lb.deletion_protection else "No").border = thin_border
-            ws3.cell(row=row, column=11, value="Yes" if lb.waf_web_acl_arn else "No").border = thin_border
-            ws3.cell(row=row, column=12, value="Yes" if lb.has_https_listener else "No").border = thin_border
+            ws3.cell(
+                row=row, column=9, value="Yes" if lb.access_logs_enabled else "No"
+            ).border = thin_border
+            ws3.cell(
+                row=row, column=10, value="Yes" if lb.deletion_protection else "No"
+            ).border = thin_border
+            ws3.cell(
+                row=row, column=11, value="Yes" if lb.waf_web_acl_arn else "No"
+            ).border = thin_border
+            ws3.cell(
+                row=row, column=12, value="Yes" if lb.has_https_listener else "No"
+            ).border = thin_border
 
     # 열 너비 조정
     for sheet in wb.worksheets:
@@ -961,7 +1056,9 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 50
+                )
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -978,67 +1075,32 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[SecurityAuditResult]:
+    """단일 계정/리전의 ELB 보안 정보 수집 및 분석 (병렬 실행용)"""
+    v2_lbs = collect_v2_lb_security(session, account_id, account_name, region)
+    classic_lbs = collect_classic_lb_security(session, account_id, account_name, region)
+    all_lbs = v2_lbs + classic_lbs
+    if not all_lbs:
+        return None
+    return analyze_all(all_lbs, session, region, account_id, account_name)
+
+
 def run(ctx) -> None:
     """ELB 보안 감사 실행"""
     console.print("[bold]ELB Security Audit 시작...[/bold]")
     console.print("[dim]SSL/TLS, WAF, 액세스 로그, 삭제 보호, 인증서 만료 분석[/dim]\n")
 
-    all_results: List[SecurityAuditResult] = []
-    collected = set()
+    result = parallel_collect(
+        ctx, _collect_and_analyze, max_workers=20, service="elbv2"
+    )
+    all_results: List[SecurityAuditResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                # 계정명
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} / {region}[/dim]")
-
-                # 수집
-                v2_lbs = collect_v2_lb_security(session, account_id, account_name, region)
-                classic_lbs = collect_classic_lb_security(session, account_id, account_name, region)
-                all_lbs = v2_lbs + classic_lbs
-
-                if not all_lbs:
-                    console.print(f"    [dim](없음)[/dim]")
-                    continue
-
-                # 분석
-                result = analyze_all(all_lbs, session, region, account_id, account_name)
-                all_results.append(result)
-
-                # 요약
-                total_findings = result.critical_count + result.high_count + result.medium_count
-                if result.critical_count > 0:
-                    console.print(f"    [red bold]CRITICAL: {result.critical_count}[/red bold]", end=" ")
-                if result.high_count > 0:
-                    console.print(f"[red]HIGH: {result.high_count}[/red]", end=" ")
-                if result.medium_count > 0:
-                    console.print(f"[yellow]MEDIUM: {result.medium_count}[/yellow]", end=" ")
-                if total_findings == 0:
-                    console.print(f"    [green]이슈 없음[/green]")
-                else:
-                    console.print()
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"    [yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"    [red]{e}[/red]")
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not all_results:
         console.print("\n[yellow]분석할 ELB 없음[/yellow]")
@@ -1055,7 +1117,9 @@ def run(ctx) -> None:
 
     console.print(f"\n[bold]전체 LB: {totals['total']}개[/bold]")
     if totals["critical"] > 0:
-        console.print(f"  [red bold]CRITICAL: {totals['critical']}건[/red bold] - 즉시 조치 필요")
+        console.print(
+            f"  [red bold]CRITICAL: {totals['critical']}건[/red bold] - 즉시 조치 필요"
+        )
     if totals["high"] > 0:
         console.print(f"  [red]HIGH: {totals['high']}건[/red]")
     if totals["medium"] > 0:

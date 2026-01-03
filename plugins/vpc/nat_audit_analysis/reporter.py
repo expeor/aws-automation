@@ -5,58 +5,134 @@ NAT Gateway Excel 보고서 생성기
 1. Summary - 전체 요약 (미사용, 저사용, 비용)
 2. Findings - 상세 분석 결과
 3. All NAT Gateways - 전체 NAT Gateway 목록
+
+Note:
+    이 모듈은 Lazy Import 패턴을 사용합니다.
+    openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+if TYPE_CHECKING:
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill
 
-from .analyzer import NATAnalysisResult, NATFinding, UsageStatus, Severity, Confidence
+from .analyzer import Confidence, NATAnalysisResult, NATFinding, Severity, UsageStatus
 
 
 class NATExcelReporter:
     """NAT Gateway Excel 보고서 생성기"""
 
-    # 스타일 정의
-    HEADER_FILL = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
-    THIN_BORDER = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-    CENTER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    # 스타일 캐시 (lazy initialization)
+    _styles_initialized: bool = False
+    _HEADER_FILL: Optional["PatternFill"] = None
+    _HEADER_FONT: Optional["Font"] = None
+    _THIN_BORDER: Optional["Border"] = None
+    _CENTER_ALIGN: Optional["Alignment"] = None
+    _STATUS_FILLS: Optional[Dict[UsageStatus, "PatternFill"]] = None
+    _SEVERITY_FILLS: Optional[Dict[Severity, "PatternFill"]] = None
 
-    # 상태별 색상
-    STATUS_FILLS = {
-        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
-        UsageStatus.LOW_USAGE: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
-        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
-        UsageStatus.PENDING: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
-        UsageStatus.UNKNOWN: PatternFill(start_color="BDC3C7", end_color="BDC3C7", fill_type="solid"),
-    }
+    @classmethod
+    def _init_styles(cls) -> None:
+        """스타일 lazy 초기화"""
+        if cls._styles_initialized:
+            return
 
-    SEVERITY_FILLS = {
-        Severity.CRITICAL: PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid"),
-        Severity.HIGH: PatternFill(start_color="E67E22", end_color="E67E22", fill_type="solid"),
-        Severity.MEDIUM: PatternFill(start_color="F1C40F", end_color="F1C40F", fill_type="solid"),
-        Severity.LOW: PatternFill(start_color="2ECC71", end_color="2ECC71", fill_type="solid"),
-        Severity.INFO: PatternFill(start_color="3498DB", end_color="3498DB", fill_type="solid"),
-    }
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+        cls._HEADER_FILL = PatternFill(
+            start_color="4472C4", end_color="4472C4", fill_type="solid"
+        )
+        cls._HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
+        cls._THIN_BORDER = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+        cls._CENTER_ALIGN = Alignment(
+            horizontal="center", vertical="center", wrap_text=True
+        )
+        cls._STATUS_FILLS = {
+            UsageStatus.UNUSED: PatternFill(
+                start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
+            ),
+            UsageStatus.LOW_USAGE: PatternFill(
+                start_color="FFE66D", end_color="FFE66D", fill_type="solid"
+            ),
+            UsageStatus.NORMAL: PatternFill(
+                start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
+            ),
+            UsageStatus.PENDING: PatternFill(
+                start_color="95A5A6", end_color="95A5A6", fill_type="solid"
+            ),
+            UsageStatus.UNKNOWN: PatternFill(
+                start_color="BDC3C7", end_color="BDC3C7", fill_type="solid"
+            ),
+        }
+        cls._SEVERITY_FILLS = {
+            Severity.CRITICAL: PatternFill(
+                start_color="E74C3C", end_color="E74C3C", fill_type="solid"
+            ),
+            Severity.HIGH: PatternFill(
+                start_color="E67E22", end_color="E67E22", fill_type="solid"
+            ),
+            Severity.MEDIUM: PatternFill(
+                start_color="F1C40F", end_color="F1C40F", fill_type="solid"
+            ),
+            Severity.LOW: PatternFill(
+                start_color="2ECC71", end_color="2ECC71", fill_type="solid"
+            ),
+            Severity.INFO: PatternFill(
+                start_color="3498DB", end_color="3498DB", fill_type="solid"
+            ),
+        }
+        cls._styles_initialized = True
+
+    @property
+    def HEADER_FILL(self) -> "PatternFill":
+        self._init_styles()
+        return self._HEADER_FILL  # type: ignore
+
+    @property
+    def HEADER_FONT(self) -> "Font":
+        self._init_styles()
+        return self._HEADER_FONT  # type: ignore
+
+    @property
+    def THIN_BORDER(self) -> "Border":
+        self._init_styles()
+        return self._THIN_BORDER  # type: ignore
+
+    @property
+    def CENTER_ALIGN(self) -> "Alignment":
+        self._init_styles()
+        return self._CENTER_ALIGN  # type: ignore
+
+    @property
+    def STATUS_FILLS(self) -> Dict[UsageStatus, "PatternFill"]:
+        self._init_styles()
+        return self._STATUS_FILLS  # type: ignore
+
+    @property
+    def SEVERITY_FILLS(self) -> Dict[Severity, "PatternFill"]:
+        self._init_styles()
+        return self._SEVERITY_FILLS  # type: ignore
 
     def __init__(
         self,
         results: List[NATAnalysisResult],
         stats_list: List[Dict[str, Any]],
     ):
+        from openpyxl import Workbook as _Workbook
+
+        self._init_styles()
         self.results = results
         self.stats_list = stats_list
-        self.wb = Workbook()
+        self.wb = _Workbook()
 
     def generate(self, output_dir: str) -> str:
         """Excel 보고서 생성"""
@@ -88,8 +164,12 @@ class NATExcelReporter:
 
     def _auto_column_width(self, ws, min_width: int = 10, max_width: int = 40) -> None:
         """열 너비 자동 조정"""
+        from openpyxl.utils import get_column_letter
+
         for column_cells in ws.columns:
-            length = max(len(str(cell.value) if cell.value else "") for cell in column_cells)
+            length = max(
+                len(str(cell.value) if cell.value else "") for cell in column_cells
+            )
             adjusted_width = min(max(length + 2, min_width), max_width)
             column_letter = get_column_letter(column_cells[0].column)
             ws.column_dimensions[column_letter].width = adjusted_width
@@ -108,14 +188,24 @@ class NATExcelReporter:
 
         # 전체 통계
         totals = {
-            "total_nat_count": sum(s.get("total_nat_count", 0) for s in self.stats_list),
+            "total_nat_count": sum(
+                s.get("total_nat_count", 0) for s in self.stats_list
+            ),
             "unused_count": sum(s.get("unused_count", 0) for s in self.stats_list),
-            "low_usage_count": sum(s.get("low_usage_count", 0) for s in self.stats_list),
+            "low_usage_count": sum(
+                s.get("low_usage_count", 0) for s in self.stats_list
+            ),
             "normal_count": sum(s.get("normal_count", 0) for s in self.stats_list),
             "pending_count": sum(s.get("pending_count", 0) for s in self.stats_list),
-            "total_monthly_cost": sum(s.get("total_monthly_cost", 0) for s in self.stats_list),
-            "total_monthly_waste": sum(s.get("total_monthly_waste", 0) for s in self.stats_list),
-            "total_annual_savings": sum(s.get("total_annual_savings", 0) for s in self.stats_list),
+            "total_monthly_cost": sum(
+                s.get("total_monthly_cost", 0) for s in self.stats_list
+            ),
+            "total_monthly_waste": sum(
+                s.get("total_monthly_waste", 0) for s in self.stats_list
+            ),
+            "total_annual_savings": sum(
+                s.get("total_annual_savings", 0) for s in self.stats_list
+            ),
         }
 
         # 핵심 지표
@@ -154,7 +244,16 @@ class NATExcelReporter:
         account_start = start_row + len(key_metrics) + 2
         ws.cell(row=account_start, column=1, value="계정/리전별 현황").font = Font(bold=True)
 
-        headers = ["Account", "Region", "Total", "Unused", "Low Usage", "Normal", "Monthly Cost", "Monthly Waste"]
+        headers = [
+            "Account",
+            "Region",
+            "Total",
+            "Unused",
+            "Low Usage",
+            "Normal",
+            "Monthly Cost",
+            "Monthly Waste",
+        ]
         for col, header in enumerate(headers, start=1):
             ws.cell(row=account_start + 1, column=col, value=header)
         self._apply_header_style(ws, account_start + 1)
@@ -167,8 +266,12 @@ class NATExcelReporter:
             ws.cell(row=row, column=4, value=stats.get("unused_count", 0))
             ws.cell(row=row, column=5, value=stats.get("low_usage_count", 0))
             ws.cell(row=row, column=6, value=stats.get("normal_count", 0))
-            ws.cell(row=row, column=7, value=f"${stats.get('total_monthly_cost', 0):,.2f}")
-            ws.cell(row=row, column=8, value=f"${stats.get('total_monthly_waste', 0):,.2f}")
+            ws.cell(
+                row=row, column=7, value=f"${stats.get('total_monthly_cost', 0):,.2f}"
+            )
+            ws.cell(
+                row=row, column=8, value=f"${stats.get('total_monthly_waste', 0):,.2f}"
+            )
 
             # 미사용이 있으면 강조
             if stats.get("unused_count", 0) > 0:
@@ -213,7 +316,9 @@ class NATExcelReporter:
                 if finding.usage_status != UsageStatus.NORMAL:
                     all_findings.append(finding)
 
-        sorted_findings = sorted(all_findings, key=lambda x: severity_order.get(x.severity, 5))
+        sorted_findings = sorted(
+            all_findings, key=lambda x: severity_order.get(x.severity, 5)
+        )
 
         for finding in sorted_findings:
             nat = finding.nat
@@ -276,9 +381,9 @@ class NATExcelReporter:
 
                 # 바이트를 읽기 쉽게 변환
                 bytes_out = nat.bytes_out_total
-                if bytes_out >= 1024 ** 3:
+                if bytes_out >= 1024**3:
                     bytes_str = f"{bytes_out / (1024 ** 3):.2f} GB"
-                elif bytes_out >= 1024 ** 2:
+                elif bytes_out >= 1024**2:
                     bytes_str = f"{bytes_out / (1024 ** 2):.2f} MB"
                 elif bytes_out >= 1024:
                     bytes_str = f"{bytes_out / 1024:.2f} KB"
@@ -286,7 +391,9 @@ class NATExcelReporter:
                     bytes_str = f"{bytes_out:.0f} B"
 
                 # 태그 문자열
-                tags_str = ", ".join(f"{k}={v}" for k, v in nat.tags.items() if k != "Name")
+                tags_str = ", ".join(
+                    f"{k}={v}" for k, v in nat.tags.items() if k != "Name"
+                )
 
                 row = [
                     nat.account_name,

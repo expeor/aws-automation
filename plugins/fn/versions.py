@@ -12,17 +12,13 @@ Lambda Version/Alias 관리:
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Set
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
@@ -30,22 +26,25 @@ console = Console()
 
 class VersionStatus(Enum):
     """버전 상태"""
-    CURRENT = "current"          # 현재 사용 중
+
+    CURRENT = "current"  # 현재 사용 중
     ALIAS_TARGET = "alias_target"  # Alias가 가리킴
-    OLD = "old"                  # 오래된 버전
-    UNUSED = "unused"            # 미사용
-    LATEST = "latest"            # $LATEST
+    OLD = "old"  # 오래된 버전
+    UNUSED = "unused"  # 미사용
+    LATEST = "latest"  # $LATEST
 
 
 class AliasStatus(Enum):
     """Alias 상태"""
-    ACTIVE = "active"            # 사용 중 (트래픽 있음)
-    INACTIVE = "inactive"        # 미사용 (트래픽 없음)
+
+    ACTIVE = "active"  # 사용 중 (트래픽 있음)
+    INACTIVE = "inactive"  # 미사용 (트래픽 없음)
 
 
 @dataclass
 class LambdaVersion:
     """Lambda 버전 정보"""
+
     function_name: str
     version: str
     description: str
@@ -58,6 +57,7 @@ class LambdaVersion:
 @dataclass
 class LambdaAlias:
     """Lambda Alias 정보"""
+
     function_name: str
     alias_name: str
     function_version: str
@@ -68,6 +68,7 @@ class LambdaAlias:
 @dataclass
 class FunctionVersionInfo:
     """함수별 Version/Alias 정보"""
+
     function_name: str
     function_arn: str
     runtime: str
@@ -94,12 +95,17 @@ class FunctionVersionInfo:
 
     @property
     def issue_count(self) -> int:
-        return len(self.old_versions) + len(self.unused_versions) + len(self.inactive_aliases)
+        return (
+            len(self.old_versions)
+            + len(self.unused_versions)
+            + len(self.inactive_aliases)
+        )
 
 
 @dataclass
 class VersionAuditResult:
     """Version/Alias 감사 결과"""
+
     account_id: str
     account_name: str
     region: str
@@ -124,10 +130,12 @@ def collect_versions(
     region: str,
 ) -> List[FunctionVersionInfo]:
     """Lambda 버전 정보 수집"""
+    from botocore.exceptions import ClientError
+
     result = []
 
     try:
-        lambda_client = session.client("lambda", region_name=region)
+        lambda_client = get_client(session, "lambda", region_name=region)
 
         paginator = lambda_client.get_paginator("list_functions")
         for page in paginator.paginate():
@@ -145,8 +153,12 @@ def collect_versions(
 
                 # 버전 목록
                 try:
-                    versions_paginator = lambda_client.get_paginator("list_versions_by_function")
-                    for v_page in versions_paginator.paginate(FunctionName=function_name):
+                    versions_paginator = lambda_client.get_paginator(
+                        "list_versions_by_function"
+                    )
+                    for v_page in versions_paginator.paginate(
+                        FunctionName=function_name
+                    ):
                         for v in v_page.get("Versions", []):
                             version = v.get("Version", "")
                             if version == "$LATEST":
@@ -156,41 +168,53 @@ def collect_versions(
                             lm_str = v.get("LastModified")
                             if lm_str:
                                 try:
-                                    last_modified = datetime.fromisoformat(lm_str.replace("Z", "+00:00"))
+                                    last_modified = datetime.fromisoformat(
+                                        lm_str.replace("Z", "+00:00")
+                                    )
                                 except ValueError:
                                     pass
 
-                            info.versions.append(LambdaVersion(
-                                function_name=function_name,
-                                version=version,
-                                description=v.get("Description", ""),
-                                runtime=v.get("Runtime", ""),
-                                code_size_bytes=v.get("CodeSize", 0),
-                                last_modified=last_modified,
-                                code_sha256=v.get("CodeSha256", ""),
-                            ))
+                            info.versions.append(
+                                LambdaVersion(
+                                    function_name=function_name,
+                                    version=version,
+                                    description=v.get("Description", ""),
+                                    runtime=v.get("Runtime", ""),
+                                    code_size_bytes=v.get("CodeSize", 0),
+                                    last_modified=last_modified,
+                                    code_sha256=v.get("CodeSha256", ""),
+                                )
+                            )
                 except ClientError:
                     pass
 
                 # Alias 목록
                 try:
                     aliases_paginator = lambda_client.get_paginator("list_aliases")
-                    for a_page in aliases_paginator.paginate(FunctionName=function_name):
+                    for a_page in aliases_paginator.paginate(
+                        FunctionName=function_name
+                    ):
                         for a in a_page.get("Aliases", []):
-                            info.aliases.append(LambdaAlias(
-                                function_name=function_name,
-                                alias_name=a.get("Name", ""),
-                                function_version=a.get("FunctionVersion", ""),
-                                description=a.get("Description", ""),
-                                routing_config=a.get("RoutingConfig"),
-                            ))
+                            info.aliases.append(
+                                LambdaAlias(
+                                    function_name=function_name,
+                                    alias_name=a.get("Name", ""),
+                                    function_version=a.get("FunctionVersion", ""),
+                                    description=a.get("Description", ""),
+                                    routing_config=a.get("RoutingConfig"),
+                                )
+                            )
                 except ClientError:
                     pass
 
                 result.append(info)
 
     except ClientError as e:
-        console.print(f"[yellow]수집 오류: {e}[/yellow]")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if not is_quiet():
+            console.print(
+                f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]"
+            )
 
     return result
 
@@ -228,11 +252,17 @@ def analyze_versions(
             aliased_versions.add(alias.function_version)
             # routing config에 있는 버전도 포함
             if alias.routing_config:
-                for v in alias.routing_config.get("AdditionalVersionWeights", {}).keys():
+                for v in alias.routing_config.get(
+                    "AdditionalVersionWeights", {}
+                ).keys():
                     aliased_versions.add(v)
 
         # 버전 분석
-        sorted_versions = sorted(func.versions, key=lambda v: int(v.version) if v.version.isdigit() else 0, reverse=True)
+        sorted_versions = sorted(
+            func.versions,
+            key=lambda v: int(v.version) if v.version.isdigit() else 0,
+            reverse=True,
+        )
 
         for i, version in enumerate(sorted_versions):
             # Alias가 가리키는 버전은 사용 중
@@ -266,13 +296,21 @@ def analyze_versions(
 
 def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
+    yellow_fill = PatternFill(
+        start_color="FFE66D", end_color="FFE66D", fill_type="solid"
+    )
 
     # Summary
     ws = wb.create_sheet("Summary")
@@ -321,7 +359,15 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
     # Functions with Issues
     ws_issues = wb.create_sheet("Cleanup Candidates")
     issue_headers = [
-        "Account", "Region", "Function", "Runtime", "총 버전", "오래된 버전", "미사용 버전", "Alias 수", "정리 대상 버전"
+        "Account",
+        "Region",
+        "Function",
+        "Runtime",
+        "총 버전",
+        "오래된 버전",
+        "미사용 버전",
+        "Alias 수",
+        "정리 대상 버전",
     ]
     for col, h in enumerate(issue_headers, 1):
         ws_issues.cell(row=1, column=col, value=h).fill = header_fill
@@ -341,12 +387,25 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
                 ws_issues.cell(row=issue_row, column=6, value=len(func.old_versions))
                 ws_issues.cell(row=issue_row, column=7, value=len(func.unused_versions))
                 ws_issues.cell(row=issue_row, column=8, value=func.alias_count)
-                ws_issues.cell(row=issue_row, column=9, value=", ".join(cleanup_versions[:10]) + ("..." if len(cleanup_versions) > 10 else ""))
+                ws_issues.cell(
+                    row=issue_row,
+                    column=9,
+                    value=", ".join(cleanup_versions[:10])
+                    + ("..." if len(cleanup_versions) > 10 else ""),
+                )
 
     # All Versions
     ws_all = wb.create_sheet("All Versions")
     all_headers = [
-        "Account", "Region", "Function", "Version", "Description", "Runtime", "Code Size", "Last Modified", "상태"
+        "Account",
+        "Region",
+        "Function",
+        "Version",
+        "Description",
+        "Runtime",
+        "Code Size",
+        "Last Modified",
+        "상태",
     ]
     for col, h in enumerate(all_headers, 1):
         ws_all.cell(row=1, column=col, value=h).fill = header_fill
@@ -360,7 +419,11 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
             for alias in func.aliases:
                 aliased_versions.add(alias.function_version)
 
-            sorted_versions = sorted(func.versions, key=lambda v: int(v.version) if v.version.isdigit() else 0, reverse=True)
+            sorted_versions = sorted(
+                func.versions,
+                key=lambda v: int(v.version) if v.version.isdigit() else 0,
+                reverse=True,
+            )
 
             for i, v in enumerate(sorted_versions):
                 all_row += 1
@@ -368,10 +431,24 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
                 ws_all.cell(row=all_row, column=2, value=func.region)
                 ws_all.cell(row=all_row, column=3, value=func.function_name)
                 ws_all.cell(row=all_row, column=4, value=v.version)
-                ws_all.cell(row=all_row, column=5, value=v.description[:50] if v.description else "-")
+                ws_all.cell(
+                    row=all_row,
+                    column=5,
+                    value=v.description[:50] if v.description else "-",
+                )
                 ws_all.cell(row=all_row, column=6, value=v.runtime)
-                ws_all.cell(row=all_row, column=7, value=f"{v.code_size_bytes / 1024 / 1024:.2f} MB")
-                ws_all.cell(row=all_row, column=8, value=v.last_modified.strftime("%Y-%m-%d") if v.last_modified else "-")
+                ws_all.cell(
+                    row=all_row,
+                    column=7,
+                    value=f"{v.code_size_bytes / 1024 / 1024:.2f} MB",
+                )
+                ws_all.cell(
+                    row=all_row,
+                    column=8,
+                    value=v.last_modified.strftime("%Y-%m-%d")
+                    if v.last_modified
+                    else "-",
+                )
 
                 # 상태
                 if v.version in aliased_versions:
@@ -389,7 +466,15 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
 
     # Aliases
     ws_alias = wb.create_sheet("Aliases")
-    alias_headers = ["Account", "Region", "Function", "Alias", "Target Version", "Description", "Routing"]
+    alias_headers = [
+        "Account",
+        "Region",
+        "Function",
+        "Alias",
+        "Target Version",
+        "Description",
+        "Routing",
+    ]
     for col, h in enumerate(alias_headers, 1):
         ws_alias.cell(row=1, column=col, value=h).fill = header_fill
         ws_alias.cell(row=1, column=col).font = header_font
@@ -409,7 +494,9 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
                 if alias.routing_config:
                     weights = alias.routing_config.get("AdditionalVersionWeights", {})
                     if weights:
-                        routing = ", ".join(f"v{k}: {v*100:.0f}%" for k, v in weights.items())
+                        routing = ", ".join(
+                            f"v{k}: {v*100:.0f}%" for k, v in weights.items()
+                        )
                 ws_alias.cell(row=alias_row, column=7, value=routing)
 
     # 열 너비
@@ -418,7 +505,9 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 50
+                )
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -435,57 +524,27 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[VersionAuditResult]:
+    """단일 계정/리전의 Lambda 버전 수집 및 분석 (병렬 실행용)"""
+    functions = collect_versions(session, account_id, account_name, region)
+    if not functions:
+        return None
+    return analyze_versions(functions, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """Version/Alias 감사 실행"""
     console.print("[bold]Lambda Version/Alias 감사 시작...[/bold]\n")
 
-    results: List[VersionAuditResult] = []
-    collected = set()
+    result = parallel_collect(
+        ctx, _collect_and_analyze, max_workers=20, service="lambda"
+    )
+    results: List[VersionAuditResult] = [r for r in result.get_data() if r is not None]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                functions = collect_versions(session, account_id, account_name, region)
-
-                if not functions:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                result = analyze_versions(functions, account_id, account_name, region)
-                results.append(result)
-
-                cleanup_count = result.old_version_count + result.unused_version_count
-                if cleanup_count > 0:
-                    console.print(
-                        f"함수 {result.total_functions}개 / 버전 {result.total_versions}개 / "
-                        f"[yellow]정리 대상 {cleanup_count}개[/yellow]"
-                    )
-                else:
-                    console.print(f"함수 {result.total_functions}개 / [green]버전 {result.total_versions}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")

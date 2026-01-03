@@ -21,13 +21,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_rds_snapshot_monthly_cost
 
@@ -50,8 +46,8 @@ OLD_SNAPSHOT_DAYS = 14
 class UsageStatus(Enum):
     """사용 상태"""
 
-    OLD = "old"             # 오래됨
-    NORMAL = "normal"       # 최근
+    OLD = "old"  # 오래됨
+    NORMAL = "normal"  # 최근
 
 
 class SnapshotType(Enum):
@@ -149,10 +145,12 @@ def collect_rds_snapshots(
     session, account_id: str, account_name: str, region: str
 ) -> List[RDSSnapshotInfo]:
     """RDS 수동 스냅샷 수집 (RDS + Aurora)"""
+    from botocore.exceptions import ClientError
+
     snapshots = []
 
     try:
-        rds = session.client("rds", region_name=region)
+        rds = get_client(session, "rds", region_name=region)
 
         # RDS 인스턴스 스냅샷 (수동)
         try:
@@ -162,11 +160,17 @@ def collect_rds_snapshots(
                     if data.get("Status") != "available":
                         continue
 
-                    snap = _parse_rds_snapshot(data, rds, account_id, account_name, region)
+                    snap = _parse_rds_snapshot(
+                        data, rds, account_id, account_name, region
+                    )
                     if snap:
                         snapshots.append(snap)
         except ClientError as e:
-            console.print(f"    [yellow]RDS 스냅샷 수집 오류: {e}[/yellow]")
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if not is_quiet():
+                console.print(
+                    f"[yellow]{account_name}/{region} RDS 스냅샷 수집 오류: {error_code}[/yellow]"
+                )
 
         # Aurora 클러스터 스냅샷 (수동)
         try:
@@ -176,14 +180,24 @@ def collect_rds_snapshots(
                     if data.get("Status") != "available":
                         continue
 
-                    snap = _parse_aurora_snapshot(data, rds, account_id, account_name, region)
+                    snap = _parse_aurora_snapshot(
+                        data, rds, account_id, account_name, region
+                    )
                     if snap:
                         snapshots.append(snap)
         except ClientError as e:
-            console.print(f"    [yellow]Aurora 스냅샷 수집 오류: {e}[/yellow]")
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if not is_quiet():
+                console.print(
+                    f"[yellow]{account_name}/{region} Aurora 스냅샷 수집 오류: {error_code}[/yellow]"
+                )
 
     except ClientError as e:
-        console.print(f"    [yellow]RDS 클라이언트 오류: {e}[/yellow]")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if not is_quiet():
+            console.print(
+                f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]"
+            )
 
     return snapshots
 
@@ -195,10 +209,14 @@ def _parse_rds_snapshot(
     try:
         arn = data.get("DBSnapshotArn", "")
         allocated_storage = data.get("AllocatedStorage", 0)
-        monthly_cost = get_rds_snapshot_monthly_cost(region, allocated_storage, is_aurora=False)
+        monthly_cost = get_rds_snapshot_monthly_cost(
+            region, allocated_storage, is_aurora=False
+        )
 
         # 태그 조회
         tags = {}
+        from botocore.exceptions import ClientError
+
         try:
             tag_response = rds.list_tags_for_resource(ResourceName=arn)
             tags = {
@@ -237,10 +255,14 @@ def _parse_aurora_snapshot(
     try:
         arn = data.get("DBClusterSnapshotArn", "")
         allocated_storage = data.get("AllocatedStorage", 0)
-        monthly_cost = get_rds_snapshot_monthly_cost(region, allocated_storage, is_aurora=True)
+        monthly_cost = get_rds_snapshot_monthly_cost(
+            region, allocated_storage, is_aurora=True
+        )
 
         # 태그 조회
         tags = {}
+        from botocore.exceptions import ClientError
+
         try:
             tag_response = rds.list_tags_for_resource(ResourceName=arn)
             tags = {
@@ -278,8 +300,7 @@ def _parse_aurora_snapshot(
 
 
 def analyze_rds_snapshots(
-    snapshots: List[RDSSnapshotInfo],
-    account_id: str, account_name: str, region: str
+    snapshots: List[RDSSnapshotInfo], account_id: str, account_name: str, region: str
 ) -> RDSSnapshotAnalysisResult:
     """RDS Snapshot 미사용 분석"""
     result = RDSSnapshotAnalysisResult(
@@ -342,17 +363,27 @@ def _analyze_single_snapshot(snapshot: RDSSnapshotInfo) -> RDSSnapshotFinding:
 
 def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     status_fills = {
-        UsageStatus.OLD: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
-        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
+        UsageStatus.OLD: PatternFill(
+            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
+        ),
+        UsageStatus.NORMAL: PatternFill(
+            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
+        ),
     }
 
     # Summary
@@ -392,9 +423,21 @@ def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -
 
     # Findings
     ws2 = wb.create_sheet("Findings")
-    headers = ["Account", "Region", "Snapshot ID", "DB Identifier", "Type", "Usage",
-               "Engine", "Size (GB)", "Age (days)", "Monthly Cost ($)",
-               "Encrypted", "Created", "Recommendation"]
+    headers = [
+        "Account",
+        "Region",
+        "Snapshot ID",
+        "DB Identifier",
+        "Type",
+        "Usage",
+        "Engine",
+        "Size (GB)",
+        "Age (days)",
+        "Monthly Cost ($)",
+        "Encrypted",
+        "Created",
+        "Recommendation",
+    ]
     ws2.append(headers)
 
     for cell in ws2[1]:
@@ -413,15 +456,23 @@ def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -
 
     for f in all_findings:
         snap = f.snapshot
-        ws2.append([
-            snap.account_name, snap.region, snap.id, snap.db_identifier,
-            snap.snapshot_type.value.upper(), f.usage_status.value,
-            f"{snap.engine} {snap.engine_version}", snap.allocated_storage_gb,
-            snap.age_days, round(snap.monthly_cost, 2),
-            "Yes" if snap.encrypted else "No",
-            snap.create_time.strftime("%Y-%m-%d") if snap.create_time else "",
-            f.recommendation,
-        ])
+        ws2.append(
+            [
+                snap.account_name,
+                snap.region,
+                snap.id,
+                snap.db_identifier,
+                snap.snapshot_type.value.upper(),
+                f.usage_status.value,
+                f"{snap.engine} {snap.engine_version}",
+                snap.allocated_storage_gb,
+                snap.age_days,
+                round(snap.monthly_cost, 2),
+                "Yes" if snap.encrypted else "No",
+                snap.create_time.strftime("%Y-%m-%d") if snap.create_time else "",
+                f.recommendation,
+            ]
+        )
 
         fill = status_fills.get(f.usage_status)
         if fill:
@@ -431,7 +482,9 @@ def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
+                max(max_len + 2, 10), 50
+            )
 
     ws2.freeze_panes = "A2"
 
@@ -449,59 +502,28 @@ def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[RDSSnapshotAnalysisResult]:
+    """단일 계정/리전의 RDS 스냅샷 수집 및 분석 (병렬 실행용)"""
+    snapshots = collect_rds_snapshots(session, account_id, account_name, region)
+    if not snapshots:
+        return None
+    return analyze_rds_snapshots(snapshots, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """RDS Snapshot 미사용 분석 실행"""
     console.print("[bold]RDS Snapshot 미사용 분석 시작...[/bold]")
     console.print(f"  [dim]기준: {OLD_SNAPSHOT_DAYS}일 이상 오래된 수동 스냅샷[/dim]")
 
-    all_results: List[RDSSnapshotAnalysisResult] = []
-    collected = set()
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="rds")
+    all_results: List[RDSSnapshotAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                # 계정명
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} / {region}[/dim]")
-
-                # 수집
-                snapshots = collect_rds_snapshots(session, account_id, account_name, region)
-
-                if not snapshots:
-                    console.print(f"    [dim](없음)[/dim]")
-                    continue
-
-                # 분석
-                result = analyze_rds_snapshots(snapshots, account_id, account_name, region)
-                all_results.append(result)
-
-                # 요약
-                if result.old_count > 0:
-                    cost_str = f" (${result.old_monthly_cost:.2f}/월)" if result.old_monthly_cost > 0 else ""
-                    console.print(f"    [yellow]오래됨 {result.old_count}개 ({result.old_size_gb}GB){cost_str}[/yellow]")
-                else:
-                    console.print(f"    [green]정상 {result.normal_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"    [yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"    [red]{e}[/red]")
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not all_results:
         console.print("[yellow]분석할 RDS 스냅샷 없음[/yellow]")
@@ -517,9 +539,13 @@ def run(ctx) -> None:
         "old_cost": sum(r.old_monthly_cost for r in all_results),
     }
 
-    console.print(f"\n[bold]전체 RDS 스냅샷: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
+    console.print(
+        f"\n[bold]전체 RDS 스냅샷: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
+    )
     if totals["old"] > 0:
-        console.print(f"  [yellow bold]오래됨: {totals['old']}개 ({totals['old_size']}GB, ${totals['old_cost']:.2f}/월)[/yellow bold]")
+        console.print(
+            f"  [yellow bold]오래됨: {totals['old']}개 ({totals['old_size']}GB, ${totals['old_cost']:.2f}/월)[/yellow bold]"
+        )
     console.print(f"  [green]최근: {totals['normal']}개[/green]")
 
     # 보고서

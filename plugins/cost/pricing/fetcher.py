@@ -3,13 +3,18 @@ plugins/cost/pricing/fetcher.py - AWS 가격 정보 가져오기
 
 AWS Pricing API (get_products)를 사용하여 리전별 가격을 조회합니다.
 """
+from __future__ import annotations
 
 import json
 import logging
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+
+from core.parallel import get_client
+
+if TYPE_CHECKING:
+    import boto3
 
 logger = logging.getLogger(__name__)
 
@@ -23,21 +28,25 @@ class PricingFetcher:
     get_products API로 리전별 가격을 조회합니다.
     """
 
-    def __init__(self, session: Optional[boto3.Session] = None):
+    def __init__(self, session: Optional["boto3.Session"] = None):
         """
         Args:
             session: boto3 세션 (None이면 기본 세션 사용)
         """
-        self.session = session or boto3.Session()
+        import boto3 as _boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        self._BotoCoreError = BotoCoreError
+        self._ClientError = ClientError
+        self.session = session or _boto3.Session()
         self._pricing_client = None
 
     @property
     def pricing_client(self):
         """Pricing API 클라이언트 (지연 생성)"""
         if self._pricing_client is None:
-            self._pricing_client = self.session.client(
-                "pricing",
-                region_name=PRICING_API_REGION
+            self._pricing_client = get_client(
+                self.session, "pricing", region_name=PRICING_API_REGION
             )
         return self._pricing_client
 
@@ -55,7 +64,11 @@ class PricingFetcher:
                 ServiceCode="AmazonEC2",
                 Filters=[
                     {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-                    {"Type": "TERM_MATCH", "Field": "operatingSystem", "Value": "Linux"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "operatingSystem",
+                        "Value": "Linux",
+                    },
                     {"Type": "TERM_MATCH", "Field": "tenancy", "Value": "Shared"},
                     {"Type": "TERM_MATCH", "Field": "preInstalledSw", "Value": "NA"},
                     {"Type": "TERM_MATCH", "Field": "capacitystatus", "Value": "Used"},
@@ -65,7 +78,11 @@ class PricingFetcher:
 
             prices = {}
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -101,14 +118,22 @@ class PricingFetcher:
                 ServiceCode="AmazonEC2",
                 Filters=[
                     {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-                    {"Type": "TERM_MATCH", "Field": "productFamily", "Value": "Storage"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "productFamily",
+                        "Value": "Storage",
+                    },
                 ],
                 MaxResults=100,
             )
 
             prices = {}
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -152,17 +177,33 @@ class PricingFetcher:
             interface_response = self.pricing_client.get_products(
                 ServiceCode="AmazonVPC",
                 Filters=[
-                    {"Type": "TERM_MATCH", "Field": "productFamily", "Value": "VpcEndpoint"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "productFamily",
+                        "Value": "VpcEndpoint",
+                    },
                     {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-                    {"Type": "TERM_MATCH", "Field": "endpointType", "Value": "Interface"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "endpointType",
+                        "Value": "Interface",
+                    },
                 ],
                 MaxResults=10,
             )
 
-            prices = {"interface_hourly": 0.0, "gateway_hourly": 0.0, "data_per_gb": 0.0}
+            prices = {
+                "interface_hourly": 0.0,
+                "gateway_hourly": 0.0,
+                "data_per_gb": 0.0,
+            }
 
             for price_item in interface_response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 terms = data.get("terms", {}).get("OnDemand", {})
                 for term in terms.values():
                     for dim in term.get("priceDimensions", {}).values():
@@ -181,7 +222,11 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"VPC Endpoint 가격 조회 실패 [{region}]: {e}")
-            return {"interface_hourly": 0.01, "gateway_hourly": 0.0, "data_per_gb": 0.01}
+            return {
+                "interface_hourly": 0.01,
+                "gateway_hourly": 0.0,
+                "data_per_gb": 0.01,
+            }
 
     def get_secrets_manager_prices(self, region: str) -> Dict[str, float]:
         """Secrets Manager 가격 조회
@@ -204,7 +249,11 @@ class PricingFetcher:
             prices = {"per_secret_monthly": 0.0, "per_10k_api_calls": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -247,7 +296,11 @@ class PricingFetcher:
             prices = {"customer_key_monthly": 0.0, "per_10k_requests": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -291,7 +344,11 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -323,10 +380,18 @@ class PricingFetcher:
                 MaxResults=20,
             )
 
-            prices = {"hosted_zone_monthly": 0.0, "additional_zone_monthly": 0.0, "query_per_million": 0.0}
+            prices = {
+                "hosted_zone_monthly": 0.0,
+                "additional_zone_monthly": 0.0,
+                "query_per_million": 0.0,
+            }
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -339,7 +404,10 @@ class PricingFetcher:
                         desc = dim.get("description", "").lower()
                         if price > 0:
                             if "hosted zone" in desc or "zone" in group:
-                                if "first 25" in desc or prices["hosted_zone_monthly"] == 0:
+                                if (
+                                    "first 25" in desc
+                                    or prices["hosted_zone_monthly"] == 0
+                                ):
                                     prices["hosted_zone_monthly"] = price
                                 else:
                                     prices["additional_zone_monthly"] = price
@@ -351,7 +419,11 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"Route53 가격 조회 실패: {e}")
-            return {"hosted_zone_monthly": 0.50, "additional_zone_monthly": 0.10, "query_per_million": 0.40}
+            return {
+                "hosted_zone_monthly": 0.50,
+                "additional_zone_monthly": 0.10,
+                "query_per_million": 0.40,
+            }
 
     def get_snapshot_prices(self, region: str) -> Dict[str, float]:
         """EBS Snapshot 가격 조회
@@ -367,7 +439,11 @@ class PricingFetcher:
                 ServiceCode="AmazonEC2",
                 Filters=[
                     {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-                    {"Type": "TERM_MATCH", "Field": "productFamily", "Value": "Storage Snapshot"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "productFamily",
+                        "Value": "Storage Snapshot",
+                    },
                 ],
                 MaxResults=10,
             )
@@ -375,7 +451,11 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 terms = data.get("terms", {}).get("OnDemand", {})
 
                 for term in terms.values():
@@ -406,7 +486,11 @@ class PricingFetcher:
                 ServiceCode="AmazonEC2",
                 Filters=[
                     {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-                    {"Type": "TERM_MATCH", "Field": "productFamily", "Value": "IP Address"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "productFamily",
+                        "Value": "IP Address",
+                    },
                 ],
                 MaxResults=10,
             )
@@ -414,7 +498,11 @@ class PricingFetcher:
             prices = {"unused_hourly": 0.0, "additional_hourly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -446,7 +534,12 @@ class PricingFetcher:
             {"alb_hourly": float, "nlb_hourly": float, "glb_hourly": float, "clb_hourly": float}
         """
         try:
-            prices = {"alb_hourly": 0.0, "nlb_hourly": 0.0, "glb_hourly": 0.0, "clb_hourly": 0.0}
+            prices = {
+                "alb_hourly": 0.0,
+                "nlb_hourly": 0.0,
+                "glb_hourly": 0.0,
+                "clb_hourly": 0.0,
+            }
 
             # ELBv2 (ALB, NLB, GLB)
             response = self.pricing_client.get_products(
@@ -458,7 +551,11 @@ class PricingFetcher:
             )
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -486,7 +583,12 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"ELB 가격 조회 실패 [{region}]: {e}")
-            return {"alb_hourly": 0.0225, "nlb_hourly": 0.0225, "glb_hourly": 0.0125, "clb_hourly": 0.025}
+            return {
+                "alb_hourly": 0.0225,
+                "nlb_hourly": 0.0225,
+                "glb_hourly": 0.0125,
+                "clb_hourly": 0.025,
+            }
 
     def get_rds_snapshot_prices(self, region: str) -> Dict[str, float]:
         """RDS Snapshot 가격 조회
@@ -502,7 +604,11 @@ class PricingFetcher:
                 ServiceCode="AmazonRDS",
                 Filters=[
                     {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-                    {"Type": "TERM_MATCH", "Field": "productFamily", "Value": "Storage Snapshot"},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "productFamily",
+                        "Value": "Storage Snapshot",
+                    },
                 ],
                 MaxResults=20,
             )
@@ -510,7 +616,11 @@ class PricingFetcher:
             prices = {"rds_per_gb_monthly": 0.0, "aurora_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -553,7 +663,11 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0, "ingestion_per_gb": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -605,7 +719,11 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 

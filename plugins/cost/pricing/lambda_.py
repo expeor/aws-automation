@@ -124,7 +124,9 @@ def get_lambda_monthly_cost(
     billable_requests = invocations
     if include_free_tier:
         billable_requests = max(0, invocations - FREE_TIER_REQUESTS)
-    request_cost = (billable_requests / 1_000_000) * prices.get("request_per_million", 0.20)
+    request_cost = (billable_requests / 1_000_000) * prices.get(
+        "request_per_million", 0.20
+    )
 
     # 실행 시간 비용 (GB-초 단위)
     # 메모리 MB -> GB, 시간 ms -> 초
@@ -132,7 +134,9 @@ def get_lambda_monthly_cost(
     billable_gb_seconds = gb_seconds
     if include_free_tier:
         billable_gb_seconds = max(0, gb_seconds - FREE_TIER_GB_SECONDS)
-    duration_cost = billable_gb_seconds * prices.get("duration_per_gb_second", 0.0000166667)
+    duration_cost = billable_gb_seconds * prices.get(
+        "duration_per_gb_second", 0.0000166667
+    )
 
     return round(request_cost + duration_cost, 4)
 
@@ -198,20 +202,26 @@ def estimate_lambda_cost(
     billable_requests = invocations
     if include_free_tier:
         billable_requests = max(0, invocations - FREE_TIER_REQUESTS)
-    request_cost = (billable_requests / 1_000_000) * prices.get("request_per_million", 0.20)
+    request_cost = (billable_requests / 1_000_000) * prices.get(
+        "request_per_million", 0.20
+    )
 
     # 실행 시간 비용
     gb_seconds = (memory_mb / 1024) * (avg_duration_ms / 1000) * invocations
     billable_gb_seconds = gb_seconds
     if include_free_tier:
         billable_gb_seconds = max(0, gb_seconds - FREE_TIER_GB_SECONDS)
-    duration_cost = billable_gb_seconds * prices.get("duration_per_gb_second", 0.0000166667)
+    duration_cost = billable_gb_seconds * prices.get(
+        "duration_per_gb_second", 0.0000166667
+    )
 
     # Provisioned Concurrency 비용
     provisioned_cost = 0.0
     if provisioned_concurrency > 0:
         gb_hours = (memory_mb / 1024) * provisioned_concurrency * HOURS_PER_MONTH
-        provisioned_cost = gb_hours * prices.get("provisioned_concurrency_per_gb_hour", 0.000004646)
+        provisioned_cost = gb_hours * prices.get(
+            "provisioned_concurrency_per_gb_hour", 0.000004646
+        )
 
     total = request_cost + duration_cost + provisioned_cost
 

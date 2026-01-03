@@ -12,12 +12,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pytz
 import questionary
-from botocore.exceptions import ClientError
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 from core.auth import get_context_session
+from core.parallel import get_client
 from core.tools.cache import get_cache_dir
 from core.tools.output import open_in_explorer
 
@@ -53,9 +53,6 @@ def collect_options(ctx) -> None:
     timezone = _get_timezone_input()
     ctx.options["timezone"] = timezone
 
-    # 4. ASCII 아트 출력
-    _print_ascii_art()
-
 
 def run(ctx) -> None:
     """ALB 로그 분석 실행
@@ -81,7 +78,7 @@ def run(ctx) -> None:
     # 세션 획득
     region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
     session = get_context_session(ctx, region)
-    s3_client = session.client("s3")
+    s3_client = get_client(session, "s3")
 
     # S3 URI 파싱
     if not bucket.startswith("s3://"):
@@ -342,7 +339,9 @@ def _get_bucket_input_with_options(session, ctx) -> Optional[str]:
 
 def _get_lb_and_build_path(session, ctx) -> str:
     """자동 탐색으로 S3 경로 생성"""
-    elbv2_client = session.client("elbv2")
+    from botocore.exceptions import ClientError
+
+    elbv2_client = get_client(session, "elbv2")
 
     # ALB 목록 조회
     try:
@@ -429,7 +428,7 @@ def _get_lb_and_build_path(session, ctx) -> str:
 
         # 계정 ID 추출
         try:
-            sts = session.client("sts")
+            sts = get_client(session, "sts")
             account_id = sts.get_caller_identity()["Account"]
         except Exception:
             account_id = "unknown"
@@ -518,11 +517,11 @@ def _get_time_range_input() -> Tuple[datetime, datetime]:
         f"{now.strftime('%Y-%m-%d %H:%M')}[/dim]"
     )
 
-    # 빠른 선택
+    # 빠른 선택 (기본값인 24시간을 첫 번째에 배치)
     quick_choices = [
+        questionary.Choice("최근 24시간", value="24h"),
         questionary.Choice("최근 1시간", value="1h"),
         questionary.Choice("최근 6시간", value="6h"),
-        questionary.Choice("최근 24시간 (기본)", value="24h"),
         questionary.Choice("최근 7일", value="7d"),
         questionary.Choice("직접 입력", value="custom"),
     ]
@@ -530,7 +529,6 @@ def _get_time_range_input() -> Tuple[datetime, datetime]:
     choice = questionary.select(
         "시간 범위를 선택하세요:",
         choices=quick_choices,
-        default="24h",
     ).ask()
 
     if choice is None:
@@ -583,7 +581,7 @@ def _get_timezone_input() -> str:
         KeyboardInterrupt: 사용자가 취소한 경우
     """
     tz_choices = [
-        questionary.Choice("Asia/Seoul (한국, 기본)", value="Asia/Seoul"),
+        questionary.Choice("Asia/Seoul (한국)", value="Asia/Seoul"),
         questionary.Choice("UTC", value="UTC"),
         questionary.Choice("America/New_York", value="America/New_York"),
         questionary.Choice("Europe/London", value="Europe/London"),
@@ -593,7 +591,6 @@ def _get_timezone_input() -> str:
     choice = questionary.select(
         "타임존을 선택하세요:",
         choices=tz_choices,
-        default="Asia/Seoul",
     ).ask()
 
     if choice is None:
@@ -611,18 +608,6 @@ def _get_timezone_input() -> str:
             return "Asia/Seoul"
 
     return choice
-
-
-def _print_ascii_art() -> None:
-    """ASCII 아트 출력"""
-    ascii_art = """
-   ___   __   ___     __   ____  _____  ___                    __
-  / _ | / /  / _ )   / /  / __ \\/ ___/ / _ \\___ ___  ___  ____/ /_
- / __ |/ /__/ _  |  / /__/ /_/ / (_ / / , _/ -_) _ \\/ _ \\/ __/ __/
-/_/ |_/____/____/  /____/\\____/\\___/ /_/|_|\\__/ .__/\\___/_/  \\__/
-                                             /_/
-    """
-    console.print(ascii_art, style="bold cyan")
 
 
 def _create_output_directory(ctx) -> str:

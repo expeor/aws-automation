@@ -13,13 +13,13 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .collector import (
-    IAMData,
-    IAMUser,
-    IAMRole,
-    IAMGroup,
-    IAMAccessKey,
-    PasswordPolicy,
     AccountSummary,
+    IAMAccessKey,
+    IAMData,
+    IAMGroup,
+    IAMRole,
+    IAMUser,
+    PasswordPolicy,
 )
 
 
@@ -131,7 +131,9 @@ class RoleAnalysisResult:
 
     @property
     def is_unused(self) -> bool:
-        return self.role.days_since_last_use == -1 or self.role.days_since_last_use >= 90
+        return (
+            self.role.days_since_last_use == -1 or self.role.days_since_last_use >= 90
+        )
 
 
 @dataclass
@@ -246,7 +248,11 @@ class IAMAnalyzer:
         },
         {
             "name": "PassRole-Lambda",
-            "permissions": {"iam:PassRole", "lambda:CreateFunction", "lambda:InvokeFunction"},
+            "permissions": {
+                "iam:PassRole",
+                "lambda:CreateFunction",
+                "lambda:InvokeFunction",
+            },
             "severity": "HIGH",
             "description": "Lambda에 Admin Role 붙여서 실행",
         },
@@ -276,7 +282,11 @@ class IAMAnalyzer:
         },
         {
             "name": "PassRole-ECS",
-            "permissions": {"iam:PassRole", "ecs:RegisterTaskDefinition", "ecs:RunTask"},
+            "permissions": {
+                "iam:PassRole",
+                "ecs:RegisterTaskDefinition",
+                "ecs:RunTask",
+            },
             "severity": "HIGH",
             "description": "ECS Task에 Admin Role로 실행",
         },
@@ -288,7 +298,11 @@ class IAMAnalyzer:
         },
         {
             "name": "CodeBuild-Role",
-            "permissions": {"iam:PassRole", "codebuild:CreateProject", "codebuild:StartBuild"},
+            "permissions": {
+                "iam:PassRole",
+                "codebuild:CreateProject",
+                "codebuild:StartBuild",
+            },
             "severity": "HIGH",
             "description": "CodeBuild에 Admin Role로 빌드 실행",
         },
@@ -415,9 +429,7 @@ class IAMAnalyzer:
 
         # 4. Account 분석
         if self.iam_data.account_summary:
-            result.account_result = self._analyze_account(
-                self.iam_data.account_summary
-            )
+            result.account_result = self._analyze_account(self.iam_data.account_summary)
 
         return result
 
@@ -441,7 +453,10 @@ class IAMAnalyzer:
             )
 
         # 2. 비활성 사용자 (90일 이상 로그인 없음)
-        if user.has_console_access and user.days_since_last_login >= self.UNUSED_THRESHOLD_DAYS:
+        if (
+            user.has_console_access
+            and user.days_since_last_login >= self.UNUSED_THRESHOLD_DAYS
+        ):
             result.issues.append(
                 Issue(
                     issue_type=IssueType.INACTIVE_USER,
@@ -763,9 +778,7 @@ class IAMAnalyzer:
 
         return result
 
-    def _analyze_password_policy(
-        self, policy: PasswordPolicy
-    ) -> PolicyAnalysisResult:
+    def _analyze_password_policy(self, policy: PasswordPolicy) -> PolicyAnalysisResult:
         """Password Policy 분석"""
         result = PolicyAnalysisResult(
             policy=policy,
@@ -1057,11 +1070,13 @@ class IAMAnalyzer:
             required_perms = path["permissions"]
             # 모든 필요 권한이 effective_permissions에 있는지 확인
             if required_perms.issubset(effective_permissions):
-                detected_paths.append({
-                    "name": path["name"],
-                    "severity": path["severity"],
-                    "description": path["description"],
-                    "permissions": list(required_perms),
-                })
+                detected_paths.append(
+                    {
+                        "name": path["name"],
+                        "severity": path["severity"],
+                        "description": path["description"],
+                        "permissions": list(required_perms),
+                    }
+                )
 
         return detected_paths

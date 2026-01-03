@@ -120,4 +120,8 @@ def _get_cached_prices(refresh: bool = False) -> Dict[str, float]:
         logger.warning(f"Route53 가격 조회 실패: {e}")
 
     # 기본값 반환
-    return {"hosted_zone_monthly": 0.50, "additional_zone_monthly": 0.10, "query_per_million": 0.40}
+    return {
+        "hosted_zone_monthly": 0.50,
+        "additional_zone_monthly": 0.10,
+        "query_per_million": 0.40,
+    }

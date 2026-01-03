@@ -25,6 +25,12 @@ core - AWS Automation 핵심 비즈니스 로직
     ├── region/                 # 리전 데이터
     │   └── data.py             # 리전 정보, 국가 매핑
     │
+    ├── parallel/               # 병렬 처리 서브시스템
+    │   ├── executor.py         # ParallelSessionExecutor
+    │   ├── decorators.py       # @safe_aws_call, @with_retry
+    │   ├── rate_limiter.py     # TokenBucketRateLimiter
+    │   └── types.py            # TaskError, TaskResult
+    │
     ├── config.py               # 중앙 집중식 설정 관리
     ├── exceptions.py           # 통합 예외 계층 구조
     └── types.py                # TypedDict/Protocol 정의
@@ -62,6 +68,7 @@ __all__ = [
     "auth",
     "tools",
     "region",
+    "parallel",
     # 모듈
     "config",
     "exceptions",

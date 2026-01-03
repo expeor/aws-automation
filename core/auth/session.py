@@ -47,12 +47,20 @@ Flow에서 선택된 계정/역할 정보를 자동으로 사용.
         ec2 = session.client("ec2")
         # identifier: SSO Session이면 account_id, 그 외는 profile_name
 """
+from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Tuple
-
-import boto3
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 from core.config import settings
 
@@ -60,9 +68,14 @@ from .config import Loader, detect_provider_type
 from .types import ProviderType
 
 if TYPE_CHECKING:
+    import boto3
+
     from cli.flow.context import ExecutionContext
+    from core.parallel import ParallelExecutionResult
 
     from .provider import BaseProvider
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +88,7 @@ def get_session(
     profile: str,
     region: Optional[str] = None,
     retry_on_expired: bool = True,
-) -> boto3.Session:
+) -> "boto3.Session":
     """단일 프로파일 + 단일 리전 세션 획득 (Thread-safe, 자동 재인증)
 
     Args:
@@ -461,6 +474,84 @@ class SessionIterator:
         return "\n".join(lines)
 
 
+class ParallelSessionIterator:
+    """병렬 세션 순회 클래스
+
+    SessionIterator의 병렬 버전.
+    기존 순차 패턴과 유사한 인터페이스를 제공하면서 내부적으로 병렬 처리합니다.
+
+    기존 코드 (순차):
+        with SessionIterator(ctx) as sessions:
+            for session, identifier, region in sessions:
+                result = collect(session, ...)
+                all_results.append(result)
+
+    신규 코드 (병렬, 권장):
+        from core.parallel import parallel_collect
+
+        result = parallel_collect(ctx, collect_func, max_workers=20)
+        all_data = result.get_data()
+
+    또는 기존 패턴 유지하면서 병렬화:
+        with ParallelSessionIterator(ctx, max_workers=20) as parallel:
+            result = parallel.map(collect_func, service="ec2")
+            # result: ParallelExecutionResult
+    """
+
+    def __init__(
+        self,
+        ctx: "ExecutionContext",
+        max_workers: int = 20,
+    ):
+        """초기화
+
+        Args:
+            ctx: ExecutionContext
+            max_workers: 최대 동시 스레드 수
+        """
+        from core.parallel import ParallelConfig, ParallelSessionExecutor
+
+        self._ctx = ctx
+        self._max_workers = max_workers
+        self._executor = ParallelSessionExecutor(
+            ctx,
+            ParallelConfig(max_workers=max_workers),
+        )
+
+    def __enter__(self) -> "ParallelSessionIterator":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        pass
+
+    def map(
+        self,
+        func: Callable[[boto3.Session, str, str, str], T],
+        service: str = "default",
+    ) -> "ParallelExecutionResult[T]":
+        """작업 함수를 모든 세션에 병렬 매핑
+
+        Args:
+            func: (session, account_id, account_name, region) -> T
+            service: AWS 서비스 이름 (rate limiting용)
+
+        Returns:
+            ParallelExecutionResult[T]
+
+        Example:
+            def collect_volumes(session, account_id, account_name, region):
+                ec2 = session.client("ec2", region_name=region)
+                return ec2.describe_volumes()["Volumes"]
+
+            with ParallelSessionIterator(ctx, max_workers=20) as parallel:
+                result = parallel.map(collect_volumes, service="ec2")
+
+                for volume in result.get_flat_data():
+                    print(volume["VolumeId"])
+        """
+        return self._executor.execute(func, service)
+
+
 def iter_context_sessions(
     ctx: "ExecutionContext",
 ) -> Iterator[Tuple[boto3.Session, str, str]]:
@@ -499,7 +590,7 @@ def get_context_session(
     ctx: "ExecutionContext",
     region: str,
     account_id: Optional[str] = None,
-) -> boto3.Session:
+) -> "boto3.Session":
     """ExecutionContext 기반 단일 세션 획득
 
     Args:

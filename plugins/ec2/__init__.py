@@ -6,6 +6,7 @@ EC2, EBS, EIP 등 컴퓨팅 리소스 분석
 
 CATEGORY = {
     "name": "ec2",
+    "display_name": "EC2",
     "description": "EC2 및 컴퓨팅 리소스 관리",
     "aliases": ["compute", "ebs", "eip"],
 }

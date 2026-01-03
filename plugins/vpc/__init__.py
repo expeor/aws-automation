@@ -6,6 +6,7 @@ Security Group, VPC, Subnet, NAT Gateway 등 네트워크 리소스 분석
 
 CATEGORY = {
     "name": "vpc",
+    "display_name": "VPC",
     "description": "VPC 및 네트워크 리소스 관리",
     "aliases": ["network", "sg", "security-group", "nat"],
 }

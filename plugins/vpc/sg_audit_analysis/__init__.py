@@ -2,17 +2,17 @@
 Security Group Audit Analysis Module
 """
 
+from .analyzer import RuleAnalysisResult, SGAnalysisResult, SGAnalyzer
 from .collector import SGCollector
-from .analyzer import SGAnalyzer, RuleAnalysisResult, SGAnalysisResult
-from .reporter import SGExcelReporter
+from .critical_ports import CRITICAL_PORTS  # 하위 호환성 (PORT_INFO alias)
 from .critical_ports import (
-    CRITICAL_PORTS,  # 하위 호환성 (PORT_INFO alias)
+    ALL_RISKY_PORTS,
     PORT_INFO,
-    CriticalPort,
     TRUSTED_ADVISOR_RED_PORTS,
     WEB_PORTS,
-    ALL_RISKY_PORTS,
+    CriticalPort,
 )
+from .reporter import SGExcelReporter
 
 __all__ = [
     "SGCollector",

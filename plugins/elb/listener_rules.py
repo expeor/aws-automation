@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from core.parallel import get_client
 from core.tools.base import BaseToolRunner
 from core.tools.output import OutputBuilder
 
@@ -251,19 +252,13 @@ class ListenerRulesAnalyzer:
 
             if field_type == "host-header":
                 host_config = cond.get("HostHeaderConfig", {})
-                analysis.host_headers.extend(
-                    host_config.get("Values", values)
-                )
+                analysis.host_headers.extend(host_config.get("Values", values))
             elif field_type == "path-pattern":
                 path_config = cond.get("PathPatternConfig", {})
-                analysis.path_patterns.extend(
-                    path_config.get("Values", values)
-                )
+                analysis.path_patterns.extend(path_config.get("Values", values))
             elif field_type == "http-request-method":
                 method_config = cond.get("HttpRequestMethodConfig", {})
-                analysis.http_methods.extend(
-                    method_config.get("Values", values)
-                )
+                analysis.http_methods.extend(method_config.get("Values", values))
             elif field_type == "source-ip":
                 ip_config = cond.get("SourceIpConfig", {})
                 analysis.source_ips.extend(ip_config.get("Values", values))
@@ -272,9 +267,7 @@ class ListenerRulesAnalyzer:
                 analysis.headers.append(header_config)
             elif field_type == "query-string":
                 qs_config = cond.get("QueryStringConfig", {})
-                analysis.query_strings.extend(
-                    qs_config.get("Values", [])
-                )
+                analysis.query_strings.extend(qs_config.get("Values", []))
 
     def _analyze_actions(self, analysis: RuleAnalysis, actions: List[Dict]) -> None:
         """액션 세부 분석"""
@@ -590,7 +583,7 @@ class ToolRunner(BaseToolRunner):
         severity_counts = {s.value: 0 for s in FindingSeverity}
 
         for account_id, region, session in self.iterate_accounts_and_regions():
-            elbv2 = session.client("elbv2")
+            elbv2 = get_client(session, "elbv2")
 
             try:
                 # ALB만 조회
@@ -675,16 +668,12 @@ class ToolRunner(BaseToolRunner):
 
         # 주요 발견 항목 출력 (HIGH 이상)
         high_findings = [
-            f
-            for f in all_findings
-            if f["Severity"] in ("CRITICAL", "HIGH")
+            f for f in all_findings if f["Severity"] in ("CRITICAL", "HIGH")
         ]
 
         if high_findings:
             console.print()
-            findings_table = Table(
-                title="주요 발견 항목 (HIGH 이상)", show_header=True
-            )
+            findings_table = Table(title="주요 발견 항목 (HIGH 이상)", show_header=True)
             findings_table.add_column("LB", style="cyan")
             findings_table.add_column("심각도")
             findings_table.add_column("제목")

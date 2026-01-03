@@ -4,8 +4,6 @@
 
 기존 파싱 로직을 DuckDB SQL로 교체하여 초고속 분석을 제공합니다.
 기존 인터페이스와 완전 호환성을 유지합니다.
-
-⚠️ 이 모듈은 duckdb가 필요합니다. 설치: pip install aa[log]
 """
 
 import os

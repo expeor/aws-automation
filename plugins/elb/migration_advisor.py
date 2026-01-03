@@ -36,13 +36,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_elb_monthly_cost
 
@@ -51,30 +47,34 @@ console = Console()
 
 class RecommendedTarget(Enum):
     """추천 마이그레이션 타겟"""
-    ALB = "ALB"       # Application Load Balancer
-    NLB = "NLB"       # Network Load Balancer
-    SPLIT = "SPLIT"   # ALB + NLB 분리 권장
-    KEEP = "KEEP"     # CLB 유지 권장 (특수 케이스)
+
+    ALB = "ALB"  # Application Load Balancer
+    NLB = "NLB"  # Network Load Balancer
+    SPLIT = "SPLIT"  # ALB + NLB 분리 권장
+    KEEP = "KEEP"  # CLB 유지 권장 (특수 케이스)
 
 
 class MigrationComplexity(Enum):
     """마이그레이션 복잡도"""
-    SIMPLE = "simple"       # 단순 마이그레이션
-    MODERATE = "moderate"   # 중간 복잡도
-    COMPLEX = "complex"     # 복잡한 마이그레이션
+
+    SIMPLE = "simple"  # 단순 마이그레이션
+    MODERATE = "moderate"  # 중간 복잡도
+    COMPLEX = "complex"  # 복잡한 마이그레이션
 
 
 class CompatibilityStatus(Enum):
     """호환성 상태"""
-    COMPATIBLE = "compatible"           # 완전 호환
-    PARTIAL = "partial"                 # 부분 호환 (조정 필요)
-    INCOMPATIBLE = "incompatible"       # 호환 불가
+
+    COMPATIBLE = "compatible"  # 완전 호환
+    PARTIAL = "partial"  # 부분 호환 (조정 필요)
+    INCOMPATIBLE = "incompatible"  # 호환 불가
 
 
 @dataclass
 class ListenerConfig:
     """리스너 설정"""
-    protocol: str           # HTTP, HTTPS, TCP, SSL
+
+    protocol: str  # HTTP, HTTPS, TCP, SSL
     port: int
     instance_protocol: str
     instance_port: int
@@ -84,7 +84,8 @@ class ListenerConfig:
 @dataclass
 class HealthCheckConfig:
     """헬스체크 설정"""
-    target: str             # TCP:80, HTTP:80/path
+
+    target: str  # TCP:80, HTTP:80/path
     interval: int
     timeout: int
     unhealthy_threshold: int
@@ -94,6 +95,7 @@ class HealthCheckConfig:
 @dataclass
 class CLBInfo:
     """Classic Load Balancer 정보"""
+
     name: str
     dns_name: str
     scheme: str
@@ -138,6 +140,7 @@ class CLBInfo:
 @dataclass
 class CompatibilityIssue:
     """호환성 이슈"""
+
     feature: str
     status: CompatibilityStatus
     description: str
@@ -147,6 +150,7 @@ class CompatibilityIssue:
 @dataclass
 class MigrationRecommendation:
     """마이그레이션 추천"""
+
     clb: CLBInfo
     target: RecommendedTarget
     complexity: MigrationComplexity
@@ -173,9 +177,14 @@ class MigrationRecommendation:
     @property
     def overall_status(self) -> CompatibilityStatus:
         """전체 호환성 상태"""
-        if any(i.status == CompatibilityStatus.INCOMPATIBLE for i in self.compatibility_issues):
+        if any(
+            i.status == CompatibilityStatus.INCOMPATIBLE
+            for i in self.compatibility_issues
+        ):
             return CompatibilityStatus.INCOMPATIBLE
-        if any(i.status == CompatibilityStatus.PARTIAL for i in self.compatibility_issues):
+        if any(
+            i.status == CompatibilityStatus.PARTIAL for i in self.compatibility_issues
+        ):
             return CompatibilityStatus.PARTIAL
         return CompatibilityStatus.COMPATIBLE
 
@@ -183,6 +192,7 @@ class MigrationRecommendation:
 @dataclass
 class MigrationAnalysisResult:
     """분석 결과"""
+
     account_id: str
     account_name: str
     region: str
@@ -205,12 +215,16 @@ class MigrationAnalysisResult:
 # =============================================================================
 
 
-def collect_clb_details(session, account_id: str, account_name: str, region: str) -> List[CLBInfo]:
+def collect_clb_details(
+    session, account_id: str, account_name: str, region: str
+) -> List[CLBInfo]:
     """CLB 상세 정보 수집"""
+    from botocore.exceptions import ClientError
+
     clbs = []
 
     try:
-        elb = session.client("elb", region_name=region)
+        elb = get_client(session, "elb", region_name=region)
 
         response = elb.describe_load_balancers()
 
@@ -221,23 +235,29 @@ def collect_clb_details(session, account_id: str, account_name: str, region: str
             listeners = []
             for ld in data.get("ListenerDescriptions", []):
                 l = ld.get("Listener", {})
-                listeners.append(ListenerConfig(
-                    protocol=l.get("Protocol", ""),
-                    port=l.get("LoadBalancerPort", 0),
-                    instance_protocol=l.get("InstanceProtocol", ""),
-                    instance_port=l.get("InstancePort", 0),
-                    ssl_certificate_id=l.get("SSLCertificateId"),
-                ))
+                listeners.append(
+                    ListenerConfig(
+                        protocol=l.get("Protocol", ""),
+                        port=l.get("LoadBalancerPort", 0),
+                        instance_protocol=l.get("InstanceProtocol", ""),
+                        instance_port=l.get("InstancePort", 0),
+                        ssl_certificate_id=l.get("SSLCertificateId"),
+                    )
+                )
 
             # 헬스체크 파싱
             hc_data = data.get("HealthCheck", {})
-            health_check = HealthCheckConfig(
-                target=hc_data.get("Target", ""),
-                interval=hc_data.get("Interval", 30),
-                timeout=hc_data.get("Timeout", 5),
-                unhealthy_threshold=hc_data.get("UnhealthyThreshold", 2),
-                healthy_threshold=hc_data.get("HealthyThreshold", 10),
-            ) if hc_data else None
+            health_check = (
+                HealthCheckConfig(
+                    target=hc_data.get("Target", ""),
+                    interval=hc_data.get("Interval", 30),
+                    timeout=hc_data.get("Timeout", 5),
+                    unhealthy_threshold=hc_data.get("UnhealthyThreshold", 2),
+                    healthy_threshold=hc_data.get("HealthyThreshold", 10),
+                )
+                if hc_data
+                else None
+            )
 
             clb = CLBInfo(
                 name=lb_name,
@@ -261,14 +281,20 @@ def collect_clb_details(session, account_id: str, account_name: str, region: str
                 attrs = elb.describe_load_balancer_attributes(LoadBalancerName=lb_name)
                 lb_attrs = attrs.get("LoadBalancerAttributes", {})
 
-                clb.cross_zone_enabled = lb_attrs.get("CrossZoneLoadBalancing", {}).get("Enabled", False)
+                clb.cross_zone_enabled = lb_attrs.get("CrossZoneLoadBalancing", {}).get(
+                    "Enabled", False
+                )
 
                 conn_drain = lb_attrs.get("ConnectionDraining", {})
                 clb.connection_draining_enabled = conn_drain.get("Enabled", False)
                 clb.connection_draining_timeout = conn_drain.get("Timeout", 300)
 
-                clb.idle_timeout = lb_attrs.get("ConnectionSettings", {}).get("IdleTimeout", 60)
-                clb.access_log_enabled = lb_attrs.get("AccessLog", {}).get("Enabled", False)
+                clb.idle_timeout = lb_attrs.get("ConnectionSettings", {}).get(
+                    "IdleTimeout", 60
+                )
+                clb.access_log_enabled = lb_attrs.get("AccessLog", {}).get(
+                    "Enabled", False
+                )
 
             except ClientError:
                 pass
@@ -277,7 +303,9 @@ def collect_clb_details(session, account_id: str, account_name: str, region: str
             try:
                 policies = elb.describe_load_balancer_policies(LoadBalancerName=lb_name)
                 for policy in policies.get("PolicyDescriptions", []):
-                    clb.policies[policy.get("PolicyName", "")] = policy.get("PolicyTypeName", "")
+                    clb.policies[policy.get("PolicyName", "")] = policy.get(
+                        "PolicyTypeName", ""
+                    )
             except ClientError:
                 pass
 
@@ -285,7 +313,11 @@ def collect_clb_details(session, account_id: str, account_name: str, region: str
 
     except ClientError as e:
         if "not available" not in str(e).lower():
-            console.print(f"    [yellow]CLB 수집 오류: {e}[/yellow]")
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if not is_quiet():
+                console.print(
+                    f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]"
+                )
 
     return clbs
 
@@ -314,7 +346,9 @@ def analyze_migration(clb: CLBInfo, region: str) -> MigrationRecommendation:
     elif target == RecommendedTarget.NLB:
         estimated_cost = get_elb_monthly_cost(region, "network")
     elif target == RecommendedTarget.SPLIT:
-        estimated_cost = get_elb_monthly_cost(region, "application") + get_elb_monthly_cost(region, "network")
+        estimated_cost = get_elb_monthly_cost(
+            region, "application"
+        ) + get_elb_monthly_cost(region, "network")
     else:
         estimated_cost = current_cost
 
@@ -360,100 +394,126 @@ def _determine_target(clb: CLBInfo) -> RecommendedTarget:
     return RecommendedTarget.KEEP
 
 
-def _analyze_compatibility(clb: CLBInfo, target: RecommendedTarget) -> List[CompatibilityIssue]:
+def _analyze_compatibility(
+    clb: CLBInfo, target: RecommendedTarget
+) -> List[CompatibilityIssue]:
     """호환성 분석"""
     issues = []
 
     # 1. VPC 기반 여부
     if not clb.is_vpc_based:
-        issues.append(CompatibilityIssue(
-            feature="EC2-Classic",
-            status=CompatibilityStatus.INCOMPATIBLE,
-            description="EC2-Classic 기반 CLB는 VPC로 먼저 마이그레이션 필요",
-            workaround="VPC로 EC2 인스턴스 마이그레이션 후 진행",
-        ))
+        issues.append(
+            CompatibilityIssue(
+                feature="EC2-Classic",
+                status=CompatibilityStatus.INCOMPATIBLE,
+                description="EC2-Classic 기반 CLB는 VPC로 먼저 마이그레이션 필요",
+                workaround="VPC로 EC2 인스턴스 마이그레이션 후 진행",
+            )
+        )
 
     # 2. 프록시 프로토콜 (NLB 타겟 시)
     if target == RecommendedTarget.NLB:
         proxy_policies = [p for p, t in clb.policies.items() if "proxy" in t.lower()]
         if proxy_policies:
-            issues.append(CompatibilityIssue(
-                feature="Proxy Protocol",
-                status=CompatibilityStatus.COMPATIBLE,
-                description="NLB도 Proxy Protocol v2 지원",
-                workaround=None,
-            ))
+            issues.append(
+                CompatibilityIssue(
+                    feature="Proxy Protocol",
+                    status=CompatibilityStatus.COMPATIBLE,
+                    description="NLB도 Proxy Protocol v2 지원",
+                    workaround=None,
+                )
+            )
 
     # 3. 스티키 세션 (ALB 타겟 시)
     if target in (RecommendedTarget.ALB, RecommendedTarget.SPLIT):
-        sticky_policies = [p for p, t in clb.policies.items() if "sticky" in t.lower() or "LBCookie" in t]
+        sticky_policies = [
+            p
+            for p, t in clb.policies.items()
+            if "sticky" in t.lower() or "LBCookie" in t
+        ]
         if sticky_policies:
-            issues.append(CompatibilityIssue(
-                feature="Sticky Sessions",
-                status=CompatibilityStatus.PARTIAL,
-                description="ALB는 다른 스티키 세션 메커니즘 사용 (Application-based)",
-                workaround="Target Group 수준에서 스티키니스 재설정 필요",
-            ))
+            issues.append(
+                CompatibilityIssue(
+                    feature="Sticky Sessions",
+                    status=CompatibilityStatus.PARTIAL,
+                    description="ALB는 다른 스티키 세션 메커니즘 사용 (Application-based)",
+                    workaround="Target Group 수준에서 스티키니스 재설정 필요",
+                )
+            )
 
     # 4. Backend Server Authentication
     backend_auth = [p for p, t in clb.policies.items() if "BackendServer" in t]
     if backend_auth:
-        issues.append(CompatibilityIssue(
-            feature="Backend Server Auth",
-            status=CompatibilityStatus.INCOMPATIBLE,
-            description="ALB/NLB는 Backend Server Authentication 미지원",
-            workaround="애플리케이션 레벨에서 mTLS 구현 또는 Private CA 사용",
-        ))
+        issues.append(
+            CompatibilityIssue(
+                feature="Backend Server Auth",
+                status=CompatibilityStatus.INCOMPATIBLE,
+                description="ALB/NLB는 Backend Server Authentication 미지원",
+                workaround="애플리케이션 레벨에서 mTLS 구현 또는 Private CA 사용",
+            )
+        )
 
     # 5. 커넥션 드레이닝
     if clb.connection_draining_enabled:
-        issues.append(CompatibilityIssue(
-            feature="Connection Draining",
-            status=CompatibilityStatus.COMPATIBLE,
-            description="ALB/NLB 모두 Deregistration Delay로 지원",
-            workaround=None,
-        ))
+        issues.append(
+            CompatibilityIssue(
+                feature="Connection Draining",
+                status=CompatibilityStatus.COMPATIBLE,
+                description="ALB/NLB 모두 Deregistration Delay로 지원",
+                workaround=None,
+            )
+        )
 
     # 6. 헬스체크
     if clb.health_check:
         hc_target = clb.health_check.target
         if hc_target.startswith("TCP:"):
             if target == RecommendedTarget.ALB:
-                issues.append(CompatibilityIssue(
-                    feature="TCP Health Check",
-                    status=CompatibilityStatus.PARTIAL,
-                    description="ALB는 HTTP/HTTPS 헬스체크만 지원",
-                    workaround="HTTP 헬스체크 엔드포인트 추가 필요",
-                ))
+                issues.append(
+                    CompatibilityIssue(
+                        feature="TCP Health Check",
+                        status=CompatibilityStatus.PARTIAL,
+                        description="ALB는 HTTP/HTTPS 헬스체크만 지원",
+                        workaround="HTTP 헬스체크 엔드포인트 추가 필요",
+                    )
+                )
 
     # 7. 여러 포트 리스너
     unique_instance_ports = set(l.instance_port for l in clb.listeners)
     if len(unique_instance_ports) > 1:
-        issues.append(CompatibilityIssue(
-            feature="Multiple Backend Ports",
-            status=CompatibilityStatus.PARTIAL,
-            description=f"다중 백엔드 포트 사용 ({len(unique_instance_ports)}개)",
-            workaround="각 포트별로 별도 Target Group 생성 필요",
-        ))
+        issues.append(
+            CompatibilityIssue(
+                feature="Multiple Backend Ports",
+                status=CompatibilityStatus.PARTIAL,
+                description=f"다중 백엔드 포트 사용 ({len(unique_instance_ports)}개)",
+                workaround="각 포트별로 별도 Target Group 생성 필요",
+            )
+        )
 
     # 8. SSL 정책
     ssl_listeners = [l for l in clb.listeners if l.protocol in ("HTTPS", "SSL")]
     if ssl_listeners:
-        issues.append(CompatibilityIssue(
-            feature="SSL/TLS Termination",
-            status=CompatibilityStatus.COMPATIBLE,
-            description="SSL 인증서 ACM으로 마이그레이션 권장",
-            workaround="IAM 인증서 → ACM 인증서 전환",
-        ))
+        issues.append(
+            CompatibilityIssue(
+                feature="SSL/TLS Termination",
+                status=CompatibilityStatus.COMPATIBLE,
+                description="SSL 인증서 ACM으로 마이그레이션 권장",
+                workaround="IAM 인증서 → ACM 인증서 전환",
+            )
+        )
 
     return issues
 
 
-def _determine_complexity(clb: CLBInfo, issues: List[CompatibilityIssue]) -> MigrationComplexity:
+def _determine_complexity(
+    clb: CLBInfo, issues: List[CompatibilityIssue]
+) -> MigrationComplexity:
     """마이그레이션 복잡도 결정"""
 
     # 호환 불가 이슈 → 복잡
-    incompatible = sum(1 for i in issues if i.status == CompatibilityStatus.INCOMPATIBLE)
+    incompatible = sum(
+        1 for i in issues if i.status == CompatibilityStatus.INCOMPATIBLE
+    )
     if incompatible > 0:
         return MigrationComplexity.COMPLEX
 
@@ -474,9 +534,7 @@ def _determine_complexity(clb: CLBInfo, issues: List[CompatibilityIssue]) -> Mig
 
 
 def _generate_checklist(
-    clb: CLBInfo,
-    target: RecommendedTarget,
-    issues: List[CompatibilityIssue]
+    clb: CLBInfo, target: RecommendedTarget, issues: List[CompatibilityIssue]
 ) -> tuple[List[str], List[str]]:
     """마이그레이션 체크리스트 및 경고 생성"""
     checklist = []
@@ -519,7 +577,9 @@ def _generate_checklist(
     return checklist, warnings
 
 
-def _generate_summary(clb: CLBInfo, target: RecommendedTarget, complexity: MigrationComplexity) -> str:
+def _generate_summary(
+    clb: CLBInfo, target: RecommendedTarget, complexity: MigrationComplexity
+) -> str:
     """마이그레이션 요약 생성"""
 
     target_names = {
@@ -545,10 +605,7 @@ def _generate_summary(clb: CLBInfo, target: RecommendedTarget, complexity: Migra
 
 
 def analyze_all(
-    clbs: List[CLBInfo],
-    region: str,
-    account_id: str,
-    account_name: str
+    clbs: List[CLBInfo], region: str, account_id: str, account_name: str
 ) -> MigrationAnalysisResult:
     """전체 CLB 마이그레이션 분석"""
     result = MigrationAnalysisResult(
@@ -585,23 +642,39 @@ def analyze_all(
 
 def generate_report(results: List[MigrationAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="2E7D32", end_color="2E7D32", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     target_fills = {
-        RecommendedTarget.ALB: PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid"),
-        RecommendedTarget.NLB: PatternFill(start_color="2196F3", end_color="2196F3", fill_type="solid"),
-        RecommendedTarget.SPLIT: PatternFill(start_color="FF9800", end_color="FF9800", fill_type="solid"),
-        RecommendedTarget.KEEP: PatternFill(start_color="9E9E9E", end_color="9E9E9E", fill_type="solid"),
+        RecommendedTarget.ALB: PatternFill(
+            start_color="4CAF50", end_color="4CAF50", fill_type="solid"
+        ),
+        RecommendedTarget.NLB: PatternFill(
+            start_color="2196F3", end_color="2196F3", fill_type="solid"
+        ),
+        RecommendedTarget.SPLIT: PatternFill(
+            start_color="FF9800", end_color="FF9800", fill_type="solid"
+        ),
+        RecommendedTarget.KEEP: PatternFill(
+            start_color="9E9E9E", end_color="9E9E9E", fill_type="solid"
+        ),
     }
 
     # Summary
@@ -644,8 +717,21 @@ def generate_report(results: List[MigrationAnalysisResult], output_dir: str) -> 
 
     # Recommendations
     ws2 = wb.create_sheet("Recommendations")
-    headers = ["Account", "Region", "CLB Name", "Scheme", "Listeners", "Instances",
-               "추천 타겟", "복잡도", "호환성", "현재 비용($)", "예상 비용($)", "차이($)", "요약"]
+    headers = [
+        "Account",
+        "Region",
+        "CLB Name",
+        "Scheme",
+        "Listeners",
+        "Instances",
+        "추천 타겟",
+        "복잡도",
+        "호환성",
+        "현재 비용($)",
+        "예상 비용($)",
+        "차이($)",
+        "요약",
+    ]
     for col, h in enumerate(headers, 1):
         cell = ws2.cell(row=1, column=col, value=h)
         cell.fill = header_fill
@@ -673,10 +759,18 @@ def generate_report(results: List[MigrationAnalysisResult], output_dir: str) -> 
                 target_cell.font = Font(bold=True, color="FFFFFF")
 
             ws2.cell(row=row, column=8, value=rec.complexity.value).border = thin_border
-            ws2.cell(row=row, column=9, value=rec.overall_status.value).border = thin_border
-            ws2.cell(row=row, column=10, value=round(rec.current_monthly_cost, 2)).border = thin_border
-            ws2.cell(row=row, column=11, value=round(rec.estimated_monthly_cost, 2)).border = thin_border
-            ws2.cell(row=row, column=12, value=round(rec.cost_difference, 2)).border = thin_border
+            ws2.cell(
+                row=row, column=9, value=rec.overall_status.value
+            ).border = thin_border
+            ws2.cell(
+                row=row, column=10, value=round(rec.current_monthly_cost, 2)
+            ).border = thin_border
+            ws2.cell(
+                row=row, column=11, value=round(rec.estimated_monthly_cost, 2)
+            ).border = thin_border
+            ws2.cell(
+                row=row, column=12, value=round(rec.cost_difference, 2)
+            ).border = thin_border
             ws2.cell(row=row, column=13, value=rec.summary).border = thin_border
 
     # Checklist
@@ -695,16 +789,26 @@ def generate_report(results: List[MigrationAnalysisResult], output_dir: str) -> 
             ws3.cell(row=row, column=2, value=rec.clb.region).border = thin_border
             ws3.cell(row=row, column=3, value=rec.clb.name).border = thin_border
             ws3.cell(row=row, column=4, value=rec.target.value).border = thin_border
-            ws3.cell(row=row, column=5, value="\n".join(rec.checklist)).border = thin_border
-            ws3.cell(row=row, column=6, value="\n".join(rec.warnings) if rec.warnings else "-").border = thin_border
+            ws3.cell(
+                row=row, column=5, value="\n".join(rec.checklist)
+            ).border = thin_border
+            ws3.cell(
+                row=row,
+                column=6,
+                value="\n".join(rec.warnings) if rec.warnings else "-",
+            ).border = thin_border
 
     # 열 너비 조정
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value).split('\n')[0] if c.value else "") for c in col)
+            max_len = max(
+                len(str(c.value).split("\n")[0] if c.value else "") for c in col
+            )
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 50
+                )
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -721,64 +825,28 @@ def generate_report(results: List[MigrationAnalysisResult], output_dir: str) -> 
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[MigrationAnalysisResult]:
+    """단일 계정/리전의 CLB 수집 및 마이그레이션 분석 (병렬 실행용)"""
+    clbs = collect_clb_details(session, account_id, account_name, region)
+    if not clbs:
+        return None
+    return analyze_all(clbs, region, account_id, account_name)
+
+
 def run(ctx) -> None:
     """CLB Migration Advisor 실행"""
     console.print("[bold]CLB Migration Advisor 시작...[/bold]")
     console.print("[dim]Classic Load Balancer → ALB/NLB 마이그레이션 분석[/dim]\n")
 
-    all_results: List[MigrationAnalysisResult] = []
-    collected = set()
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elb")
+    all_results: List[MigrationAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} / {region}[/dim]")
-
-                # CLB 수집
-                clbs = collect_clb_details(session, account_id, account_name, region)
-
-                if not clbs:
-                    console.print(f"    [dim](CLB 없음)[/dim]")
-                    continue
-
-                # 분석
-                result = analyze_all(clbs, region, account_id, account_name)
-                all_results.append(result)
-
-                # 요약 출력
-                console.print(f"    [cyan]CLB {result.total_clbs}개:[/cyan] ", end="")
-                parts = []
-                if result.alb_recommended > 0:
-                    parts.append(f"[green]ALB→{result.alb_recommended}[/green]")
-                if result.nlb_recommended > 0:
-                    parts.append(f"[blue]NLB→{result.nlb_recommended}[/blue]")
-                if result.split_recommended > 0:
-                    parts.append(f"[yellow]분리→{result.split_recommended}[/yellow]")
-                if result.keep_recommended > 0:
-                    parts.append(f"[dim]유지→{result.keep_recommended}[/dim]")
-                console.print(", ".join(parts))
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"    [yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"    [red]{e}[/red]")
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not all_results:
         console.print("\n[yellow]분석할 CLB 없음[/yellow]")

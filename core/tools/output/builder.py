@@ -252,12 +252,7 @@ def single_report_directory(session_name: str) -> str:
         output_dir = single_report_directory("my-sso-session")
         # → output/my-sso-session/reports/2025-12-31/
     """
-    return (
-        OutputPath(session_name)
-        .sub("reports")
-        .with_date(DatePattern.DAILY)
-        .build()
-    )
+    return OutputPath(session_name).sub("reports").with_date(DatePattern.DAILY).build()
 
 
 def create_report_directory(
@@ -283,8 +278,5 @@ def create_report_directory(
         # → output/my-profile/tools/alb_log/2025/12/
     """
     return (
-        OutputPath(identifier)
-        .sub("tools", tool_name)
-        .with_date(date_pattern)
-        .build()
+        OutputPath(identifier).sub("tools", tool_name).with_date(date_pattern).build()
     )

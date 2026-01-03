@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .collector import SSOData, SSOPermissionSet, SSOUser, SSOGroup
+from .collector import SSOData, SSOGroup, SSOPermissionSet, SSOUser
 
 
 class IssueType(Enum):
@@ -277,7 +277,9 @@ class SSOAnalyzer:
             for account_name in user.admin_accounts:
                 # account_name으로 account_id 찾기
                 for assign in user.assignments:
-                    if assign.get("account_name") == account_name and assign.get("is_admin"):
+                    if assign.get("account_name") == account_name and assign.get(
+                        "is_admin"
+                    ):
                         self._add_admin_user(
                             assign.get("account_id", ""),
                             account_name,
@@ -410,7 +412,9 @@ class SSOAnalyzer:
         result.total_permission_sets = len(self.sso_data.permission_sets)
 
         # 사용자 통계
-        result.users_with_admin = sum(1 for u in self.sso_data.users if u.has_admin_access)
+        result.users_with_admin = sum(
+            1 for u in self.sso_data.users if u.has_admin_access
+        )
         result.users_no_assignment = sum(
             1 for u in self.sso_data.users if not u.assignments
         )
@@ -424,7 +428,9 @@ class SSOAnalyzer:
         )
 
         # Group 통계
-        result.empty_groups = sum(1 for g in self.sso_data.groups if g.member_count == 0)
+        result.empty_groups = sum(
+            1 for g in self.sso_data.groups if g.member_count == 0
+        )
 
     def get_summary_stats(self, result: SSOAnalysisResult) -> Dict[str, Any]:
         """요약 통계 반환"""
@@ -433,7 +439,9 @@ class SSOAnalyzer:
             1 for i in result.all_issues if i.severity == Severity.CRITICAL
         )
         high_count = sum(1 for i in result.all_issues if i.severity == Severity.HIGH)
-        medium_count = sum(1 for i in result.all_issues if i.severity == Severity.MEDIUM)
+        medium_count = sum(
+            1 for i in result.all_issues if i.severity == Severity.MEDIUM
+        )
         low_count = sum(1 for i in result.all_issues if i.severity == Severity.LOW)
 
         return {

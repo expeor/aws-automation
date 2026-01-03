@@ -13,13 +13,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_kms_key_price
 
@@ -28,6 +24,7 @@ console = Console()
 
 class KMSKeyStatus(Enum):
     """KMS 키 상태"""
+
     NORMAL = "normal"
     DISABLED = "disabled"
     PENDING_DELETE = "pending_delete"
@@ -36,6 +33,7 @@ class KMSKeyStatus(Enum):
 @dataclass
 class KMSKeyInfo:
     """KMS 키 정보"""
+
     account_id: str
     account_name: str
     region: str
@@ -60,6 +58,7 @@ class KMSKeyInfo:
 @dataclass
 class KMSKeyFinding:
     """KMS 키 분석 결과"""
+
     key: KMSKeyInfo
     status: KMSKeyStatus
     recommendation: str
@@ -68,6 +67,7 @@ class KMSKeyFinding:
 @dataclass
 class KMSKeyAnalysisResult:
     """KMS 키 분석 결과 집계"""
+
     account_id: str
     account_name: str
     region: str
@@ -81,9 +81,13 @@ class KMSKeyAnalysisResult:
     findings: List[KMSKeyFinding] = field(default_factory=list)
 
 
-def collect_kms_keys(session, account_id: str, account_name: str, region: str) -> List[KMSKeyInfo]:
+def collect_kms_keys(
+    session, account_id: str, account_name: str, region: str
+) -> List[KMSKeyInfo]:
     """KMS 키 수집"""
-    kms = session.client("kms", region_name=region)
+    from botocore.exceptions import ClientError
+
+    kms = get_client(session, "kms", region_name=region)
     keys = []
 
     paginator = kms.get_paginator("list_keys")
@@ -102,19 +106,21 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
                 except ClientError:
                     pass
 
-                keys.append(KMSKeyInfo(
-                    account_id=account_id,
-                    account_name=account_name,
-                    region=region,
-                    key_id=key["KeyId"],
-                    arn=key_info.get("Arn", ""),
-                    description=key_info.get("Description", ""),
-                    key_state=key_info.get("KeyState", ""),
-                    key_manager=key_info.get("KeyManager", ""),
-                    creation_date=key_info.get("CreationDate"),
-                    deletion_date=key_info.get("DeletionDate"),
-                    alias=alias,
-                ))
+                keys.append(
+                    KMSKeyInfo(
+                        account_id=account_id,
+                        account_name=account_name,
+                        region=region,
+                        key_id=key["KeyId"],
+                        arn=key_info.get("Arn", ""),
+                        description=key_info.get("Description", ""),
+                        key_state=key_info.get("KeyState", ""),
+                        key_manager=key_info.get("KeyManager", ""),
+                        creation_date=key_info.get("CreationDate"),
+                        deletion_date=key_info.get("DeletionDate"),
+                        alias=alias,
+                    )
+                )
             except ClientError:
                 continue
 
@@ -122,10 +128,7 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
 
 
 def analyze_kms_keys(
-    keys: List[KMSKeyInfo],
-    account_id: str,
-    account_name: str,
-    region: str
+    keys: List[KMSKeyInfo], account_id: str, account_name: str, region: str
 ) -> KMSKeyAnalysisResult:
     """KMS 키 분석"""
     result = KMSKeyAnalysisResult(
@@ -141,51 +144,67 @@ def analyze_kms_keys(
         else:
             result.aws_managed_count += 1
             result.normal_count += 1
-            result.findings.append(KMSKeyFinding(
-                key=key,
-                status=KMSKeyStatus.NORMAL,
-                recommendation="AWS 관리 키 (무료)",
-            ))
+            result.findings.append(
+                KMSKeyFinding(
+                    key=key,
+                    status=KMSKeyStatus.NORMAL,
+                    recommendation="AWS 관리 키 (무료)",
+                )
+            )
             continue
 
         if key.key_state == "PendingDeletion":
             result.pending_delete_count += 1
-            result.findings.append(KMSKeyFinding(
-                key=key,
-                status=KMSKeyStatus.PENDING_DELETE,
-                recommendation=f"삭제 예정: {key.deletion_date.strftime('%Y-%m-%d') if key.deletion_date else 'N/A'}",
-            ))
+            result.findings.append(
+                KMSKeyFinding(
+                    key=key,
+                    status=KMSKeyStatus.PENDING_DELETE,
+                    recommendation=f"삭제 예정: {key.deletion_date.strftime('%Y-%m-%d') if key.deletion_date else 'N/A'}",
+                )
+            )
             continue
 
         if key.key_state == "Disabled":
             result.disabled_count += 1
             result.disabled_monthly_cost += key.monthly_cost
-            result.findings.append(KMSKeyFinding(
-                key=key,
-                status=KMSKeyStatus.DISABLED,
-                recommendation="비활성화됨 - 삭제 검토",
-            ))
+            result.findings.append(
+                KMSKeyFinding(
+                    key=key,
+                    status=KMSKeyStatus.DISABLED,
+                    recommendation="비활성화됨 - 삭제 검토",
+                )
+            )
             continue
 
         result.normal_count += 1
-        result.findings.append(KMSKeyFinding(
-            key=key,
-            status=KMSKeyStatus.NORMAL,
-            recommendation="정상",
-        ))
+        result.findings.append(
+            KMSKeyFinding(
+                key=key,
+                status=KMSKeyStatus.NORMAL,
+                recommendation="정상",
+            )
+        )
 
     return result
 
 
 def generate_report(results: List[KMSKeyAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
+    yellow_fill = PatternFill(
+        start_color="FFE066", end_color="FFE066", fill_type="solid"
+    )
 
     ws = wb.create_sheet("Summary")
     ws["A1"] = "KMS 키 분석 보고서"
@@ -211,7 +230,16 @@ def generate_report(results: List[KMSKeyAnalysisResult], output_dir: str) -> str
             ws.cell(row=row, column=6).fill = yellow_fill
 
     ws_detail = wb.create_sheet("KMS Keys")
-    detail_headers = ["Account", "Region", "Key ID", "Alias", "Type", "상태", "월간 비용", "권장 조치"]
+    detail_headers = [
+        "Account",
+        "Region",
+        "Key ID",
+        "Alias",
+        "Type",
+        "상태",
+        "월간 비용",
+        "권장 조치",
+    ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill
         ws_detail.cell(row=1, column=col).font = header_font
@@ -228,7 +256,9 @@ def generate_report(results: List[KMSKeyAnalysisResult], output_dir: str) -> str
                 ws_detail.cell(row=detail_row, column=4, value=k.alias or "-")
                 ws_detail.cell(row=detail_row, column=5, value=k.key_manager)
                 ws_detail.cell(row=detail_row, column=6, value=k.key_state)
-                ws_detail.cell(row=detail_row, column=7, value=f"${k.monthly_cost:,.2f}")
+                ws_detail.cell(
+                    row=detail_row, column=7, value=f"${k.monthly_cost:,.2f}"
+                )
                 ws_detail.cell(row=detail_row, column=8, value=f.recommendation)
 
     for sheet in wb.worksheets:
@@ -236,7 +266,9 @@ def generate_report(results: List[KMSKeyAnalysisResult], output_dir: str) -> str
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 40
+                )
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -246,52 +278,27 @@ def generate_report(results: List[KMSKeyAnalysisResult], output_dir: str) -> str
     return filepath
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[KMSKeyAnalysisResult]:
+    """단일 계정/리전의 KMS 키 수집 및 분석 (병렬 실행용)"""
+    keys = collect_kms_keys(session, account_id, account_name, region)
+    if not keys:
+        return None
+    return analyze_kms_keys(keys, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """KMS 키 미사용 분석"""
     console.print("[bold]KMS 키 분석 시작...[/bold]\n")
 
-    results: List[KMSKeyAnalysisResult] = []
-    collected = set()
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="kms")
+    results: List[KMSKeyAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                keys = collect_kms_keys(session, account_id, account_name, region)
-                if not keys:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                result = analyze_kms_keys(keys, account_id, account_name, region)
-                results.append(result)
-
-                if result.disabled_count > 0:
-                    console.print(f"CMK {result.customer_managed_count}개 / [yellow]비활성화 {result.disabled_count}개[/yellow]")
-                else:
-                    console.print(f"[green]CMK {result.customer_managed_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")
@@ -302,7 +309,9 @@ def run(ctx) -> None:
     disabled_cost = sum(r.disabled_monthly_cost for r in results)
 
     console.print(f"\n[bold]종합 결과[/bold]")
-    console.print(f"CMK: {total_cmk}개 / 비활성화: [yellow]{total_disabled}개[/yellow] (${disabled_cost:,.2f}/월)")
+    console.print(
+        f"CMK: {total_cmk}개 / 비활성화: [yellow]{total_disabled}개[/yellow] (${disabled_cost:,.2f}/월)"
+    )
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

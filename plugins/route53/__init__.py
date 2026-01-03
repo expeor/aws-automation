@@ -9,6 +9,7 @@ Hosted Zone, 레코드셋, 헬스체크 등 DNS 리소스 분석
 
 CATEGORY = {
     "name": "route53",
+    "display_name": "Route 53",
     "description": "Route 53 DNS 관리",
     "aliases": ["dns", "domain", "r53"],
 }

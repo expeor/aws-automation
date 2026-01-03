@@ -43,7 +43,9 @@ class PublicIPResult:
 def _get_cache_dir() -> str:
     """캐시 디렉토리 경로 (프로젝트 루트의 temp 폴더)"""
     # plugins/vpc -> plugins -> project_root
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
     cache_dir = os.path.join(project_root, "temp", "ip_ranges")
     os.makedirs(cache_dir, exist_ok=True)
     return cache_dir
@@ -89,8 +91,7 @@ def get_aws_ip_ranges() -> dict:
 
     try:
         response = requests.get(
-            "https://ip-ranges.amazonaws.com/ip-ranges.json",
-            timeout=5
+            "https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5
         )
         data = response.json()
         _save_to_cache("aws", data)
@@ -107,8 +108,7 @@ def get_gcp_ip_ranges() -> dict:
 
     try:
         response = requests.get(
-            "https://www.gstatic.com/ipranges/cloud.json",
-            timeout=10
+            "https://www.gstatic.com/ipranges/cloud.json", timeout=10
         )
         data = response.json()
         _save_to_cache("gcp", data)
@@ -154,8 +154,7 @@ def get_oracle_ip_ranges() -> dict:
 
     try:
         response = requests.get(
-            "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json",
-            timeout=10
+            "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10
         )
         data = response.json()
         _save_to_cache("oracle", data)
@@ -177,21 +176,31 @@ def search_in_aws(ip: str, data: dict) -> List[PublicIPResult]:
     except ValueError:
         return results
 
-    prefixes = data.get("prefixes", []) if ip_obj.version == 4 else data.get("ipv6_prefixes", [])
+    prefixes = (
+        data.get("prefixes", [])
+        if ip_obj.version == 4
+        else data.get("ipv6_prefixes", [])
+    )
     prefix_key = "ip_prefix" if ip_obj.version == 4 else "ipv6_prefix"
 
     for prefix in prefixes:
         try:
             network = ipaddress.ip_network(prefix[prefix_key])
             if ip_obj in network:
-                results.append(PublicIPResult(
-                    ip_address=ip,
-                    provider="AWS",
-                    service=prefix.get("service", ""),
-                    ip_prefix=prefix[prefix_key],
-                    region=prefix.get("region", ""),
-                    extra={"network_border_group": prefix.get("network_border_group", "")}
-                ))
+                results.append(
+                    PublicIPResult(
+                        ip_address=ip,
+                        provider="AWS",
+                        service=prefix.get("service", ""),
+                        ip_prefix=prefix[prefix_key],
+                        region=prefix.get("region", ""),
+                        extra={
+                            "network_border_group": prefix.get(
+                                "network_border_group", ""
+                            )
+                        },
+                    )
+                )
         except (ValueError, KeyError):
             continue
 
@@ -214,13 +223,15 @@ def search_in_gcp(ip: str, data: dict) -> List[PublicIPResult]:
         try:
             network = ipaddress.ip_network(prefix[prefix_key])
             if ip_obj in network:
-                results.append(PublicIPResult(
-                    ip_address=ip,
-                    provider="GCP",
-                    service=prefix.get("service", "Google Cloud"),
-                    ip_prefix=prefix[prefix_key],
-                    region=prefix.get("scope", ""),
-                ))
+                results.append(
+                    PublicIPResult(
+                        ip_address=ip,
+                        provider="GCP",
+                        service=prefix.get("service", "Google Cloud"),
+                        ip_prefix=prefix[prefix_key],
+                        region=prefix.get("scope", ""),
+                    )
+                )
         except ValueError:
             continue
 
@@ -243,13 +254,15 @@ def search_in_azure(ip: str, data: dict) -> List[PublicIPResult]:
             try:
                 network = ipaddress.ip_network(prefix)
                 if ip_obj in network:
-                    results.append(PublicIPResult(
-                        ip_address=ip,
-                        provider="Azure",
-                        service=service_name,
-                        ip_prefix=prefix,
-                        region=region,
-                    ))
+                    results.append(
+                        PublicIPResult(
+                            ip_address=ip,
+                            provider="Azure",
+                            service=service_name,
+                            ip_prefix=prefix,
+                            region=region,
+                        )
+                    )
             except ValueError:
                 continue
 
@@ -275,13 +288,15 @@ def search_in_oracle(ip: str, data: dict) -> List[PublicIPResult]:
                 network = ipaddress.ip_network(cidr)
                 if ip_obj in network:
                     service = ", ".join(tags) if tags else "Oracle Cloud"
-                    results.append(PublicIPResult(
-                        ip_address=ip,
-                        provider="Oracle",
-                        service=service,
-                        ip_prefix=cidr,
-                        region=region_name,
-                    ))
+                    results.append(
+                        PublicIPResult(
+                            ip_address=ip,
+                            provider="Oracle",
+                            service=service,
+                            ip_prefix=cidr,
+                            region=region_name,
+                        )
+                    )
             except ValueError:
                 continue
 
@@ -308,8 +323,7 @@ def load_ip_ranges_parallel(target_providers: set) -> Dict[str, dict]:
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
-            executor.submit(loaders[p]): p
-            for p in target_providers if p in loaders
+            executor.submit(loaders[p]): p for p in target_providers if p in loaders
         }
 
         for future in as_completed(futures):
@@ -382,12 +396,14 @@ def search_public_ip(
 
         # 결과 없으면 Unknown 추가
         if not found:
-            all_results.append(PublicIPResult(
-                ip_address=ip,
-                provider="Unknown",
-                service="",
-                ip_prefix="",
-                region="",
-            ))
+            all_results.append(
+                PublicIPResult(
+                    ip_address=ip,
+                    provider="Unknown",
+                    service="",
+                    ip_prefix="",
+                    region="",
+                )
+            )
 
     return all_results

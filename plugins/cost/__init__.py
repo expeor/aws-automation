@@ -7,6 +7,7 @@ plugins/cost - 비용 최적화 및 Cost Explorer 도구
 
 CATEGORY = {
     "name": "cost",
+    "display_name": "Cost Explorer",
     "description": "비용 최적화 및 Cost Explorer",
     "aliases": ["billing", "savings", "optimization"],
 }

@@ -12,35 +12,35 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .collector import NATGateway, NATAuditData
+from .collector import NATAuditData, NATGateway
 
 
 class UsageStatus(Enum):
     """사용 상태"""
 
-    UNUSED = "unused"           # 확실히 미사용 (트래픽 0)
-    LOW_USAGE = "low_usage"     # 저사용 (일평균 < 1GB)
-    NORMAL = "normal"           # 정상 사용
-    PENDING = "pending"         # 생성 중/보류 중
-    UNKNOWN = "unknown"         # 메트릭 없음
+    UNUSED = "unused"  # 확실히 미사용 (트래픽 0)
+    LOW_USAGE = "low_usage"  # 저사용 (일평균 < 1GB)
+    NORMAL = "normal"  # 정상 사용
+    PENDING = "pending"  # 생성 중/보류 중
+    UNKNOWN = "unknown"  # 메트릭 없음
 
 
 class Confidence(Enum):
     """판단 신뢰도"""
 
-    HIGH = "high"       # 확실함 - 바로 조치 가능
-    MEDIUM = "medium"   # 검토 필요
-    LOW = "low"         # 판단 불가
+    HIGH = "high"  # 확실함 - 바로 조치 가능
+    MEDIUM = "medium"  # 검토 필요
+    LOW = "low"  # 판단 불가
 
 
 class Severity(Enum):
     """심각도"""
 
     CRITICAL = "critical"  # 즉시 조치 (미사용 + 고비용)
-    HIGH = "high"          # 빠른 조치 권장
-    MEDIUM = "medium"      # 검토 필요
-    LOW = "low"            # 참고
-    INFO = "info"          # 정보성
+    HIGH = "high"  # 빠른 조치 권장
+    MEDIUM = "medium"  # 검토 필요
+    LOW = "low"  # 참고
+    INFO = "info"  # 정보성
 
 
 @dataclass
@@ -114,7 +114,9 @@ class NATAnalyzer:
 
         # 전체 통계
         result.total_nat_count = len(self.audit_data.nat_gateways)
-        result.total_monthly_cost = sum(f.nat.total_monthly_cost for f in result.findings)
+        result.total_monthly_cost = sum(
+            f.nat.total_monthly_cost for f in result.findings
+        )
         result.total_monthly_waste = sum(f.monthly_waste for f in result.findings)
         result.total_annual_savings = sum(f.annual_savings for f in result.findings)
 
@@ -172,7 +174,7 @@ class NATAnalyzer:
             )
 
         # 2. 저사용 (일평균 < 1GB)
-        daily_avg_gb = (bytes_out / (1024 ** 3)) / metric_days
+        daily_avg_gb = (bytes_out / (1024**3)) / metric_days
 
         if daily_avg_gb < self.LOW_USAGE_THRESHOLD_GB_PER_DAY:
             # 트래픽이 있는 날이 적으면 더 의심스러움

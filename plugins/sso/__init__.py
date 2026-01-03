@@ -7,6 +7,7 @@ plugins/sso - IAM Identity Center(SSO) 보안 감사 및 관리 도구
 
 CATEGORY = {
     "name": "sso",
+    "display_name": "IAM Identity Center",
     "description": "IAM Identity Center(SSO) 보안 감사 도구",
     "aliases": ["identity-center", "sso-audit"],
 }

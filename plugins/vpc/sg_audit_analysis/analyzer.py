@@ -14,10 +14,10 @@ from typing import Any, Dict, List, Set
 
 from .collector import SecurityGroup, SGRule
 from .critical_ports import (
-    CriticalPort,
-    PORT_INFO,
     ALL_RISKY_PORTS,
+    PORT_INFO,
     WEB_PORTS,
+    CriticalPort,
     check_port_range,
     is_risky_port,
     is_web_port,
@@ -77,7 +77,9 @@ class RuleAnalysisResult:
     is_cross_account: bool = False  # Cross-account SG 참조
     cross_account_id: str = ""  # 참조된 계정 ID
     has_no_description: bool = False  # Description 없음
-    hidden_risky_ports: List[CriticalPort] = field(default_factory=list)  # 넓은 범위에 숨은 위험 포트
+    hidden_risky_ports: List[CriticalPort] = field(
+        default_factory=list
+    )  # 넓은 범위에 숨은 위험 포트
     # 추가 경고 메시지
     warnings: List[str] = field(default_factory=list)
 
@@ -206,7 +208,9 @@ class SGAnalyzer:
             warnings.append("Egress ALL 허용 - 데이터 유출 통제 불가")
 
         # 2. Self 참조 + ALL 포트 → 횡이동 위험
-        is_self_all_ports = rule.is_self_reference and (is_all_ports or is_all_protocols)
+        is_self_all_ports = rule.is_self_reference and (
+            is_all_ports or is_all_protocols
+        )
         if is_self_all_ports:
             warnings.append("Self 참조 ALL 포트 - 같은 SG 내 횡이동 가능")
 

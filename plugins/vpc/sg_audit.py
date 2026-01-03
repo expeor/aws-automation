@@ -8,15 +8,25 @@ SG 현황 및 미사용 SG/규칙 분석
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-from botocore.exceptions import ClientError
+from typing import List, Optional
+
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 from .sg_audit_analysis import SGAnalyzer, SGCollector, SGExcelReporter
 
 console = Console()
+
+
+def _collect_sgs(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[List]:
+    """단일 계정/리전의 Security Group 수집 (병렬 실행용)"""
+    collector = SGCollector()
+    sgs = collector.collect(session, account_id, account_name, region)
+    return sgs if sgs else None
 
 
 def run(ctx) -> None:
@@ -26,57 +36,22 @@ def run(ctx) -> None:
     # 1. 데이터 수집
     console.print("[cyan]Step 1: Security Group 데이터 수집 중...[/cyan]")
 
-    # Account ID -> Name 매핑 생성
-    account_names = {}
-    if hasattr(ctx, "accounts") and ctx.accounts:
-        for acc in ctx.accounts:
-            account_names[acc.id] = acc.name
+    # 병렬 수집
+    result = parallel_collect(ctx, _collect_sgs, max_workers=20, service="ec2")
 
-    collector = SGCollector()
+    # 결과 평탄화 (각 리전의 SG 목록을 하나로 합침)
     all_sgs = []
-    skipped_regions = []
+    for sgs in result.get_data():
+        if sgs:
+            all_sgs.extend(sgs)
 
-    # 중복 방지를 위한 수집 완료 추적
-    collected_keys = set()
-
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                # STS로 실제 Account ID 조회
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-                account_name = account_names.get(account_id, identifier)
-
-                # 중복 수집 방지
-                collect_key = f"{account_id}/{region}"
-                if collect_key in collected_keys:
-                    console.print(f"  [dim yellow]SKIP (중복): {account_name} / {region}[/dim yellow]")
-                    continue
-                collected_keys.add(collect_key)
-
-                console.print(f"  [dim]{account_name} ({account_id}) / {region}[/dim]")
-                sgs = collector.collect(session, account_id, account_name, region)
-                all_sgs.extend(sgs)
-
-            except ClientError as e:
-                # Opt-in 리전 또는 비활성화된 리전은 건너뜀
-                error_code = e.response.get("Error", {}).get("Code", "Unknown")
-                skipped_regions.append(f"{region}: {error_code}")
-                continue
-            except Exception as e:
-                skipped_regions.append(f"{region}: {str(e)}")
-                continue
-
-    # 건너뛴 리전 출력
-    if skipped_regions:
-        console.print(f"[dim]  (접근 불가 리전 {len(skipped_regions)}개 건너뜀)[/dim]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not all_sgs:
         console.print("[yellow]수집된 Security Group이 없습니다.[/yellow]")
-        if collector.errors:
-            console.print("[red]오류 목록:[/red]")
-            for err in collector.errors:
-                console.print(f"  - {err}")
         return
 
     console.print(f"[green]총 {len(all_sgs)}개 Security Group 수집 완료[/green]")
@@ -113,14 +88,6 @@ def run(ctx) -> None:
 
     console.print(f"[bold green]보고서 생성 완료![/bold green]")
     console.print(f"  경로: {filepath}")
-
-    # 오류 출력
-    if collector.errors:
-        console.print(f"\n[yellow]수집 중 오류 {len(collector.errors)}건:[/yellow]")
-        for err in collector.errors[:5]:
-            console.print(f"  - {err}")
-        if len(collector.errors) > 5:
-            console.print(f"  ... 외 {len(collector.errors) - 5}건")
 
     # 폴더 열기
     open_in_explorer(output_path)

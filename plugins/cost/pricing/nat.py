@@ -34,24 +34,24 @@ NAT_GATEWAY_PRICES: Dict[str, Dict[str, float]] = {
     "ap-northeast-3": {"hourly": 0.045, "per_gb": 0.045},  # 오사카
     "ap-southeast-1": {"hourly": 0.045, "per_gb": 0.045},  # 싱가포르
     "ap-southeast-2": {"hourly": 0.045, "per_gb": 0.045},  # 시드니
-    "ap-south-1": {"hourly": 0.045, "per_gb": 0.045},      # 뭄바이
-    "ap-east-1": {"hourly": 0.045, "per_gb": 0.045},       # 홍콩
+    "ap-south-1": {"hourly": 0.045, "per_gb": 0.045},  # 뭄바이
+    "ap-east-1": {"hourly": 0.045, "per_gb": 0.045},  # 홍콩
     # US
-    "us-east-1": {"hourly": 0.045, "per_gb": 0.045},       # 버지니아
-    "us-east-2": {"hourly": 0.045, "per_gb": 0.045},       # 오하이오
-    "us-west-1": {"hourly": 0.045, "per_gb": 0.045},       # 캘리포니아
-    "us-west-2": {"hourly": 0.045, "per_gb": 0.045},       # 오레곤
+    "us-east-1": {"hourly": 0.045, "per_gb": 0.045},  # 버지니아
+    "us-east-2": {"hourly": 0.045, "per_gb": 0.045},  # 오하이오
+    "us-west-1": {"hourly": 0.045, "per_gb": 0.045},  # 캘리포니아
+    "us-west-2": {"hourly": 0.045, "per_gb": 0.045},  # 오레곤
     # Europe
-    "eu-west-1": {"hourly": 0.045, "per_gb": 0.045},       # 아일랜드
-    "eu-west-2": {"hourly": 0.045, "per_gb": 0.045},       # 런던
-    "eu-west-3": {"hourly": 0.045, "per_gb": 0.045},       # 파리
-    "eu-central-1": {"hourly": 0.045, "per_gb": 0.045},    # 프랑크푸르트
-    "eu-north-1": {"hourly": 0.045, "per_gb": 0.045},      # 스톡홀름
+    "eu-west-1": {"hourly": 0.045, "per_gb": 0.045},  # 아일랜드
+    "eu-west-2": {"hourly": 0.045, "per_gb": 0.045},  # 런던
+    "eu-west-3": {"hourly": 0.045, "per_gb": 0.045},  # 파리
+    "eu-central-1": {"hourly": 0.045, "per_gb": 0.045},  # 프랑크푸르트
+    "eu-north-1": {"hourly": 0.045, "per_gb": 0.045},  # 스톡홀름
     # Others
-    "sa-east-1": {"hourly": 0.045, "per_gb": 0.045},       # 상파울루
-    "ca-central-1": {"hourly": 0.045, "per_gb": 0.045},    # 캐나다
-    "me-south-1": {"hourly": 0.045, "per_gb": 0.045},      # 바레인
-    "af-south-1": {"hourly": 0.045, "per_gb": 0.045},      # 케이프타운
+    "sa-east-1": {"hourly": 0.045, "per_gb": 0.045},  # 상파울루
+    "ca-central-1": {"hourly": 0.045, "per_gb": 0.045},  # 캐나다
+    "me-south-1": {"hourly": 0.045, "per_gb": 0.045},  # 바레인
+    "af-south-1": {"hourly": 0.045, "per_gb": 0.045},  # 케이프타운
 }
 
 # 기본 가격 (알 수 없는 리전용)

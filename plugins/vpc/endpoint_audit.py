@@ -9,17 +9,13 @@ plugins/vpc/endpoint_audit.py - VPC Endpoint 미사용 분석
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_endpoint_monthly_cost
 
@@ -28,14 +24,16 @@ console = Console()
 
 class EndpointStatus(Enum):
     """VPC Endpoint 상태"""
+
     NORMAL = "normal"
-    UNUSED = "unused"        # 트래픽 없음
-    PENDING = "pending"      # 상태 pending
+    UNUSED = "unused"  # 트래픽 없음
+    PENDING = "pending"  # 상태 pending
 
 
 @dataclass
 class VPCEndpointInfo:
     """VPC Endpoint 정보"""
+
     account_id: str
     account_name: str
     region: str
@@ -62,6 +60,7 @@ class VPCEndpointInfo:
 @dataclass
 class EndpointFinding:
     """Endpoint 분석 결과"""
+
     endpoint: VPCEndpointInfo
     status: EndpointStatus
     recommendation: str
@@ -70,6 +69,7 @@ class EndpointFinding:
 @dataclass
 class EndpointAnalysisResult:
     """Endpoint 분석 결과 집계"""
+
     account_id: str
     account_name: str
     region: str
@@ -87,9 +87,11 @@ class EndpointAnalysisResult:
 # =============================================================================
 
 
-def collect_endpoints(session, account_id: str, account_name: str, region: str) -> List[VPCEndpointInfo]:
+def collect_endpoints(
+    session, account_id: str, account_name: str, region: str
+) -> List[VPCEndpointInfo]:
     """VPC Endpoints 수집"""
-    ec2 = session.client("ec2", region_name=region)
+    ec2 = get_client(session, "ec2", region_name=region)
     endpoints = []
 
     paginator = ec2.get_paginator("describe_vpc_endpoints")
@@ -106,18 +108,20 @@ def collect_endpoints(session, account_id: str, account_name: str, region: str) 
             if creation_time and not isinstance(creation_time, datetime):
                 creation_time = None
 
-            endpoints.append(VPCEndpointInfo(
-                account_id=account_id,
-                account_name=account_name,
-                region=region,
-                endpoint_id=ep["VpcEndpointId"],
-                endpoint_type=ep.get("VpcEndpointType", "Unknown"),
-                service_name=ep.get("ServiceName", ""),
-                vpc_id=ep.get("VpcId", ""),
-                state=ep.get("State", ""),
-                creation_time=creation_time,
-                name=name,
-            ))
+            endpoints.append(
+                VPCEndpointInfo(
+                    account_id=account_id,
+                    account_name=account_name,
+                    region=region,
+                    endpoint_id=ep["VpcEndpointId"],
+                    endpoint_type=ep.get("VpcEndpointType", "Unknown"),
+                    service_name=ep.get("ServiceName", ""),
+                    vpc_id=ep.get("VpcId", ""),
+                    state=ep.get("State", ""),
+                    creation_time=creation_time,
+                    name=name,
+                )
+            )
 
     return endpoints
 
@@ -127,7 +131,9 @@ def check_endpoint_usage(session, region: str, endpoint_id: str, days: int = 7) 
     CloudWatch 메트릭으로 Endpoint 사용량 확인
     BytesProcessed 또는 ActiveConnections 메트릭 확인
     """
-    cloudwatch = session.client("cloudwatch", region_name=region)
+    from botocore.exceptions import ClientError
+
+    cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
     end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(days=days)
@@ -169,7 +175,7 @@ def analyze_endpoints(
     session,
     account_id: str,
     account_name: str,
-    region: str
+    region: str,
 ) -> EndpointAnalysisResult:
     """VPC Endpoint 분석"""
     result = EndpointAnalysisResult(
@@ -184,22 +190,26 @@ def analyze_endpoints(
             result.gateway_count += 1
             # Gateway는 무료이므로 분석 제외
             result.normal_count += 1
-            result.findings.append(EndpointFinding(
-                endpoint=ep,
-                status=EndpointStatus.NORMAL,
-                recommendation="Gateway Endpoint (무료)",
-            ))
+            result.findings.append(
+                EndpointFinding(
+                    endpoint=ep,
+                    status=EndpointStatus.NORMAL,
+                    recommendation="Gateway Endpoint (무료)",
+                )
+            )
             continue
 
         result.interface_count += 1
 
         # Pending 상태 체크
         if ep.state.lower() in ("pending", "pendingacceptance"):
-            result.findings.append(EndpointFinding(
-                endpoint=ep,
-                status=EndpointStatus.PENDING,
-                recommendation="Pending 상태 - 연결 확인 필요",
-            ))
+            result.findings.append(
+                EndpointFinding(
+                    endpoint=ep,
+                    status=EndpointStatus.PENDING,
+                    recommendation="Pending 상태 - 연결 확인 필요",
+                )
+            )
             continue
 
         # 사용량 체크는 시간이 오래 걸리므로 기본적으로 normal로 처리
@@ -208,19 +218,23 @@ def analyze_endpoints(
         if ep.state.lower() != "available":
             result.unused_count += 1
             result.unused_monthly_cost += ep.monthly_cost
-            result.findings.append(EndpointFinding(
-                endpoint=ep,
-                status=EndpointStatus.UNUSED,
-                recommendation=f"상태 비정상: {ep.state}",
-            ))
+            result.findings.append(
+                EndpointFinding(
+                    endpoint=ep,
+                    status=EndpointStatus.UNUSED,
+                    recommendation=f"상태 비정상: {ep.state}",
+                )
+            )
             continue
 
         result.normal_count += 1
-        result.findings.append(EndpointFinding(
-            endpoint=ep,
-            status=EndpointStatus.NORMAL,
-            recommendation="정상",
-        ))
+        result.findings.append(
+            EndpointFinding(
+                endpoint=ep,
+                status=EndpointStatus.NORMAL,
+                recommendation="정상",
+            )
+        )
 
     return result
 
@@ -232,11 +246,17 @@ def analyze_endpoints(
 
 def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     # Summary
@@ -263,7 +283,18 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
 
     # 상세
     ws_detail = wb.create_sheet("Endpoints")
-    detail_headers = ["Account", "Region", "Endpoint ID", "Name", "Type", "Service", "VPC", "State", "월간 비용", "상태"]
+    detail_headers = [
+        "Account",
+        "Region",
+        "Endpoint ID",
+        "Name",
+        "Type",
+        "Service",
+        "VPC",
+        "State",
+        "월간 비용",
+        "상태",
+    ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill
         ws_detail.cell(row=1, column=col).font = header_font
@@ -278,7 +309,9 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
             ws_detail.cell(row=detail_row, column=3, value=ep.endpoint_id)
             ws_detail.cell(row=detail_row, column=4, value=ep.name or "-")
             ws_detail.cell(row=detail_row, column=5, value=ep.endpoint_type)
-            ws_detail.cell(row=detail_row, column=6, value=ep.service_name.split(".")[-1])
+            ws_detail.cell(
+                row=detail_row, column=6, value=ep.service_name.split(".")[-1]
+            )
             ws_detail.cell(row=detail_row, column=7, value=ep.vpc_id)
             ws_detail.cell(row=detail_row, column=8, value=ep.state)
             ws_detail.cell(row=detail_row, column=9, value=f"${ep.monthly_cost:,.2f}")
@@ -290,7 +323,9 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 40
+                )
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -306,52 +341,33 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[EndpointAnalysisResult]:
+    """단일 계정/리전의 VPC Endpoint 수집 및 분석 (병렬 실행용)"""
+    endpoints = collect_endpoints(session, account_id, account_name, region)
+    if not endpoints:
+        return None
+
+    return analyze_endpoints(endpoints, session, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """VPC Endpoint 미사용 분석"""
     console.print("[bold]VPC Endpoint 분석 시작...[/bold]\n")
 
-    results: List[EndpointAnalysisResult] = []
-    collected = set()
+    # 병렬 수집 및 분석
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
+    # None 필터링
+    results: List[EndpointAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                endpoints = collect_endpoints(session, account_id, account_name, region)
-                if not endpoints:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                result = analyze_endpoints(endpoints, session, account_id, account_name, region)
-                results.append(result)
-
-                if result.unused_count > 0:
-                    console.print(f"전체 {result.total_count}개 / [yellow]미사용 {result.unused_count}개[/yellow]")
-                else:
-                    console.print(f"[green]{result.total_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")
@@ -360,7 +376,9 @@ def run(ctx) -> None:
     # 요약
     total_interface = sum(r.interface_count for r in results)
     total_gateway = sum(r.gateway_count for r in results)
-    total_cost = sum(r.interface_count * get_endpoint_monthly_cost(r.region) for r in results)
+    total_cost = sum(
+        r.interface_count * get_endpoint_monthly_cost(r.region) for r in results
+    )
 
     console.print(f"\n[bold]종합 결과[/bold]")
     console.print(f"Interface Endpoint: {total_interface}개 (${total_cost:,.2f}/월)")

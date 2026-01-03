@@ -17,13 +17,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
@@ -37,10 +33,10 @@ console = Console()
 class UsageStatus(Enum):
     """사용 상태"""
 
-    UNUSED = "unused"           # 미사용 (available 상태)
-    NORMAL = "normal"           # 정상 사용 (in-use)
-    PENDING = "pending"         # 확인 필요
-    AWS_MANAGED = "aws_managed" # AWS 관리형 (삭제 불가)
+    UNUSED = "unused"  # 미사용 (available 상태)
+    NORMAL = "normal"  # 정상 사용 (in-use)
+    PENDING = "pending"  # 확인 필요
+    AWS_MANAGED = "aws_managed"  # AWS 관리형 (삭제 불가)
 
 
 class Severity(Enum):
@@ -89,8 +85,14 @@ class ENIInfo:
         if self.requester_id and self.requester_id != self.owner_id:
             return True
         aws_managed_types = {
-            "nat_gateway", "gateway_load_balancer", "gateway_load_balancer_endpoint",
-            "vpc_endpoint", "efa", "trunk", "load_balancer", "lambda",
+            "nat_gateway",
+            "gateway_load_balancer",
+            "gateway_load_balancer_endpoint",
+            "vpc_endpoint",
+            "efa",
+            "trunk",
+            "load_balancer",
+            "lambda",
         }
         return self.interface_type in aws_managed_types
 
@@ -132,10 +134,12 @@ def collect_enis(
     session, account_id: str, account_name: str, region: str
 ) -> List[ENIInfo]:
     """ENI 목록 수집"""
+    from botocore.exceptions import ClientError
+
     enis = []
 
     try:
-        ec2 = session.client("ec2", region_name=region)
+        ec2 = get_client(session, "ec2", region_name=region)
         paginator = ec2.get_paginator("describe_network_interfaces")
 
         for page in paginator.paginate():
@@ -157,13 +161,19 @@ def collect_enis(
                     subnet_id=data.get("SubnetId", ""),
                     availability_zone=data.get("AvailabilityZone", ""),
                     private_ip=data.get("PrivateIpAddress", ""),
-                    public_ip=data.get("Association", {}).get("PublicIp", "") if data.get("Association") else "",
+                    public_ip=data.get("Association", {}).get("PublicIp", "")
+                    if data.get("Association")
+                    else "",
                     interface_type=data.get("InterfaceType", ""),
                     requester_id=data.get("RequesterId", ""),
                     owner_id=data.get("OwnerId", ""),
                     instance_id=attachment.get("InstanceId", "") if attachment else "",
-                    attachment_status=attachment.get("Status", "") if attachment else "",
-                    security_groups=[g.get("GroupId", "") for g in data.get("Groups", [])],
+                    attachment_status=attachment.get("Status", "")
+                    if attachment
+                    else "",
+                    security_groups=[
+                        g.get("GroupId", "") for g in data.get("Groups", [])
+                    ],
                     tags=tags,
                     name=tags.get("Name", ""),
                     account_id=account_id,
@@ -173,7 +183,11 @@ def collect_enis(
                 enis.append(eni)
 
     except ClientError as e:
-        console.print(f"    [yellow]ENI 수집 오류: {e}[/yellow]")
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if not is_quiet():
+            console.print(
+                f"    [yellow]{account_name}/{region} ENI 수집 오류: {error_code}[/yellow]"
+            )
 
     return enis
 
@@ -183,7 +197,9 @@ def collect_enis(
 # =============================================================================
 
 
-def analyze_enis(enis: List[ENIInfo], account_id: str, account_name: str, region: str) -> ENIAnalysisResult:
+def analyze_enis(
+    enis: List[ENIInfo], account_id: str, account_name: str, region: str
+) -> ENIAnalysisResult:
     """ENI 미사용 분석"""
     result = ENIAnalysisResult(
         account_id=account_id,
@@ -280,22 +296,38 @@ def _analyze_single_eni(eni: ENIInfo) -> ENIFinding:
 
 def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
-        UsageStatus.PENDING: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
-        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
-        UsageStatus.AWS_MANAGED: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
+        UsageStatus.UNUSED: PatternFill(
+            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
+        ),
+        UsageStatus.PENDING: PatternFill(
+            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
+        ),
+        UsageStatus.NORMAL: PatternFill(
+            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
+        ),
+        UsageStatus.AWS_MANAGED: PatternFill(
+            start_color="95A5A6", end_color="95A5A6", fill_type="solid"
+        ),
     }
 
     # Summary
@@ -333,8 +365,21 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
 
     # Findings
     ws2 = wb.create_sheet("Findings")
-    headers = ["Account", "Region", "ENI ID", "Name", "Status", "Usage", "Severity",
-               "Description", "Recommendation", "VPC ID", "Subnet ID", "Private IP", "Type"]
+    headers = [
+        "Account",
+        "Region",
+        "ENI ID",
+        "Name",
+        "Status",
+        "Usage",
+        "Severity",
+        "Description",
+        "Recommendation",
+        "VPC ID",
+        "Subnet ID",
+        "Private IP",
+        "Type",
+    ]
     ws2.append(headers)
 
     for cell in ws2[1]:
@@ -350,16 +395,33 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
                 all_findings.append(f)
 
     # 심각도순
-    severity_order = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2, Severity.INFO: 3}
+    severity_order = {
+        Severity.HIGH: 0,
+        Severity.MEDIUM: 1,
+        Severity.LOW: 2,
+        Severity.INFO: 3,
+    }
     all_findings.sort(key=lambda x: severity_order.get(x.severity, 9))
 
     for f in all_findings:
         eni = f.eni
-        ws2.append([
-            eni.account_name, eni.region, eni.id, eni.name, eni.status,
-            f.usage_status.value, f.severity.value, f.description,
-            f.recommendation, eni.vpc_id, eni.subnet_id, eni.private_ip, eni.interface_type,
-        ])
+        ws2.append(
+            [
+                eni.account_name,
+                eni.region,
+                eni.id,
+                eni.name,
+                eni.status,
+                f.usage_status.value,
+                f.severity.value,
+                f.description,
+                f.recommendation,
+                eni.vpc_id,
+                eni.subnet_id,
+                eni.private_ip,
+                eni.interface_type,
+            ]
+        )
 
         fill = status_fills.get(f.usage_status)
         if fill:
@@ -369,7 +431,9 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 40)
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
+                max(max_len + 2, 10), 40
+            )
 
     ws2.freeze_panes = "A2"
 
@@ -387,52 +451,27 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> ENIAnalysisResult:
+    """단일 계정/리전의 ENI 수집 및 분석 (병렬 실행용)"""
+    enis = collect_enis(session, account_id, account_name, region)
+    return analyze_enis(enis, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """ENI 미사용 분석 실행"""
     console.print("[bold]ENI 미사용 분석 시작...[/bold]")
 
-    all_results: List[ENIAnalysisResult] = []
-    collected = set()
+    # 병렬 수집 및 분석
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
+    all_results: List[ENIAnalysisResult] = result.get_data()
 
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                # 계정명
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} / {region}[/dim]")
-
-                # 수집 + 분석
-                enis = collect_enis(session, account_id, account_name, region)
-                result = analyze_enis(enis, account_id, account_name, region)
-                all_results.append(result)
-
-                # 요약
-                if result.unused_count > 0:
-                    console.print(f"    [red]미사용: {result.unused_count}개[/red]")
-                elif result.pending_count > 0:
-                    console.print(f"    [yellow]확인 필요: {result.pending_count}개[/yellow]")
-                else:
-                    console.print(f"    [green]정상 {result.normal_count}개, AWS {result.aws_managed_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                console.print(f"    [yellow]{code}[/yellow]")
-            except Exception as e:
-                console.print(f"    [red]{e}[/red]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not all_results:
         console.print("[yellow]분석할 ENI 없음[/yellow]")

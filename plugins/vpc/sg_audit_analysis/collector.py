@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional, Set
 
 from botocore.exceptions import ClientError
 
+from core.parallel import ErrorSeverity, get_client, try_or_default
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,7 +82,7 @@ class SGCollector:
         self.vpc_default_map.clear()
 
         try:
-            ec2 = session.client("ec2", region_name=region)
+            ec2 = get_client(session, "ec2", region_name=region)
 
             # 1. VPC 정보 수집 (Default VPC 판단용)
             self._collect_vpcs(ec2, account_id, region)

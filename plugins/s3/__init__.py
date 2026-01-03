@@ -9,6 +9,7 @@ plugins/s3 - S3 스토리지 관리 도구
 
 CATEGORY = {
     "name": "s3",
+    "display_name": "S3",
     "description": "S3 스토리지 관리",
     "aliases": ["storage", "bucket"],
 }

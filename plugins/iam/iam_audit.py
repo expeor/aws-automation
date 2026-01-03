@@ -12,90 +12,57 @@ IAM 보안 감사 및 모범 사례 점검:
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from botocore.exceptions import ClientError
 from rich.console import Console
 from rich.table import Table
 
-from core.auth import SessionIterator
+from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
-from .iam_audit_analysis import (
-    IAMCollector,
-    IAMAnalyzer,
-    IAMExcelReporter,
-)
+from .iam_audit_analysis import IAMAnalyzer, IAMCollector, IAMExcelReporter
 
 console = Console()
+
+
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[Tuple[Any, Dict[str, Any]]]:
+    """단일 계정의 IAM 수집 및 분석 (병렬 실행용)"""
+    collector = IAMCollector()
+    iam_data = collector.collect(session, account_id, account_name)
+    analyzer = IAMAnalyzer(iam_data)
+    analysis_result = analyzer.analyze()
+    stats = analyzer.get_summary_stats(analysis_result)
+    return (analysis_result, stats)
 
 
 def run(ctx) -> None:
     """IAM 종합 점검 실행"""
     console.print("[bold]IAM 종합 점검 시작...[/bold]")
 
-    # 1. 데이터 수집
+    # 1. 데이터 수집 (IAM은 글로벌이지만 병렬 처리 프레임워크 사용)
     console.print("[cyan]Step 1: IAM 데이터 수집 중...[/cyan]")
 
-    collector = IAMCollector()
+    # 병렬 수집 및 분석
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="iam")
+
+    # 결과 분리
     all_results = []
     all_stats = []
-    skipped_accounts = []
+    for data in result.get_data():
+        if data is not None:
+            analysis_result, stats = data
+            all_results.append(analysis_result)
+            all_stats.append(stats)
 
-    # 중복 방지를 위한 수집 완료 추적
-    collected_accounts = set()
-
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                # STS로 실제 Account ID 조회
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                # IAM은 글로벌 서비스이므로 계정당 한 번만 수집
-                if account_id in collected_accounts:
-                    continue
-                collected_accounts.add(account_id)
-
-                # Account Name 결정
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"  [dim]{account_name} ({account_id})[/dim]")
-
-                # 데이터 수집
-                iam_data = collector.collect(session, account_id, account_name)
-
-                # 분석
-                analyzer = IAMAnalyzer(iam_data)
-                analysis_result = analyzer.analyze()
-                stats = analyzer.get_summary_stats(analysis_result)
-
-                all_results.append(analysis_result)
-                all_stats.append(stats)
-
-            except ClientError as e:
-                error_code = e.response.get("Error", {}).get("Code", "Unknown")
-                skipped_accounts.append(f"{identifier}: {error_code}")
-                continue
-            except Exception as e:
-                skipped_accounts.append(f"{identifier}: {str(e)}")
-                continue
-
-    # 건너뛴 계정 출력
-    if skipped_accounts:
-        console.print(f"[dim]  (접근 불가 계정 {len(skipped_accounts)}개 건너뜀)[/dim]")
+    # 에러 출력
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
+        console.print(f"[dim]{result.get_error_summary()}[/dim]")
 
     if not all_results:
         console.print("[yellow]수집된 IAM 데이터가 없습니다.[/yellow]")
-        if collector.errors:
-            console.print("[red]오류 목록:[/red]")
-            for err in collector.errors:
-                console.print(f"  - {err}")
         return
 
     console.print(f"[green]{len(all_results)}개 계정 데이터 수집 완료[/green]")
@@ -113,14 +80,6 @@ def run(ctx) -> None:
 
     console.print(f"[bold green]보고서 생성 완료![/bold green]")
     console.print(f"  경로: {filepath}")
-
-    # 오류 출력
-    if collector.errors:
-        console.print(f"\n[yellow]수집 중 오류 {len(collector.errors)}건:[/yellow]")
-        for err in collector.errors[:5]:
-            console.print(f"  - {err}")
-        if len(collector.errors) > 5:
-            console.print(f"  ... 외 {len(collector.errors) - 5}건")
 
     # 폴더 열기
     open_in_explorer(output_path)
@@ -156,9 +115,7 @@ def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
                 f"    - Root Access Key 존재: {totals['root_access_key_count']}개 계정"
             )
         if totals["root_no_mfa_count"] > 0:
-            console.print(
-                f"    - Root MFA 미설정: {totals['root_no_mfa_count']}개 계정"
-            )
+            console.print(f"    - Root MFA 미설정: {totals['root_no_mfa_count']}개 계정")
 
     if totals["high_issues"] > 0:
         console.print(f"  [yellow]HIGH 이슈: {totals['high_issues']}건[/yellow]")

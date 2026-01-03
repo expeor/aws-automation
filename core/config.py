@@ -137,14 +137,12 @@ class Settings:
     # 취약 프로토콜 목록
     # - SSLv3: POODLE 취약점
     # - TLSv1/1.1: 2020년 deprecated (RFC 8996)
-    SECURITY_VULNERABLE_PROTOCOLS: FrozenSet[str] = frozenset({
-        "SSLv3", "TLSv1", "TLSv1.1"
-    })
+    SECURITY_VULNERABLE_PROTOCOLS: FrozenSet[str] = frozenset(
+        {"SSLv3", "TLSv1", "TLSv1.1"}
+    )
 
     # 안전한 프로토콜 목록
-    SECURITY_SECURE_PROTOCOLS: FrozenSet[str] = frozenset({
-        "TLSv1.2", "TLSv1.3"
-    })
+    SECURITY_SECURE_PROTOCOLS: FrozenSet[str] = frozenset({"TLSv1.2", "TLSv1.3"})
 
     # 취약한 암호화 스위트 패턴
     # - RC4: 스트림 암호 취약 (2015 금지)
@@ -153,14 +151,14 @@ class Settings:
     # - NULL: 암호화 없음
     # - EXPORT: 약한 키 길이
     # - anon: 인증 없음 (MITM 취약)
-    SECURITY_WEAK_CIPHER_PATTERNS: FrozenSet[str] = frozenset({
-        "RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon"
-    })
+    SECURITY_WEAK_CIPHER_PATTERNS: FrozenSet[str] = frozenset(
+        {"RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon"}
+    )
 
     # 인증서 만료 경고 임계값 (일)
-    SECURITY_CERT_EXPIRY_CRITICAL: int = 7   # 7일 이내 = CRITICAL
-    SECURITY_CERT_EXPIRY_HIGH: int = 30      # 30일 이내 = HIGH
-    SECURITY_CERT_EXPIRY_MEDIUM: int = 90    # 90일 이내 = MEDIUM
+    SECURITY_CERT_EXPIRY_CRITICAL: int = 7  # 7일 이내 = CRITICAL
+    SECURITY_CERT_EXPIRY_HIGH: int = 30  # 30일 이내 = HIGH
+    SECURITY_CERT_EXPIRY_MEDIUM: int = 90  # 90일 이내 = MEDIUM
 
     # WAF 필수 여부 (internet-facing ALB)
     SECURITY_WAF_REQUIRED_FOR_PUBLIC: bool = True
@@ -171,7 +169,12 @@ class Settings:
     # 삭제 보호 필수 패턴 (정규식)
     # - 이 패턴에 매칭되는 이름의 리소스는 삭제 보호 필수
     SECURITY_DELETION_PROTECTION_PATTERNS: tuple = (
-        "prod", "prd", "production", "live", "main", "master"
+        "prod",
+        "prd",
+        "production",
+        "live",
+        "main",
+        "master",
     )
 
 

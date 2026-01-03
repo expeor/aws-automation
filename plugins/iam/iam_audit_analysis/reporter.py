@@ -19,15 +19,15 @@ from typing import Any, Dict, List
 from core.tools.io.excel import ColumnDef, Workbook
 
 from .analyzer import (
-    IAMAnalysisResult,
-    UserAnalysisResult,
-    KeyAnalysisResult,
-    RoleAnalysisResult,
-    GroupAnalysisResult,
-    PolicyAnalysisResult,
     AccountAnalysisResult,
-    Severity,
+    GroupAnalysisResult,
+    IAMAnalysisResult,
     IssueType,
+    KeyAnalysisResult,
+    PolicyAnalysisResult,
+    RoleAnalysisResult,
+    Severity,
+    UserAnalysisResult,
 )
 
 
@@ -268,7 +268,9 @@ class IAMExcelReporter:
             ColumnDef(header="Account Name", width=20, style="data"),
             ColumnDef(header="User Name", width=25, style="data"),
             ColumnDef(header="Created", width=12, style="data"),
-            ColumnDef(header="Access Type", width=12, style="center"),  # Console/Key/Both/None
+            ColumnDef(
+                header="Access Type", width=12, style="center"
+            ),  # Console/Key/Both/None
             ColumnDef(header="Console", width=8, style="center"),
             ColumnDef(header="MFA", width=8, style="center"),
             ColumnDef(header="Last Login", width=12, style="data"),
@@ -299,11 +301,16 @@ class IAMExcelReporter:
 
                 # 이슈 목록
                 issue_details = "; ".join(
-                    [f"[{i.severity.value}] {i.issue_type.value}" for i in user_result.issues]
+                    [
+                        f"[{i.severity.value}] {i.issue_type.value}"
+                        for i in user_result.issues
+                    ]
                 )
 
                 # Privesc Paths
-                privesc_str = ", ".join(user.privesc_paths) if user.privesc_paths else ""
+                privesc_str = (
+                    ", ".join(user.privesc_paths) if user.privesc_paths else ""
+                )
 
                 # Access Type 결정 (Console/Key/Both/None)
                 has_console = user.has_console_access
@@ -327,7 +334,9 @@ class IAMExcelReporter:
                         "Y" if user.has_console_access else "N",
                         "Y" if user.has_mfa else "N",
                         last_login_str,
-                        user.days_since_last_login if user.days_since_last_login >= 0 else "",
+                        user.days_since_last_login
+                        if user.days_since_last_login >= 0
+                        else "",
                         int(user.active_key_count),
                         int(user.active_git_credential_count),
                         ", ".join(user.groups),
@@ -467,7 +476,9 @@ class IAMExcelReporter:
                     trust_risks_str += f" (+{len(role.trust_policy_risks) - 2})"
 
                 # Privesc Paths
-                privesc_str = ", ".join(role.privesc_paths) if role.privesc_paths else ""
+                privesc_str = (
+                    ", ".join(role.privesc_paths) if role.privesc_paths else ""
+                )
 
                 # 이슈 목록
                 issue_details = "; ".join(
@@ -483,7 +494,9 @@ class IAMExcelReporter:
                         created_str,
                         int(role.age_days),
                         last_used_str,
-                        role.days_since_last_use if role.days_since_last_use >= 0 else "",
+                        role.days_since_last_use
+                        if role.days_since_last_use >= 0
+                        else "",
                         role.last_used_region,
                         "Y" if role.is_service_linked else "",
                         "Y" if role.has_admin_access else "",
@@ -616,7 +629,9 @@ class IAMExcelReporter:
                     "Y" if policy.require_lowercase else "N",
                     "Y" if policy.expire_passwords else "N",
                     int(policy.max_password_age) if policy.expire_passwords else "",
-                    int(policy.password_reuse_prevention) if policy.password_reuse_prevention > 0 else "",
+                    int(policy.password_reuse_prevention)
+                    if policy.password_reuse_prevention > 0
+                    else "",
                     int(result.policy_result.score),
                     issue_details,
                 ]

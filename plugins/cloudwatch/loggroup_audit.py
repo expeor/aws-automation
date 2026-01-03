@@ -13,13 +13,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
@@ -32,15 +28,17 @@ OLD_DAYS_THRESHOLD = 90
 
 class LogGroupStatus(Enum):
     """로그 그룹 상태"""
+
     NORMAL = "normal"
-    EMPTY = "empty"          # 로그 없음
+    EMPTY = "empty"  # 로그 없음
     NO_RETENTION = "no_retention"  # 보존 기간 미설정 (무기한)
-    OLD = "old"              # 오래된 (ingestion 없음)
+    OLD = "old"  # 오래된 (ingestion 없음)
 
 
 @dataclass
 class LogGroupInfo:
     """CloudWatch Log Group 정보"""
+
     account_id: str
     account_name: str
     region: str
@@ -54,7 +52,7 @@ class LogGroupInfo:
 
     @property
     def stored_gb(self) -> float:
-        return self.stored_bytes / (1024 ** 3)
+        return self.stored_bytes / (1024**3)
 
     @property
     def monthly_cost(self) -> float:
@@ -74,6 +72,7 @@ class LogGroupInfo:
 @dataclass
 class LogGroupFinding:
     """Log Group 분석 결과"""
+
     log_group: LogGroupInfo
     status: LogGroupStatus
     recommendation: str
@@ -82,6 +81,7 @@ class LogGroupFinding:
 @dataclass
 class LogGroupAnalysisResult:
     """Log Group 분석 결과 집계"""
+
     account_id: str
     account_name: str
     region: str
@@ -101,21 +101,31 @@ class LogGroupAnalysisResult:
 # =============================================================================
 
 
-def collect_log_groups(session, account_id: str, account_name: str, region: str) -> List[LogGroupInfo]:
+def collect_log_groups(
+    session, account_id: str, account_name: str, region: str
+) -> List[LogGroupInfo]:
     """CloudWatch Log Groups 수집"""
-    logs = session.client("logs", region_name=region)
+    from botocore.exceptions import ClientError
+
+    logs = get_client(session, "logs", region_name=region)
     log_groups = []
 
     paginator = logs.get_paginator("describe_log_groups")
     for page in paginator.paginate():
         for lg in page.get("logGroups", []):
             creation_ts = lg.get("creationTime", 0)
-            creation_time = datetime.fromtimestamp(creation_ts / 1000, tz=timezone.utc) if creation_ts else datetime.now(timezone.utc)
+            creation_time = (
+                datetime.fromtimestamp(creation_ts / 1000, tz=timezone.utc)
+                if creation_ts
+                else datetime.now(timezone.utc)
+            )
 
             # 마지막 ingestion 시간 (lastIngestionTime이 없으면 스트림 확인)
             last_ingestion = None
             if "lastIngestionTime" in lg:
-                last_ingestion = datetime.fromtimestamp(lg["lastIngestionTime"] / 1000, tz=timezone.utc)
+                last_ingestion = datetime.fromtimestamp(
+                    lg["lastIngestionTime"] / 1000, tz=timezone.utc
+                )
 
             # 로그 스트림 개수 (메트릭 데이터에서 확인 불가시 0)
             stream_count = lg.get("metricFilterCount", 0)  # 대략적 추정
@@ -126,7 +136,7 @@ def collect_log_groups(session, account_id: str, account_name: str, region: str)
                     logGroupName=lg["logGroupName"],
                     limit=1,
                     orderBy="LastEventTime",
-                    descending=True
+                    descending=True,
                 )
                 streams = streams_resp.get("logStreams", [])
                 stream_count = len(streams)  # 최소 1개 있는지 확인
@@ -140,18 +150,20 @@ def collect_log_groups(session, account_id: str, account_name: str, region: str)
             except ClientError:
                 pass
 
-            log_groups.append(LogGroupInfo(
-                account_id=account_id,
-                account_name=account_name,
-                region=region,
-                name=lg["logGroupName"],
-                arn=lg.get("arn", ""),
-                creation_time=creation_time,
-                stored_bytes=lg.get("storedBytes", 0),
-                retention_days=lg.get("retentionInDays"),
-                last_ingestion_time=last_ingestion,
-                log_stream_count=stream_count,
-            ))
+            log_groups.append(
+                LogGroupInfo(
+                    account_id=account_id,
+                    account_name=account_name,
+                    region=region,
+                    name=lg["logGroupName"],
+                    arn=lg.get("arn", ""),
+                    creation_time=creation_time,
+                    stored_bytes=lg.get("storedBytes", 0),
+                    retention_days=lg.get("retentionInDays"),
+                    last_ingestion_time=last_ingestion,
+                    log_stream_count=stream_count,
+                )
+            )
 
     return log_groups
 
@@ -162,10 +174,7 @@ def collect_log_groups(session, account_id: str, account_name: str, region: str)
 
 
 def analyze_log_groups(
-    log_groups: List[LogGroupInfo],
-    account_id: str,
-    account_name: str,
-    region: str
+    log_groups: List[LogGroupInfo], account_id: str, account_name: str, region: str
 ) -> LogGroupAnalysisResult:
     """Log Group 분석"""
     result = LogGroupAnalysisResult(
@@ -182,40 +191,48 @@ def analyze_log_groups(
         if lg.stored_bytes == 0:
             result.empty_count += 1
             result.empty_monthly_cost += lg.monthly_cost
-            result.findings.append(LogGroupFinding(
-                log_group=lg,
-                status=LogGroupStatus.EMPTY,
-                recommendation="빈 로그 그룹 삭제 검토",
-            ))
+            result.findings.append(
+                LogGroupFinding(
+                    log_group=lg,
+                    status=LogGroupStatus.EMPTY,
+                    recommendation="빈 로그 그룹 삭제 검토",
+                )
+            )
             continue
 
         # 오래된 로그 (ingestion 없음)
         if lg.days_since_ingestion and lg.days_since_ingestion > OLD_DAYS_THRESHOLD:
             result.old_count += 1
             result.old_monthly_cost += lg.monthly_cost
-            result.findings.append(LogGroupFinding(
-                log_group=lg,
-                status=LogGroupStatus.OLD,
-                recommendation=f"{lg.days_since_ingestion}일간 로그 없음 - 보존 정책 검토",
-            ))
+            result.findings.append(
+                LogGroupFinding(
+                    log_group=lg,
+                    status=LogGroupStatus.OLD,
+                    recommendation=f"{lg.days_since_ingestion}일간 로그 없음 - 보존 정책 검토",
+                )
+            )
             continue
 
         # 보존 기간 미설정 (무기한)
         if lg.retention_days is None and lg.stored_bytes > 0:
             result.no_retention_count += 1
-            result.findings.append(LogGroupFinding(
-                log_group=lg,
-                status=LogGroupStatus.NO_RETENTION,
-                recommendation="보존 기간 설정 권장 (비용 절감)",
-            ))
+            result.findings.append(
+                LogGroupFinding(
+                    log_group=lg,
+                    status=LogGroupStatus.NO_RETENTION,
+                    recommendation="보존 기간 설정 권장 (비용 절감)",
+                )
+            )
             continue
 
         result.normal_count += 1
-        result.findings.append(LogGroupFinding(
-            log_group=lg,
-            status=LogGroupStatus.NORMAL,
-            recommendation="정상",
-        ))
+        result.findings.append(
+            LogGroupFinding(
+                log_group=lg,
+                status=LogGroupStatus.NORMAL,
+                recommendation="정상",
+            )
+        )
 
     return result
 
@@ -227,14 +244,22 @@ def analyze_log_groups(
 
 def generate_report(results: List[LogGroupAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
+    yellow_fill = PatternFill(
+        start_color="FFE066", end_color="FFE066", fill_type="solid"
+    )
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -262,7 +287,11 @@ def generate_report(results: List[LogGroupAnalysisResult], output_dir: str) -> s
         ws.cell(row=row, column=5, value=r.old_count)
         ws.cell(row=row, column=6, value=r.no_retention_count)
         ws.cell(row=row, column=7, value=round(r.total_stored_gb, 2))
-        ws.cell(row=row, column=8, value=f"${r.empty_monthly_cost + r.old_monthly_cost:,.2f}")
+        ws.cell(
+            row=row,
+            column=8,
+            value=f"${r.empty_monthly_cost + r.old_monthly_cost:,.2f}",
+        )
 
         if r.empty_count > 0:
             ws.cell(row=row, column=4).fill = red_fill
@@ -278,8 +307,17 @@ def generate_report(results: List[LogGroupAnalysisResult], output_dir: str) -> s
 
     # 상세 시트
     ws_detail = wb.create_sheet("Log Groups")
-    detail_headers = ["Account", "Region", "Log Group", "상태", "저장 (GB)", "보존 기간",
-                      "마지막 Ingestion", "월간 비용", "권장 조치"]
+    detail_headers = [
+        "Account",
+        "Region",
+        "Log Group",
+        "상태",
+        "저장 (GB)",
+        "보존 기간",
+        "마지막 Ingestion",
+        "월간 비용",
+        "권장 조치",
+    ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill
         ws_detail.cell(row=1, column=col).font = header_font
@@ -295,9 +333,21 @@ def generate_report(results: List[LogGroupAnalysisResult], output_dir: str) -> s
                 ws_detail.cell(row=detail_row, column=3, value=lg.name)
                 ws_detail.cell(row=detail_row, column=4, value=f.status.value)
                 ws_detail.cell(row=detail_row, column=5, value=round(lg.stored_gb, 4))
-                ws_detail.cell(row=detail_row, column=6, value=f"{lg.retention_days}일" if lg.retention_days else "무기한")
-                ws_detail.cell(row=detail_row, column=7, value=lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-")
-                ws_detail.cell(row=detail_row, column=8, value=round(lg.monthly_cost, 4))
+                ws_detail.cell(
+                    row=detail_row,
+                    column=6,
+                    value=f"{lg.retention_days}일" if lg.retention_days else "무기한",
+                )
+                ws_detail.cell(
+                    row=detail_row,
+                    column=7,
+                    value=lg.last_ingestion_time.strftime("%Y-%m-%d")
+                    if lg.last_ingestion_time
+                    else "-",
+                )
+                ws_detail.cell(
+                    row=detail_row, column=8, value=round(lg.monthly_cost, 4)
+                )
                 ws_detail.cell(row=detail_row, column=9, value=f.recommendation)
 
     # 열 너비 조정
@@ -306,7 +356,9 @@ def generate_report(results: List[LogGroupAnalysisResult], output_dir: str) -> s
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 50
+                )
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -323,56 +375,27 @@ def generate_report(results: List[LogGroupAnalysisResult], output_dir: str) -> s
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[LogGroupAnalysisResult]:
+    """단일 계정/리전의 Log Group 수집 및 분석 (병렬 실행용)"""
+    log_groups = collect_log_groups(session, account_id, account_name, region)
+    if not log_groups:
+        return None
+    return analyze_log_groups(log_groups, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """CloudWatch Log Group 미사용 분석"""
     console.print("[bold]CloudWatch Log Group 분석 시작...[/bold]\n")
 
-    results: List[LogGroupAnalysisResult] = []
-    collected = set()
-    errors = []
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="logs")
+    results: List[LogGroupAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                log_groups = collect_log_groups(session, account_id, account_name, region)
-                if not log_groups:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                result = analyze_log_groups(log_groups, account_id, account_name, region)
-                results.append(result)
-
-                issue_count = result.empty_count + result.old_count + result.no_retention_count
-                if issue_count > 0:
-                    console.print(f"전체 {result.total_count}개 / [yellow]이슈 {issue_count}개[/yellow]")
-                else:
-                    console.print(f"[green]{result.total_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-                    errors.append(f"{identifier}/{region}: {code}")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
-                errors.append(str(e))
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")

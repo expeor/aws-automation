@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 
 from botocore.exceptions import ClientError
 
+from core.parallel import get_client
+
 logger = logging.getLogger(__name__)
 
 
@@ -287,7 +289,7 @@ class IAMCollector:
         iam_data = IAMData(account_id=account_id, account_name=account_name)
 
         try:
-            iam = session.client("iam")
+            iam = get_client(session, "iam")
 
             # 1. Account Summary
             iam_data.account_summary = self._collect_account_summary(
@@ -370,8 +372,12 @@ class IAMCollector:
             policy.minimum_length = pw_policy.get("MinimumPasswordLength", 0)
             policy.require_symbols = pw_policy.get("RequireSymbols", False)
             policy.require_numbers = pw_policy.get("RequireNumbers", False)
-            policy.require_uppercase = pw_policy.get("RequireUppercaseCharacters", False)
-            policy.require_lowercase = pw_policy.get("RequireLowercaseCharacters", False)
+            policy.require_uppercase = pw_policy.get(
+                "RequireUppercaseCharacters", False
+            )
+            policy.require_lowercase = pw_policy.get(
+                "RequireLowercaseCharacters", False
+            )
             policy.allow_users_to_change = pw_policy.get(
                 "AllowUsersToChangePassword", True
             )
@@ -449,9 +455,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _collect_user_access_keys(
-        self, iam, user: IAMUser, now: datetime
-    ) -> None:
+    def _collect_user_access_keys(self, iam, user: IAMUser, now: datetime) -> None:
         """사용자 Access Keys 수집"""
         try:
             response = iam.list_access_keys(UserName=user.user_name)
@@ -493,9 +497,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _collect_user_git_credentials(
-        self, iam, user: IAMUser, now: datetime
-    ) -> None:
+    def _collect_user_git_credentials(self, iam, user: IAMUser, now: datetime) -> None:
         """사용자 Git Credentials (CodeCommit) 수집"""
         try:
             response = iam.list_service_specific_credentials(
@@ -527,9 +529,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _collect_user_login_profile(
-        self, iam, user: IAMUser, now: datetime
-    ) -> None:
+    def _collect_user_login_profile(self, iam, user: IAMUser, now: datetime) -> None:
         """사용자 Login Profile (Console Access) 수집"""
         try:
             response = iam.get_login_profile(UserName=user.user_name)
@@ -580,9 +580,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _analyze_policy_document(
-        self, policy_doc: Dict[str, Any], entity: Any
-    ) -> None:
+    def _analyze_policy_document(self, policy_doc: Dict[str, Any], entity: Any) -> None:
         """정책 문서에서 위험한 권한 분석
 
         Args:
@@ -611,8 +609,13 @@ class IAMCollector:
                 if action in ("iam:PassRole", "iam:*", "*"):
                     if "*" in resources or any("*" in r for r in resources):
                         entity.has_passrole_wildcard = True
-                        if "iam:PassRole (Resource: *)" not in entity.dangerous_permissions:
-                            entity.dangerous_permissions.append("iam:PassRole (Resource: *)")
+                        if (
+                            "iam:PassRole (Resource: *)"
+                            not in entity.dangerous_permissions
+                        ):
+                            entity.dangerous_permissions.append(
+                                "iam:PassRole (Resource: *)"
+                            )
 
                 # 단독 위험 권한 검사
                 if action in self.DANGEROUS_PERMISSIONS:
@@ -758,9 +761,7 @@ class IAMCollector:
                         role.age_days = delta.days
 
                     # Service-linked role 확인
-                    role.is_service_linked = role.path.startswith(
-                        "/aws-service-role/"
-                    )
+                    role.is_service_linked = role.path.startswith("/aws-service-role/")
 
                     # AWS managed role 확인
                     role.is_aws_managed = role.path.startswith("/service-role/")
@@ -768,9 +769,7 @@ class IAMCollector:
                     # Trust Policy
                     trust_policy = role_data.get("AssumeRolePolicyDocument", {})
                     role.trust_policy = trust_policy
-                    role.trusted_entities = self._extract_trusted_entities(
-                        trust_policy
-                    )
+                    role.trusted_entities = self._extract_trusted_entities(trust_policy)
 
                     # Last Used
                     last_used = role_data.get("RoleLastUsed", {})
@@ -858,9 +857,7 @@ class IAMCollector:
 
         return entities
 
-    def _analyze_trust_policy(
-        self, role: IAMRole, current_account_id: str
-    ) -> None:
+    def _analyze_trust_policy(self, role: IAMRole, current_account_id: str) -> None:
         """Trust Policy 위험 분석
 
         탐지 대상:
@@ -915,7 +912,10 @@ class IAMCollector:
 
                     # === 3. 외부 계정 검사 ===
                     external_account_id = self._extract_account_from_arn(aws_arn)
-                    if external_account_id and external_account_id != current_account_id:
+                    if (
+                        external_account_id
+                        and external_account_id != current_account_id
+                    ):
                         role.external_account_ids.append(external_account_id)
 
                         # ExternalId 조건 있는지 확인
@@ -988,7 +988,7 @@ class IAMCollector:
         import json
 
         try:
-            config_client = session.client("config")
+            config_client = get_client(session, "config")
 
             # Role 이름 -> Role 객체 매핑
             role_map = {role.role_name: role for role in iam_data.roles}
@@ -1084,7 +1084,7 @@ class IAMCollector:
         수정/삭제 이력만 수집 (CREATE는 무시)
         """
         try:
-            config_client = session.client("config")
+            config_client = get_client(session, "config")
 
             # User 이름 -> User 객체 매핑
             user_map = {user.user_name: user for user in iam_data.users}
@@ -1152,9 +1152,7 @@ class IAMCollector:
         except Exception as e:
             logger.warning(f"User 변경 이력 수집 실패 [{iam_data.account_name}]: {e}")
 
-    def _summarize_config_diff(
-        self, old_config: str, new_config: str
-    ) -> str:
+    def _summarize_config_diff(self, old_config: str, new_config: str) -> str:
         """설정 변경 사항 요약
 
         JSON 문자열로 된 설정을 비교하여 변경 사항 요약
@@ -1182,8 +1180,12 @@ class IAMCollector:
                     changes.append("MFA 변경")
 
             # Policy 변경
-            old_policies = set(p.get("policyName", "") for p in old.get("attachedManagedPolicies", []))
-            new_policies = set(p.get("policyName", "") for p in new.get("attachedManagedPolicies", []))
+            old_policies = set(
+                p.get("policyName", "") for p in old.get("attachedManagedPolicies", [])
+            )
+            new_policies = set(
+                p.get("policyName", "") for p in new.get("attachedManagedPolicies", [])
+            )
             if old_policies != new_policies:
                 added = new_policies - old_policies
                 removed = old_policies - new_policies

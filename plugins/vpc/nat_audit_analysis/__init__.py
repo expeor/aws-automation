@@ -7,8 +7,8 @@ NAT Gateway 미사용 탐지:
 - Reporter: Excel 보고서 생성
 """
 
-from .collector import NATCollector, NATGateway, NATAuditData
-from .analyzer import NATAnalyzer, NATAnalysisResult
+from .analyzer import NATAnalysisResult, NATAnalyzer
+from .collector import NATAuditData, NATCollector, NATGateway
 from .reporter import NATExcelReporter
 
 __all__ = [

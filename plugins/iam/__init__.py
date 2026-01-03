@@ -7,6 +7,7 @@ plugins/iam - IAM 보안 감사 및 관리 도구
 
 CATEGORY = {
     "name": "iam",
+    "display_name": "IAM",
     "description": "IAM 보안 감사 및 관리 도구",
     "aliases": ["iam-audit", "security"],
 }

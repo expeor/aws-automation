@@ -39,6 +39,7 @@ if TYPE_CHECKING:
         StaticCredentialsProvider,
     )
     from .session import (
+        ParallelSessionIterator,
         SessionIterator,
         clear_cache,
         get_context_session,
@@ -155,6 +156,7 @@ __all__ = [
     "clear_cache",
     # Context 기반 세션 헬퍼
     "SessionIterator",
+    "ParallelSessionIterator",
     "iter_context_sessions",
     "get_context_session",
     # Context 정보 조회
@@ -214,6 +216,7 @@ _IMPORT_MAPPING = {
     "clear_cache": (".session", "clear_cache"),
     # Context 기반 세션 헬퍼
     "SessionIterator": (".session", "SessionIterator"),
+    "ParallelSessionIterator": (".session", "ParallelSessionIterator"),
     "iter_context_sessions": (".session", "iter_context_sessions"),
     "get_context_session": (".session", "get_context_session"),
     # Context 정보 조회

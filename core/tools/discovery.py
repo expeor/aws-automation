@@ -368,6 +368,69 @@ def get_category(
     return None
 
 
+def get_category_by_sub_service(
+    sub_service_name: str, include_aws_services: bool = True
+) -> Optional[Dict[str, Any]]:
+    """하위 서비스명으로 카테고리 조회 (도구 필터링 포함)
+
+    sub_services에 정의된 하위 서비스명으로 조회 시,
+    해당 sub_service 필드를 가진 도구만 필터링하여 반환합니다.
+
+    Args:
+        sub_service_name: 하위 서비스 이름 (예: "alb", "nlb", "redis")
+        include_aws_services: AWS 서비스 카테고리도 조회
+
+    Returns:
+        필터링된 도구를 포함한 카테고리 정보 또는 None
+
+    Example:
+        >>> cat = get_category_by_sub_service("alb")
+        >>> # cat["name"] == "elb"
+        >>> # cat["tools"]에는 sub_service=="alb"인 도구만 포함
+        >>> # cat["_sub_service_filter"] == "alb" (필터 적용됨을 표시)
+    """
+    for cat in discover_categories(include_aws_services=include_aws_services):
+        sub_services = cat.get("sub_services", [])
+        if sub_service_name in sub_services:
+            # 해당 sub_service에 속하는 도구만 필터링
+            filtered_tools = [
+                tool for tool in cat.get("tools", [])
+                if tool.get("sub_service") == sub_service_name
+            ]
+            # 복사본 반환 (원본 변경 방지)
+            filtered_cat = cat.copy()
+            filtered_cat["tools"] = filtered_tools
+            filtered_cat["_sub_service_filter"] = sub_service_name
+            return filtered_cat
+    return None
+
+
+def resolve_category(
+    name: str, include_aws_services: bool = True
+) -> Optional[Dict[str, Any]]:
+    """카테고리 또는 하위 서비스명으로 조회 (통합 함수)
+
+    1. 먼저 정확한 카테고리명으로 검색
+    2. 없으면 별칭(aliases)으로 검색
+    3. 없으면 하위 서비스(sub_services)로 검색
+
+    Args:
+        name: 카테고리명, 별칭, 또는 하위 서비스명
+        include_aws_services: AWS 서비스 카테고리도 조회
+
+    Returns:
+        카테고리 정보 또는 None
+        - 하위 서비스로 조회된 경우 `_sub_service_filter` 필드가 설정됨
+    """
+    # 1. 정확한 카테고리명 또는 별칭으로 조회
+    cat = get_category(name, include_aws_services)
+    if cat:
+        return cat
+
+    # 2. 하위 서비스명으로 조회
+    return get_category_by_sub_service(name, include_aws_services)
+
+
 def load_tool(category_name: str, tool_name: str) -> Optional[Dict[str, Callable]]:
     """도구 동적 로드
 

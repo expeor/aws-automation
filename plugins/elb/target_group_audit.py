@@ -13,13 +13,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Set
 
-from botocore.exceptions import ClientError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
 from rich.console import Console
 
-from core.auth import SessionIterator
+from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
@@ -27,6 +23,7 @@ console = Console()
 
 class TargetGroupStatus(Enum):
     """Target Group 상태"""
+
     NORMAL = "normal"
     UNATTACHED = "unattached"  # LB에 연결 안 됨
     NO_TARGETS = "no_targets"  # 타겟 없음
@@ -36,6 +33,7 @@ class TargetGroupStatus(Enum):
 @dataclass
 class TargetGroupInfo:
     """Target Group 정보"""
+
     account_id: str
     account_name: str
     region: str
@@ -58,6 +56,7 @@ class TargetGroupInfo:
 @dataclass
 class TargetGroupFinding:
     """Target Group 분석 결과"""
+
     tg: TargetGroupInfo
     status: TargetGroupStatus
     recommendation: str
@@ -66,6 +65,7 @@ class TargetGroupFinding:
 @dataclass
 class TargetGroupAnalysisResult:
     """Target Group 분석 결과 집계"""
+
     account_id: str
     account_name: str
     region: str
@@ -82,9 +82,13 @@ class TargetGroupAnalysisResult:
 # =============================================================================
 
 
-def collect_target_groups(session, account_id: str, account_name: str, region: str) -> List[TargetGroupInfo]:
+def collect_target_groups(
+    session, account_id: str, account_name: str, region: str
+) -> List[TargetGroupInfo]:
     """Target Groups 수집"""
-    elbv2 = session.client("elbv2", region_name=region)
+    from botocore.exceptions import ClientError
+
+    elbv2 = get_client(session, "elbv2", region_name=region)
     target_groups = []
 
     paginator = elbv2.get_paginator("describe_target_groups")
@@ -105,13 +109,19 @@ def collect_target_groups(session, account_id: str, account_name: str, region: s
 
             # 타겟 상태 조회
             try:
-                health_resp = elbv2.describe_target_health(TargetGroupArn=tg["TargetGroupArn"])
+                health_resp = elbv2.describe_target_health(
+                    TargetGroupArn=tg["TargetGroupArn"]
+                )
                 targets = health_resp.get("TargetHealthDescriptions", [])
                 tg_info.total_targets = len(targets)
                 tg_info.healthy_targets = sum(
-                    1 for t in targets if t.get("TargetHealth", {}).get("State") == "healthy"
+                    1
+                    for t in targets
+                    if t.get("TargetHealth", {}).get("State") == "healthy"
                 )
-                tg_info.unhealthy_targets = tg_info.total_targets - tg_info.healthy_targets
+                tg_info.unhealthy_targets = (
+                    tg_info.total_targets - tg_info.healthy_targets
+                )
             except ClientError:
                 pass
 
@@ -129,7 +139,7 @@ def analyze_target_groups(
     target_groups: List[TargetGroupInfo],
     account_id: str,
     account_name: str,
-    region: str
+    region: str,
 ) -> TargetGroupAnalysisResult:
     """Target Group 분석"""
     result = TargetGroupAnalysisResult(
@@ -143,39 +153,47 @@ def analyze_target_groups(
         # LB에 연결 안 됨
         if not tg.is_attached:
             result.unattached_count += 1
-            result.findings.append(TargetGroupFinding(
-                tg=tg,
-                status=TargetGroupStatus.UNATTACHED,
-                recommendation="로드밸런서에 연결되지 않음 - 삭제 검토",
-            ))
+            result.findings.append(
+                TargetGroupFinding(
+                    tg=tg,
+                    status=TargetGroupStatus.UNATTACHED,
+                    recommendation="로드밸런서에 연결되지 않음 - 삭제 검토",
+                )
+            )
             continue
 
         # 타겟 없음
         if tg.total_targets == 0:
             result.no_targets_count += 1
-            result.findings.append(TargetGroupFinding(
-                tg=tg,
-                status=TargetGroupStatus.NO_TARGETS,
-                recommendation="등록된 타겟 없음 - 타겟 등록 또는 삭제 검토",
-            ))
+            result.findings.append(
+                TargetGroupFinding(
+                    tg=tg,
+                    status=TargetGroupStatus.NO_TARGETS,
+                    recommendation="등록된 타겟 없음 - 타겟 등록 또는 삭제 검토",
+                )
+            )
             continue
 
         # 모든 타겟 비정상
         if tg.healthy_targets == 0 and tg.total_targets > 0:
             result.unhealthy_count += 1
-            result.findings.append(TargetGroupFinding(
-                tg=tg,
-                status=TargetGroupStatus.ALL_UNHEALTHY,
-                recommendation="모든 타겟 비정상 - 헬스체크 확인 필요",
-            ))
+            result.findings.append(
+                TargetGroupFinding(
+                    tg=tg,
+                    status=TargetGroupStatus.ALL_UNHEALTHY,
+                    recommendation="모든 타겟 비정상 - 헬스체크 확인 필요",
+                )
+            )
             continue
 
         result.normal_count += 1
-        result.findings.append(TargetGroupFinding(
-            tg=tg,
-            status=TargetGroupStatus.NORMAL,
-            recommendation="정상",
-        ))
+        result.findings.append(
+            TargetGroupFinding(
+                tg=tg,
+                status=TargetGroupStatus.NORMAL,
+                recommendation="정상",
+            )
+        )
 
     return result
 
@@ -187,14 +205,22 @@ def analyze_target_groups(
 
 def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     wb = Workbook()
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
+    yellow_fill = PatternFill(
+        start_color="FFE066", end_color="FFE066", fill_type="solid"
+    )
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -227,8 +253,19 @@ def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -
 
     # 상세 시트
     ws_detail = wb.create_sheet("Target Groups")
-    detail_headers = ["Account", "Region", "Name", "상태", "Type", "Protocol", "Port",
-                      "LB 연결", "Total Targets", "Healthy", "권장 조치"]
+    detail_headers = [
+        "Account",
+        "Region",
+        "Name",
+        "상태",
+        "Type",
+        "Protocol",
+        "Port",
+        "LB 연결",
+        "Total Targets",
+        "Healthy",
+        "권장 조치",
+    ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill
         ws_detail.cell(row=1, column=col).font = header_font
@@ -246,7 +283,9 @@ def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -
                 ws_detail.cell(row=detail_row, column=5, value=tg.target_type)
                 ws_detail.cell(row=detail_row, column=6, value=tg.protocol or "-")
                 ws_detail.cell(row=detail_row, column=7, value=tg.port or "-")
-                ws_detail.cell(row=detail_row, column=8, value=len(tg.load_balancer_arns))
+                ws_detail.cell(
+                    row=detail_row, column=8, value=len(tg.load_balancer_arns)
+                )
                 ws_detail.cell(row=detail_row, column=9, value=tg.total_targets)
                 ws_detail.cell(row=detail_row, column=10, value=tg.healthy_targets)
                 ws_detail.cell(row=detail_row, column=11, value=f.recommendation)
@@ -257,7 +296,9 @@ def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
+                    max(max_len + 2, 10), 40
+                )
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -274,56 +315,29 @@ def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -
 # =============================================================================
 
 
+def _collect_and_analyze(
+    session, account_id: str, account_name: str, region: str
+) -> Optional[TargetGroupAnalysisResult]:
+    """단일 계정/리전의 Target Group 수집 및 분석 (병렬 실행용)"""
+    target_groups = collect_target_groups(session, account_id, account_name, region)
+    if not target_groups:
+        return None
+    return analyze_target_groups(target_groups, account_id, account_name, region)
+
+
 def run(ctx) -> None:
     """Target Group 미사용 분석"""
     console.print("[bold]Target Group 분석 시작...[/bold]\n")
 
-    results: List[TargetGroupAnalysisResult] = []
-    collected = set()
-    errors = []
+    result = parallel_collect(
+        ctx, _collect_and_analyze, max_workers=20, service="elbv2"
+    )
+    results: List[TargetGroupAnalysisResult] = [
+        r for r in result.get_data() if r is not None
+    ]
 
-    with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
-            try:
-                sts = session.client("sts")
-                account_id = sts.get_caller_identity()["Account"]
-
-                key = f"{account_id}:{region}"
-                if key in collected:
-                    continue
-                collected.add(key)
-
-                account_name = identifier
-                if hasattr(ctx, "accounts") and ctx.accounts:
-                    for acc in ctx.accounts:
-                        if acc.id == account_id:
-                            account_name = acc.name
-                            break
-
-                console.print(f"[cyan]{account_name} / {region}[/cyan]", end=" ")
-
-                target_groups = collect_target_groups(session, account_id, account_name, region)
-                if not target_groups:
-                    console.print("[dim](없음)[/dim]")
-                    continue
-
-                result = analyze_target_groups(target_groups, account_id, account_name, region)
-                results.append(result)
-
-                issue_count = result.unattached_count + result.no_targets_count + result.unhealthy_count
-                if issue_count > 0:
-                    console.print(f"전체 {result.total_count}개 / [yellow]이슈 {issue_count}개[/yellow]")
-                else:
-                    console.print(f"[green]{result.total_count}개[/green]")
-
-            except ClientError as e:
-                code = e.response.get("Error", {}).get("Code", "Unknown")
-                if code not in ("InvalidClientTokenId", "ExpiredToken", "AccessDenied"):
-                    console.print(f"[yellow]{code}[/yellow]")
-                    errors.append(f"{identifier}/{region}: {code}")
-            except Exception as e:
-                console.print(f"[red]{e}[/red]")
-                errors.append(str(e))
+    if result.error_count > 0:
+        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")
