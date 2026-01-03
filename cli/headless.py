@@ -2,31 +2,26 @@
 cli/headless.py - Headless CLI Runner
 
 CI/CD 파이프라인 및 자동화를 위한 비대화형 실행 모드입니다.
-모든 옵션을 명령줄에서 받아 대화형 프롬프트 없이 실행합니다.
+SSO Profile 또는 Access Key 프로파일만 지원합니다.
 
 Usage:
-    aa run ec2/ebs_audit --profile my-sso --region ap-northeast-2
+    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
 
     # 다중 리전
-    aa run ec2/ebs_audit --profile my-sso --region ap-northeast-2,us-east-1
+    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
 
     # 전체 리전
-    aa run ec2/ebs_audit --profile my-sso --region all
-
-    # 계정 필터링 (SSO Session만)
-    aa run ec2/ebs_audit --profile my-sso --target "prod*" --role AdminRole
+    aa run ec2/ebs_audit -p my-profile -r all
 
     # JSON 출력
-    aa run ec2/ebs_audit --profile my-sso --region all --format json
+    aa run ec2/ebs_audit -p my-profile -f json -o result.json
 
 옵션:
-    --profile: AWS 프로파일 또는 SSO 세션 이름 (필수)
-    --region: 리전 또는 리전 패턴 (기본: ap-northeast-2)
-    --target: 계정 필터 패턴 (SSO Session만, 예: "prod*", "dev-*")
-    --role: IAM Role 이름 (SSO Session만, 기본: 자동 선택)
-    --format: 출력 형식 (console, json, csv)
-    --output: 출력 파일 경로 (기본: 자동 생성)
-    --quiet: 최소 출력 모드
+    -p, --profile: SSO Profile 또는 Access Key 프로파일 (필수)
+    -r, --region: 리전 또는 리전 패턴 (기본: ap-northeast-2)
+    -f, --format: 출력 형식 (console, json, csv)
+    -o, --output: 출력 파일 경로 (기본: 자동 생성)
+    -q, --quiet: 최소 출력 모드
 """
 
 import json
@@ -36,8 +31,8 @@ from typing import List, Optional
 
 from rich.console import Console
 
-from cli.flow.context import ExecutionContext, ProviderKind, RoleSelection, ToolInfo
-from core.filter import AccountFilter, expand_region_pattern
+from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
+from core.filter import expand_region_pattern
 
 console = Console()
 
@@ -52,11 +47,9 @@ class HeadlessConfig:
 
     # 인증
     profile: str
-    role: Optional[str] = None
 
     # 대상
     regions: List[str] = field(default_factory=list)
-    target: Optional[str] = None  # 계정 필터 패턴
 
     # 출력
     format: str = "console"  # console, json, csv
@@ -152,10 +145,6 @@ class HeadlessRunner:
             is_global=tool_meta.get("is_global", False),
         )
 
-        # 계정 필터 설정
-        if self.config.target:
-            ctx.target_filter = AccountFilter(self.config.target)
-
         return ctx
 
     def _setup_auth(self) -> bool:
@@ -166,11 +155,13 @@ class HeadlessRunner:
         config = load_config()
         profile_name = self.config.profile
 
-        # 1. SSO Session인지 확인
+        # SSO Session은 지원하지 않음
         if profile_name in config.sessions:
-            return self._setup_sso_session(config)
+            console.print(f"[red]SSO Session은 headless 모드에서 지원하지 않습니다: {profile_name}[/red]")
+            console.print("[dim]SSO Profile 또는 Access Key 프로파일을 사용하세요.[/dim]")
+            return False
 
-        # 2. Profile인지 확인
+        # Profile인지 확인
         if profile_name in config.profiles:
             profile = config.profiles[profile_name]
             provider_type = detect_provider_type(profile)
@@ -183,113 +174,12 @@ class HeadlessRunner:
                 console.print(f"[red]지원하지 않는 프로파일 유형: {provider_type}[/red]")
                 return False
 
-        # 3. 찾을 수 없음
+        # 찾을 수 없음
         console.print(f"[red]프로파일을 찾을 수 없습니다: {profile_name}[/red]")
-        console.print("[dim]사용 가능한 프로파일/세션:[/dim]")
-        for name in list(config.sessions.keys())[:5]:
-            console.print(f"  [dim]- {name} (SSO Session)[/dim]")
+        console.print("[dim]사용 가능한 프로파일:[/dim]")
         for name in list(config.profiles.keys())[:5]:
-            console.print(f"  [dim]- {name} (Profile)[/dim]")
+            console.print(f"  [dim]- {name}[/dim]")
         return False
-
-    def _setup_sso_session(self, config) -> bool:
-        """SSO Session 인증 설정"""
-        from core.auth.provider import SSOSessionConfig, SSOSessionProvider
-
-        session_config = config.sso_sessions.get(self.config.profile)
-        if not session_config:
-            console.print(f"[red]SSO 세션을 찾을 수 없습니다: {self.config.profile}[/red]")
-            return False
-
-        sso_config = SSOSessionConfig(
-            session_name=self.config.profile,
-            start_url=session_config.get("sso_start_url", ""),
-            region=session_config.get("sso_region", ""),
-        )
-
-        provider = SSOSessionProvider(sso_config)
-
-        # 인증 (캐시된 토큰 사용)
-        if not self.config.quiet:
-            console.print(f"[dim]SSO 세션 인증 중: {self.config.profile}[/dim]")
-
-        provider.authenticate()
-
-        self._ctx.provider = provider
-        self._ctx.provider_kind = ProviderKind.SSO_SESSION
-        self._ctx.profile_name = self.config.profile
-
-        # 계정 목록 조회
-        accounts = provider.list_accounts()
-        self._ctx.accounts = accounts
-
-        if not self.config.quiet:
-            console.print(f"[dim]계정 {len(accounts)}개 조회됨[/dim]")
-
-        # 타겟 필터 적용 후 계정 수
-        target_accounts = self._ctx.get_target_accounts()
-        if len(target_accounts) != len(accounts):
-            if not self.config.quiet:
-                console.print(f"[dim]필터 적용 후 {len(target_accounts)}개 계정 대상[/dim]")
-
-        if not target_accounts:
-            console.print("[red]대상 계정이 없습니다. --target 패턴을 확인하세요.[/red]")
-            return False
-
-        # Role 설정
-        return self._setup_role(provider, target_accounts)
-
-    def _setup_role(self, provider, target_accounts) -> bool:
-        """Role 설정 (SSO Session)"""
-        role_name = self.config.role
-
-        if role_name:
-            # 명시적으로 지정된 Role 사용
-            role_account_map = {}
-            for account in target_accounts:
-                roles = provider.list_account_roles(account.id)
-                role_names = [r.get("roleName", "") for r in roles]
-                if role_name in role_names:
-                    if role_name not in role_account_map:
-                        role_account_map[role_name] = []
-                    role_account_map[role_name].append(account.id)
-
-            if not role_account_map.get(role_name):
-                console.print(f"[red]지정된 Role '{role_name}'을 사용할 수 있는 계정이 없습니다.[/red]")
-                return False
-
-            self._ctx.role_selection = RoleSelection(
-                primary_role=role_name,
-                role_account_map=role_account_map,
-            )
-
-        else:
-            # 자동 Role 선택 (첫 번째 계정의 첫 번째 Role)
-            first_account = target_accounts[0]
-            roles = provider.list_account_roles(first_account.id)
-            if not roles:
-                console.print(f"[red]계정 {first_account.id}에 사용 가능한 Role이 없습니다.[/red]")
-                return False
-
-            role_name = roles[0].get("roleName", "")
-
-            # 모든 계정에서 해당 Role 사용 가능 여부 확인
-            role_account_map = {role_name: []}
-            for account in target_accounts:
-                acc_roles = provider.list_account_roles(account.id)
-                acc_role_names = [r.get("roleName", "") for r in acc_roles]
-                if role_name in acc_role_names:
-                    role_account_map[role_name].append(account.id)
-
-            self._ctx.role_selection = RoleSelection(
-                primary_role=role_name,
-                role_account_map=role_account_map,
-            )
-
-            if not self.config.quiet:
-                console.print(f"[dim]Role 자동 선택: {role_name}[/dim]")
-
-        return True
 
     def _setup_sso_profile(self) -> bool:
         """SSO Profile 인증 설정"""
@@ -376,13 +266,6 @@ class HeadlessRunner:
         console.print(f"[bold]{self._ctx.tool.name}[/bold]")
         console.print(f"  프로파일: {self._ctx.profile_name}")
 
-        if self._ctx.role_selection:
-            console.print(f"  Role: {self._ctx.role_selection.primary_role}")
-
-        if self._ctx.is_multi_account():
-            target_count = len(self._ctx.get_target_accounts())
-            console.print(f"  계정: {target_count}개")
-
         if len(self._ctx.regions) == 1:
             console.print(f"  리전: {self._ctx.regions[0]}")
         else:
@@ -393,20 +276,18 @@ def run_headless(
     tool_path: str,
     profile: str,
     regions: List[str],
-    target: Optional[str] = None,
-    role: Optional[str] = None,
     format: str = "console",
     output: Optional[str] = None,
     quiet: bool = False,
 ) -> int:
     """Headless 실행 편의 함수
 
+    SSO Profile 또는 Access Key 프로파일만 지원합니다.
+
     Args:
         tool_path: 도구 경로 (category/module 형식)
-        profile: AWS 프로파일 또는 SSO 세션 이름
+        profile: SSO Profile 또는 Access Key 프로파일
         regions: 리전 목록
-        target: 계정 필터 패턴 (SSO Session만)
-        role: IAM Role 이름 (SSO Session만)
         format: 출력 형식
         output: 출력 파일 경로
         quiet: 최소 출력 모드
@@ -429,9 +310,7 @@ def run_headless(
         category=category,
         tool_module=tool_module,
         profile=profile,
-        role=role,
         regions=regions if regions else ["ap-northeast-2"],
-        target=target,
         format=format,
         output=output,
         quiet=quiet,

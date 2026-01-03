@@ -98,9 +98,27 @@ def _build_help_text() -> str:
         "",
         "\b",
         "[Headless CLI (CI/CD용)]",
-        "  aa run ec2/ebs_audit -p my-sso -r all",
-        "  aa run ec2/ebs_audit -p my-sso -t 'prod*'",
-        "  aa list-tools        사용 가능한 도구 목록",
+        "  aa list-tools                      도구 목록 조회",
+        "  aa run <도구경로> [옵션]           도구 실행",
+        "",
+        "  옵션:",
+        "    -p, --profile       SSO Profile 또는 Access Key 프로파일",
+        "    -g, --profile-group 프로파일 그룹 (aa group list로 확인)",
+        "    -r, --region        리전 (다중 가능, 'all' 또는 패턴)",
+        "    -f, --format        출력 형식 (console, json, csv)",
+        "    -o, --output        출력 파일 경로",
+        "    -q, --quiet         최소 출력 모드",
+        "",
+        "  예시:",
+        "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
+        "    aa run ec2/ebs_audit -p my-profile -r all -f json",
+        "",
+        "\b",
+        "[프로파일 그룹]",
+        "  aa group list         그룹 목록",
+        "  aa group create       그룹 생성 (인터랙티브)",
+        "  aa group show <이름>  그룹 상세",
+        "  aa group delete <이름> 그룹 삭제",
         "",
         "\b",
         "[예시]",
@@ -140,7 +158,7 @@ cli.help = _build_help_text()
     "-p",
     "--profile",
     required=False,
-    help="AWS 프로파일 또는 SSO 세션 이름",
+    help="SSO Profile 또는 Access Key 프로파일",
 )
 @click.option(
     "-g",
@@ -155,17 +173,6 @@ cli.help = _build_help_text()
     multiple=True,
     default=["ap-northeast-2"],
     help="리전 (다중 가능, 'all'=전체, 패턴 가능: 'ap-*')",
-)
-@click.option(
-    "-t",
-    "--target",
-    default=None,
-    help="계정 필터 패턴 (SSO Session만, 예: 'prod*', 'dev-*')",
-)
-@click.option(
-    "--role",
-    default=None,
-    help="IAM Role 이름 (SSO Session만, 기본: 자동 선택)",
 )
 @click.option(
     "-f",
@@ -187,33 +194,32 @@ cli.help = _build_help_text()
     help="최소 출력 모드",
 )
 def run_command(
-    tool_path, profile, profile_group, region, target, role, format, output, quiet
+    tool_path, profile, profile_group, region, format, output, quiet
 ):
     """비대화형 도구 실행 (CI/CD용)
 
+    SSO Profile 또는 Access Key 프로파일만 지원합니다.
+
     \b
-    TOOL_PATH: category/module 형식
+    TOOL_PATH: category/module 형식 (aa list-tools로 확인)
         예: ec2/ebs_audit, iam/unused_users, s3/public_buckets
 
     \b
     Examples:
         # 기본 실행
-        aa run ec2/ebs_audit -p my-sso -r ap-northeast-2
+        aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
 
         # 프로파일 그룹으로 실행
         aa run ec2/ebs_audit -g "개발 환경" -r ap-northeast-2
 
         # 다중 리전
-        aa run ec2/ebs_audit -p my-sso -r ap-northeast-2 -r us-east-1
+        aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
 
         # 전체 리전
-        aa run ec2/ebs_audit -p my-sso -r all
-
-        # 계정 필터링 (SSO Session만)
-        aa run ec2/ebs_audit -p my-sso -t "prod*" --role AdminRole
+        aa run ec2/ebs_audit -p my-profile -r all
 
         # JSON 출력
-        aa run ec2/ebs_audit -p my-sso -f json -o result.json
+        aa run ec2/ebs_audit -p my-profile -f json -o result.json
     """
     from cli.headless import run_headless
 
@@ -248,8 +254,6 @@ def run_command(
             tool_path=tool_path,
             profile=p,
             regions=list(region),
-            target=target,
-            role=role,
             format=format,
             output=output,
             quiet=quiet,
