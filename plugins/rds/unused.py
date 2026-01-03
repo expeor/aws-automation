@@ -303,9 +303,7 @@ def generate_report(results: List[RDSAnalysisResult], output_dir: str) -> str:
     yellow_fill = PatternFill(
         start_color="FFE066", end_color="FFE066", fill_type="solid"
     )
-    gray_fill = PatternFill(
-        start_color="CCCCCC", end_color="CCCCCC", fill_type="solid"
-    )
+    gray_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")

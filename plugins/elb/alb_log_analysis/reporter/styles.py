@@ -38,14 +38,26 @@ class StyleCache:
 
         self._align_center = Alignment(horizontal="center", vertical="center")
         self._align_left = Alignment(horizontal="left", vertical="center")
-        self._align_left_wrap = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        self._align_left_wrap = Alignment(
+            horizontal="left", vertical="center", wrap_text=True
+        )
         self._align_right = Alignment(horizontal="right", vertical="center")
 
-        self._fill_abuse = PatternFill(start_color="FFCDD2", end_color="FFCDD2", fill_type="solid")
-        self._fill_danger = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
-        self._fill_warning = PatternFill(start_color="FFE6CC", end_color="FFE6CC", fill_type="solid")
-        self._fill_title = PatternFill(start_color="D6EAF8", end_color="D6EAF8", fill_type="solid")
-        self._fill_header = PatternFill(start_color="EBF1FA", end_color="EBF1FA", fill_type="solid")
+        self._fill_abuse = PatternFill(
+            start_color="FFCDD2", end_color="FFCDD2", fill_type="solid"
+        )
+        self._fill_danger = PatternFill(
+            start_color="FFCCCC", end_color="FFCCCC", fill_type="solid"
+        )
+        self._fill_warning = PatternFill(
+            start_color="FFE6CC", end_color="FFE6CC", fill_type="solid"
+        )
+        self._fill_title = PatternFill(
+            start_color="D6EAF8", end_color="D6EAF8", fill_type="solid"
+        )
+        self._fill_header = PatternFill(
+            start_color="EBF1FA", end_color="EBF1FA", fill_type="solid"
+        )
 
         self._font_bold = Font(name="Consolas", bold=True)
         self._font_italic_gray = Font(name="Consolas", italic=True, color="808080")
@@ -141,9 +153,12 @@ class StyleCache:
         """Get header style dict."""
         self._ensure_init()
         from openpyxl.styles import PatternFill
+
         return {
             "font": self._font_header,
-            "fill": PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid"),
+            "fill": PatternFill(
+                start_color="4472C4", end_color="4472C4", fill_type="solid"
+            ),
             "alignment": self._align_center,
             "border": self._border,
         }
@@ -151,6 +166,7 @@ class StyleCache:
     def register_named_styles(self, wb: "Workbook") -> None:
         """Register named styles with workbook."""
         from openpyxl.styles import NamedStyle, PatternFill
+
         self._ensure_init()
 
         styles = [

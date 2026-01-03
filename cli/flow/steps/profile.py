@@ -211,7 +211,9 @@ class ProfileStep:
             profiles_preview = ", ".join(g.profiles[:2])
             if len(g.profiles) > 2:
                 profiles_preview += f" 외 {len(g.profiles) - 2}개"
-            print_box_line(f" {idx}) [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]")
+            print_box_line(
+                f" {idx}) [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]"
+            )
 
         print_box_line("")
         print_box_line(" [dim]0) 뒤로[/dim]")

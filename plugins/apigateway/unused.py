@@ -253,12 +253,8 @@ def collect_apis(
     """모든 API Gateway 수집"""
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
-    rest_apis = collect_rest_apis(
-        session, account_id, account_name, region, cloudwatch
-    )
-    http_apis = collect_http_apis(
-        session, account_id, account_name, region, cloudwatch
-    )
+    rest_apis = collect_rest_apis(session, account_id, account_name, region, cloudwatch)
+    http_apis = collect_http_apis(session, account_id, account_name, region, cloudwatch)
 
     return rest_apis + http_apis
 

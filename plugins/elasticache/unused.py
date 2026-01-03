@@ -372,7 +372,9 @@ def generate_report(results: List[ElastiCacheAnalysisResult], output_dir: str) -
                 ws_detail.cell(row=detail_row, column=5, value=c.node_type)
                 ws_detail.cell(row=detail_row, column=6, value=c.num_nodes)
                 ws_detail.cell(row=detail_row, column=7, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=8, value=f"{c.avg_connections:.1f}")
+                ws_detail.cell(
+                    row=detail_row, column=8, value=f"{c.avg_connections:.1f}"
+                )
                 ws_detail.cell(row=detail_row, column=9, value=f"{c.avg_cpu:.1f}%")
                 ws_detail.cell(
                     row=detail_row, column=10, value=f"${c.estimated_monthly_cost:.2f}"

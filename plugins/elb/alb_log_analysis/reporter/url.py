@@ -36,11 +36,17 @@ class URLSheetWriter(BaseSheetWriter):
                 top_method = top_method.replace("-", "")
 
             # Unique IPs
-            if "unique_ips" in details and isinstance(details.get("unique_ips"), (int, float)):
+            if "unique_ips" in details and isinstance(
+                details.get("unique_ips"), (int, float)
+            ):
                 unique_ips = int(details.get("unique_ips") or 0)
             else:
                 client_ips_val = details.get("client_ips", set())
-                unique_ips = len(client_ips_val) if isinstance(client_ips_val, (set, list, tuple)) else 0
+                unique_ips = (
+                    len(client_ips_val)
+                    if isinstance(client_ips_val, (set, list, tuple))
+                    else 0
+                )
 
             # Average response time
             avg_response_time = self._parse_avg_response_time(details)
@@ -68,21 +74,23 @@ class URLSheetWriter(BaseSheetWriter):
                     client_ip = next(iter(client_ips))
                     country = self.get_country_code(client_ip)
 
-            url_data.append({
-                "Count": count,
-                "Client": client_ip,
-                "Country": country,
-                "Method": top_method,
-                "Request": url,
-                "Unique IPs": unique_ips,
-                "Avg Response Time": avg_response_time,
-                "Top Status": top_status,
-                "Error Rate (%)": error_rate,
-            })
+            url_data.append(
+                {
+                    "Count": count,
+                    "Client": client_ip,
+                    "Country": country,
+                    "Method": top_method,
+                    "Request": url,
+                    "Unique IPs": unique_ips,
+                    "Avg Response Time": avg_response_time,
+                    "Top Status": top_status,
+                    "Error Rate (%)": error_rate,
+                }
+            )
 
         # Sort and limit
         url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[
-            :SheetConfig.TOP_URL_LIMIT
+            : SheetConfig.TOP_URL_LIMIT
         ]
 
         if not url_data_sorted:
@@ -107,7 +115,7 @@ class URLSheetWriter(BaseSheetWriter):
             {"Count": count, "Request": url} for url, count in url_counts.items()
         ]
         url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[
-            :SheetConfig.TOP_URL_LIMIT
+            : SheetConfig.TOP_URL_LIMIT
         ]
 
         if not url_data_sorted:
@@ -148,7 +156,8 @@ class URLSheetWriter(BaseSheetWriter):
 
         # Filter valid status codes
         valid_counts = {
-            k: v for k, v in status_counts.items()
+            k: v
+            for k, v in status_counts.items()
             if k and str(k).strip() not in ("", "-", "N/A")
         }
 
@@ -168,7 +177,8 @@ class URLSheetWriter(BaseSheetWriter):
             return 0.0
 
         error_count = sum(
-            count for status, count in status_counts.items()
+            count
+            for status, count in status_counts.items()
             if str(status).startswith(("4", "5"))
         )
 

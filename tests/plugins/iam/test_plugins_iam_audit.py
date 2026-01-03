@@ -60,22 +60,24 @@ class TestPrintSummary:
         """Critical 이슈가 있는 경우"""
         from plugins.iam.iam_audit import _print_summary
 
-        stats = [{
-            "total_users": 10,
-            "users_without_mfa": 3,
-            "inactive_users": 2,
-            "total_active_keys": 15,
-            "old_keys": 5,
-            "unused_keys": 2,
-            "total_roles": 20,
-            "unused_roles": 5,
-            "admin_roles": 3,
-            "critical_issues": 2,
-            "high_issues": 5,
-            "medium_issues": 10,
-            "root_access_key": True,
-            "root_mfa": False,
-        }]
+        stats = [
+            {
+                "total_users": 10,
+                "users_without_mfa": 3,
+                "inactive_users": 2,
+                "total_active_keys": 15,
+                "old_keys": 5,
+                "unused_keys": 2,
+                "total_roles": 20,
+                "unused_roles": 5,
+                "admin_roles": 3,
+                "critical_issues": 2,
+                "high_issues": 5,
+                "medium_issues": 10,
+                "root_access_key": True,
+                "root_mfa": False,
+            }
+        ]
 
         _print_summary(stats)
 
@@ -88,22 +90,24 @@ class TestPrintSummary:
         """Critical 이슈가 없는 경우"""
         from plugins.iam.iam_audit import _print_summary
 
-        stats = [{
-            "total_users": 10,
-            "users_without_mfa": 0,
-            "inactive_users": 0,
-            "total_active_keys": 15,
-            "old_keys": 0,
-            "unused_keys": 0,
-            "total_roles": 20,
-            "unused_roles": 0,
-            "admin_roles": 0,
-            "critical_issues": 0,
-            "high_issues": 0,
-            "medium_issues": 0,
-            "root_access_key": False,
-            "root_mfa": True,
-        }]
+        stats = [
+            {
+                "total_users": 10,
+                "users_without_mfa": 0,
+                "inactive_users": 0,
+                "total_active_keys": 15,
+                "old_keys": 0,
+                "unused_keys": 0,
+                "total_roles": 20,
+                "unused_roles": 0,
+                "admin_roles": 0,
+                "critical_issues": 0,
+                "high_issues": 0,
+                "medium_issues": 0,
+                "root_access_key": False,
+                "root_mfa": True,
+            }
+        ]
 
         _print_summary(stats)
 
@@ -160,22 +164,24 @@ class TestPrintSummary:
         """Root Access Key 경고"""
         from plugins.iam.iam_audit import _print_summary
 
-        stats = [{
-            "total_users": 5,
-            "users_without_mfa": 0,
-            "inactive_users": 0,
-            "total_active_keys": 5,
-            "old_keys": 0,
-            "unused_keys": 0,
-            "total_roles": 10,
-            "unused_roles": 0,
-            "admin_roles": 0,
-            "critical_issues": 1,
-            "high_issues": 0,
-            "medium_issues": 0,
-            "root_access_key": True,
-            "root_mfa": True,
-        }]
+        stats = [
+            {
+                "total_users": 5,
+                "users_without_mfa": 0,
+                "inactive_users": 0,
+                "total_active_keys": 5,
+                "old_keys": 0,
+                "unused_keys": 0,
+                "total_roles": 10,
+                "unused_roles": 0,
+                "admin_roles": 0,
+                "critical_issues": 1,
+                "high_issues": 0,
+                "medium_issues": 0,
+                "root_access_key": True,
+                "root_mfa": True,
+            }
+        ]
 
         _print_summary(stats)
 
@@ -199,7 +205,9 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/123456789012/iam-audit/2024-01-01"
+        mock_path_instance.build.return_value = (
+            "/output/123456789012/iam-audit/2024-01-01"
+        )
         mock_output_path.return_value = mock_path_instance
 
         result = _create_output_directory(mock_ctx)
@@ -219,7 +227,9 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/my-profile/iam-audit/2024-01-01"
+        mock_path_instance.build.return_value = (
+            "/output/my-profile/iam-audit/2024-01-01"
+        )
         mock_output_path.return_value = mock_path_instance
 
         result = _create_output_directory(mock_ctx)

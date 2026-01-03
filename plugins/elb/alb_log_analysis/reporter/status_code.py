@@ -48,11 +48,15 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             },
             SHEET_NAMES.BACKEND_4XX_COUNT: {
                 "count": self.data.get("backend_4xx_count", 0),
-                "full_logs": self.data.get("Backend 4xx Count", {}).get("full_logs", []),
+                "full_logs": self.data.get("Backend 4xx Count", {}).get(
+                    "full_logs", []
+                ),
             },
             SHEET_NAMES.BACKEND_5XX_COUNT: {
                 "count": self.data.get("backend_5xx_count", 0),
-                "full_logs": self.data.get("Backend 5xx Count", {}).get("full_logs", []),
+                "full_logs": self.data.get("Backend 5xx Count", {}).get(
+                    "full_logs", []
+                ),
             },
         }
 
@@ -83,11 +87,15 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             },
             SHEET_NAMES.BACKEND_4XX_TS: {
                 "count": self.data.get("backend_4xx_count", 0),
-                "full_logs": self.data.get("Backend 4xx Count", {}).get("full_logs", []),
+                "full_logs": self.data.get("Backend 4xx Count", {}).get(
+                    "full_logs", []
+                ),
             },
             SHEET_NAMES.BACKEND_5XX_TS: {
                 "count": self.data.get("backend_5xx_count", 0),
-                "full_logs": self.data.get("Backend 5xx Count", {}).get("full_logs", []),
+                "full_logs": self.data.get("Backend 5xx Count", {}).get(
+                    "full_logs", []
+                ),
             },
         }
 
@@ -120,7 +128,9 @@ class StatusCodeSheetWriter(BaseSheetWriter):
 
             # Select headers based on sheet type
             is_3xx = "3xx" in sheet_name
-            headers = list(HEADERS.STATUS_COUNT_3XX if is_3xx else HEADERS.STATUS_COUNT_BASE)
+            headers = list(
+                HEADERS.STATUS_COUNT_3XX if is_3xx else HEADERS.STATUS_COUNT_BASE
+            )
 
             self.write_header_row(ws, headers)
 
@@ -153,7 +163,9 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             request = log.get("request", "N/A")
             http_method = log.get("http_method", "").replace("-", "")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
-            target_status = self.convert_status_code(log.get("target_status_code", "N/A"))
+            target_status = self.convert_status_code(
+                log.get("target_status_code", "N/A")
+            )
             target = log.get("target", "")
             target_field = "" if not target or target == "-" else target
             target_group = log.get("target_group_name", "") or ""
@@ -161,13 +173,24 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             if include_redirect:
                 redirect_url = log.get("redirect_url", "").replace("-", "")
                 key = (
-                    client_ip, target_field, target_group, http_method,
-                    request, redirect_url, elb_status, target_status
+                    client_ip,
+                    target_field,
+                    target_group,
+                    http_method,
+                    request,
+                    redirect_url,
+                    elb_status,
+                    target_status,
                 )
             else:
                 key = (
-                    client_ip, target_field, target_group, http_method,
-                    request, elb_status, target_status
+                    client_ip,
+                    target_field,
+                    target_group,
+                    http_method,
+                    request,
+                    elb_status,
+                    target_status,
                 )
 
             counts[key] = counts.get(key, 0) + 1
@@ -188,11 +211,26 @@ class StatusCodeSheetWriter(BaseSheetWriter):
 
         for row_idx, (key_tuple, count) in enumerate(items, start=2):
             if is_3xx:
-                (client_ip, target, target_group, method, request,
-                 redirect_url, elb_status, target_status) = key_tuple
+                (
+                    client_ip,
+                    target,
+                    target_group,
+                    method,
+                    request,
+                    redirect_url,
+                    elb_status,
+                    target_status,
+                ) = key_tuple
             else:
-                (client_ip, target, target_group, method, request,
-                 elb_status, target_status) = key_tuple
+                (
+                    client_ip,
+                    target,
+                    target_group,
+                    method,
+                    request,
+                    elb_status,
+                    target_status,
+                ) = key_tuple
                 redirect_url = None
 
             is_abuse = client_ip in self.abuse_ip_set
@@ -283,14 +321,25 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             request = log.get("request", "N/A")
             user_agent = log.get("user_agent", "N/A")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
-            target_status = self.convert_status_code(log.get("target_status_code", "N/A"))
+            target_status = self.convert_status_code(
+                log.get("target_status_code", "N/A")
+            )
             error_reason = log.get("error_reason", "-")
             if error_reason in (None, "-"):
                 error_reason = ""
 
             values = [
-                timestamp_str, client_ip, country, target_field, target_group,
-                method, request, user_agent, elb_status, target_status, error_reason
+                timestamp_str,
+                client_ip,
+                country,
+                target_field,
+                target_group,
+                method,
+                request,
+                user_agent,
+                elb_status,
+                target_status,
+                error_reason,
             ]
 
             for col_idx, (header, value) in enumerate(zip(headers, values), start=1):
@@ -340,12 +389,11 @@ class ClientStatusSheetWriter(BaseSheetWriter):
 
             # Calculate totals and sort
             client_totals = {
-                ip: sum(counts.values())
-                for ip, counts in client_status_stats.items()
+                ip: sum(counts.values()) for ip, counts in client_status_stats.items()
             }
             sorted_clients = sorted(
                 client_totals.items(), key=lambda x: x[1], reverse=True
-            )[:SheetConfig.TOP_CLIENT_LIMIT]
+            )[: SheetConfig.TOP_CLIENT_LIMIT]
 
             # Write data
             row = 2
@@ -365,7 +413,9 @@ class ClientStatusSheetWriter(BaseSheetWriter):
 
                 # Status code columns
                 for col_idx, status_code in enumerate(sorted_codes, 3):
-                    cell = ws.cell(row=row, column=col_idx, value=status_counts.get(status_code, 0))
+                    cell = ws.cell(
+                        row=row, column=col_idx, value=status_counts.get(status_code, 0)
+                    )
                     cell.number_format = "#,##0"
                     cell.border = self.styles.thin_border
 
@@ -430,7 +480,8 @@ class TargetStatusSheetWriter(BaseSheetWriter):
             target_totals = {}
             for target, status_counts in target_status_stats.items():
                 backend_total = sum(
-                    count for key, count in status_counts.items()
+                    count
+                    for key, count in status_counts.items()
                     if key.startswith("Backend:")
                 )
                 if backend_total > 0:
@@ -451,7 +502,7 @@ class TargetStatusSheetWriter(BaseSheetWriter):
                 if "(" in target_display and target_display.endswith(")"):
                     open_idx = target_display.rfind("(")
                     parsed_group = target_display[:open_idx]
-                    parsed_target = target_display[open_idx + 1:-1]
+                    parsed_target = target_display[open_idx + 1 : -1]
 
                 # Target cell
                 cell = ws.cell(row=row, column=1, value=parsed_target)

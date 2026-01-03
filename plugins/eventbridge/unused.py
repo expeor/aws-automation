@@ -133,7 +133,9 @@ def collect_rules(
                         event_bus_name=bus_name,
                         state=rule.get("State", ""),
                         schedule_expression=rule.get("ScheduleExpression", ""),
-                        event_pattern=rule.get("EventPattern", "")[:100] if rule.get("EventPattern") else "",
+                        event_pattern=rule.get("EventPattern", "")[:100]
+                        if rule.get("EventPattern")
+                        else "",
                         target_count=target_count,
                     )
 
@@ -274,9 +276,7 @@ def generate_report(results: List[EventBridgeAnalysisResult], output_dir: str) -
     yellow_fill = PatternFill(
         start_color="FFE066", end_color="FFE066", fill_type="solid"
     )
-    gray_fill = PatternFill(
-        start_color="CCCCCC", end_color="CCCCCC", fill_type="solid"
-    )
+    gray_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")

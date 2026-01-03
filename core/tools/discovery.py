@@ -394,7 +394,8 @@ def get_category_by_sub_service(
         if sub_service_name in sub_services:
             # 해당 sub_service에 속하는 도구만 필터링
             filtered_tools = [
-                tool for tool in cat.get("tools", [])
+                tool
+                for tool in cat.get("tools", [])
                 if tool.get("sub_service") == sub_service_name
             ]
             # 복사본 반환 (원본 변경 방지)

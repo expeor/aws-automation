@@ -186,7 +186,9 @@ cli.help = _build_help_text()
     is_flag=True,
     help="최소 출력 모드",
 )
-def run_command(tool_path, profile, profile_group, region, target, role, format, output, quiet):
+def run_command(
+    tool_path, profile, profile_group, region, target, role, format, output, quiet
+):
     """비대화형 도구 실행 (CI/CD용)
 
     \b
@@ -499,7 +501,9 @@ def group_create():
     # 5. 저장
     manager = ProfileGroupsManager()
     if manager.add(name, kind, selected_profiles):
-        console.print(f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]")
+        console.print(
+            f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]"
+        )
     else:
         console.print(f"\n[red]그룹 저장 실패 (이미 존재하거나 최대 개수 초과)[/red]")
         raise SystemExit(1)

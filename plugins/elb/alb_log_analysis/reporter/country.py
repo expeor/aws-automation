@@ -21,7 +21,9 @@ class CountrySheetWriter(BaseSheetWriter):
             if not country_stats:
                 return
 
-            client_ip_counts: Dict[str, int] = self.data.get("client_ip_counts", {}) or {}
+            client_ip_counts: Dict[str, int] = (
+                self.data.get("client_ip_counts", {}) or {}
+            )
             ip_country_mapping: Dict[str, Optional[str]] = (
                 self.data.get("ip_country_mapping", {}) or {}
             )
@@ -32,9 +34,9 @@ class CountrySheetWriter(BaseSheetWriter):
                 country_code = ip_country_mapping.get(ip) or "ZZ"
                 if country_code in SPECIAL_COUNTRY_CODES:
                     country_code = "ZZ"
-                country_request_counts[country_code] = (
-                    country_request_counts.get(country_code, 0) + int(req_count or 0)
-                )
+                country_request_counts[country_code] = country_request_counts.get(
+                    country_code, 0
+                ) + int(req_count or 0)
 
             total_requests = sum(country_request_counts.values()) or 1
 
@@ -43,17 +45,19 @@ class CountrySheetWriter(BaseSheetWriter):
             for country_code, ip_count in country_stats.items():
                 total_req = country_request_counts.get(country_code, 0)
                 percentage = round((total_req / total_requests) * 100, 2)
-                country_data.append({
-                    "Count": total_req,
-                    "Country": country_code,
-                    "IP Count": ip_count,
-                    "Percentage": percentage,
-                })
+                country_data.append(
+                    {
+                        "Count": total_req,
+                        "Country": country_code,
+                        "IP Count": ip_count,
+                        "Percentage": percentage,
+                    }
+                )
 
             # Sort by count, limit to top countries
             country_data_sorted = sorted(
                 country_data, key=lambda x: x["Count"], reverse=True
-            )[:SheetConfig.TOP_COUNTRY_LIMIT]
+            )[: SheetConfig.TOP_COUNTRY_LIMIT]
 
             if not country_data_sorted:
                 return

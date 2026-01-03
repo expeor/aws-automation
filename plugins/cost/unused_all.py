@@ -991,11 +991,15 @@ def _collect_elasticache(
 ) -> Dict[str, Any]:
     """ElastiCache 수집 및 분석"""
     try:
-        clusters = collect_elasticache_clusters(session, account_id, account_name, region)
+        clusters = collect_elasticache_clusters(
+            session, account_id, account_name, region
+        )
         if not clusters:
             return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
 
-        result = analyze_elasticache_clusters(clusters, account_id, account_name, region)
+        result = analyze_elasticache_clusters(
+            clusters, account_id, account_name, region
+        )
         return {
             "total": result.total_clusters,
             "unused": result.unused_clusters + result.low_usage_clusters,
@@ -1018,7 +1022,9 @@ def _collect_rds_instance(
         result = analyze_rds_instances(instances, account_id, account_name, region)
         return {
             "total": result.total_instances,
-            "unused": result.unused_instances + result.low_usage_instances + result.stopped_instances,
+            "unused": result.unused_instances
+            + result.low_usage_instances
+            + result.stopped_instances,
             "waste": result.unused_monthly_cost + result.low_usage_monthly_cost,
             "result": result,
         }
@@ -1611,9 +1617,7 @@ def _print_error_summary(errors: List[str]) -> None:
     # 출력
     console.print(f"\n[yellow]오류 {len(errors)}건[/yellow]")
 
-    for error_code, regions in sorted(
-        error_groups.items(), key=lambda x: -len(x[1])
-    ):
+    for error_code, regions in sorted(error_groups.items(), key=lambda x: -len(x[1])):
         unique_regions = sorted(set(regions))
         if len(unique_regions) <= 3:
             region_str = ", ".join(unique_regions)
@@ -1692,8 +1696,18 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("Route53", "route53_total", "route53_empty", "route53_monthly_waste"),
         ("S3", "s3_total", "s3_empty", None),
         ("Lambda", "lambda_total", "lambda_unused", "lambda_monthly_waste"),
-        ("ElastiCache", "elasticache_total", "elasticache_unused", "elasticache_monthly_waste"),
-        ("RDS Instance", "rds_instance_total", "rds_instance_unused", "rds_instance_monthly_waste"),
+        (
+            "ElastiCache",
+            "elasticache_total",
+            "elasticache_unused",
+            "elasticache_monthly_waste",
+        ),
+        (
+            "RDS Instance",
+            "rds_instance_total",
+            "rds_instance_unused",
+            "rds_instance_monthly_waste",
+        ),
         ("EFS", "efs_total", "efs_unused", "efs_monthly_waste"),
         ("SQS", "sqs_total", "sqs_unused", None),
         ("SNS", "sns_total", "sns_unused", None),
@@ -1765,7 +1779,9 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     _create_s3_sheet(wb, result.s3_results, header_fill, header_font)
     _create_lambda_sheet(wb, result.lambda_results, header_fill, header_font)
     _create_elasticache_sheet(wb, result.elasticache_results, header_fill, header_font)
-    _create_rds_instance_sheet(wb, result.rds_instance_results, header_fill, header_font)
+    _create_rds_instance_sheet(
+        wb, result.rds_instance_results, header_fill, header_font
+    )
     _create_efs_sheet(wb, result.efs_results, header_fill, header_font)
     _create_sqs_sheet(wb, result.sqs_results, header_fill, header_font)
     _create_sns_sheet(wb, result.sns_results, header_fill, header_font)

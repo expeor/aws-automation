@@ -301,7 +301,9 @@ def generate_report(results: List[SNSAnalysisResult], output_dir: str) -> str:
                 ws_detail.cell(row=detail_row, column=3, value=t.topic_name)
                 ws_detail.cell(row=detail_row, column=4, value=t.subscription_count)
                 ws_detail.cell(row=detail_row, column=5, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=6, value=int(t.messages_published))
+                ws_detail.cell(
+                    row=detail_row, column=6, value=int(t.messages_published)
+                )
                 ws_detail.cell(
                     row=detail_row, column=7, value=int(t.notifications_delivered)
                 )

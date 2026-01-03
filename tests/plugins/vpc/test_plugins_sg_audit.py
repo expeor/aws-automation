@@ -77,7 +77,9 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/123456789012/sg-audit/2024-01-01"
+        mock_path_instance.build.return_value = (
+            "/output/123456789012/sg-audit/2024-01-01"
+        )
         mock_output_path.return_value = mock_path_instance
 
         result = _create_output_directory(mock_ctx)

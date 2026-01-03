@@ -13,8 +13,10 @@ AWS 인증 캐시 관리 구현
 - 토큰 만료 시간은 IAM Identity Center 설정을 따름
 """
 
+import base64
 import hashlib
 import json
+import logging
 import os
 import threading
 from dataclasses import dataclass, field
@@ -23,6 +25,117 @@ from pathlib import Path
 from typing import Any, Dict, Generic, Optional, TypeVar
 
 from ..types import AccountInfo, TokenExpiredError
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Token Encryption
+# =============================================================================
+
+
+class TokenEncryption:
+    """토큰 암호화/복호화를 담당하는 클래스
+
+    PBKDF2 키 유도 + Fernet 대칭 암호화를 사용합니다.
+    암호화 키는 머신 고유 정보를 기반으로 생성됩니다.
+    """
+
+    _instance: Optional["TokenEncryption"] = None
+    _lock = threading.Lock()
+
+    def __new__(cls) -> "TokenEncryption":
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self) -> None:
+        if self._initialized:
+            return
+        self._initialized = True
+        self._fernet: Optional[Any] = None
+        self._encryption_available = False
+        self._init_encryption()
+
+    def _init_encryption(self) -> None:
+        """암호화 모듈 초기화"""
+        try:
+            from cryptography.fernet import Fernet
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+            # 머신 고유 키 생성 (사용자명 + 홈 디렉토리 기반)
+            machine_id = f"{os.getenv('USERNAME', os.getenv('USER', 'default'))}"
+            machine_id += str(Path.home())
+
+            # PBKDF2로 키 유도
+            salt = b"aws_automation_toolkit_v1"
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100000,
+            )
+            key = base64.urlsafe_b64encode(kdf.derive(machine_id.encode()))
+            self._fernet = Fernet(key)
+            self._encryption_available = True
+            logger.debug("토큰 암호화 초기화 완료")
+        except ImportError:
+            logger.warning("cryptography 모듈 없음 - 토큰이 평문으로 저장됩니다")
+            self._encryption_available = False
+        except Exception as e:
+            logger.warning(f"암호화 초기화 실패 - 토큰이 평문으로 저장됩니다: {e}")
+            self._encryption_available = False
+
+    @property
+    def is_available(self) -> bool:
+        """암호화 사용 가능 여부"""
+        return self._encryption_available
+
+    def encrypt(self, data: str) -> str:
+        """문자열 데이터 암호화
+
+        Args:
+            data: 암호화할 문자열
+
+        Returns:
+            암호화된 base64 문자열, 암호화 불가시 원본 반환
+        """
+        if not self._encryption_available or not self._fernet:
+            return data
+        try:
+            encrypted = self._fernet.encrypt(data.encode())
+            return base64.urlsafe_b64encode(encrypted).decode()
+        except Exception as e:
+            logger.debug(f"암호화 실패: {e}")
+            return data
+
+    def decrypt(self, data: str) -> str:
+        """암호화된 데이터 복호화
+
+        Args:
+            data: 복호화할 base64 문자열
+
+        Returns:
+            복호화된 문자열, 복호화 불가시 원본 반환
+        """
+        if not self._encryption_available or not self._fernet:
+            return data
+        try:
+            decoded = base64.urlsafe_b64decode(data.encode())
+            decrypted = self._fernet.decrypt(decoded)
+            return decrypted.decode()
+        except Exception:
+            # 복호화 실패 시 평문으로 간주
+            return data
+
+
+def get_token_encryption() -> TokenEncryption:
+    """TokenEncryption 싱글톤 인스턴스 반환"""
+    return TokenEncryption()
+
 
 # =============================================================================
 # Generic Cache Entry
@@ -120,7 +233,8 @@ class TokenCache:
 
             buffer = timedelta(seconds=buffer_seconds)
             return datetime.now(timezone.utc) >= (expires_at - buffer)
-        except Exception:
+        except (ValueError, TypeError):
+            # 날짜 파싱 실패 시 만료된 것으로 처리
             return True
 
     def get_expires_at_datetime(self) -> Optional[datetime]:
@@ -129,19 +243,42 @@ class TokenCache:
             return datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(
                 tzinfo=timezone.utc
             )
-        except Exception:
+        except (ValueError, TypeError):
             return None
 
-    def to_dict(self) -> Dict[str, Any]:
-        """딕셔너리로 변환 (JSON 저장용)"""
+    def to_dict(self, encrypt: bool = True) -> Dict[str, Any]:
+        """딕셔너리로 변환 (JSON 저장용)
+
+        Args:
+            encrypt: True이면 민감한 필드를 암호화
+
+        Returns:
+            JSON 저장용 딕셔너리
+        """
+        encryption = get_token_encryption() if encrypt else None
+
+        # 민감한 필드 암호화
+        access_token = self.access_token
+        client_secret = self.client_secret
+        refresh_token = self.refresh_token
+
+        if encryption and encryption.is_available:
+            if access_token:
+                access_token = encryption.encrypt(access_token)
+            if client_secret:
+                client_secret = encryption.encrypt(client_secret)
+            if refresh_token:
+                refresh_token = encryption.encrypt(refresh_token)
+
         data = {
-            "accessToken": self.access_token,
+            "accessToken": access_token,
             "expiresAt": self.expires_at,
             "clientId": self.client_id,
-            "clientSecret": self.client_secret,
+            "clientSecret": client_secret,
+            "_encrypted": encryption.is_available if encryption else False,
         }
-        if self.refresh_token:
-            data["refreshToken"] = self.refresh_token
+        if refresh_token:
+            data["refreshToken"] = refresh_token
         if self.region:
             data["region"] = self.region
         if self.start_url:
@@ -150,13 +287,32 @@ class TokenCache:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TokenCache":
-        """딕셔너리에서 생성 (JSON 로드용)"""
+        """딕셔너리에서 생성 (JSON 로드용)
+
+        암호화된 필드는 자동으로 복호화됩니다.
+        """
+        encryption = get_token_encryption()
+        is_encrypted = data.get("_encrypted", False)
+
+        # 민감한 필드 복호화
+        access_token = data.get("accessToken", "")
+        client_secret = data.get("clientSecret", "")
+        refresh_token = data.get("refreshToken")
+
+        if is_encrypted and encryption.is_available:
+            if access_token:
+                access_token = encryption.decrypt(access_token)
+            if client_secret:
+                client_secret = encryption.decrypt(client_secret)
+            if refresh_token:
+                refresh_token = encryption.decrypt(refresh_token)
+
         return cls(
-            access_token=data.get("accessToken", ""),
+            access_token=access_token,
             expires_at=data.get("expiresAt", ""),
             client_id=data.get("clientId", ""),
-            client_secret=data.get("clientSecret", ""),
-            refresh_token=data.get("refreshToken"),
+            client_secret=client_secret,
+            refresh_token=refresh_token,
             region=data.get("region"),
             start_url=data.get("startUrl"),
         )
@@ -221,7 +377,14 @@ class TokenCacheManager:
                 data = json.load(f)
 
             return TokenCache.from_dict(data)
-        except Exception:
+        except (FileNotFoundError, PermissionError) as e:
+            logger.debug(f"토큰 캐시 파일 접근 실패: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.warning(f"토큰 캐시 파일 파싱 실패: {e}")
+            return None
+        except (KeyError, TypeError) as e:
+            logger.debug(f"토큰 캐시 데이터 형식 오류: {e}")
             return None
 
     def save(self, token_cache: TokenCache) -> None:
@@ -249,7 +412,8 @@ class TokenCacheManager:
             if self.cache_path.exists():
                 self.cache_path.unlink()
             return True
-        except Exception:
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            logger.debug(f"토큰 캐시 파일 삭제 실패: {e}")
             return False
 
     def exists(self) -> bool:
