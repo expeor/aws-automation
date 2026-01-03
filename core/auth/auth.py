@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 import boto3
 from botocore.config import Config as BotocoreConfig
+from botocore.exceptions import BotoCoreError, ClientError
 
 from .config import AWSProfile, AWSSession, Loader, ParsedConfig
 from .types import (
@@ -22,6 +23,7 @@ from .types import (
     AuthError,
     NotAuthenticatedError,
     Provider,
+    ProviderError,
     ProviderType,
 )
 
@@ -218,8 +220,10 @@ class Manager:
                 if provider.is_authenticated():
                     accounts = provider.list_accounts()
                     all_accounts.update(accounts)
-            except Exception as e:
-                logger.warning(f"Provider {provider.name()} 계정 조회 실패: {e}")
+            except (ClientError, BotoCoreError) as e:
+                logger.warning(f"Provider {provider.name()} 계정 조회 실패 (AWS): {e}")
+            except (ProviderError, AuthError) as e:
+                logger.warning(f"Provider {provider.name()} 계정 조회 실패 (인증): {e}")
 
         return all_accounts
 
@@ -278,8 +282,11 @@ class Manager:
                 result = func(account_info, session)
                 results[account_id] = result
 
-            except Exception as e:
-                logger.error(f"계정 {account_id} 작업 실패: {e}")
+            except (ClientError, BotoCoreError) as e:
+                logger.error(f"계정 {account_id} AWS 작업 실패: {e}")
+                results[account_id] = None
+            except (ProviderError, AuthError) as e:
+                logger.error(f"계정 {account_id} 인증 실패: {e}")
                 results[account_id] = None
 
         return results
@@ -323,8 +330,11 @@ class Manager:
                 session = provider.get_session(account_id, role, region)
                 result = func(account_info, session)
                 return account_id, result
-            except Exception as e:
-                logger.error(f"계정 {account_id} 작업 실패: {e}")
+            except (ClientError, BotoCoreError) as e:
+                logger.error(f"계정 {account_id} AWS 작업 실패: {e}")
+                return account_id, None
+            except (ProviderError, AuthError) as e:
+                logger.error(f"계정 {account_id} 인증 실패: {e}")
                 return account_id, None
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -337,7 +347,11 @@ class Manager:
                 try:
                     account_id, result = future.result()
                     results[account_id] = result
-                except Exception as e:
+                except concurrent.futures.CancelledError:
+                    acc_id = futures[future]
+                    logger.warning(f"계정 {acc_id} 작업 취소됨")
+                    results[acc_id] = None
+                except (ClientError, BotoCoreError, ProviderError, AuthError) as e:
                     acc_id = futures[future]
                     logger.error(f"계정 {acc_id} 작업 예외: {e}")
                     results[acc_id] = None
@@ -381,7 +395,9 @@ class Manager:
         for provider in self._providers.values():
             try:
                 provider.close()
-            except Exception as e:
+            except (ClientError, BotoCoreError) as e:
+                logger.warning(f"Provider 정리 실패 (AWS): {e}")
+            except (ProviderError, OSError) as e:
                 logger.warning(f"Provider 정리 실패: {e}")
 
         self._providers.clear()
