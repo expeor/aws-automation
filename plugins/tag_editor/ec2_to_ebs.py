@@ -24,6 +24,16 @@ from core.tools.io.excel import ColumnDef, Workbook
 
 logger = logging.getLogger(__name__)
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeInstances",
+    ],
+    "write": [
+        "ec2:CreateTags",
+    ],
+}
+
 
 @dataclass
 class TagSyncResult:

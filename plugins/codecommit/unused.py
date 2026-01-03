@@ -20,6 +20,15 @@ from core.tools.io.excel import ColumnDef, Workbook
 
 logger = logging.getLogger(__name__)
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "codecommit:ListRepositories",
+        "codecommit:GetRepository",
+        "codecommit:ListBranches",
+    ],
+}
+
 
 @dataclass
 class Repository:

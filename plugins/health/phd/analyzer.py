@@ -30,6 +30,15 @@ logger = logging.getLogger(__name__)
 # AWS Health API는 us-east-1에서만 사용 가능
 HEALTH_REGION = "us-east-1"
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "health:DescribeEvents",
+        "health:DescribeEventDetails",
+        "health:DescribeAffectedEntities",
+    ],
+}
+
 
 @dataclass
 class EventFilter:
