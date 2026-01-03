@@ -28,6 +28,10 @@ MPE ID 형식:
 ※ prefix는 소문자, Long MPE ID는 대문자 사용
 ※ 태그 키 "map-migrated"는 반드시 소문자 그대로 사용 (대소문자 변경/공백 불가)
 ※ Cost Allocation Tag는 자동 활성화됨 (MAP 2.0 terms signed after Nov 18, 2024)
+
+참고 - 자동 생성 태그:
+- "aws-migration-project-id": MGN(Application Migration Service)에서 자동 생성
+  → MAP 크레딧 계산에 직접 사용되지 않음, 별도 관리 불필요
 """
 
 from __future__ import annotations
