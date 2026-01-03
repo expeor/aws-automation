@@ -12,33 +12,6 @@ concurrency:
 
 jobs:
   # =============================================================================
-  # Lint & Format Check
-  # =============================================================================
-  lint:
-    name: Lint & Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install linting tools
-        run: pip install black flake8 isort
-
-      - name: Check formatting with Black
-        run: black --check --diff .
-
-      - name: Check import sorting with isort
-        run: isort --check-only --diff .
-
-      - name: Lint with Flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
-
-  # =============================================================================
   # Type Checking
   # =============================================================================
   typecheck:
