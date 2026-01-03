@@ -1,18 +1,13 @@
 """
-plugins/codecommit/repo_audit.py - CodeCommit 리포지토리 분석
+plugins/codecommit/unused.py - CodeCommit 미사용 리포지토리 분석
 
-모든 CodeCommit 리포지토리와 브랜치 정보를 조회합니다.
-
-사용 케이스:
-- 전체 리포지토리/브랜치 현황 파악
-- 미사용/방치된 리포지토리 식별
-- 멀티 계정 CodeCommit 사용 현황 감사
+빈 리포지토리(브랜치 없음) 탐지
 
 사용법:
-    from plugins.codecommit.repo_audit import RepoAuditor
+    from plugins.codecommit.unused import collect_repos, analyze_repos
 
-    auditor = RepoAuditor(session)
-    result = auditor.audit()
+    repos = collect_repos(session, account_id, account_name, region)
+    result = analyze_repos(repos, account_id, account_name, region)
 """
 
 import logging
@@ -31,11 +26,13 @@ class Repository:
     """CodeCommit 리포지토리 정보"""
 
     name: str
+    account_id: str = ""
+    account_name: str = ""
+    region: str = ""
     description: str = ""
     clone_url_http: str = ""
     clone_url_ssh: str = ""
     arn: str = ""
-    account_id: str = ""
     creation_date: Optional[datetime] = None
     last_modified_date: Optional[datetime] = None
     default_branch: str = ""
@@ -357,3 +354,133 @@ def generate_report(
     """리포트 생성 (편의 함수)"""
     reporter = RepoAuditReporter(result)
     return reporter.generate_report(output_dir, file_prefix)
+
+
+# =============================================================================
+# unused_all 연동용 함수 (collect_*, analyze_* 패턴)
+# =============================================================================
+
+
+@dataclass
+class CodeCommitAnalysisResult:
+    """CodeCommit 분석 결과 (unused_all 연동용)"""
+
+    account_id: str
+    account_name: str
+    region: str
+    total_repos: int = 0
+    empty_repos: int = 0
+    total_branches: int = 0
+    repos: List[Repository] = field(default_factory=list)
+    empty_repo_list: List[Repository] = field(default_factory=list)
+
+    # 비용 없음 (CodeCommit은 저장량 기반 과금, 빈 리포지토리는 무료)
+    unused_monthly_cost: float = 0.0
+
+
+def collect_repos(
+    session,
+    account_id: str,
+    account_name: str,
+    region: str,
+) -> List[Repository]:
+    """CodeCommit 리포지토리 수집
+
+    Args:
+        session: boto3.Session
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: 리전
+
+    Returns:
+        Repository 리스트
+    """
+    repos = []
+
+    try:
+        client = session.client("codecommit", region_name=region)
+
+        # 리포지토리 목록 조회
+        paginator = client.get_paginator("list_repositories")
+        for page in paginator.paginate():
+            for repo_info in page.get("repositories", []):
+                repo_name = repo_info["repositoryName"]
+
+                try:
+                    # 리포지토리 상세 정보
+                    response = client.get_repository(repositoryName=repo_name)
+                    metadata = response.get("repositoryMetadata", {})
+
+                    # 브랜치 목록
+                    branches = _list_branches(client, repo_name)
+
+                    repos.append(
+                        Repository(
+                            name=repo_name,
+                            account_id=account_id,
+                            account_name=account_name,
+                            region=region,
+                            description=metadata.get("repositoryDescription", ""),
+                            clone_url_http=metadata.get("cloneUrlHttp", ""),
+                            clone_url_ssh=metadata.get("cloneUrlSsh", ""),
+                            arn=metadata.get("Arn", ""),
+                            creation_date=metadata.get("creationDate"),
+                            last_modified_date=metadata.get("lastModifiedDate"),
+                            default_branch=metadata.get("defaultBranch", ""),
+                            branches=branches,
+                        )
+                    )
+                except Exception as e:
+                    logger.warning(f"리포지토리 {repo_name} 조회 실패: {e}")
+
+    except Exception as e:
+        logger.error(f"CodeCommit 리포지토리 수집 실패: {e}")
+
+    return repos
+
+
+def _list_branches(client, repo_name: str) -> List[str]:
+    """브랜치 목록 조회"""
+    branches = []
+
+    try:
+        paginator = client.get_paginator("list_branches")
+        for page in paginator.paginate(repositoryName=repo_name):
+            branches.extend(page.get("branches", []))
+    except Exception as e:
+        logger.warning(f"리포지토리 {repo_name} 브랜치 조회 실패: {e}")
+
+    return branches
+
+
+def analyze_repos(
+    repos: List[Repository],
+    account_id: str,
+    account_name: str,
+    region: str,
+) -> CodeCommitAnalysisResult:
+    """CodeCommit 리포지토리 분석
+
+    Args:
+        repos: Repository 리스트
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: 리전
+
+    Returns:
+        CodeCommitAnalysisResult
+    """
+    empty_repos = [r for r in repos if r.is_empty]
+    total_branches = sum(r.branch_count for r in repos)
+
+    return CodeCommitAnalysisResult(
+        account_id=account_id,
+        account_name=account_name,
+        region=region,
+        total_repos=len(repos),
+        empty_repos=len(empty_repos),
+        total_branches=total_branches,
+        repos=repos,
+        empty_repo_list=empty_repos,
+        unused_monthly_cost=0.0,  # 빈 리포지토리는 비용 없음
+    )

@@ -99,6 +99,10 @@ from plugins.dynamodb.unused import (
     analyze_tables as analyze_dynamodb_tables,
     collect_dynamodb_tables,
 )
+from plugins.codecommit.unused import (
+    analyze_repos as analyze_codecommit_repos,
+    collect_repos as collect_codecommit_repos,
+)
 
 
 # =============================================================================
@@ -618,6 +622,26 @@ def collect_dynamodb(
         return {"error": f"DynamoDB: {e}"}
 
 
+def collect_codecommit(
+    session, account_id: str, account_name: str, region: str
+) -> Dict[str, Any]:
+    """CodeCommit 수집 및 분석"""
+    try:
+        repos = collect_codecommit_repos(session, account_id, account_name, region)
+        if not repos:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_codecommit_repos(repos, account_id, account_name, region)
+        return {
+            "total": result.total_repos,
+            "unused": result.empty_repos,
+            "waste": 0.0,  # CodeCommit 빈 리포지토리는 비용 없음
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"CodeCommit: {e}"}
+
+
 def collect_route53(session, account_id: str, account_name: str) -> Dict[str, Any]:
     """Route53 수집 및 분석 (글로벌 서비스)"""
     try:
@@ -692,6 +716,8 @@ REGIONAL_COLLECTORS: Dict[str, Callable] = {
     # Monitoring
     "cw_alarm": collect_cw_alarm,
     "loggroup": collect_loggroup,
+    # Developer Tools
+    "codecommit": collect_codecommit,
 }
 
 # 글로벌 수집기 (DNS)

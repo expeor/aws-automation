@@ -2,13 +2,17 @@
 plugins/codecommit - CodeCommit 리포지토리 관리 도구
 
 CodeCommit 리포지토리 및 브랜치 현황 분석
+빈 리포지토리 탐지
 """
 
-from .repo_audit import (
+from .unused import (
     AuditResult,
+    CodeCommitAnalysisResult,
     RepoAuditor,
     RepoAuditReporter,
     Repository,
+    analyze_repos,
+    collect_repos,
     generate_report,
 )
 
@@ -18,6 +22,10 @@ __all__ = [
     "AuditResult",
     "Repository",
     "generate_report",
+    # unused_all 연동
+    "collect_repos",
+    "analyze_repos",
+    "CodeCommitAnalysisResult",
 ]
 
 CATEGORY = {
@@ -32,7 +40,7 @@ TOOLS = [
         "name": "리포지토리 분석",
         "description": "CodeCommit 리포지토리 및 브랜치 현황 분석",
         "permission": "read",
-        "module": "repo_audit",
+        "module": "unused",
         "function": "run_audit",
         "area": "management",
     },
@@ -40,7 +48,7 @@ TOOLS = [
         "name": "빈 리포지토리 조회",
         "description": "브랜치가 없는 빈 리포지토리 목록 조회",
         "permission": "read",
-        "module": "repo_audit",
+        "module": "unused",
         "function": "run_empty_repos",
         "area": "cost",
     },
@@ -54,13 +62,7 @@ def run_audit(
     output_dir: str = "./reports",
     **kwargs,
 ):
-    """CodeCommit 리포지토리 분석
-
-    Args:
-        session: boto3.Session
-        region: 리전
-        output_dir: 리포트 출력 디렉토리
-    """
+    """CodeCommit 리포지토리 분석"""
     auditor = RepoAuditor(session=session, region=region)
     result = auditor.audit()
 
@@ -90,12 +92,7 @@ def run_empty_repos(
     region: str = None,
     **kwargs,
 ):
-    """빈 리포지토리 조회
-
-    Args:
-        session: boto3.Session
-        region: 리전
-    """
+    """빈 리포지토리 조회"""
     auditor = RepoAuditor(session=session, region=region)
     result = auditor.audit()
 
