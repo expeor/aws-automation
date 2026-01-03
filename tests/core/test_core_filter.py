@@ -90,6 +90,7 @@ class TestMatchPattern:
         # case_sensitive=True일 때 소문자 변환을 하지 않지만,
         # fnmatch 자체가 플랫폼 의존적
         import sys
+
         if sys.platform != "win32":
             assert match_pattern("PROD-WEB", "prod*", case_sensitive=True) is False
         # 소문자는 항상 매칭

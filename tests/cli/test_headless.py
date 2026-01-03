@@ -384,7 +384,9 @@ class TestHeadlessRunnerAuth:
 
         mock_config = MagicMock()
         mock_config.sessions = {}
-        mock_config.profiles = {"test-profile": {"sso_start_url": "https://test.awsapps.com/start"}}
+        mock_config.profiles = {
+            "test-profile": {"sso_start_url": "https://test.awsapps.com/start"}
+        }
         mock_load_config.return_value = mock_config
         mock_detect.return_value = ProviderType.SSO_PROFILE
 

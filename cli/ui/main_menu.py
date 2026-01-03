@@ -702,9 +702,7 @@ class MainMenu:
         self.console.print(
             "  [cyan]c[/cyan]  AWS 분류       카테고리별 탐색 (Compute, Storage...)"
         )
-        self.console.print(
-            "  [cyan]t[/cyan]  점검 유형      TA 영역별 (보안, 비용, 성능...)"
-        )
+        self.console.print("  [cyan]t[/cyan]  점검 유형      TA 영역별 (보안, 비용, 성능...)")
         self.console.print("  [cyan]f[/cyan]  즐겨찾기       자주 사용하는 도구 추가/제거")
         self.console.print()
         self.console.print("[bold yellow]설정[/bold yellow]")
@@ -1061,9 +1059,7 @@ class MainMenu:
                     selected_area = AREA_REGISTRY[idx - 1]
                     self._show_tools_in_area(selected_area, all_tools)
                 else:
-                    self.console.print(
-                        f"[red]1-{len(AREA_REGISTRY)} 범위의 번호를 입력하세요.[/]"
-                    )
+                    self.console.print(f"[red]1-{len(AREA_REGISTRY)} 범위의 번호를 입력하세요.[/]")
 
     def _show_tools_in_area(self, area: dict, all_tools: list) -> None:
         """영역 내 도구 목록 표시 및 선택"""
@@ -1332,7 +1328,10 @@ class MainMenu:
 
                 if kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE:
                     result.append(profile_name)
-                elif kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS:
+                elif (
+                    kind == "static"
+                    and provider_type == ProviderType.STATIC_CREDENTIALS
+                ):
                     result.append(profile_name)
         except Exception:
             pass
@@ -1570,7 +1569,9 @@ class MainMenu:
                 if manager.update(group.name, profiles=new_profiles):
                     self.console.print(f"[dim]프로파일 변경됨 ({len(new_profiles)}개)[/dim]")
 
-    def _reorder_profile_group_interactive(self, manager, groups, direction: str) -> None:
+    def _reorder_profile_group_interactive(
+        self, manager, groups, direction: str
+    ) -> None:
         """프로파일 그룹 순서 변경"""
         self.console.print()
         label = "위로" if direction == "up" else "아래로"

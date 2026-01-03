@@ -62,7 +62,11 @@ class AbuseIPSheetWriter(BaseSheetWriter):
         border = self.styles.thin_border
 
         for row_idx, ip in enumerate(sorted_ips, start=2):
-            details = abuse_ip_details.get(ip, {}) if isinstance(abuse_ip_details, dict) else {}
+            details = (
+                abuse_ip_details.get(ip, {})
+                if isinstance(abuse_ip_details, dict)
+                else {}
+            )
             request_count = client_ip_counts.get(ip, 0)
 
             # Count (A)
@@ -161,10 +165,7 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
                     all_logs.extend(full_logs)
 
         # Filter for abuse IPs
-        return [
-            log for log in all_logs
-            if log.get("client_ip", "N/A") in abuse_ips
-        ]
+        return [log for log in all_logs if log.get("client_ip", "N/A") in abuse_ips]
 
     def _safe_timestamp_key(self, entry: Dict[str, Any]) -> datetime:
         """Get timestamp for sorting."""
@@ -200,11 +201,21 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
             request = log.get("request", "N/A")
             user_agent = log.get("user_agent", "N/A")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
-            backend_status = self.convert_status_code(log.get("target_status_code", "N/A"))
+            backend_status = self.convert_status_code(
+                log.get("target_status_code", "N/A")
+            )
 
             values = [
-                timestamp_str, client_ip, country, target_field, target_group,
-                method, request, user_agent, elb_status, backend_status
+                timestamp_str,
+                client_ip,
+                country,
+                target_field,
+                target_group,
+                method,
+                request,
+                user_agent,
+                elb_status,
+                backend_status,
             ]
 
             for col_idx, value in enumerate(values, start=1):

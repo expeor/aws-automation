@@ -25,15 +25,17 @@ class TestPrintSummary:
         """단일 통계"""
         from plugins.vpc.nat_audit import _print_summary
 
-        stats = [{
-            "total_nat_count": 5,
-            "unused_count": 2,
-            "low_usage_count": 1,
-            "normal_count": 2,
-            "total_monthly_cost": 100.0,
-            "total_monthly_waste": 40.0,
-            "total_annual_savings": 480.0,
-        }]
+        stats = [
+            {
+                "total_nat_count": 5,
+                "unused_count": 2,
+                "low_usage_count": 1,
+                "normal_count": 2,
+                "total_monthly_cost": 100.0,
+                "total_monthly_waste": 40.0,
+                "total_annual_savings": 480.0,
+            }
+        ]
 
         _print_summary(stats)
 
@@ -78,15 +80,17 @@ class TestPrintSummary:
         """미사용 NAT가 없는 경우"""
         from plugins.vpc.nat_audit import _print_summary
 
-        stats = [{
-            "total_nat_count": 3,
-            "unused_count": 0,
-            "low_usage_count": 0,
-            "normal_count": 3,
-            "total_monthly_cost": 60.0,
-            "total_monthly_waste": 0.0,
-            "total_annual_savings": 0.0,
-        }]
+        stats = [
+            {
+                "total_nat_count": 3,
+                "unused_count": 0,
+                "low_usage_count": 0,
+                "normal_count": 3,
+                "total_monthly_cost": 60.0,
+                "total_monthly_waste": 0.0,
+                "total_annual_savings": 0.0,
+            }
+        ]
 
         _print_summary(stats)
 
@@ -109,7 +113,9 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/123456789012/nat-audit/2024-01-01"
+        mock_path_instance.build.return_value = (
+            "/output/123456789012/nat-audit/2024-01-01"
+        )
         mock_output_path.return_value = mock_path_instance
 
         result = _create_output_directory(mock_ctx)
@@ -130,7 +136,9 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/my-profile/nat-audit/2024-01-01"
+        mock_path_instance.build.return_value = (
+            "/output/my-profile/nat-audit/2024-01-01"
+        )
         mock_output_path.return_value = mock_path_instance
 
         result = _create_output_directory(mock_ctx)

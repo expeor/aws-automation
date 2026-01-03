@@ -119,9 +119,7 @@ def collect_alarms(
         for page in paginator.paginate():
             for alarm in page.get("MetricAlarms", []):
                 dimensions_list = alarm.get("Dimensions", [])
-                dim_str_parts = [
-                    f"{d['Name']}={d['Value']}" for d in dimensions_list
-                ]
+                dim_str_parts = [f"{d['Name']}={d['Value']}" for d in dimensions_list]
 
                 namespace = alarm.get("Namespace", "")
                 metric_name = alarm.get("MetricName", "")
@@ -178,7 +176,11 @@ def analyze_alarms(
         # 고아 알람: 지표 데이터 없음 (INSUFFICIENT_DATA 포함)
         if not alarm.has_metric_data:
             result.orphan_alarms += 1
-            reason = "INSUFFICIENT_DATA" if alarm.state == "INSUFFICIENT_DATA" else "지표 데이터 없음"
+            reason = (
+                "INSUFFICIENT_DATA"
+                if alarm.state == "INSUFFICIENT_DATA"
+                else "지표 데이터 없음"
+            )
             result.findings.append(
                 AlarmFinding(
                     alarm=alarm,
@@ -328,9 +330,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="cloudwatch"
     )
-    results: List[AlarmAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    results: List[AlarmAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -355,7 +355,9 @@ def run(ctx) -> None:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("cloudwatch-alarm-orphan").with_date().build()
+    output_path = (
+        OutputPath(identifier).sub("cloudwatch-alarm-orphan").with_date().build()
+    )
     filepath = generate_report(results, output_path)
 
     console.print(f"\n[bold green]완료![/bold green] {filepath}")

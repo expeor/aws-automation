@@ -114,7 +114,9 @@ class TestAnalyzeSecrets:
     def test_unused_secret_old_access(self, mock_price):
         """오래된 액세스 - 미사용"""
         mock_price.return_value = 0.40
-        old_access = datetime.now(timezone.utc) - timedelta(days=UNUSED_DAYS_THRESHOLD + 10)
+        old_access = datetime.now(timezone.utc) - timedelta(
+            days=UNUSED_DAYS_THRESHOLD + 10
+        )
         secrets = [
             SecretInfo(
                 account_id="123456789012",
@@ -139,7 +141,9 @@ class TestAnalyzeSecrets:
     def test_unused_secret_never_accessed(self, mock_price):
         """액세스 없음 + 오래된 생성일"""
         mock_price.return_value = 0.40
-        old_created = datetime.now(timezone.utc) - timedelta(days=UNUSED_DAYS_THRESHOLD + 10)
+        old_created = datetime.now(timezone.utc) - timedelta(
+            days=UNUSED_DAYS_THRESHOLD + 10
+        )
         secrets = [
             SecretInfo(
                 account_id="123456789012",

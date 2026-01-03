@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 def get_column_letter(col_idx: int) -> str:
     """Get Excel column letter from index (1-based)."""
     from openpyxl.utils import get_column_letter as _gcl
+
     return _gcl(col_idx)
 
 
@@ -162,6 +163,7 @@ class BaseSheetWriter:
         self, ws: "Worksheet", headers: Union[List[str], Tuple[str, ...]]
     ) -> None:
         from openpyxl.styles import Alignment
+
         for col, header in enumerate(list(headers), 1):
             if header not in WRAP_TEXT_COLUMNS:
                 continue
@@ -171,7 +173,9 @@ class BaseSheetWriter:
                 if cell.alignment:
                     cell.alignment = cell.alignment.copy(wrap_text=True)
                 else:
-                    cell.alignment = Alignment(horizontal=h_align, vertical="center", wrap_text=True)
+                    cell.alignment = Alignment(
+                        horizontal=h_align, vertical="center", wrap_text=True
+                    )
 
     def convert_status_code(self, code: Any) -> Union[int, str]:
         if code is None or code == "" or code == "-":
@@ -274,7 +278,11 @@ class SummarySheetHelper:
         return self
 
     def add_item(
-        self, label: str, value: Any, highlight: Optional[str] = None, number_format: Optional[str] = None
+        self,
+        label: str,
+        value: Any,
+        highlight: Optional[str] = None,
+        number_format: Optional[str] = None,
     ) -> "SummarySheetHelper":
         label_cell = self.ws.cell(row=self.row, column=1, value=label)
         label_cell.font = self.styles.label_font
@@ -301,7 +309,11 @@ class SummarySheetHelper:
         return self
 
     def add_list_section(
-        self, label: str, items: List[Tuple[str, Any]], max_items: int = 5, suffix: str = ""
+        self,
+        label: str,
+        items: List[Tuple[str, Any]],
+        max_items: int = 5,
+        suffix: str = "",
     ) -> "SummarySheetHelper":
         label_cell = self.ws.cell(row=self.row, column=1, value=f"{label}:")
         label_cell.font = self.styles.label_font
@@ -319,12 +331,18 @@ class SummarySheetHelper:
         else:
             for i, (name, count) in enumerate(items[:max_items], 1):
                 display = str(name)[:47] + "..." if len(str(name)) > 50 else str(name)
-                name_cell = self.ws.cell(row=self.row, column=1, value=f"{i}. {display}")
+                name_cell = self.ws.cell(
+                    row=self.row, column=1, value=f"{i}. {display}"
+                )
                 name_cell.font = self.styles.value_font
                 name_cell.alignment = self.styles.align_left
                 name_cell.border = self.styles.thin_border
 
-                val = f"{count:,}{suffix}" if isinstance(count, (int, float)) else str(count)
+                val = (
+                    f"{count:,}{suffix}"
+                    if isinstance(count, (int, float))
+                    else str(count)
+                )
                 count_cell = self.ws.cell(row=self.row, column=2, value=val)
                 count_cell.font = self.styles.value_font
                 count_cell.alignment = self.styles.align_right

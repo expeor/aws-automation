@@ -132,39 +132,91 @@ class Headers:
     ABUSE_IP: Tuple[str, ...] = ("Count", "IP", "Country", "ASN", "ISP")
 
     ABUSE_REQUESTS: Tuple[str, ...] = (
-        "Timestamp", "Client", "Country", "Target", "Target group name",
-        "Method", "Request", "User Agent", "ELB Status Code", "Backend Status Code",
+        "Timestamp",
+        "Client",
+        "Country",
+        "Target",
+        "Target group name",
+        "Method",
+        "Request",
+        "User Agent",
+        "ELB Status Code",
+        "Backend Status Code",
     )
 
     RESPONSE_TIME: Tuple[str, ...] = (
-        "Response time", "Timestamp", "Client", "Country", "Target", "Target group name",
-        "Method", "Request", "User Agent", "ELB Status Code", "Backend Status Code",
+        "Response time",
+        "Timestamp",
+        "Client",
+        "Country",
+        "Target",
+        "Target group name",
+        "Method",
+        "Request",
+        "User Agent",
+        "ELB Status Code",
+        "Backend Status Code",
     )
 
     BYTES_ANALYSIS: Tuple[str, ...] = (
-        "Request", "수신 데이터 (Bytes)", "송신 데이터 (Bytes)", "총 데이터 (Bytes)", "총 데이터 (변환)",
+        "Request",
+        "수신 데이터 (Bytes)",
+        "송신 데이터 (Bytes)",
+        "총 데이터 (Bytes)",
+        "총 데이터 (변환)",
     )
 
     STATUS_COUNT_BASE: Tuple[str, ...] = (
-        "Count", "Client", "Country", "Target", "Target group name",
-        "Method", "Request", "ELB Status Code", "Backend Status Code",
+        "Count",
+        "Client",
+        "Country",
+        "Target",
+        "Target group name",
+        "Method",
+        "Request",
+        "ELB Status Code",
+        "Backend Status Code",
     )
 
     STATUS_COUNT_3XX: Tuple[str, ...] = (
-        "Count", "Client", "Country", "Target", "Target group name",
-        "Method", "Request", "Redirect URL", "ELB Status Code", "Backend Status Code",
+        "Count",
+        "Client",
+        "Country",
+        "Target",
+        "Target group name",
+        "Method",
+        "Request",
+        "Redirect URL",
+        "ELB Status Code",
+        "Backend Status Code",
     )
 
     STATUS_TIMESTAMP: Tuple[str, ...] = (
-        "Timestamp", "Client", "Country", "Target", "Target group name",
-        "Method", "Request", "User Agent", "ELB Status Code", "Backend Status Code", "Error Reason",
+        "Timestamp",
+        "Client",
+        "Country",
+        "Target",
+        "Target group name",
+        "Method",
+        "Request",
+        "User Agent",
+        "ELB Status Code",
+        "Backend Status Code",
+        "Error Reason",
     )
 
     COUNTRY_STATS: Tuple[str, ...] = ("Count", "Country", "IP Count", "Percentage")
 
     URL_DETAILED: Tuple[str, ...] = (
-        "Count", "Client", "Country", "Method", "Request",
-        "Unique IPs", "Avg Response Time", "Top Status", "Error Rate (%)",
+        "Count",
+        "Client",
+        "Country",
+        "Method",
+        "Request",
+        "Unique IPs",
+        "Avg Response Time",
+        "Top Status",
+        "Error Rate (%)",
     )
 
     URL_SIMPLE: Tuple[str, ...] = ("Count", "Request")
@@ -173,8 +225,12 @@ class Headers:
 HEADERS = Headers()
 
 STATUS_CODE_TYPES: Tuple[str, ...] = (
-    "ELB 2xx Count", "ELB 3xx Count", "ELB 4xx Count",
-    "ELB 5xx Count", "Backend 4xx Count", "Backend 5xx Count",
+    "ELB 2xx Count",
+    "ELB 3xx Count",
+    "ELB 4xx Count",
+    "ELB 5xx Count",
+    "Backend 4xx Count",
+    "Backend 5xx Count",
 )
 
 SPECIAL_COUNTRY_CODES: FrozenSet[str] = frozenset(

@@ -53,6 +53,7 @@ class ALBExcelReporter:
         os.makedirs(output_dir, exist_ok=True)
 
         from .reporter.styles import get_style_cache
+
         self._style_cache = get_style_cache()
 
     def generate_report(self, report_name: Optional[str] = None) -> str:
@@ -194,7 +195,11 @@ class ALBExcelReporter:
         """Save workbook."""
         if report_name:
             if os.path.isabs(report_name) or "/" in report_name or "\\" in report_name:
-                path = report_name if report_name.endswith(".xlsx") else f"{report_name}.xlsx"
+                path = (
+                    report_name
+                    if report_name.endswith(".xlsx")
+                    else f"{report_name}.xlsx"
+                )
             else:
                 path = os.path.join(self.output_dir, f"{report_name}.xlsx")
         else:
@@ -217,8 +222,16 @@ class ALBExcelReporter:
             except Exception:
                 pass
 
-        alb_name = str(data.get("alb_name") or "alb").strip().replace("/", "-").replace("\\", "-")
-        return os.path.join(self.output_dir, f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx")
+        alb_name = (
+            str(data.get("alb_name") or "alb")
+            .strip()
+            .replace("/", "-")
+            .replace("\\", "-")
+        )
+        return os.path.join(
+            self.output_dir,
+            f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx",
+        )
 
     def _get_matching_abuse_ips(self, data: Dict[str, Any]) -> Set[str]:
         """Get abuse IPs matching actual client IPs."""
@@ -226,7 +239,9 @@ class ALBExcelReporter:
         abuse_list, _ = self._get_normalized_abuse_ips(data)
         return client_ips.intersection(abuse_list)
 
-    def _get_normalized_abuse_ips(self, data: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
+    def _get_normalized_abuse_ips(
+        self, data: Dict[str, Any]
+    ) -> Tuple[List[str], Dict[str, Any]]:
         """Normalize abuse IP data."""
         excluded = {"abuse_ips", "abuse_ip_details", "timestamp"}
 

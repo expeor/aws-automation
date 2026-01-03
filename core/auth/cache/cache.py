@@ -136,6 +136,7 @@ def get_token_encryption() -> TokenEncryption:
     """TokenEncryption 싱글톤 인스턴스 반환"""
     return TokenEncryption()
 
+
 # =============================================================================
 # Generic Cache Entry
 # =============================================================================
