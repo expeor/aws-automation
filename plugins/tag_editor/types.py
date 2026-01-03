@@ -4,10 +4,30 @@ plugins/tag_editor/types.py - MAP 태그 관리 데이터 타입
 MAP 2.0 마이그레이션 태그 분석/적용을 위한 데이터 구조 정의
 
 Reference:
+- MAP 2.0 공식 문서 (태깅 가이드):
+  https://docs.aws.amazon.com/migrationhub-strategy/latest/userguide/tagging-key-combinations.html
 - MAP 2.0 포함 서비스 목록:
   https://s3-us-west-2.amazonaws.com/map-2.0-customer-documentation/included-services/MAP_Included_Services_List.pdf
 - ResourceGroupsTaggingAPI 지원 서비스:
   https://docs.aws.amazon.com/resourcegroupstagging/latest/APIReference/supported-services.html
+- 대규모 리소스 태깅 베스트 프랙티스:
+  https://aws.amazon.com/blogs/mt/maximizing-resource-tagging-at-scale-and-across-teams-for-your-migration-to-aws/
+
+MAP Tag Value 형식:
+- 일반 마이그레이션: mig{MPE_ID} (예: mig12345 또는 migABCDE12345)
+- SAP 워크로드: sap{MPE_ID} (예: sap12345 또는 sapABCDE12345)
+- Oracle 워크로드: oracle{MPE_ID} (예: oracle12345 또는 oracleABCDE12345)
+- Commercial DB&A (On-prem → AWS): comm{MPE_ID}
+- Non-commercial DB&A (EC2 → AWS): mig_ec2_{MPE_ID}
+- Commercial DB&A (EC2 → AWS): comm_ec2_{MPE_ID}
+
+MPE ID 형식:
+- Short: 5자리 숫자 (예: 12345)
+- Long: 10자리 영숫자 (예: ABCDE12345, 대문자)
+
+※ prefix는 소문자, Long MPE ID는 대문자 사용
+※ 태그 키 "map-migrated"는 반드시 소문자 그대로 사용 (대소문자 변경/공백 불가)
+※ Cost Allocation Tag는 자동 활성화됨 (MAP 2.0 terms signed after Nov 18, 2024)
 """
 
 from __future__ import annotations

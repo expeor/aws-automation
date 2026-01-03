@@ -220,8 +220,14 @@ def collect_options(ctx: "ExecutionContext") -> None:
     # 1. MAP 태그 값 입력
     console.print(f"\n[bold]태그 설정[/bold]")
     console.print(f"태그 키: {MAP_TAG_KEY}")
+    console.print("\n[dim]태그 값 형식 (MPE ID 기반):[/dim]")
+    console.print("[dim]  - 일반 마이그레이션: mig12345 또는 migABCDE12345[/dim]")
+    console.print("[dim]  - SAP 워크로드: sap12345 또는 sapABCDE12345[/dim]")
+    console.print("[dim]  - Oracle 워크로드: oracle12345 또는 oracleABCDE12345[/dim]")
+    console.print("[dim]  - Commercial DB&A: comm12345 또는 commABCDE12345[/dim]")
+    console.print("[dim]  - EC2 → AWS DB&A: mig_ec2_12345 또는 comm_ec2_12345[/dim]")
 
-    tag_value = Prompt.ask("태그 값 입력 (Server ID 등)")
+    tag_value = Prompt.ask("\n태그 값 입력")
     ctx.options["tag_value"] = tag_value
 
     # 2. 대상 선택
