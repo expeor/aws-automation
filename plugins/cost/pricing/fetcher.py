@@ -753,3 +753,79 @@ class PricingFetcher:
                 "duration_per_gb_second": 0.0000166667,
                 "provisioned_concurrency_per_gb_hour": 0.000004646,
             }
+
+    def get_dynamodb_prices(self, region: str) -> Dict[str, float]:
+        """DynamoDB 가격 조회
+
+        Args:
+            region: AWS 리전 코드
+
+        Returns:
+            {
+                "rcu_per_hour": float,          # RCU 시간당 가격 (Provisioned)
+                "wcu_per_hour": float,          # WCU 시간당 가격 (Provisioned)
+                "read_per_million": float,      # 읽기 100만 요청당 가격 (On-Demand)
+                "write_per_million": float,     # 쓰기 100만 요청당 가격 (On-Demand)
+                "storage_per_gb": float,        # 스토리지 GB당 월간 가격
+            }
+        """
+        try:
+            response = self.pricing_client.get_products(
+                ServiceCode="AmazonDynamoDB",
+                Filters=[
+                    {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
+                ],
+                MaxResults=100,
+            )
+
+            prices = {
+                "rcu_per_hour": 0.0,
+                "wcu_per_hour": 0.0,
+                "read_per_million": 0.0,
+                "write_per_million": 0.0,
+                "storage_per_gb": 0.0,
+            }
+
+            for price_item in response.get("PriceList", []):
+                data = (
+                    json.loads(price_item)
+                    if isinstance(price_item, str)
+                    else price_item
+                )
+                attrs = data.get("product", {}).get("attributes", {})
+                terms = data.get("terms", {}).get("OnDemand", {})
+
+                usage_type = attrs.get("usagetype", "").lower()
+                group = attrs.get("group", "").lower()
+
+                for term in terms.values():
+                    for dim in term.get("priceDimensions", {}).values():
+                        price = float(dim.get("pricePerUnit", {}).get("USD", "0"))
+                        if price > 0:
+                            # Provisioned Capacity
+                            if "readcapacityunit" in usage_type:
+                                prices["rcu_per_hour"] = price
+                            elif "writecapacityunit" in usage_type:
+                                prices["wcu_per_hour"] = price
+                            # On-Demand
+                            elif "readrequestunits" in usage_type:
+                                prices["read_per_million"] = price * 1_000_000
+                            elif "writerequestunits" in usage_type:
+                                prices["write_per_million"] = price * 1_000_000
+                            # Storage
+                            elif "timeddatasize" in usage_type or "storage" in group:
+                                prices["storage_per_gb"] = price
+
+            logger.info(f"DynamoDB 가격 조회 완료: {region}")
+            return prices
+
+        except (ClientError, BotoCoreError) as e:
+            logger.warning(f"DynamoDB 가격 조회 실패 [{region}]: {e}")
+            # 기본값 (ap-northeast-2 기준)
+            return {
+                "rcu_per_hour": 0.00013,
+                "wcu_per_hour": 0.00065,
+                "read_per_million": 0.25,
+                "write_per_million": 1.25,
+                "storage_per_gb": 0.25,
+            }

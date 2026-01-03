@@ -148,6 +148,11 @@ from plugins.cloudwatch.alarm_orphan import (
     analyze_alarms as analyze_cw_alarms,
     collect_alarms as collect_cw_alarms,
 )
+from plugins.dynamodb.unused import (
+    DynamoDBAnalysisResult,
+    analyze_tables as analyze_dynamodb_tables,
+    collect_dynamodb_tables,
+)
 
 console = Console()
 
@@ -404,6 +409,16 @@ RESOURCE_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "final": "cw_alarm_results",
         "data_key": "result",
     },
+    "dynamodb": {
+        "display": "DynamoDB",
+        "total": "dynamodb_total",
+        "unused": "dynamodb_unused",
+        "waste": "dynamodb_monthly_waste",
+        "data_unused": "unused",
+        "session": "dynamodb_result",
+        "final": "dynamodb_results",
+        "data_key": "result",
+    },
     # Global resources
     "route53": {
         "display": "Route53",
@@ -591,6 +606,11 @@ class UnusedResourceSummary:
     cw_alarm_total: int = 0
     cw_alarm_orphan: int = 0
 
+    # DynamoDB
+    dynamodb_total: int = 0
+    dynamodb_unused: int = 0
+    dynamodb_monthly_waste: float = 0.0
+
 
 @dataclass
 class SessionCollectionResult:
@@ -627,6 +647,7 @@ class SessionCollectionResult:
     apigateway_result: Optional[APIGatewayAnalysisResult] = None
     eventbridge_result: Optional[EventBridgeAnalysisResult] = None
     cw_alarm_result: Optional[AlarmAnalysisResult] = None
+    dynamodb_result: Optional[DynamoDBAnalysisResult] = None
 
     # 에러 목록
     errors: List[str] = field(default_factory=list)
@@ -667,6 +688,7 @@ class UnusedAllResult:
     apigateway_results: List[APIGatewayAnalysisResult] = field(default_factory=list)
     eventbridge_results: List[EventBridgeAnalysisResult] = field(default_factory=list)
     cw_alarm_results: List[AlarmAnalysisResult] = field(default_factory=list)
+    dynamodb_results: List[DynamoDBAnalysisResult] = field(default_factory=list)
 
 
 # =============================================================================
@@ -1166,6 +1188,26 @@ def _collect_cw_alarm(
         return {"error": f"CloudWatch Alarm: {e}"}
 
 
+def _collect_dynamodb(
+    session, account_id: str, account_name: str, region: str
+) -> Dict[str, Any]:
+    """DynamoDB 수집 및 분석"""
+    try:
+        tables = collect_dynamodb_tables(session, account_id, account_name, region)
+        if not tables:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_dynamodb_tables(tables, account_id, account_name, region)
+        return {
+            "total": result.total_tables,
+            "unused": result.unused_tables + result.low_usage_tables,
+            "waste": result.unused_monthly_cost + result.low_usage_monthly_cost,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"DynamoDB: {e}"}
+
+
 def _collect_route53(session, account_id: str, account_name: str) -> Dict[str, Any]:
     """Route53 수집 및 분석 (글로벌 서비스)"""
     try:
@@ -1222,7 +1264,6 @@ REGIONAL_COLLECTORS: Dict[str, Callable] = {
     "kms": _collect_kms,
     "ecr": _collect_ecr,
     "lambda": _collect_lambda,
-    # 신규 추가 리소스
     "elasticache": _collect_elasticache,
     "rds_instance": _collect_rds_instance,
     "efs": _collect_efs,
@@ -1232,6 +1273,7 @@ REGIONAL_COLLECTORS: Dict[str, Callable] = {
     "apigateway": _collect_apigateway,
     "eventbridge": _collect_eventbridge,
     "cw_alarm": _collect_cw_alarm,
+    "dynamodb": _collect_dynamodb,
 }
 
 
