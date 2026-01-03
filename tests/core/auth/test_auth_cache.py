@@ -153,7 +153,8 @@ class TestTokenCache:
             start_url="https://example.awsapps.com/start",
         )
 
-        data = token.to_dict()
+        # 암호화 없이 딕셔너리 변환 (테스트용)
+        data = token.to_dict(encrypt=False)
 
         assert data["accessToken"] == "test-token"
         assert data["expiresAt"] == "2025-01-01T00:00:00Z"
@@ -161,6 +162,7 @@ class TestTokenCache:
         assert data["refreshToken"] == "refresh-789"
         assert data["region"] == "us-east-1"
         assert data["startUrl"] == "https://example.awsapps.com/start"
+        assert data["_encrypted"] is False
 
     def test_to_dict_without_optional(self):
         """선택 필드 없이 딕셔너리 변환"""
@@ -169,7 +171,7 @@ class TestTokenCache:
             expires_at="2025-01-01T00:00:00Z",
         )
 
-        data = token.to_dict()
+        data = token.to_dict(encrypt=False)
 
         assert "refreshToken" not in data
         assert "region" not in data
@@ -202,6 +204,31 @@ class TestTokenCache:
         assert token.access_token == ""
         assert token.expires_at == ""
         assert token.refresh_token is None
+
+    def test_encryption_roundtrip(self):
+        """암호화/복호화 라운드트립 테스트"""
+        token = TokenCache(
+            access_token="secret-access-token",
+            expires_at="2025-01-01T00:00:00Z",
+            client_id="client-123",
+            client_secret="super-secret",
+            refresh_token="refresh-token-xyz",
+            region="us-east-1",
+            start_url="https://example.awsapps.com/start",
+        )
+
+        # 암호화하여 딕셔너리로 변환
+        encrypted_data = token.to_dict(encrypt=True)
+
+        # 암호화된 상태에서 복원
+        restored_token = TokenCache.from_dict(encrypted_data)
+
+        # 원본과 동일해야 함
+        assert restored_token.access_token == "secret-access-token"
+        assert restored_token.client_secret == "super-secret"
+        assert restored_token.refresh_token == "refresh-token-xyz"
+        assert restored_token.expires_at == "2025-01-01T00:00:00Z"
+        assert restored_token.region == "us-east-1"
 
 
 # =============================================================================
