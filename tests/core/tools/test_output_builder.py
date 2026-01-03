@@ -287,13 +287,13 @@ class TestOpenInExplorer:
         assert not new_dir.exists()
 
         with patch("core.tools.output.builder.platform.system", return_value="Windows"):
-            with patch("os.startfile"):
+            with patch("os.startfile", create=True):
                 open_in_explorer(str(new_dir))
 
         assert new_dir.exists()
 
     @patch("core.tools.output.builder.platform.system", return_value="Windows")
-    @patch("os.startfile")
+    @patch("os.startfile", create=True)
     def test_windows_uses_startfile(self, mock_startfile, mock_system, tmp_path):
         """Windows에서 os.startfile 사용"""
         test_dir = tmp_path / "test"
@@ -329,7 +329,7 @@ class TestOpenInExplorer:
         assert result is True
 
     @patch("core.tools.output.builder.platform.system", return_value="Windows")
-    @patch("os.startfile", side_effect=Exception("error"))
+    @patch("os.startfile", create=True, side_effect=Exception("error"))
     def test_returns_false_on_error(self, mock_startfile, mock_system, tmp_path):
         """에러 발생 시 False 반환"""
         test_dir = tmp_path / "test"
@@ -354,7 +354,7 @@ class TestOpenFile:
         assert result is False
 
     @patch("core.tools.output.builder.platform.system", return_value="Windows")
-    @patch("os.startfile")
+    @patch("os.startfile", create=True)
     def test_windows_uses_startfile(self, mock_startfile, mock_system, tmp_path):
         """Windows에서 os.startfile 사용"""
         test_file = tmp_path / "test.txt"
