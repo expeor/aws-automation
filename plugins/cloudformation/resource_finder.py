@@ -417,3 +417,82 @@ def generate_report(
     """리포트 생성 (편의 함수)"""
     reporter = ResourceFinderReporter(result)
     return reporter.generate_report(output_dir, file_prefix)
+
+
+# =============================================================================
+# CLI 진입점 함수
+# =============================================================================
+
+
+def run_search(
+    session,
+    physical_id: str = None,
+    resource_type: str = None,
+    regions: list = None,
+    output_dir: str = "./reports",
+    **kwargs,
+):
+    """CloudFormation 리소스 검색
+
+    Args:
+        session: boto3.Session
+        physical_id: 검색할 Physical ID (부분 일치)
+        resource_type: 검색할 Resource Type (부분 일치)
+        regions: 검색할 리전 리스트
+        output_dir: 리포트 출력 디렉토리
+    """
+    finder = ResourceFinder(
+        session=session,
+        regions=regions or ["ap-northeast-2"],
+    )
+
+    result = finder.search(
+        physical_id=physical_id,
+        resource_type=resource_type,
+    )
+
+    reporter = ResourceFinderReporter(result)
+    reporter.print_summary()
+
+    if result.count > 0:
+        output_path = reporter.generate_report(
+            output_dir=output_dir,
+            file_prefix="cfn_resource_search",
+        )
+        return {
+            "count": result.count,
+            "stacks_searched": result.total_stacks_searched,
+            "report_path": str(output_path),
+        }
+
+    return {
+        "count": 0,
+        "stacks_searched": result.total_stacks_searched,
+        "message": "No matching resources found",
+    }
+
+
+def run_search_by_physical_id(
+    session,
+    physical_id: str,
+    regions: list = None,
+    output_dir: str = "./reports",
+    **kwargs,
+):
+    """Physical ID로 Stack 검색
+
+    Args:
+        session: boto3.Session
+        physical_id: 검색할 Physical ID
+        regions: 검색할 리전 리스트
+        output_dir: 리포트 출력 디렉토리
+    """
+    if not physical_id:
+        return {"error": "physical_id is required"}
+
+    return run_search(
+        session=session,
+        physical_id=physical_id,
+        regions=regions,
+        output_dir=output_dir,
+    )

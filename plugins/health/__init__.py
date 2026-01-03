@@ -13,10 +13,11 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "PHD 이벤트 조회",
-        "description": "AWS Personal Health Dashboard 전체 이벤트 조회",
+        "name": "PHD 전체 분석",
+        "description": "AWS Personal Health Dashboard 전체 이벤트 분석 및 보고서 생성",
         "permission": "read",
         "module": "phd",
+        "function": "run_analysis",
         "area": "monitoring",
     },
     {
