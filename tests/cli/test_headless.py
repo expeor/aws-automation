@@ -10,7 +10,6 @@ import pytest
 
 from cli.headless import HeadlessConfig, HeadlessRunner, run_headless
 from core.auth.types import AccountInfo
-from core.filter import AccountFilter
 
 
 class TestHeadlessConfig:
@@ -27,9 +26,7 @@ class TestHeadlessConfig:
         assert config.category == "ec2"
         assert config.tool_module == "ebs_audit"
         assert config.profile == "test-profile"
-        assert config.role is None
         assert config.regions == []
-        assert config.target is None
         assert config.format == "console"
         assert config.output is None
         assert config.quiet is False
@@ -39,10 +36,8 @@ class TestHeadlessConfig:
         config = HeadlessConfig(
             category="vpc",
             tool_module="nat_audit",
-            profile="my-sso",
-            role="AdminRole",
+            profile="my-profile",
             regions=["ap-northeast-2", "us-east-1"],
-            target="prod*",
             format="json",
             output="/tmp/output.json",
             quiet=True,
@@ -50,10 +45,8 @@ class TestHeadlessConfig:
 
         assert config.category == "vpc"
         assert config.tool_module == "nat_audit"
-        assert config.profile == "my-sso"
-        assert config.role == "AdminRole"
+        assert config.profile == "my-profile"
         assert config.regions == ["ap-northeast-2", "us-east-1"]
-        assert config.target == "prod*"
         assert config.format == "json"
         assert config.output == "/tmp/output.json"
         assert config.quiet is True
@@ -109,23 +102,6 @@ class TestHeadlessRunner:
         assert ctx.tool.description == "EBS 볼륨 감사"
         assert ctx.tool.permission == "read"
         assert ctx.tool.supports_single_region_only is False
-
-    def test_build_context_with_target_filter(self):
-        """타겟 필터가 있는 Context 구성"""
-        config = HeadlessConfig(
-            category="ec2",
-            tool_module="ebs_audit",
-            profile="test-profile",
-            target="prod*",
-        )
-        runner = HeadlessRunner(config)
-
-        tool_meta = {"name": "test", "description": "test"}
-        ctx = runner._build_context(tool_meta)
-
-        assert ctx.target_filter is not None
-        assert isinstance(ctx.target_filter, AccountFilter)
-        assert ctx.target_filter.patterns == ["prod*"]
 
     @patch("cli.headless.console")
     def test_setup_regions_single(self, mock_console, basic_config):
@@ -301,10 +277,8 @@ class TestRunHeadless:
 
         result = run_headless(
             tool_path="ec2/ebs_audit",
-            profile="my-sso",
+            profile="my-profile",
             regions=["ap-northeast-2", "us-east-1"],
-            target="prod*",
-            role="AdminRole",
             format="json",
             output="/tmp/output.json",
             quiet=True,
