@@ -49,6 +49,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 import click
+from click import Context, HelpFormatter
 
 # Keep lightweight, centralized logging config
 # WARNING 레벨로 설정하여 INFO 로그가 도구 출력에 섞이지 않도록 함
@@ -72,13 +73,53 @@ def get_version() -> str:
 
 VERSION = get_version()
 
+# 유틸리티 명령어 목록 (서비스 명령어와 분리 표시용)
+UTILITY_COMMANDS = {"run", "list-tools", "group"}
+
+
+class GroupedCommandsGroup(click.Group):
+    """명령어를 서비스/유틸리티로 분리해서 표시하는 커스텀 Click 그룹"""
+
+    def format_commands(self, ctx: Context, formatter: HelpFormatter) -> None:
+        """명령어를 그룹화해서 표시"""
+        commands = []
+        for subcommand in self.list_commands(ctx):
+            cmd = self.get_command(ctx, subcommand)
+            if cmd is None or cmd.hidden:
+                continue
+            commands.append((subcommand, cmd))
+
+        if not commands:
+            return
+
+        # 명령어 분류
+        utility_cmds = []
+        service_cmds = []
+
+        for name, cmd in commands:
+            help_text = cmd.get_short_help_str(limit=formatter.width)
+            if name in UTILITY_COMMANDS:
+                utility_cmds.append((name, help_text))
+            else:
+                service_cmds.append((name, help_text))
+
+        # 유틸리티 명령어
+        if utility_cmds:
+            with formatter.section("유틸리티"):
+                formatter.write_dl(utility_cmds)
+
+        # 서비스 명령어
+        if service_cmds:
+            with formatter.section("AWS 서비스"):
+                formatter.write_dl(service_cmds)
+
 
 def _build_help_text() -> str:
     """help 텍스트 생성"""
     lines = [
         "AA - AWS Automation CLI",
         "",
-        "AWS 리소스 분석, 비용 최적화, 보안 점검, 보고서 생성 등",
+        "AWS 리소스 분석, 비용 최적화, 보안 점검 등",
         "AWS 운영 업무를 자동화하는 CLI 도구입니다.",
         "",
         "\b",  # Click 줄바꿈 유지 마커
@@ -87,51 +128,29 @@ def _build_help_text() -> str:
         "  aa <서비스>     특정 서비스 도구 실행",
         "",
         "\b",
-        "[주요 서비스 명령어]",
-        "  aa ec2          EC2 인스턴스 분석",
-        "  aa ebs          EBS 볼륨 분석 (미사용, 암호화 등)",
-        "  aa s3           S3 버킷 분석 (퍼블릭, 암호화 등)",
-        "  aa rds          RDS 데이터베이스 분석",
-        "  aa iam          IAM 사용자/역할/액세스키 분석",
-        "  aa vpc          VPC 네트워크 분석",
-        "  aa report       정기 보고서 생성",
-        "",
-        "\b",
-        "[Headless CLI (CI/CD용)]",
-        "  aa list-tools                      도구 목록 조회",
-        "  aa run <도구경로> [옵션]           도구 실행",
-        "",
-        "  옵션:",
-        "    -p, --profile       SSO Profile 또는 Access Key 프로파일",
-        "    -g, --profile-group 프로파일 그룹 (aa group list로 확인)",
-        "    -r, --region        리전 (다중 가능, 'all' 또는 패턴)",
-        "    -f, --format        출력 형식 (console, json, csv)",
-        "    -o, --output        출력 파일 경로",
-        "    -q, --quiet         최소 출력 모드",
+        "[Headless 모드 (CI/CD용)]",
+        "  aa run <도구경로> [옵션]    도구 실행",
+        "  aa list-tools               도구 목록 조회",
         "",
         "  예시:",
         "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
-        "    aa run ec2/ebs_audit -p my-profile -r all -f json",
+        "    aa run ec2/ebs_audit -g 'Dev Team' -r all -f json",
         "",
         "\b",
         "[프로파일 그룹]",
-        "  aa group list         그룹 목록",
-        "  aa group create       그룹 생성 (인터랙티브)",
-        "  aa group show <이름>  그룹 상세",
-        "  aa group delete <이름> 그룹 삭제",
+        "  aa group list / create / show / delete",
         "",
         "\b",
         "[예시]",
-        "  aa ec2 --help   EC2 카테고리 도움말 표시",
-        "  aa              -> 대화형 메뉴 진입",
-        "                  -> 키워드 검색 (예: '미사용', 'rds')",
-        "                  -> 번호로 도구 선택 후 실행",
+        "  aa ec2          EC2 도구 실행",
+        "  aa iam          IAM 보안 감사",
+        "  aa cost         비용 최적화 분석",
     ]
 
     return "\n".join(lines)
 
 
-@click.group(invoke_without_command=True)
+@click.group(cls=GroupedCommandsGroup, invoke_without_command=True)
 @click.version_option(VERSION, prog_name="aa")
 @click.pass_context
 def cli(ctx):

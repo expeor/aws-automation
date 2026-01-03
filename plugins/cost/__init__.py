@@ -15,7 +15,7 @@ CATEGORY = {
 TOOLS = [
     {
         "name": "미사용 리소스 종합 분석",
-        "description": "NAT, ENI, EBS, EIP, ELB, Snapshot 미사용 리소스 종합 보고서",
+        "description": "NAT, ENI, EBS, EIP, ELB, Snapshot, DynamoDB 등 미사용 리소스 종합 보고서",
         "permission": "read",
         "module": "unused_all",
         "area": "cost",
