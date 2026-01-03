@@ -8,13 +8,13 @@ import pytest
 from moto import mock_aws
 
 from plugins.ec2.eip_audit import (
-    EIPInfo,
     EIPFinding,
-    UsageStatus,
+    EIPInfo,
     Severity,
-    collect_eips,
-    analyze_eips,
+    UsageStatus,
     _analyze_single_eip,
+    analyze_eips,
+    collect_eips,
 )
 
 
@@ -143,19 +143,35 @@ class TestAnalyzeEIPs:
         """혼합 EIP 분석"""
         eips = [
             EIPInfo(
-                allocation_id="eipalloc-1", public_ip="1.1.1.1", domain="vpc",
-                instance_id="i-1", association_id="eipassoc-1",
-                network_interface_id="eni-1", private_ip="10.0.0.1",
-                network_border_group="ap-northeast-2", tags={}, name="attached",
-                account_id="123456789012", account_name="test", region="ap-northeast-2",
+                allocation_id="eipalloc-1",
+                public_ip="1.1.1.1",
+                domain="vpc",
+                instance_id="i-1",
+                association_id="eipassoc-1",
+                network_interface_id="eni-1",
+                private_ip="10.0.0.1",
+                network_border_group="ap-northeast-2",
+                tags={},
+                name="attached",
+                account_id="123456789012",
+                account_name="test",
+                region="ap-northeast-2",
                 monthly_cost=0.0,
             ),
             EIPInfo(
-                allocation_id="eipalloc-2", public_ip="2.2.2.2", domain="vpc",
-                instance_id="", association_id="",
-                network_interface_id="", private_ip="",
-                network_border_group="ap-northeast-2", tags={}, name="unused",
-                account_id="123456789012", account_name="test", region="ap-northeast-2",
+                allocation_id="eipalloc-2",
+                public_ip="2.2.2.2",
+                domain="vpc",
+                instance_id="",
+                association_id="",
+                network_interface_id="",
+                private_ip="",
+                network_border_group="ap-northeast-2",
+                tags={},
+                name="unused",
+                account_id="123456789012",
+                account_name="test",
+                region="ap-northeast-2",
                 monthly_cost=3.60,
             ),
         ]

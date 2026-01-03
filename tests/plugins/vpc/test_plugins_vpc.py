@@ -5,17 +5,17 @@ tests/test_plugins_vpc.py - VPC 플러그인 테스트
 import pytest
 
 from plugins.vpc.sg_audit_analysis.critical_ports import (
-    CriticalPort,
-    TRUSTED_ADVISOR_RED_PORTS,
-    WEB_PORTS,
     ALL_RISKY_PORTS,
     PORT_INFO,
-    is_trusted_advisor_red,
-    is_web_port,
-    is_risky_port,
-    get_port_info,
+    TRUSTED_ADVISOR_RED_PORTS,
+    WEB_PORTS,
+    CriticalPort,
     check_port_range,
     check_port_range_all,
+    get_port_info,
+    is_risky_port,
+    is_trusted_advisor_red,
+    is_web_port,
 )
 
 
@@ -178,5 +178,12 @@ class TestPortInfo:
     def test_categories(self):
         """카테고리 분류"""
         categories = {info.category for info in PORT_INFO.values()}
-        expected = {"database", "remote_access", "file_transfer", "windows", "unix", "web"}
+        expected = {
+            "database",
+            "remote_access",
+            "file_transfer",
+            "windows",
+            "unix",
+            "web",
+        }
         assert categories == expected

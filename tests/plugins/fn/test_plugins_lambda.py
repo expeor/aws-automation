@@ -8,14 +8,14 @@ from unittest.mock import patch
 import pytest
 
 from plugins.fn.common.runtime_eol import (
-    RuntimeInfo,
+    RUNTIME_EOL_DATA,
     EOLStatus,
-    get_runtime_info,
-    get_runtime_status,
+    RuntimeInfo,
     get_deprecated_runtimes,
     get_expiring_runtimes,
     get_recommended_upgrade,
-    RUNTIME_EOL_DATA,
+    get_runtime_info,
+    get_runtime_status,
 )
 
 
