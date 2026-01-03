@@ -1,0 +1,45 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps"
+    groups:
+      # AWS SDK 관련 패키지 그룹화
+      aws-sdk:
+        patterns:
+          - "boto*"
+          - "botocore"
+          - "s3transfer"
+      # 테스트 도구 그룹화
+      testing:
+        patterns:
+          - "pytest*"
+          - "moto*"
+          - "coverage"
+      # 개발 도구 그룹화
+      dev-tools:
+        patterns:
+          - "black"
+          - "flake8"
+          - "mypy"
+          - "isort"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
