@@ -77,13 +77,23 @@ __all__ = [
 
 
 # CLI 진입점 함수들
-def run_analysis(session, output_dir: str = "./reports", **kwargs):
+def run_analysis(ctx) -> None:
     """PHD 전체 이벤트 분석 및 보고서 생성"""
+    from core.auth.session import get_context_session
+    from core.tools.output import OutputPath
+
+    # AWS Health API는 us-east-1에서만 사용 가능
+    session = get_context_session(ctx, "us-east-1")
+
     collector = HealthCollector(session)
     result = collector.collect_all()
 
     reporter = PatchReporter(result)
     reporter.print_summary()
+
+    # 출력 경로 생성
+    identifier = ctx.profile_name or "default"
+    output_dir = OutputPath(identifier).sub("phd").with_date().build()
 
     output_path = reporter.generate_report(
         output_dir=output_dir,
@@ -98,13 +108,23 @@ def run_analysis(session, output_dir: str = "./reports", **kwargs):
     }
 
 
-def run_patch_analysis(session, output_dir: str = "./reports", **kwargs):
+def run_patch_analysis(ctx) -> None:
     """필수 패치 분석 보고서 생성"""
+    from core.auth.session import get_context_session
+    from core.tools.output import OutputPath
+
+    # AWS Health API는 us-east-1에서만 사용 가능
+    session = get_context_session(ctx, "us-east-1")
+
     collector = HealthCollector(session)
     result = collector.collect_patches(days_ahead=90)
 
     reporter = PatchReporter(result)
     reporter.print_summary()
+
+    # 출력 경로 생성
+    identifier = ctx.profile_name or "default"
+    output_dir = OutputPath(identifier).sub("phd").with_date().build()
 
     output_path = reporter.generate_report(
         output_dir=output_dir,
@@ -121,8 +141,13 @@ def run_patch_analysis(session, output_dir: str = "./reports", **kwargs):
     }
 
 
-def run_issues(session, **kwargs):
+def run_issues(ctx) -> None:
     """서비스 장애 현황 조회"""
+    from core.auth.session import get_context_session
+
+    # AWS Health API는 us-east-1에서만 사용 가능
+    session = get_context_session(ctx, "us-east-1")
+
     collector = HealthCollector(session)
     issues = collector.collect_issues()
 
@@ -155,7 +180,7 @@ TOOLS = [
         "permission": "read",
         "module": "phd",
         "function": "run_analysis",
-        "area": "monitoring",
+        "area": "operational",
     },
     {
         "name": "필수 패치 분석",
@@ -163,7 +188,7 @@ TOOLS = [
         "permission": "read",
         "module": "phd",
         "function": "run_patch_analysis",
-        "area": "monitoring",
+        "area": "operational",
     },
     {
         "name": "서비스 장애 현황",
@@ -171,6 +196,6 @@ TOOLS = [
         "permission": "read",
         "module": "phd",
         "function": "run_issues",
-        "area": "monitoring",
+        "area": "operational",
     },
 ]

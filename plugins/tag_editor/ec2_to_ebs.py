@@ -381,25 +381,20 @@ def sync_tags(
     return syncer.sync_all(instance_ids, tag_keys)
 
 
-def run_sync(
-    session,
-    region: str = None,
-    instance_ids: list = None,
-    tag_keys: list = None,
-    dry_run: bool = False,
-    output_dir: str = "./reports",
-    **kwargs,
-):
-    """EC2 태그를 EBS에 동기화 (CLI 진입점)
+def run_sync(ctx) -> None:
+    """EC2 태그를 EBS에 동기화 (CLI 진입점)"""
+    from core.auth.session import get_context_session
+    from core.tools.output import OutputPath
 
-    Args:
-        session: boto3.Session
-        region: 리전
-        instance_ids: 특정 인스턴스만 처리
-        tag_keys: 특정 태그 키만 동기화
-        dry_run: True면 시뮬레이션
-        output_dir: 리포트 출력 디렉토리
-    """
+    # 옵션에서 파라미터 추출
+    instance_ids = ctx.options.get("instance_ids")
+    tag_keys = ctx.options.get("tag_keys")
+    dry_run = ctx.options.get("dry_run", False)
+
+    # 첫 번째 리전에서 세션 획득
+    region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
+    session = get_context_session(ctx, region)
+
     syncer = EC2ToEBSTagSync(session, region, dry_run)
     summary = syncer.sync_all(instance_ids, tag_keys)
 
@@ -407,6 +402,9 @@ def run_sync(
     reporter.print_summary()
 
     if summary.results:
+        identifier = ctx.profile_name or "default"
+        output_dir = OutputPath(identifier).sub("tag_editor").with_date().build()
+
         output_path = reporter.generate_report(
             output_dir=output_dir,
             file_prefix="ec2_to_ebs_tags",

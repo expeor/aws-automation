@@ -21,6 +21,15 @@ from plugins.cost.pricing.dynamodb import get_dynamodb_monthly_cost
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "dynamodb:ListTables",
+        "dynamodb:DescribeTable",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 # 미사용 기준: 7일간 읽기/쓰기 작업 0
 UNUSED_DAYS_THRESHOLD = 7
 # 저사용 기준: 평균 소비 용량이 프로비저닝의 10% 미만

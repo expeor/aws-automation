@@ -21,6 +21,13 @@ from plugins.cost.pricing import get_secret_price
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "secretsmanager:ListSecrets",
+    ],
+}
+
 # 미사용 기준: 90일 이상 액세스 없음
 UNUSED_DAYS_THRESHOLD = 90
 

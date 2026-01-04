@@ -500,13 +500,14 @@ def analyze_repos(
 # =============================================================================
 
 
-def run_audit(
-    session,
-    region: str = None,
-    output_dir: str = "./reports",
-    **kwargs,
-):
+def run_audit(ctx) -> None:
     """CodeCommit 리포지토리 분석"""
+    from core.auth.session import get_context_session
+    from core.tools.output import OutputPath
+
+    region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
+    session = get_context_session(ctx, region)
+
     auditor = RepoAuditor(session=session, region=region)
     result = auditor.audit()
 
@@ -514,6 +515,9 @@ def run_audit(
     reporter.print_summary()
 
     if result.total_repos > 0:
+        identifier = ctx.profile_name or "default"
+        output_dir = OutputPath(identifier).sub("codecommit").with_date().build()
+
         output_path = reporter.generate_report(
             output_dir=output_dir,
             file_prefix="codecommit_repos",
@@ -531,12 +535,13 @@ def run_audit(
     }
 
 
-def run_empty_repos(
-    session,
-    region: str = None,
-    **kwargs,
-):
+def run_empty_repos(ctx) -> None:
     """빈 리포지토리 조회"""
+    from core.auth.session import get_context_session
+
+    region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
+    session = get_context_session(ctx, region)
+
     auditor = RepoAuditor(session=session, region=region)
     result = auditor.audit()
 

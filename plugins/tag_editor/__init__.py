@@ -49,6 +49,6 @@ TOOLS = [
         "permission": "write",
         "module": "ec2_to_ebs",
         "function": "run_sync",
-        "area": "management",
+        "area": "operational",
     },
 ]

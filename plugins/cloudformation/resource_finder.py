@@ -424,26 +424,22 @@ def generate_report(
 # =============================================================================
 
 
-def run_search(
-    session,
-    physical_id: str = None,
-    resource_type: str = None,
-    regions: list = None,
-    output_dir: str = "./reports",
-    **kwargs,
-):
-    """CloudFormation 리소스 검색
+def run_search(ctx) -> None:
+    """CloudFormation 리소스 검색"""
+    from core.auth.session import get_context_session
+    from core.tools.output import OutputPath
 
-    Args:
-        session: boto3.Session
-        physical_id: 검색할 Physical ID (부분 일치)
-        resource_type: 검색할 Resource Type (부분 일치)
-        regions: 검색할 리전 리스트
-        output_dir: 리포트 출력 디렉토리
-    """
+    # 첫 번째 리전에서 세션 획득
+    region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
+    session = get_context_session(ctx, region)
+
+    # 옵션에서 검색어 가져오기
+    physical_id = ctx.options.get("physical_id")
+    resource_type = ctx.options.get("resource_type")
+
     finder = ResourceFinder(
         session=session,
-        regions=regions or ["ap-northeast-2"],
+        regions=ctx.regions or [region],
     )
 
     result = finder.search(
@@ -455,6 +451,9 @@ def run_search(
     reporter.print_summary()
 
     if result.count > 0:
+        identifier = ctx.profile_name or "default"
+        output_dir = OutputPath(identifier).sub("cloudformation").with_date().build()
+
         output_path = reporter.generate_report(
             output_dir=output_dir,
             file_prefix="cfn_resource_search",
@@ -472,27 +471,11 @@ def run_search(
     }
 
 
-def run_search_by_physical_id(
-    session,
-    physical_id: str,
-    regions: list = None,
-    output_dir: str = "./reports",
-    **kwargs,
-):
-    """Physical ID로 Stack 검색
-
-    Args:
-        session: boto3.Session
-        physical_id: 검색할 Physical ID
-        regions: 검색할 리전 리스트
-        output_dir: 리포트 출력 디렉토리
-    """
+def run_search_by_physical_id(ctx) -> None:
+    """Physical ID로 Stack 검색"""
+    physical_id = ctx.options.get("physical_id")
     if not physical_id:
+        print("physical_id가 필요합니다.")
         return {"error": "physical_id is required"}
 
-    return run_search(
-        session=session,
-        physical_id=physical_id,
-        regions=regions,
-        output_dir=output_dir,
-    )
+    return run_search(ctx)

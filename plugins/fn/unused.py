@@ -30,6 +30,16 @@ from .common.collector import LambdaFunctionInfo, collect_functions_with_metrics
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "lambda:ListFunctions",
+        "lambda:GetFunction",
+        "lambda:ListProvisionedConcurrencyConfigs",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class UsageStatus(Enum):
     """사용 상태"""

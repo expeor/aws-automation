@@ -20,6 +20,14 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+    ],
+}
+
 # 비용: $0.03/GB/월 (저장)
 COST_PER_GB_MONTH = 0.03
 # 기준: 90일 이상 ingestion 없으면 오래된 것으로 판단

@@ -42,7 +42,7 @@ TOOLS = [
         "permission": "read",
         "module": "unused",
         "function": "run_audit",
-        "area": "management",
+        "area": "operational",
     },
     {
         "name": "빈 리포지토리 조회",

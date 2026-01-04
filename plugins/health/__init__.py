@@ -18,7 +18,7 @@ TOOLS = [
         "permission": "read",
         "module": "phd",
         "function": "run_analysis",
-        "area": "monitoring",
+        "area": "operational",
     },
     {
         "name": "필수 패치 분석",
@@ -26,7 +26,7 @@ TOOLS = [
         "permission": "read",
         "module": "phd",
         "function": "run_patch_analysis",
-        "area": "monitoring",
+        "area": "operational",
     },
     {
         "name": "서비스 장애 현황",
@@ -34,6 +34,6 @@ TOOLS = [
         "permission": "read",
         "module": "phd",
         "function": "run_issues",
-        "area": "monitoring",
+        "area": "operational",
     },
 ]

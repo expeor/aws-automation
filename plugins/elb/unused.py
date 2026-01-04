@@ -30,6 +30,16 @@ from plugins.cost.pricing import get_elb_monthly_cost
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetHealth",
+        "elasticloadbalancing:DescribeInstanceHealth",
+    ],
+}
+
 
 # =============================================================================
 # 데이터 구조

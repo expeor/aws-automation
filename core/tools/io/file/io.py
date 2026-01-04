@@ -103,6 +103,3 @@ def write_json(
         return write_file(filepath, content)
     except Exception:
         return False
-        return True
-    except Exception:
-        return False

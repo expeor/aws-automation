@@ -29,6 +29,14 @@ from plugins.cost.pricing import get_snapshot_monthly_cost
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeImages",
+    ],
+}
+
 
 # =============================================================================
 # 상수

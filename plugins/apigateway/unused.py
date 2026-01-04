@@ -20,6 +20,14 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "apigateway:GET",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 # 미사용 기준: 7일간 요청 0
 UNUSED_DAYS_THRESHOLD = 7
 

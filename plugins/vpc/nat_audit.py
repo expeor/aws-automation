@@ -21,6 +21,14 @@ from .nat_audit_analysis import NATAnalyzer, NATCollector, NATExcelReporter
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeNatGateways",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
