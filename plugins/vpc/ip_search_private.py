@@ -24,6 +24,13 @@ from botocore.exceptions import ClientError
 from core.auth import SessionIterator
 from core.parallel import get_client
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeNetworkInterfaces",
+    ],
+}
+
 # =============================================================================
 # 데이터 구조
 # =============================================================================

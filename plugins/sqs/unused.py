@@ -23,6 +23,15 @@ console = Console()
 # 미사용 기준: 7일간 메시지 송수신 0
 UNUSED_DAYS_THRESHOLD = 7
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "sqs:ListQueues",
+        "sqs:GetQueueAttributes",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class QueueStatus(Enum):
     """큐 상태"""

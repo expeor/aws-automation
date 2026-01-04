@@ -23,6 +23,15 @@ console = Console()
 # 미사용 기준: 7일간 메시지 발행 0
 UNUSED_DAYS_THRESHOLD = 7
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "sns:ListTopics",
+        "sns:ListSubscriptionsByTopic",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class TopicStatus(Enum):
     """토픽 상태"""

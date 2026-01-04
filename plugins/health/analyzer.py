@@ -1,5 +1,5 @@
 """
-plugins/health/phd/analyzer.py - AWS Personal Health Dashboard 분석기
+plugins/health/analyzer.py - AWS Personal Health Dashboard 분석기
 
 AWS Health API를 호출하여 계정별 Health 이벤트를 조회합니다.
 - scheduledChange: 예정된 유지보수, 패치

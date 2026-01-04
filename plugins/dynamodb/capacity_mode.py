@@ -28,6 +28,15 @@ console = Console()
 # 분석 기간 (일)
 ANALYSIS_DAYS = 14
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "dynamodb:ListTables",
+        "dynamodb:DescribeTable",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class CapacityRecommendation(Enum):
     """용량 모드 권장 사항"""

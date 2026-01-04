@@ -23,6 +23,17 @@ from core.tools.output import open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+        "s3:ListBucket",
+        "s3:GetObject",
+        "sts:GetCallerIdentity",
+    ],
+}
+
 
 def collect_options(ctx) -> None:
     """ALB 로그 분석에 필요한 옵션 수집

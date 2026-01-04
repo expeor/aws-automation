@@ -24,64 +24,11 @@ AWS Cost Optimization Hub에서 비용 최적화 권장사항을 조회하고 �
 - Cost Efficiency Metric: https://docs.aws.amazon.com/cost-management/latest/userguide/cost-efficiency-metric.html
 - API Reference: https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_Operations_Cost_Optimization_Hub.html
 
-## 사용법
-
-    from plugins.cost.coh import CostOptimizationAnalyzer, CostOptimizationCollector
-    from plugins.cost.coh.reporter import generate_report
-
-    # 분석기 직접 사용
-    analyzer = CostOptimizationAnalyzer(session)
-    recommendations = analyzer.get_recommendations(action_types=["Rightsize"])
-
-    # 수집기 사용 (필터링 포함)
-    collector = CostOptimizationCollector(session)
-    result = collector.collect_all()
-
-    # 리포트 생성
-    generate_report(result, output_dir="./reports")
-
-## 환경변수
-
-    AA_COH_EXCLUDE_ACCOUNT_IDS: 제외할 계정 ID (쉼표 구분)
-    AA_COH_EXCLUDE_ACCOUNT_NAMES: 제외할 계정 이름 (쉼표 구분)
-    AA_COH_EXCLUDE_ACCOUNT_NAME_REGEX: 제외할 계정 이름 정규식
-
 ## Note
-    - Cost Optimization Hub는 us-east-1 리전에서만 사용 가능
-    - Organizations 관리 계정 또는 위임된 관리자 계정에서 전체 조직 권장사항 조회 가능
-    - 권장사항은 매일 새로고침됨 (전일 사용량 기준)
+- Cost Optimization Hub는 us-east-1 리전에서만 사용 가능
+- Organizations 관리 계정 또는 위임된 관리자 계정에서 전체 조직 권장사항 조회 가능
+- 권장사항은 매일 새로고침됨 (전일 사용량 기준)
 """
-
-from .analyzer import (
-    COH_REGION,
-    CostOptimizationAnalyzer,
-    Recommendation,
-    RecommendationFilter,
-)
-from .collector import (
-    AccountFilter,
-    CollectionResult,
-    CostOptimizationCollector,
-)
-from .reporter import (
-    CostOptimizationReporter,
-    generate_report,
-)
-
-__all__ = [
-    # Analyzer
-    "CostOptimizationAnalyzer",
-    "Recommendation",
-    "RecommendationFilter",
-    "COH_REGION",
-    # Collector
-    "CostOptimizationCollector",
-    "CollectionResult",
-    "AccountFilter",
-    # Reporter
-    "CostOptimizationReporter",
-    "generate_report",
-]
 
 # CLI 도구 정의
 TOOLS = [

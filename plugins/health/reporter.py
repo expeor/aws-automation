@@ -1,5 +1,5 @@
 """
-plugins/health/phd/reporter.py - AWS Health 패치 보고서 생성기
+plugins/health/reporter.py - AWS Health 패치 보고서 생성기
 
 수집된 패치/유지보수 이벤트를 Excel 형식으로 출력합니다.
 - 요약 시트: 긴급도별, 서비스별 현황

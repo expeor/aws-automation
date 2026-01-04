@@ -27,6 +27,17 @@ from plugins.cost.pricing import (
     get_lambda_provisioned_monthly_cost,
 )
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "lambda:ListFunctions",
+        "lambda:ListTags",
+        "lambda:ListProvisionedConcurrencyConfigs",
+        "lambda:GetFunctionConcurrency",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 from .common.collector import (
     LambdaFunctionInfo,
     LambdaMetrics,

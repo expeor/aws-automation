@@ -23,6 +23,13 @@ from core.tools.output.builder import OutputPath
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeNetworkInterfaces",
+    ],
+}
+
 
 # =============================================================================
 # 타입 정의

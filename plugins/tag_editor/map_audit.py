@@ -23,6 +23,13 @@ from rich.table import Table
 
 from core.parallel import parallel_collect, get_client
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "tag:GetResources",
+    ],
+}
+
 from .types import (
     MAP_TAG_KEY,
     RESOURCE_TYPE_GROUPS,

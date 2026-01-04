@@ -1,5 +1,5 @@
 """
-plugins/health/phd/collector.py - AWS Health 이벤트 수집기
+plugins/health/collector.py - AWS Health 이벤트 수집기
 
 Health 이벤트를 수집하고 패치/유지보수 중심으로 분류합니다.
 - 긴급도별 분류 (critical, high, medium, low)

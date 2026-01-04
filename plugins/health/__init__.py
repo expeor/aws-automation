@@ -16,24 +16,24 @@ TOOLS = [
         "name": "PHD 전체 분석",
         "description": "AWS Personal Health Dashboard 전체 이벤트 분석 및 보고서 생성",
         "permission": "read",
-        "module": "phd",
-        "function": "run_analysis",
+        "module": "analysis",
         "area": "operational",
+        "is_global": True,  # AWS Health API는 us-east-1 고정 - 리전 선택 불필요
     },
     {
         "name": "필수 패치 분석",
         "description": "예정된 패치/유지보수 이벤트 분석 및 보고서 생성",
         "permission": "read",
-        "module": "phd",
-        "function": "run_patch_analysis",
+        "module": "patch_analysis",
         "area": "operational",
+        "is_global": True,  # AWS Health API는 us-east-1 고정 - 리전 선택 불필요
     },
     {
         "name": "서비스 장애 현황",
         "description": "현재 진행 중인 AWS 서비스 장애 조회",
         "permission": "read",
-        "module": "phd",
-        "function": "run_issues",
+        "module": "issues",
         "area": "operational",
+        "is_global": True,  # AWS Health API는 us-east-1 고정 - 리전 선택 불필요
     },
 ]

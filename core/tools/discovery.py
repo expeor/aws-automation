@@ -484,10 +484,14 @@ def load_tool(category_name: str, tool_name: str) -> Optional[Dict[str, Callable
         # collect_options 함수 (선택)
         collect_func = getattr(module, "collect_options", None)
 
+        # REQUIRED_PERMISSIONS (선택)
+        required_permissions = getattr(module, "REQUIRED_PERMISSIONS", None)
+
         return {
             "run": run_func,
             "collect_options": collect_func,
             "meta": tool_meta,
+            "required_permissions": required_permissions,
         }
 
     except ImportError as e:
@@ -549,10 +553,14 @@ def _load_referenced_tool(tool_meta: Dict[str, Any]) -> Optional[Dict[str, Calla
         merged_meta = {**original_tool, **tool_meta}
         merged_meta["_original_ref"] = ref  # 원본 참조 정보 유지
 
+        # REQUIRED_PERMISSIONS (선택)
+        required_permissions = getattr(module, "REQUIRED_PERMISSIONS", None)
+
         return {
             "run": run_func,
             "collect_options": collect_func,
             "meta": merged_meta,
+            "required_permissions": required_permissions,
         }
 
     except ImportError as e:

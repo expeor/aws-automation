@@ -37,6 +37,14 @@ console = Console()
 # 최근 생성 기준 (일) - 이내는 제외
 RECENT_DAYS = 14
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeImages",
+        "ec2:DescribeInstances",
+    ],
+}
+
 
 # =============================================================================
 # 데이터 구조

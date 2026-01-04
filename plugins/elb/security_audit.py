@@ -38,6 +38,18 @@ from typing import Any, Dict, List, Optional, Set
 from rich.console import Console
 
 from core.config import settings
+
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+        "elasticloadbalancing:DescribeListeners",
+        "elasticloadbalancing:DescribeSSLPolicies",
+        "wafv2:GetWebACLForResource",
+        "acm:DescribeCertificate",
+    ],
+}
 from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
