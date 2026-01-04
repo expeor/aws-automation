@@ -99,6 +99,8 @@ def _show_cache_menu(ctx, session_name: str):
     eni_cache = ENICache(session_name=session_name)
 
     console.print("\n[bold cyan]━━━ 캐시 관리 ━━━[/bold cyan]")
+    console.print("[dim]• Private: 선택한 계정/리전의 ENI (AWS 인증 필요)[/dim]")
+    console.print("[dim]• Public: 클라우드 IP 대역 (인증 불필요, 공용)[/dim]")
 
     # Private (ENI) 캐시 상태
     console.print("\n[bold]Private (ENI)[/bold]")
@@ -278,13 +280,15 @@ def _handle_public_filter_query(query: str, save_csv: bool):
     @ 접두사 쿼리 처리
 
     형식:
-        @                    → 메뉴 모드
-        @aws                 → AWS 필터 메뉴
-        @aws:ap-northeast-2  → AWS에서 ap-northeast-2 검색
-        @aws:EC2             → AWS에서 EC2 서비스 검색
-        @gcp:asia            → GCP에서 asia 검색
+        @                              → 메뉴 모드
+        @aws                           → AWS 필터 메뉴
+        @aws ap-northeast-2            → AWS 서울 리전
+        @aws ec2                       → AWS EC2 서비스
+        @aws ap-northeast-2 ec2        → AWS 서울 리전 + EC2 (AND)
+        @aws ap-northeast-2,us-east-1  → 서울 + 버지니아 리전 (OR)
+        @aws ap-northeast-2 ec2,route53 → 서울 리전 + EC2/Route53
     """
-    from plugins.vpc.ip_search.public import search_by_filter
+    from plugins.vpc.ip_search.public import search_by_filter, get_available_filters
 
     query = query[1:].strip()  # @ 제거
 
@@ -293,20 +297,23 @@ def _handle_public_filter_query(query: str, save_csv: bool):
         provider, filter_value = _show_public_filter_menu()
         if not provider or not filter_value:
             return
+        filter_tokens = [filter_value]
     else:
-        # @provider:filter 또는 @provider filter 파싱 (콜론/공백 모두 지원)
+        # @provider filter1 filter2 ... 파싱
         if ":" in query:
             parts = query.split(":", 1)
             provider = parts[0].strip().lower()
-            filter_value = parts[1].strip()
+            filter_str = parts[1].strip()
         elif " " in query:
-            parts = query.split(None, 1)  # 공백으로 분리
+            parts = query.split(None, 1)
             provider = parts[0].strip().lower()
-            filter_value = parts[1].strip() if len(parts) > 1 else None
+            filter_str = parts[1].strip() if len(parts) > 1 else ""
         else:
-            # @provider만 입력한 경우 - 해당 provider 메뉴
             provider = query.lower()
-            filter_value = None
+            filter_str = ""
+
+        # 공백으로 분리된 필터 토큰들
+        filter_tokens = filter_str.split() if filter_str else []
 
     # 유효한 provider 확인
     valid_providers = {"aws", "gcp", "azure", "oracle"}
@@ -315,10 +322,8 @@ def _handle_public_filter_query(query: str, save_csv: bool):
         console.print(f"[dim]사용 가능: {', '.join(valid_providers)}[/dim]")
         return
 
-    # filter_value가 없으면 필터 목록 표시
-    if not filter_value:
-        from plugins.vpc.ip_search.public import get_available_filters
-
+    # filter_tokens가 없으면 필터 목록 표시
+    if not filter_tokens:
         filters = get_available_filters(provider)
         console.print(f"\n[bold yellow]━━━ {provider.upper()} IP 범위 ━━━[/bold yellow]")
 
@@ -334,30 +339,111 @@ def _handle_public_filter_query(query: str, save_csv: bool):
         if len(filters["services"]) > 20:
             console.print(f"  ... 외 {len(filters['services']) - 20}개")
 
-        console.print(f"\n[dim]검색 예: @{provider}:ap-northeast-2, @{provider}:EC2[/dim]")
+        console.print(f"\n[dim]검색 예:[/dim]")
+        console.print(f"  [dim]@{provider} ap-northeast-2          리전 검색[/dim]")
+        console.print(f"  [dim]@{provider} ec2                     서비스 검색[/dim]")
+        console.print(f"  [dim]@{provider} ap-northeast-2 ec2      리전+서비스 (AND)[/dim]")
+        console.print(f"  [dim]@{provider} ap-northeast-2,us-east-1  다중 리전 (OR)[/dim]")
         return
 
+    # 필터 토큰을 region/service로 분류
+    filters = get_available_filters(provider)
+    known_regions = {r.lower(): r for r in filters["regions"]}
+    known_services = {s.lower(): s for s in filters["services"]}
+
+    region_filters = []
+    service_filters = []
+
+    for token in filter_tokens:
+        # 쉼표로 분리된 다중 값 처리
+        values = [v.strip() for v in token.split(",") if v.strip()]
+        for val in values:
+            val_lower = val.lower()
+            # 정확히 일치하거나 부분 일치로 분류
+            matched_region = None
+            matched_service = None
+
+            # 정확한 일치 먼저 확인
+            if val_lower in known_regions:
+                matched_region = val
+            elif val_lower in known_services:
+                matched_service = val
+            else:
+                # 부분 일치 확인
+                for kr in known_regions:
+                    if val_lower in kr or kr in val_lower:
+                        matched_region = val
+                        break
+                if not matched_region:
+                    for ks in known_services:
+                        if val_lower in ks or ks in val_lower:
+                            matched_service = val
+                            break
+
+            if matched_region:
+                region_filters.append(val)
+            elif matched_service:
+                service_filters.append(val)
+            else:
+                # 분류 실패 시 둘 다 시도
+                region_filters.append(val)
+                service_filters.append(val)
+
     # 검색 실행
-    console.print(f"[dim]검색: {provider.upper()} → {filter_value}[/dim]")
+    filter_desc = []
+    if region_filters:
+        filter_desc.append(f"리전={','.join(region_filters)}")
+    if service_filters:
+        filter_desc.append(f"서비스={','.join(service_filters)}")
+    console.print(f"[dim]검색: {provider.upper()} → {' + '.join(filter_desc) if filter_desc else 'all'}[/dim]")
+
+    all_results = []
 
     with console.status(f"[bold yellow]{provider.upper()} IP 범위 검색 중..."):
-        # region과 service 모두에서 검색
-        results = search_by_filter(provider=provider, region=filter_value)
-        if not results:
-            results = search_by_filter(provider=provider, service=filter_value)
+        # region OR 조건으로 수집
+        region_results = []
+        if region_filters:
+            for rf in region_filters:
+                region_results.extend(search_by_filter(provider=provider, region=rf))
+        else:
+            # 리전 필터가 없으면 전체
+            region_results = search_by_filter(provider=provider)
 
-    if not results:
-        console.print(f"[yellow]'{filter_value}'에 해당하는 IP 범위가 없습니다.[/yellow]")
+        # service 필터 적용 (AND)
+        if service_filters and region_results:
+            for result in region_results:
+                for sf in service_filters:
+                    if sf.lower() in (result.service or "").lower():
+                        all_results.append(result)
+                        break
+        elif not service_filters:
+            all_results = region_results
+        else:
+            # region_results가 없고 service만 있는 경우
+            for sf in service_filters:
+                all_results.extend(search_by_filter(provider=provider, service=sf))
+
+    # 중복 제거
+    seen = set()
+    unique_results = []
+    for r in all_results:
+        key = (r.ip_prefix, r.service, r.region)
+        if key not in seen:
+            seen.add(key)
+            unique_results.append(r)
+
+    if not unique_results:
+        console.print(f"[yellow]해당 조건에 맞는 IP 범위가 없습니다.[/yellow]")
         return
 
     # 결과 표시
-    console.print(f"\n[bold yellow]━━━ {provider.upper()} IP 범위 ({len(results)}개) ━━━[/bold yellow]")
-    _display_public_table(results)
-    console.print(f"\n[dim]{len(results)}개 IP 범위[/dim]")
+    console.print(f"\n[bold yellow]━━━ {provider.upper()} IP 범위 ({len(unique_results)}개) ━━━[/bold yellow]")
+    _display_public_table(unique_results)
+    console.print(f"\n[dim]{len(unique_results)}개 IP 범위[/dim]")
 
     # CSV 저장
     if save_csv:
-        filepath = _save_public_csv(results)
+        filepath = _save_public_csv(unique_results)
         if filepath:
             console.print(f"[green]CSV: {filepath}[/green]")
 
@@ -627,11 +713,12 @@ def _show_help():
 
 [bold cyan]━━━ Public IP 범위 검색 ━━━[/bold cyan]
 
-  [yellow]@aws[/yellow]               AWS 리전/서비스 목록 보기
-  [yellow]@aws ap-northeast-2[/yellow] AWS 서울 리전 IP 범위 (콜론 또는 공백)
-  [yellow]@aws:EC2[/yellow]           AWS EC2 서비스 IP 범위
-  [yellow]@gcp asia[/yellow]          GCP 아시아 리전 IP 범위
-  [yellow]@azure koreacentral[/yellow] Azure 한국 리전 IP 범위
+  [yellow]@aws[/yellow]                        AWS 리전/서비스 목록
+  [yellow]@aws ap-northeast-2[/yellow]         서울 리전
+  [yellow]@aws ec2[/yellow]                    EC2 서비스
+  [yellow]@aws ap-northeast-2 ec2[/yellow]     서울 + EC2 (AND)
+  [yellow]@aws ap-northeast-2,us-east-1[/yellow]  서울 + 버지니아 (OR)
+  [yellow]@aws ap-northeast-2,us-east-1 ec2,route53[/yellow]  다중 조합
 
 [bold cyan]━━━ 기타 명령어 ━━━[/bold cyan]
 
@@ -697,8 +784,17 @@ def run(ctx):
 
     # 시작 메시지
     console.print(f"\n[bold cyan]━━━ IP 검색 ({session_name}) ━━━[/bold cyan]")
-    console.print(f"  [dim]ENI 캐시:[/dim] {_format_cache_status(cache)}")
-    console.print(f"  [dim]토글:[/dim] [yellow]p[/yellow]=Public  [magenta]d[/magenta]=Detail  [green]c[/green]=CSV  |  [dim]@aws:리전  cache  h=도움말  q=종료[/dim]")
+
+    # 캐시 상태에 따른 안내
+    if not cache or not cache.is_valid():
+        console.print(f"\n[yellow]Private 검색용 ENI 캐시가 없습니다.[/yellow]")
+        console.print(f"  [dim]• Private 검색: 선택한 계정/리전의 ENI 정보 검색 (cache로 생성)[/dim]")
+        console.print(f"  [dim]• Public 검색: 클라우드 IP 대역 검색 (인증 불필요, 바로 사용 가능)[/dim]")
+        console.print(f"  [dim]  → @aws, @gcp, @azure, @oracle 명령으로 Public IP 범위 검색[/dim]")
+    else:
+        console.print(f"  [dim]ENI 캐시:[/dim] {_format_cache_status(cache)}")
+
+    console.print(f"\n  [dim]토글:[/dim] [yellow]p[/yellow]=Public  [magenta]d[/magenta]=Detail  [green]c[/green]=CSV  |  [dim]@aws:리전  cache  h=도움말  q=종료[/dim]")
 
     # 검색 루프
     while True:
