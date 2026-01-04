@@ -6,6 +6,7 @@ pkg/output/builder.py 단위 테스트
 """
 
 import os
+import sys
 from datetime import datetime
 from unittest.mock import patch
 
@@ -262,12 +263,7 @@ class TestOutputPathChaining:
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
 
-            path = (
-                OutputPath("test-profile")
-                .sub("AWS_EBS_Reports")
-                .with_date("monthly")
-                .build()
-            )
+            path = OutputPath("test-profile").sub("AWS_EBS_Reports").with_date("monthly").build()
 
             assert "test-profile" in path
             assert "AWS_EBS_Reports" in path
@@ -289,57 +285,57 @@ class TestOpenInExplorer:
         assert not new_dir.exists()
 
         with (
-            patch("core.tools.output.builder.platform.system", return_value="Windows"),
+            patch.object(sys, "platform", "win32"),
             patch("os.startfile", create=True),
         ):
             open_in_explorer(str(new_dir))
 
         assert new_dir.exists()
 
-    @patch("core.tools.output.builder.platform.system", return_value="Windows")
     @patch("os.startfile", create=True)
-    def test_windows_uses_startfile(self, mock_startfile, mock_system, tmp_path):
+    def test_windows_uses_startfile(self, mock_startfile, tmp_path):
         """Windows에서 os.startfile 사용"""
         test_dir = tmp_path / "test"
         test_dir.mkdir()
 
-        result = open_in_explorer(str(test_dir))
+        with patch.object(sys, "platform", "win32"):
+            result = open_in_explorer(str(test_dir))
 
         mock_startfile.assert_called_once_with(str(test_dir))
         assert result is True
 
-    @patch("core.tools.output.builder.platform.system", return_value="Darwin")
     @patch("subprocess.run")
-    def test_macos_uses_open(self, mock_run, mock_system, tmp_path):
+    def test_macos_uses_open(self, mock_run, tmp_path):
         """macOS에서 open 명령어 사용"""
         test_dir = tmp_path / "test"
         test_dir.mkdir()
 
-        result = open_in_explorer(str(test_dir))
+        with patch.object(sys, "platform", "darwin"):
+            result = open_in_explorer(str(test_dir))
 
         mock_run.assert_called_once_with(["open", str(test_dir)], check=False)
         assert result is True
 
-    @patch("core.tools.output.builder.platform.system", return_value="Linux")
     @patch("subprocess.run")
-    def test_linux_uses_xdg_open(self, mock_run, mock_system, tmp_path):
+    def test_linux_uses_xdg_open(self, mock_run, tmp_path):
         """Linux에서 xdg-open 명령어 사용"""
         test_dir = tmp_path / "test"
         test_dir.mkdir()
 
-        result = open_in_explorer(str(test_dir))
+        with patch.object(sys, "platform", "linux"):
+            result = open_in_explorer(str(test_dir))
 
         mock_run.assert_called_once_with(["xdg-open", str(test_dir)], check=False)
         assert result is True
 
-    @patch("core.tools.output.builder.platform.system", return_value="Windows")
     @patch("os.startfile", create=True, side_effect=Exception("error"))
-    def test_returns_false_on_error(self, mock_startfile, mock_system, tmp_path):
+    def test_returns_false_on_error(self, mock_startfile, tmp_path):
         """에러 발생 시 False 반환"""
         test_dir = tmp_path / "test"
         test_dir.mkdir()
 
-        result = open_in_explorer(str(test_dir))
+        with patch.object(sys, "platform", "win32"):
+            result = open_in_explorer(str(test_dir))
 
         assert result is False
 
@@ -357,26 +353,26 @@ class TestOpenFile:
         result = open_file("/nonexistent/file.txt")
         assert result is False
 
-    @patch("core.tools.output.builder.platform.system", return_value="Windows")
     @patch("os.startfile", create=True)
-    def test_windows_uses_startfile(self, mock_startfile, mock_system, tmp_path):
+    def test_windows_uses_startfile(self, mock_startfile, tmp_path):
         """Windows에서 os.startfile 사용"""
         test_file = tmp_path / "test.txt"
         test_file.write_text("test")
 
-        result = open_file(str(test_file))
+        with patch.object(sys, "platform", "win32"):
+            result = open_file(str(test_file))
 
         mock_startfile.assert_called_once_with(str(test_file))
         assert result is True
 
-    @patch("core.tools.output.builder.platform.system", return_value="Darwin")
     @patch("subprocess.run")
-    def test_macos_uses_open(self, mock_run, mock_system, tmp_path):
+    def test_macos_uses_open(self, mock_run, tmp_path):
         """macOS에서 open 명령어 사용"""
         test_file = tmp_path / "test.txt"
         test_file.write_text("test")
 
-        result = open_file(str(test_file))
+        with patch.object(sys, "platform", "darwin"):
+            result = open_file(str(test_file))
 
         mock_run.assert_called_once_with(["open", str(test_file)], check=False)
         assert result is True
