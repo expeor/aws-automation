@@ -7,7 +7,7 @@ discovery 기반으로 도구를 자동 발견하고 실행합니다.
 
 import sys
 import traceback
-from typing import Optional
+from typing import Any, Optional
 
 from rich.console import Console
 
@@ -30,8 +30,11 @@ class FlowRunner:
                     console.print(f"[red]실행 실패: {result.message}[/red]")
 
                 console.print()
-                console.print("[dim]완료[/dim]")
-                console.print()
+
+                # 계속 실행 여부 확인
+                cont = console.input("[dim]계속? [Y/n][/dim] > ").strip().lower()
+                if cont == "n":
+                    break
 
                 entry_point = None
 
@@ -266,7 +269,10 @@ class FlowRunner:
             )
             return
 
-        self._print_execution_summary(ctx)
+        # 필요 권한 정보 추출
+        required_permissions = tool.get("required_permissions")
+
+        self._print_execution_summary(ctx, required_permissions)
         console.print()
         console.print("[dim]실행 중...[/dim]")
         console.print()
@@ -289,9 +295,13 @@ class FlowRunner:
 
         except Exception as e:
             ctx.error = e
+            # AccessDenied 오류 시 권한 안내
+            self._handle_permission_error(e, required_permissions)
             raise
 
-    def _print_execution_summary(self, ctx: ExecutionContext) -> None:
+    def _print_execution_summary(
+        self, ctx: ExecutionContext, required_permissions: Any = None
+    ) -> None:
         """실행 전 요약 출력"""
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
@@ -317,7 +327,89 @@ class FlowRunner:
             target_count = len(ctx.get_target_accounts())
             print_box_line(f" 계정: {target_count}개")
 
+        # 필요 권한 표시
+        if required_permissions:
+            self._print_permissions_in_box(required_permissions)
+
         print_box_end()
+
+    def _print_permissions_in_box(self, permissions: dict) -> None:
+        """박스 내에 권한 목록 출력"""
+        from cli.ui.console import print_box_line
+
+        read_perms = permissions.get("read", [])
+        write_perms = permissions.get("write", [])
+
+        if not read_perms and not write_perms:
+            return
+
+        print_box_line(" 필요 권한:")
+        if read_perms:
+            for perm in read_perms:
+                print_box_line(f"   [dim]•[/dim] {perm}")
+        if write_perms:
+            for perm in write_perms:
+                print_box_line(f"   [yellow]•[/yellow] {perm} [dim](write)[/dim]")
+
+    def _count_permissions(self, permissions: dict) -> int:
+        """권한 개수 계산"""
+        count = 0
+        for perm_list in permissions.values():
+            if isinstance(perm_list, list):
+                count += len(perm_list)
+        return count
+
+    def _handle_permission_error(
+        self, error: Exception, required_permissions: Any
+    ) -> None:
+        """권한 오류 시 안내 메시지 출력"""
+        # botocore ClientError에서 AccessDenied 확인
+        error_code = None
+        try:
+            if hasattr(error, "response"):
+                error_code = getattr(error, "response", {}).get("Error", {}).get("Code")
+        except Exception:
+            pass
+
+        # AccessDenied 관련 오류인 경우에만 권한 안내
+        access_denied_codes = {
+            "AccessDenied",
+            "AccessDeniedException",
+            "UnauthorizedAccess",
+            "UnauthorizedOperation",
+            "AuthorizationError",
+        }
+
+        if error_code not in access_denied_codes:
+            return
+
+        console.print()
+        console.print("[yellow]━━━ 권한 오류 ━━━[/yellow]")
+        console.print(f"[red]{error_code}: 필요한 권한이 없습니다.[/red]")
+
+        if required_permissions:
+            console.print()
+            console.print("[cyan]이 도구에 필요한 권한:[/cyan]")
+
+            # read 권한
+            read_perms = required_permissions.get("read", [])
+            if read_perms:
+                console.print("[dim]  Read:[/dim]")
+                for perm in read_perms:
+                    console.print(f"    - {perm}")
+
+            # write 권한
+            write_perms = required_permissions.get("write", [])
+            if write_perms:
+                console.print("[dim]  Write:[/dim]")
+                for perm in write_perms:
+                    console.print(f"    - {perm}")
+
+            console.print()
+            console.print(
+                "[dim]IAM 정책에 위 권한을 추가하거나 관리자에게 문의하세요.[/dim]"
+            )
+        console.print("[yellow]━━━━━━━━━━━━━━━━━[/yellow]")
 
 
 def create_flow_runner() -> FlowRunner:

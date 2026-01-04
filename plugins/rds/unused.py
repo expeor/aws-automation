@@ -25,6 +25,14 @@ UNUSED_DAYS_THRESHOLD = 7
 # 저사용 기준: CPU 평균 5% 미만
 LOW_USAGE_CPU_THRESHOLD = 5.0
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "rds:DescribeDBInstances",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class InstanceStatus(Enum):
     """인스턴스 상태"""

@@ -726,5 +726,143 @@ def _register_category_commands():
 _register_category_commands()
 
 
+# =============================================================================
+# IP 검색 단축 명령어
+# =============================================================================
+
+
+@cli.command("ip")
+@click.argument("query", nargs=-1)
+@click.option("-p", "--profile", default=None, help="SSO 프로파일")
+@click.option("-c", "--csv", "save_csv", is_flag=True, help="결과를 CSV로 저장")
+@click.option("-d", "--detail", "detail_mode", is_flag=True, help="상세 모드 (API로 리소스 정보 조회)")
+@click.option("--no-public", "no_public", is_flag=True, help="Public 검색 비활성화")
+def ip_command(query, profile, save_csv, detail_mode, no_public):
+    """IP 검색 (Public + Private 통합)
+
+    \b
+    인자 없이 실행하면 대화형 모드로 진입합니다.
+    인자를 주면 바로 검색 후 종료합니다.
+
+    \b
+    검색 쿼리 형식:
+      IP        10.0.1.50, 13.124.199.1
+      CIDR      10.0.0.0/24
+      ENI ID    eni-04d867ef
+      VPC ID    vpc-0a6d4f22
+      텍스트    my-lambda, RDS
+
+    \b
+    Examples:
+      aa ip                          # 대화형 모드
+      aa ip 10.0.1.50                # 단일 IP 검색
+      aa ip 10.0.0.0/8               # CIDR 범위 검색
+      aa ip 10.0.1.50 -d             # 상세 모드 (API 조회)
+      aa ip 10.0.1.50 --no-public    # Private 검색만
+      aa ip vpc-0a6d4f22 -c          # VPC 검색 + CSV 저장
+      aa ip 10.0.1.50 -p my-profile  # 특정 프로파일 사용
+    """
+    from cli.flow import create_flow_runner
+    from cli.flow.context import ExecutionContext
+
+    # 쿼리가 없으면 기존 대화형 모드
+    if not query:
+        runner = create_flow_runner()
+        runner.run_tool_directly("vpc", "ip_search")
+        return
+
+    # 쿼리가 있으면 바로 검색 모드
+    _run_ip_search_direct(list(query), profile, save_csv, detail_mode, not no_public)
+
+
+def _run_ip_search_direct(
+    queries: list,
+    profile: str,
+    save_csv: bool,
+    detail_mode: bool = False,
+    public_mode: bool = True,
+):
+    """IP 검색 직접 실행 (CLI 인자 모드)"""
+    from rich.console import Console
+
+    console = Console()
+
+    # 프로파일 결정
+    if not profile:
+        # 기본 프로파일 사용
+        from core.auth import list_profiles
+
+        profiles = list_profiles()
+        if profiles:
+            profile = profiles[0]
+        else:
+            console.print("[red]사용 가능한 프로파일이 없습니다. -p 옵션으로 지정하세요.[/red]")
+            raise SystemExit(1)
+
+    # 컨텍스트 구성
+    from cli.flow.context import ExecutionContext
+    from core.auth import get_session
+
+    ctx = ExecutionContext()
+    ctx.profile_name = profile
+
+    try:
+        # 세션 생성
+        session = get_session(profile)
+        ctx.session = session
+
+        # 캐시 확인
+        from plugins.vpc.ip_search.private import ENICache
+
+        cache = ENICache(session_name=profile)
+        if not cache.is_valid():
+            console.print(f"[yellow]ENI 캐시가 없습니다. Private 검색이 제한됩니다.[/yellow]")
+            console.print("[dim]전체 검색을 원하면 'aa ip'로 대화형 모드 진입 후 'cache' 명령 사용[/dim]\n")
+            cache = None
+
+        # 검색 실행
+        from plugins.vpc.ip_search.private import parse_query, QueryType, search_by_query
+        from plugins.vpc.ip_search.public import search_public_ip
+
+        results = {"public": [], "private": []}
+
+        # Public 검색 (public_mode가 True일 때만)
+        if public_mode:
+            ip_queries = []
+            for query in queries:
+                query_type, value = parse_query(query)
+                if query_type == QueryType.IP and value:
+                    ip_queries.append(value)
+
+            if ip_queries:
+                with console.status("[bold yellow]Public IP 범위 검색 중..."):
+                    results["public"] = search_public_ip(ip_queries)
+
+        # Private 검색
+        if cache:
+            with console.status("[bold green]Private ENI 검색 중..."):
+                results["private"] = search_by_query(queries, cache)
+
+        # 상세 모드: API로 리소스 정보 enrichment
+        if detail_mode and results.get("private") and cache:
+            from plugins.vpc.ip_search.main import _enrich_with_detail
+
+            with console.status("[bold magenta]리소스 상세 정보 조회 중..."):
+                results["private"] = _enrich_with_detail(ctx, results["private"], cache, profile)
+
+        # 결과 출력
+        from plugins.vpc.ip_search.main import _display_results
+
+        _display_results(results, save_csv=save_csv)
+
+    except Exception as e:
+        console.print(f"[red]오류: {e}[/red]")
+        if "--debug" in sys.argv:
+            import traceback
+
+            traceback.print_exc()
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
     cli()

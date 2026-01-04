@@ -21,6 +21,15 @@ from plugins.cost.pricing import get_kms_key_price
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "kms:ListKeys",
+        "kms:DescribeKey",
+        "kms:ListAliases",
+    ],
+}
+
 
 class KMSKeyStatus(Enum):
     """KMS 키 상태"""

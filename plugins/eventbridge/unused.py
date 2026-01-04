@@ -23,6 +23,16 @@ console = Console()
 # 미사용 기준: 7일간 트리거 0
 UNUSED_DAYS_THRESHOLD = 7
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "events:ListEventBuses",
+        "events:ListRules",
+        "events:ListTargetsByRule",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class RuleStatus(Enum):
     """규칙 상태"""

@@ -19,6 +19,15 @@ from .sg_audit_analysis import SGAnalyzer, SGCollector, SGExcelReporter
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeInstances",
+    ],
+}
+
 
 def _collect_sgs(
     session, account_id: str, account_name: str, region: str

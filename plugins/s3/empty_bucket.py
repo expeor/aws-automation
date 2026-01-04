@@ -20,6 +20,19 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "s3:ListAllMyBuckets",
+        "s3:GetBucketLocation",
+        "s3:GetBucketVersioning",
+        "s3:GetBucketLifecycleConfiguration",
+        "s3:GetBucketLogging",
+        "s3:GetBucketReplication",
+        "s3:ListBucket",
+    ],
+}
+
 # 미사용 기준: 90일 이상 접근 없음
 UNUSED_DAYS_THRESHOLD = 90
 

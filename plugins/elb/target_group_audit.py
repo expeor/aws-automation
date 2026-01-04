@@ -20,6 +20,14 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetHealth",
+    ],
+}
+
 
 class TargetGroupStatus(Enum):
     """Target Group 상태"""

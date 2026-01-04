@@ -21,6 +21,14 @@ from plugins.cost.pricing import get_endpoint_monthly_cost
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeVpcEndpoints",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class EndpointStatus(Enum):
     """VPC Endpoint 상태"""

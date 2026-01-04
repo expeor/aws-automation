@@ -20,6 +20,14 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "acm:ListCertificates",
+        "acm:DescribeCertificate",
+    ],
+}
+
 # 만료 임박 기준: 30일 이내
 EXPIRING_DAYS_THRESHOLD = 30
 

@@ -58,7 +58,8 @@ class RegionStep:
         else:
             modes = [
                 f"현재 리전 ({self.default_region})",
-                "여러 리전 선택",
+                "다른 리전 1개 선택",
+                "여러 리전 선택 (2개 이상)",
                 f"모든 리전 ({len(ALL_REGIONS)}개)",
             ]
 
@@ -98,11 +99,13 @@ class RegionStep:
                 ctx.regions = [self._select_single_region()]
         else:
             # 다중 리전 지원하는 경우
-            if mode == 1:  # 단일 리전
+            if mode == 1:  # 현재 리전
                 ctx.regions = [self.default_region]
-            elif mode == 3:  # 모든 리전
+            elif mode == 2:  # 다른 리전 1개
+                ctx.regions = [self._select_single_region()]
+            elif mode == 4:  # 모든 리전
                 ctx.regions = ALL_REGIONS.copy()
-            else:  # 다중 리전
+            else:  # 여러 리전 (2개 이상)
                 ctx.regions = self._select_multiple_regions()
 
         # 결과 출력
@@ -119,25 +122,21 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions_for_selection = common_region_codes + other_regions
 
-        print_box_start(f"리전 선택 ({len(all_regions_for_selection)}개)")
+        print_box_start(f"리전 ({len(all_regions_for_selection)}개)")
 
-        # 2열 레이아웃
-        half = (len(all_regions_for_selection) + 1) // 2
-        for i in range(half):
-            left_idx = i + 1
-            left = all_regions_for_selection[i]
-            left_name = REGION_NAMES.get(left, "")[:8]
-            left_mark = "*" if left == self.default_region else " "
-            left_str = f"{left_idx:>2}){left_mark}{left:<16} {left_name:<8}"
-
-            if i + half < len(all_regions_for_selection):
-                right_idx = i + half + 1
-                right = all_regions_for_selection[i + half]
-                right_name = REGION_NAMES.get(right, "")[:8]
-                right_str = f"{right_idx:>2}) {right:<16} {right_name}"
-                print_box_line(f" {left_str}  {right_str}")
-            else:
-                print_box_line(f" {left_str}")
+        # 3열 레이아웃 (리전 코드만)
+        cols = 3
+        rows = (len(all_regions_for_selection) + cols - 1) // cols
+        for row in range(rows):
+            line_parts = []
+            for col in range(cols):
+                idx = row + col * rows
+                if idx < len(all_regions_for_selection):
+                    num = idx + 1
+                    region = all_regions_for_selection[idx]
+                    mark = "*" if region == self.default_region else " "
+                    line_parts.append(f"{num:>2}){mark}{region:<15}")
+            print_box_line(" " + "".join(line_parts))
 
         print_box_end()
 
@@ -158,7 +157,7 @@ class RegionStep:
                 console.print("[dim]숫자 입력[/dim]")
 
     def _select_multiple_regions(self) -> List[str]:
-        """복수 리전 선택 UI"""
+        """복수 리전 선택 UI (2개 이상)"""
         console.print()
 
         # 자주 사용하는 리전 우선 표시
@@ -166,44 +165,24 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions = common_region_codes + other_regions
 
-        # 기본 선택 (서울)
-        selected_indices = {0} if all_regions[0] == self.default_region else set()
-        for i, r in enumerate(all_regions):
-            if r == self.default_region:
-                selected_indices.add(i)
-                break
+        print_box_start(f"리전 ({len(all_regions)}개)")
 
-        def display():
-            print_box_start(f"리전 선택 ({len(all_regions)}개)")
+        # 3열 레이아웃 (리전 코드만)
+        cols = 3
+        rows = (len(all_regions) + cols - 1) // cols
+        for row in range(rows):
+            line_parts = []
+            for col in range(cols):
+                idx = row + col * rows
+                if idx < len(all_regions):
+                    num = idx + 1
+                    region = all_regions[idx]
+                    line_parts.append(f"{num:>2}) {region:<16}")
+            print_box_line(" " + "".join(line_parts))
 
-            # 2열 레이아웃
-            half = (len(all_regions) + 1) // 2
-            for i in range(half):
-                left_idx = i + 1
-                left = all_regions[i]
-                left_check = "[green]v[/green]" if i in selected_indices else " "
-                left_name = REGION_NAMES.get(left, "")[:6]
-                left_str = f"{left_idx:>2}){left_check}{left:<14} {left_name:<6}"
-
-                if i + half < len(all_regions):
-                    right_idx = i + half + 1
-                    right = all_regions[i + half]
-                    right_check = (
-                        "[green]v[/green]" if (i + half) in selected_indices else " "
-                    )
-                    right_name = REGION_NAMES.get(right, "")[:6]
-                    right_str = f"{right_idx:>2}){right_check}{right:<14} {right_name}"
-                    print_box_line(f" {left_str}  {right_str}")
-                else:
-                    print_box_line(f" {left_str}")
-
-            print_box_line()
-            print_box_line(
-                f"[dim]번호: 토글 | a: 전체 | d: 완료 ({len(selected_indices)}개)[/dim]"
-            )
-            print_box_end()
-
-        display()
+        print_box_line()
+        print_box_line("[dim]번호 (쉼표 구분) | a: 전체[/dim]")
+        print_box_end()
 
         while True:
             choice = console.input("> ").strip().lower()
@@ -211,30 +190,24 @@ class RegionStep:
             if not choice:
                 continue
 
-            if choice == "d":
-                if not selected_indices:
-                    return [self.default_region]
-                return [all_regions[i] for i in sorted(selected_indices)]
-
             if choice == "a":
-                if len(selected_indices) == len(all_regions):
-                    selected_indices.clear()
-                else:
-                    selected_indices = set(range(len(all_regions)))
-                display()
-                continue
+                return all_regions.copy()
 
-            # 번호 토글
+            # 번호 파싱 및 즉시 반환
             try:
                 nums = [int(n) for n in choice.replace(",", " ").split()]
+                selected = []
                 for num in nums:
                     if 1 <= num <= len(all_regions):
-                        idx = num - 1
-                        if idx in selected_indices:
-                            selected_indices.discard(idx)
-                        else:
-                            selected_indices.add(idx)
-                display()
+                        region = all_regions[num - 1]
+                        if region not in selected:
+                            selected.append(region)
+
+                if len(selected) < 2:
+                    console.print("[yellow]2개 이상 선택해주세요[/yellow]")
+                    continue
+
+                return selected
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 

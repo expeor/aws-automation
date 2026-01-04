@@ -23,6 +23,15 @@ console = Console()
 # 미사용 기준: 7일간 I/O 없음
 UNUSED_DAYS_THRESHOLD = 7
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "elasticfilesystem:DescribeFileSystems",
+        "elasticfilesystem:DescribeMountTargets",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 
 class FileSystemStatus(Enum):
     """파일시스템 상태"""

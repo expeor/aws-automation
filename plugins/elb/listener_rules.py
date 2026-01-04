@@ -22,6 +22,15 @@ from core.parallel import get_client
 from core.tools.base import BaseToolRunner
 from core.tools.output import OutputBuilder
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeListeners",
+        "elasticloadbalancing:DescribeRules",
+    ],
+}
+
 
 class FindingSeverity(str, Enum):
     """발견 항목 심각도"""

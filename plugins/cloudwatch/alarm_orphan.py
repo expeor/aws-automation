@@ -22,6 +22,14 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:GetMetricStatistics",
+    ],
+}
+
 # 지표 데이터 확인 기간 (일)
 METRIC_CHECK_DAYS = 7
 

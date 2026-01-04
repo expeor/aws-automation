@@ -21,6 +21,15 @@ from plugins.cost.pricing import get_ecr_storage_price
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ecr:DescribeRepositories",
+        "ecr:GetLifecyclePolicy",
+        "ecr:DescribeImages",
+    ],
+}
+
 # 미사용 기준: 90일 이상 pull 없음
 UNUSED_DAYS_THRESHOLD = 90
 

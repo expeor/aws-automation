@@ -16,7 +16,7 @@ TOOLS = [
         "name": "IP 검색",
         "description": "공인/사설 IP 검색 (AWS, GCP, Azure, Oracle + ENI 캐시)",
         "permission": "read",
-        "module": "ip_search",
+        "module": "ip_search",  # ip_search/ 폴더
         "area": "security",
     },
     {

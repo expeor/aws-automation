@@ -29,6 +29,14 @@ from plugins.cost.pricing import get_rds_snapshot_monthly_cost
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "rds:DescribeDBSnapshots",
+        "rds:DescribeDBClusterSnapshots",
+    ],
+}
+
 
 # =============================================================================
 # 상수

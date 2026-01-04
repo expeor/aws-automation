@@ -23,6 +23,15 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "lambda:ListFunctions",
+        "lambda:ListVersionsByFunction",
+        "lambda:ListAliases",
+    ],
+}
+
 
 class VersionStatus(Enum):
     """버전 상태"""

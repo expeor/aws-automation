@@ -1,5 +1,5 @@
 """
-plugins/vpc/ip_search_private.py - 사설 IP 검색기
+plugins/vpc/ip_search/private.py - 사설 IP 검색기
 
 AWS ENI(Elastic Network Interface) 캐시를 사용한 사설 IP 검색
 
@@ -23,6 +23,7 @@ from botocore.exceptions import ClientError
 
 from core.auth import SessionIterator
 from core.parallel import get_client
+
 
 # =============================================================================
 # 데이터 구조
@@ -50,7 +51,7 @@ class PrivateIPResult:
     name: str = ""
     is_managed: bool = False
     managed_by: str = "User"
-    mapped_resource: str = ""  # 상세 모드에서 사용
+    mapped_resource: str = ""
 
 
 # =============================================================================
@@ -77,9 +78,9 @@ class ENICache:
         if cache_dir:
             self.cache_dir = cache_dir
         else:
-            # plugins/vpc -> plugins -> project_root
+            # plugins/vpc/ip_search -> vpc -> plugins -> project_root
             project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             )
             self.cache_dir = os.path.join(project_root, "temp", "eni")
 
@@ -91,9 +92,7 @@ class ENICache:
         self.expiry = timedelta(hours=expiry_hours)
 
         # 캐시 데이터
-        self.cache: Dict[
-            str, Dict[str, Any]
-        ] = {}  # IP -> {interfaces: [], last_accessed: float}
+        self.cache: Dict[str, Dict[str, Any]] = {}
         self.sorted_ips: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = []
         self.lock = threading.Lock()
 
@@ -120,7 +119,6 @@ class ENICache:
             current = time.time()
             expiry_secs = self.expiry.total_seconds()
 
-            # 만료되지 않은 항목만 로드
             self.cache = {
                 ip_str: entry
                 for ip_str, entry in data.items()
@@ -250,6 +248,28 @@ class ENICache:
         """캐시된 ENI 수 반환"""
         return len(self.cache)
 
+    def get_stats(self) -> Dict[str, Any]:
+        """캐시 통계 반환 (리전별, 계정별 ENI 수)"""
+        regions: Dict[str, int] = {}
+        accounts: Dict[str, str] = {}  # account_id -> account_name
+
+        with self.lock:
+            for entry in self.cache.values():
+                eni = entry.get("eni", {})
+                region = eni.get("Region", "unknown")
+                account_id = eni.get("AccountId", "unknown")
+                account_name = eni.get("AccountName", account_id)
+
+                regions[region] = regions.get(region, 0) + 1
+                if account_id not in accounts:
+                    accounts[account_id] = account_name
+
+        return {
+            "total": len(self.cache),
+            "regions": regions,
+            "accounts": accounts,
+        }
+
 
 # =============================================================================
 # ENI 수집 함수
@@ -263,19 +283,7 @@ def fetch_enis_from_account(
     regions: List[str],
     progress_callback=None,
 ) -> List[Dict[str, Any]]:
-    """
-    계정에서 ENI 목록 수집
-
-    Args:
-        session: boto3 세션
-        account_id: 계정 ID
-        account_name: 계정 이름
-        regions: 조회할 리전 목록
-        progress_callback: 진행 콜백 함수
-
-    Returns:
-        ENI 정보 목록
-    """
+    """계정에서 ENI 목록 수집"""
     interfaces = []
 
     for region in regions:
@@ -285,12 +293,10 @@ def fetch_enis_from_account(
 
             for page in paginator.paginate():
                 for eni in page["NetworkInterfaces"]:
-                    # 메타 정보 추가
                     eni["AccountId"] = account_id
                     eni["AccountName"] = account_name
                     eni["Region"] = region
 
-                    # 관리형 여부 판단
                     is_managed = eni.get("RequesterManaged", False)
                     managed_by = "User"
 
@@ -337,19 +343,13 @@ def fetch_enis_from_account(
 
 
 def map_eni_to_resource(eni: Dict[str, Any]) -> str:
-    """
-    ENI Description을 파싱하여 연결된 리소스 추출 (빠른 매핑)
-
-    Returns:
-        리소스 정보 문자열 (예: "EC2: i-xxx", "RDS: mydb", "Lambda: my-func")
-    """
+    """ENI Description을 파싱하여 연결된 리소스 추출 (빠른 매핑)"""
     import re
 
     description = eni.get("Description", "")
     interface_type = eni.get("InterfaceType", "")
     attachment = eni.get("Attachment", {})
 
-    # EC2 인스턴스 (Attachment에서 확인)
     instance_id = attachment.get("InstanceId")
     if instance_id:
         return f"EC2: {instance_id}"
@@ -357,21 +357,18 @@ def map_eni_to_resource(eni: Dict[str, Any]) -> str:
     if not description:
         return ""
 
-    # EFS Mount Target
     if "EFS" in description or "mount target" in description.lower():
         fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
         if fs_match:
             return f"EFS: {fs_match.group(0)}"
         return "EFS"
 
-    # Lambda
     if "AWS Lambda VPC ENI" in description:
         func_match = re.search(r"AWS Lambda VPC ENI-(.+)", description)
         if func_match:
             return f"Lambda: {func_match.group(1).strip()}"
         return "Lambda"
 
-    # ELB (ALB/NLB/CLB)
     if "ELB" in description:
         if "app/" in description:
             alb_name = description.split("app/")[1].split("/")[0]
@@ -383,11 +380,9 @@ def map_eni_to_resource(eni: Dict[str, Any]) -> str:
             clb_name = description.replace("ELB ", "").strip()
             return f"CLB: {clb_name}"
 
-    # RDS
     if "RDSNetworkInterface" in description:
         rds_patterns = [
             r"RDSNetworkInterface[:\s-]+([a-zA-Z0-9_-]+)",
-            r"db[:\s-]+([a-zA-Z0-9_-]+)",
             r"([a-zA-Z0-9_-]+)\..*\.rds\.amazonaws\.com",
         ]
         for pattern in rds_patterns:
@@ -398,41 +393,33 @@ def map_eni_to_resource(eni: Dict[str, Any]) -> str:
                     return f"RDS: {db_id}"
         return "RDS"
 
-    # VPC Endpoint
     if "VPC Endpoint" in description:
         return "VPC Endpoint"
 
-    # FSx
     if "FSx" in description or "fsx" in description.lower():
         fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
         if fs_match:
             return f"FSx: {fs_match.group(0)}"
         return "FSx"
 
-    # NAT Gateway
     if "NAT Gateway" in description or interface_type == "nat_gateway":
         nat_match = re.search(r"nat-[a-zA-Z0-9]+", description)
         if nat_match:
             return f"NAT: {nat_match.group(0)}"
         return "NAT Gateway"
 
-    # ECS
     if "ecs" in interface_type.lower() or "ecs" in description.lower():
         return "ECS Task"
 
-    # ElastiCache
     if "ElastiCache" in description:
         return "ElastiCache"
 
-    # OpenSearch / Elasticsearch
     if "OpenSearch" in description or "Elasticsearch" in description:
         return "OpenSearch"
 
-    # Transit Gateway
     if "Transit Gateway" in description:
         return "Transit Gateway"
 
-    # API Gateway
     if "API Gateway" in description:
         return "API Gateway"
 
@@ -444,21 +431,16 @@ def map_eni_to_resource(eni: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def eni_to_result(
-    ip: str, eni: Dict[str, Any], detailed: bool = False
-) -> PrivateIPResult:
+def eni_to_result(ip: str, eni: Dict[str, Any], detailed: bool = False) -> PrivateIPResult:
     """ENI 데이터를 검색 결과로 변환"""
-    # 태그에서 Name 추출
     name = ""
     for tag in eni.get("TagSet", []):
         if tag.get("Key") == "Name":
             name = tag.get("Value", "")
             break
 
-    # 보안 그룹 목록
     security_groups = [sg.get("GroupName", "") for sg in eni.get("Groups", [])]
 
-    # Primary IP 추출
     primary_private = ""
     primary_public = ""
     for priv_ip in eni.get("PrivateIpAddresses", []):
@@ -467,7 +449,6 @@ def eni_to_result(
             primary_public = priv_ip.get("Association", {}).get("PublicIp", "")
             break
 
-    # 상세 모드일 때만 리소스 매핑
     mapped_resource = map_eni_to_resource(eni) if detailed else ""
 
     return PrivateIPResult(
@@ -493,6 +474,57 @@ def eni_to_result(
 
 
 # =============================================================================
+# 쿼리 파서
+# =============================================================================
+
+
+class QueryType:
+    """검색 쿼리 타입"""
+
+    IP = "ip"
+    CIDR = "cidr"
+    ENI_ID = "eni_id"
+    VPC_ID = "vpc_id"
+    SUBNET_ID = "subnet_id"
+    INSTANCE_ID = "instance_id"
+    SECURITY_GROUP = "security_group"
+    TEXT = "text"
+
+
+def parse_query(query: str) -> Tuple[str, str]:
+    """검색 쿼리 파싱하여 타입과 값 반환"""
+    query = query.strip()
+    if not query:
+        return QueryType.TEXT, ""
+
+    if query.startswith("eni-"):
+        return QueryType.ENI_ID, query
+    if query.startswith("vpc-"):
+        return QueryType.VPC_ID, query
+    if query.startswith("subnet-"):
+        return QueryType.SUBNET_ID, query
+    if query.startswith("i-"):
+        return QueryType.INSTANCE_ID, query
+    if query.startswith("sg-"):
+        return QueryType.SECURITY_GROUP, query
+
+    if "/" in query:
+        try:
+            ipaddress.ip_network(query, strict=False)
+            return QueryType.CIDR, query
+        except ValueError:
+            pass
+
+    try:
+        ipaddress.ip_address(query)
+        return QueryType.IP, query
+    except ValueError:
+        pass
+
+    return QueryType.TEXT, query
+
+
+# =============================================================================
 # 메인 검색 함수
 # =============================================================================
 
@@ -502,17 +534,7 @@ def search_private_ip(
     cache: ENICache,
     detailed: bool = False,
 ) -> List[PrivateIPResult]:
-    """
-    사설 IP 검색 (캐시 기반)
-
-    Args:
-        ip_list: 검색할 IP 주소 또는 CIDR 목록
-        cache: ENI 캐시
-        detailed: 상세 모드 (리소스 매핑 포함)
-
-    Returns:
-        검색 결과 목록
-    """
+    """사설 IP 검색 (캐시 기반)"""
     results = []
 
     for ip_or_cidr in ip_list:
@@ -520,7 +542,6 @@ def search_private_ip(
         if not ip_or_cidr:
             continue
 
-        # CIDR인지 확인
         if "/" in ip_or_cidr:
             matches = cache.get_by_cidr(ip_or_cidr)
             for ip, eni in matches:
@@ -533,30 +554,110 @@ def search_private_ip(
     return results
 
 
+def search_by_query(queries: List[str], cache: ENICache) -> List[PrivateIPResult]:
+    """다양한 쿼리 타입으로 검색 (통합 검색용)"""
+    results = []
+    seen_enis = set()
+
+    for query in queries:
+        query_type, value = parse_query(query)
+        if not value:
+            continue
+
+        matched_enis = []
+
+        if query_type == QueryType.IP:
+            for eni in cache.get_by_ip(value):
+                matched_enis.append((value, eni))
+
+        elif query_type == QueryType.CIDR:
+            matched_enis = cache.get_by_cidr(value)
+
+        elif query_type in (
+            QueryType.ENI_ID,
+            QueryType.VPC_ID,
+            QueryType.SUBNET_ID,
+            QueryType.INSTANCE_ID,
+            QueryType.SECURITY_GROUP,
+            QueryType.TEXT,
+        ):
+            matched_enis = _search_by_field(cache, query_type, value)
+
+        for ip, eni in matched_enis:
+            eni_id = eni.get("NetworkInterfaceId", "")
+            if eni_id and eni_id not in seen_enis:
+                seen_enis.add(eni_id)
+                results.append(eni_to_result(ip, eni, detailed=True))
+
+    return results
+
+
+def _search_by_field(
+    cache: ENICache, query_type: str, value: str
+) -> List[Tuple[str, Dict[str, Any]]]:
+    """필드 기반 검색 (캐시 전체 순회)"""
+    results = []
+    value_lower = value.lower()
+
+    with cache.lock:
+        for ip_str, entry in cache.cache.items():
+            for eni in entry.get("interfaces", []):
+                matched = False
+
+                if query_type == QueryType.ENI_ID:
+                    if eni.get("NetworkInterfaceId", "").lower() == value_lower:
+                        matched = True
+
+                elif query_type == QueryType.VPC_ID:
+                    if eni.get("VpcId", "").lower() == value_lower:
+                        matched = True
+
+                elif query_type == QueryType.SUBNET_ID:
+                    if eni.get("SubnetId", "").lower() == value_lower:
+                        matched = True
+
+                elif query_type == QueryType.INSTANCE_ID:
+                    instance_id = eni.get("Attachment", {}).get("InstanceId", "")
+                    if instance_id.lower() == value_lower:
+                        matched = True
+
+                elif query_type == QueryType.SECURITY_GROUP:
+                    for sg in eni.get("Groups", []):
+                        sg_id = sg.get("GroupId", "").lower()
+                        sg_name = sg.get("GroupName", "").lower()
+                        if value_lower in sg_id or value_lower in sg_name:
+                            matched = True
+                            break
+
+                elif query_type == QueryType.TEXT:
+                    description = eni.get("Description", "").lower()
+                    name = ""
+                    for tag in eni.get("TagSet", []):
+                        if tag.get("Key") == "Name":
+                            name = tag.get("Value", "").lower()
+                            break
+
+                    if value_lower in description or value_lower in name:
+                        matched = True
+
+                if matched:
+                    results.append((ip_str, eni))
+
+    return results
+
+
 def refresh_cache(
     cache: ENICache,
     session_iterator: SessionIterator,
     regions: Optional[List[str]] = None,
     progress_callback=None,
 ) -> int:
-    """
-    캐시 새로고침
-
-    Args:
-        cache: ENI 캐시
-        session_iterator: 세션 반복자
-        regions: 조회할 리전 목록 (None이면 활성 리전)
-        progress_callback: 진행 콜백
-
-    Returns:
-        수집된 ENI 수
-    """
+    """캐시 새로고침"""
     from core.region import get_active_regions
 
     total_count = 0
 
     for account_id, account_name, session in session_iterator:
-        # 리전 목록 결정
         if regions:
             target_regions = regions
         else:

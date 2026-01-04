@@ -21,6 +21,15 @@ from plugins.cost.pricing import get_hosted_zone_price
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "route53:ListHostedZones",
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets",
+    ],
+}
+
 
 class ZoneStatus(Enum):
     """Hosted Zone 상태"""

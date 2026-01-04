@@ -25,6 +25,19 @@ from .sso_audit_analysis import SSOAnalyzer, SSOCollector, SSOExcelReporter
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "sso:ListInstances",
+        "sso:ListPermissionSets",
+        "sso:DescribePermissionSet",
+        "sso:ListAccountAssignments",
+        "identitystore:ListUsers",
+        "identitystore:ListGroups",
+        "identitystore:ListGroupMemberships",
+    ],
+}
+
 
 def run(ctx) -> None:
     """IAM Identity Center 종합 점검 실행"""

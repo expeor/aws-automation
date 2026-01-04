@@ -24,6 +24,13 @@ from plugins.cost.pricing import get_ebs_monthly_cost
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeVolumes",
+    ],
+}
+
 
 # =============================================================================
 # 데이터 구조

@@ -24,6 +24,13 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
+# 필요한 AWS 권한 목록
+REQUIRED_PERMISSIONS = {
+    "read": [
+        "ec2:DescribeNetworkInterfaces",
+    ],
+}
+
 
 # =============================================================================
 # 데이터 구조
