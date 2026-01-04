@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -19,10 +18,8 @@ from .types import (
     MAP_TAG_KEY,
     MapTagAnalysisResult,
     MapTagApplyResult,
-    ResourceTagInfo,
     TagOperationResult,
 )
-
 
 # =============================================================================
 # 스타일 상수
@@ -55,7 +52,7 @@ def _adjust_column_widths(wb: Workbook) -> None:
 
 
 def generate_audit_report(
-    results: List[MapTagAnalysisResult],
+    results: list[MapTagAnalysisResult],
     output_dir: str,
     untagged_only: bool = False,
 ) -> str:
@@ -107,7 +104,11 @@ def generate_audit_report(
 
     for r in results:
         row += 1
-        rate = (r.tagged_resources / r.total_resources * 100) if r.total_resources > 0 else 0
+        rate = (
+            (r.tagged_resources / r.total_resources * 100)
+            if r.total_resources > 0
+            else 0
+        )
         ws.cell(row=row, column=1, value=r.account_name)
         ws.cell(row=row, column=2, value=r.region)
         ws.cell(row=row, column=3, value=r.total_resources)
@@ -121,7 +122,9 @@ def generate_audit_report(
     ws_type = wb.create_sheet("By Resource Type")
 
     # 타입별 통계 집계
-    type_totals: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
+    type_totals: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"total": 0, "tagged": 0}
+    )
     for r in results:
         for ts in r.type_stats:
             type_totals[ts.resource_type]["total"] += ts.total
@@ -133,7 +136,9 @@ def generate_audit_report(
         ws_type.cell(row=1, column=col).font = HEADER_FONT
 
     row = 1
-    for res_type, counts in sorted(type_totals.items(), key=lambda x: x[1]["total"], reverse=True):
+    for res_type, counts in sorted(
+        type_totals.items(), key=lambda x: x[1]["total"], reverse=True
+    ):
         row += 1
         total = counts["total"]
         tagged = counts["tagged"]
@@ -178,7 +183,15 @@ def generate_audit_report(
     # ===== 태그된 리소스 시트 (옵션) =====
     if not untagged_only:
         ws_tagged = wb.create_sheet("Tagged Resources")
-        headers = ["Account", "Region", "Type", "Resource ID", "Name", "MAP Tag Value", "ARN"]
+        headers = [
+            "Account",
+            "Region",
+            "Type",
+            "Resource ID",
+            "Name",
+            "MAP Tag Value",
+            "ARN",
+        ]
         for col, h in enumerate(headers, 1):
             ws_tagged.cell(row=1, column=col, value=h).fill = HEADER_FILL
             ws_tagged.cell(row=1, column=col).font = HEADER_FONT
@@ -201,7 +214,16 @@ def generate_audit_report(
 
     # ===== 전체 리소스 시트 =====
     ws_all = wb.create_sheet("All Resources")
-    headers = ["Account", "Region", "Type", "Resource ID", "Name", "MAP Tagged", "MAP Value", "ARN"]
+    headers = [
+        "Account",
+        "Region",
+        "Type",
+        "Resource ID",
+        "Name",
+        "MAP Tagged",
+        "MAP Value",
+        "ARN",
+    ]
     for col, h in enumerate(headers, 1):
         ws_all.cell(row=1, column=col, value=h).fill = HEADER_FILL
         ws_all.cell(row=1, column=col).font = HEADER_FONT
@@ -219,7 +241,9 @@ def generate_audit_report(
             ws_all.cell(row=row, column=4, value=res.resource_id)
             ws_all.cell(row=row, column=5, value=res.name or "-")
 
-            tagged_cell = ws_all.cell(row=row, column=6, value="Yes" if res.has_map_tag else "No")
+            tagged_cell = ws_all.cell(
+                row=row, column=6, value="Yes" if res.has_map_tag else "No"
+            )
             if res.has_map_tag:
                 tagged_cell.fill = GREEN_FILL
             else:
@@ -245,7 +269,7 @@ def generate_audit_report(
 
 
 def generate_apply_report(
-    results: List[MapTagApplyResult],
+    results: list[MapTagApplyResult],
     output_dir: str,
 ) -> str:
     """MAP 태그 적용 결과 Excel 리포트 생성"""
@@ -307,7 +331,18 @@ def generate_apply_report(
 
     # ===== 상세 로그 시트 =====
     ws_log = wb.create_sheet("Operation Log")
-    headers = ["Account", "Region", "Type", "Resource ID", "Name", "Operation", "Result", "Error", "Previous", "New"]
+    headers = [
+        "Account",
+        "Region",
+        "Type",
+        "Resource ID",
+        "Name",
+        "Operation",
+        "Result",
+        "Error",
+        "Previous",
+        "New",
+    ]
     for col, h in enumerate(headers, 1):
         ws_log.cell(row=1, column=col, value=h).fill = HEADER_FILL
         ws_log.cell(row=1, column=col).font = HEADER_FONT

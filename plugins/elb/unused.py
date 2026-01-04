@@ -20,7 +20,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -86,12 +85,12 @@ class LoadBalancerInfo:
     scheme: str  # internet-facing, internal
     state: str
     vpc_id: str
-    availability_zones: List[str]
-    created_time: Optional[datetime]
-    tags: Dict[str, str]
+    availability_zones: list[str]
+    created_time: datetime | None
+    tags: dict[str, str]
 
     # 타겟 그룹 (ALB/NLB/GWLB)
-    target_groups: List[TargetGroupInfo] = field(default_factory=list)
+    target_groups: list[TargetGroupInfo] = field(default_factory=list)
 
     # CLB 전용
     registered_instances: int = 0
@@ -138,7 +137,7 @@ class LBAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[LBFinding] = field(default_factory=list)
+    findings: list[LBFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -157,7 +156,7 @@ class LBAnalysisResult:
 
 def collect_v2_load_balancers(
     session, account_id: str, account_name: str, region: str
-) -> List[LoadBalancerInfo]:
+) -> list[LoadBalancerInfo]:
     """ALB/NLB/GWLB 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -219,7 +218,7 @@ def collect_v2_load_balancers(
     return load_balancers
 
 
-def _get_target_groups(elbv2, lb_arn: str) -> List[TargetGroupInfo]:
+def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
     """LB에 연결된 타겟 그룹 조회"""
     from botocore.exceptions import ClientError
 
@@ -272,7 +271,7 @@ def _get_target_groups(elbv2, lb_arn: str) -> List[TargetGroupInfo]:
 
 def collect_classic_load_balancers(
     session, account_id: str, account_name: str, region: str
-) -> List[LoadBalancerInfo]:
+) -> list[LoadBalancerInfo]:
     """Classic Load Balancer 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -350,7 +349,7 @@ def collect_classic_load_balancers(
 
 
 def analyze_load_balancers(
-    load_balancers: List[LoadBalancerInfo],
+    load_balancers: list[LoadBalancerInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -451,7 +450,7 @@ def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
 # =============================================================================
 
 
-def generate_report(results: List[LBAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -622,7 +621,7 @@ def run(ctx) -> None:
         ctx, _collect_and_analyze, max_workers=20, service="elasticloadbalancing"
     )
 
-    all_results: List[LBAnalysisResult] = result.get_data()
+    all_results: list[LBAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:

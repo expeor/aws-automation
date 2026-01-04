@@ -9,11 +9,11 @@ Security Group 데이터 수집기
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from botocore.exceptions import ClientError
 
-from core.parallel import ErrorSeverity, get_client, try_or_default
+from core.parallel import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +28,12 @@ class SGRule:
     port_range: str
     source_dest: str  # IP, SG ID, or Prefix List
     source_dest_type: str  # ip / sg / prefix-list
-    referenced_sg_id: Optional[str] = None
+    referenced_sg_id: str | None = None
     description: str = ""
     # 추가 분석용 필드
     is_self_reference: bool = False  # 자기 자신 참조
     is_cross_account: bool = False  # 다른 계정 SG 참조
-    referenced_account_id: Optional[str] = None  # 참조된 SG의 계정 ID
+    referenced_account_id: str | None = None  # 참조된 SG의 계정 ID
     is_ipv6: bool = False  # IPv6 규칙 여부
 
 
@@ -54,28 +54,28 @@ class SecurityGroup:
     is_default_vpc: bool = False
 
     # 규칙
-    inbound_rules: List[SGRule] = field(default_factory=list)
-    outbound_rules: List[SGRule] = field(default_factory=list)
+    inbound_rules: list[SGRule] = field(default_factory=list)
+    outbound_rules: list[SGRule] = field(default_factory=list)
 
     # ENI 연결 정보
     eni_count: int = 0
-    eni_descriptions: List[str] = field(default_factory=list)
+    eni_descriptions: list[str] = field(default_factory=list)
 
     # 참조 정보
-    referenced_by_sgs: Set[str] = field(default_factory=set)
+    referenced_by_sgs: set[str] = field(default_factory=set)
 
 
 class SGCollector:
     """Security Group 데이터 수집기"""
 
     def __init__(self):
-        self.security_groups: Dict[str, SecurityGroup] = {}  # sg_id -> SG
-        self.vpc_default_map: Dict[str, bool] = {}  # vpc_id -> is_default
-        self.errors: List[str] = []
+        self.security_groups: dict[str, SecurityGroup] = {}  # sg_id -> SG
+        self.vpc_default_map: dict[str, bool] = {}  # vpc_id -> is_default
+        self.errors: list[str] = []
 
     def collect(
         self, session, account_id: str, account_name: str, region: str
-    ) -> List[SecurityGroup]:
+    ) -> list[SecurityGroup]:
         """단일 계정/리전에서 SG 데이터 수집"""
         # 이전 수집 데이터 초기화 (중복 방지)
         self.security_groups.clear()
@@ -160,8 +160,8 @@ class SGCollector:
                 self.security_groups[sg_id] = security_group
 
     def _parse_rules(
-        self, rule: Dict[str, Any], direction: str, sg_id: str, account_id: str
-    ) -> List[SGRule]:
+        self, rule: dict[str, Any], direction: str, sg_id: str, account_id: str
+    ) -> list[SGRule]:
         """규칙 파싱"""
         rules = []
 
@@ -172,9 +172,7 @@ class SGCollector:
         from_port = rule.get("FromPort")
         to_port = rule.get("ToPort")
 
-        if protocol == "ALL":
-            port_range = "ALL"
-        elif from_port is None or to_port is None:
+        if protocol == "ALL" or from_port is None or to_port is None:
             port_range = "ALL"
         elif from_port == -1 or to_port == -1:
             # ICMP 등 포트 개념이 없는 프로토콜은 -1 반환

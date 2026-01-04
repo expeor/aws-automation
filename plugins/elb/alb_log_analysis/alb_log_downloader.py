@@ -3,14 +3,13 @@ import concurrent.futures
 import gc
 import gzip
 import os
-import re
 import shutil
 from collections import namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
-import pytz
+import pytz  # type: ignore[import-untyped]
 from botocore.exceptions import ClientError
 from rich.console import Console
 from rich.progress import (
@@ -30,6 +29,8 @@ except ImportError:
 
     console = Console()
     logger = logging.getLogger(__name__)
+
+import contextlib
 
 from core.tools.cache import get_cache_dir
 
@@ -60,7 +61,7 @@ class ALBLogDownloader:
         s3_client: Any,
         s3_uri: str,
         start_datetime: Any,
-        end_datetime: Optional[Any] = None,
+        end_datetime: Any | None = None,
         timezone: str = "Asia/Seoul",
         max_workers: int = 5,
         chunk_size: int = 8 * 1024 * 1024,  # 8MB
@@ -94,6 +95,8 @@ class ALBLogDownloader:
         # S3 URI 파싱
         if not s3_uri.startswith("s3://"):
             raise ValueError("S3 URI는 's3://'로 시작해야 합니다.")
+
+        self.s3_uri = s3_uri  # Store for later use
 
         # s3:// 제거
         path = s3_uri[5:]
@@ -154,7 +157,7 @@ class ALBLogDownloader:
         self.decompressed_dir = os.path.join(alb_data_dir, "log")  # 압축 해제된 로그 저장
 
         # 요청 범위 미스매치 시 사용자 안내를 위해 S3에서 확인된 실제 로그 범위(KST)를 저장
-        self.available_range_local: Optional[Tuple[datetime, datetime]] = None
+        self.available_range_local: tuple[datetime, datetime] | None = None
 
         # 디렉토리 생성
         os.makedirs(self.temp_dir, exist_ok=True)
@@ -212,7 +215,7 @@ class ALBLogDownloader:
             suffix = token_hex(4)
             return f"alb_{suffix}.xlsx"
 
-    def _smart_date_range_optimization(self) -> List[str]:
+    def _smart_date_range_optimization(self) -> list[str]:
         """스마트 날짜 범위 최적화 - 시간 범위에 따라 접두사 세분화"""
         prefixes = []
 
@@ -269,7 +272,7 @@ class ALBLogDownloader:
         logger.debug(f"생성된 접두사 목록: {prefixes}")
         return prefixes
 
-    def _extract_timestamp_from_key(self, key: str) -> Optional[datetime]:
+    def _extract_timestamp_from_key(self, key: str) -> datetime | None:
         """S3 객체 키에서 타임스탬프를 추출합니다."""
         try:
             # ALB 로그 파일명 형식에서 타임스탬프 추출
@@ -336,7 +339,7 @@ class ALBLogDownloader:
             logger.debug(f"타임스탬프 추출 실패 ({key}): {str(e)}")
             return None
 
-    def _binary_search_time_filter(self, log_files: List[S3LogFile]) -> List[S3LogFile]:
+    def _binary_search_time_filter(self, log_files: list[S3LogFile]) -> list[S3LogFile]:
         """바이너리 서치를 사용한 시간 범위 필터링"""
         if not self.smart_filtering or not log_files:
             # 스마트 필터링 비활성화시 기존 방식
@@ -464,7 +467,7 @@ class ALBLogDownloader:
 
     def _list_objects_for_prefix(
         self, prefix: str, progress: Progress, task_id: Any
-    ) -> List[S3LogFile]:
+    ) -> list[S3LogFile]:
         """특정 접두사에 대한 S3 객체 목록을 최적화하여 반환합니다."""
         result = []
         paginator = self.s3_client.get_paginator("list_objects_v2")
@@ -495,7 +498,7 @@ class ALBLogDownloader:
             logger.error(f"❌ 객체 목록 조회 실패 ({prefix}): {str(e)}")
             return []
 
-    def _list_objects_for_prefix_simple(self, prefix: str) -> List[S3LogFile]:
+    def _list_objects_for_prefix_simple(self, prefix: str) -> list[S3LogFile]:
         """특정 접두사에 대한 S3 객체 목록을 간단히 반환합니다 (Progress 없이)."""
         result = []
         paginator = self.s3_client.get_paginator("list_objects_v2")
@@ -554,21 +557,23 @@ class ALBLogDownloader:
                     f"   해결 방법:\n"
                     f"   - S3 버킷이 있는 계정에서 직접 접근하거나\n"
                     f"   - S3 버킷 정책에 현재 역할에 대한 접근 권한 추가 필요"
-                )
+                ) from e
             elif error_code == "404":
                 raise LogDownloadError(
                     f"❌ S3 버킷 '{self.bucket_name}'을(를) 찾을 수 없습니다.\n"
                     f"   버킷 이름을 확인해주세요."
-                )
+                ) from e
             else:
                 raise LogDownloadError(
                     f"❌ S3 버킷 '{self.bucket_name}' 접근 오류: {error_code}\n"
                     f"   상세: {str(e)}"
-                )
+                ) from e
         except Exception as e:
-            raise LogDownloadError(f"❌ S3 버킷 '{self.bucket_name}' 접근 확인 실패: {str(e)}")
+            raise LogDownloadError(
+                f"❌ S3 버킷 '{self.bucket_name}' 접근 확인 실패: {str(e)}"
+            ) from e
 
-    def download_logs(self) -> List[str]:
+    def download_logs(self) -> list[str]:
         """최적화된 방식으로 S3에서 로그 파일을 다운로드합니다."""
         try:
             # 🔐 S3 버킷 접근 권한 사전 검증
@@ -694,11 +699,11 @@ class ALBLogDownloader:
 
         except Exception as e:
             logger.error(f"❌ 로그 다운로드 중 오류 발생: {str(e)}")
-            raise LogDownloadError(f"로그 다운로드 중 오류 발생: {str(e)}")
+            raise LogDownloadError(f"로그 다운로드 중 오류 발생: {str(e)}") from e
 
     def _download_single_file(
         self, key: str, progress: Progress, task_id: Any
-    ) -> Optional[str]:
+    ) -> str | None:
         """단일 파일을 다운로드합니다."""
         try:
             # 🔧 수정: 모든 파일을 한 폴더에 저장 (날짜별 디렉토리 분리 제거)
@@ -746,7 +751,7 @@ class ALBLogDownloader:
                 file_size = os.path.getsize(local_path)
                 progress.update(
                     task_id,
-                    description=f"[cyan]다운로드 진행중...",
+                    description="[cyan]다운로드 진행중...",
                 )
 
             except Exception as e:
@@ -761,7 +766,7 @@ class ALBLogDownloader:
             logger.error(f"❌ 파일 다운로드 실패 ({key}): {str(e)}")
             return None
 
-    def decompress_logs(self, gz_directory: Optional[str] = None) -> str:
+    def decompress_logs(self, gz_directory: str | None = None) -> str:
         """압축된 로그 파일을 해제합니다."""
         if gz_directory is None:
             gz_directory = self.temp_dir
@@ -804,9 +809,11 @@ class ALBLogDownloader:
 
                 try:
                     # 압축 해제 진행
-                    with gzip.open(gz_file_path, "rb") as gz_file:
-                        with open(log_file_path, "wb") as log_file:
-                            shutil.copyfileobj(gz_file, log_file)
+                    with (
+                        gzip.open(gz_file_path, "rb") as gz_file,
+                        open(log_file_path, "wb") as log_file,
+                    ):
+                        shutil.copyfileobj(gz_file, log_file)
 
                     # 개별 파일 로그를 DEBUG로 변경 (터미널 출력 정리)
                     logger.debug(
@@ -881,12 +888,10 @@ class ALBLogDownloader:
         except Exception as e:
             logger.error(f"❌ 디렉토리 정리 실패: {directory}, 오류: {e}")
             # 실패해도 디렉터리 생성 시도
-            try:
+            with contextlib.suppress(Exception):
                 os.makedirs(directory, exist_ok=True)
-            except Exception:
-                pass
 
-    def _get_log_files_from_s3(self, date_prefixes: List[str]) -> List[S3LogFile]:
+    def _get_log_files_from_s3(self, date_prefixes: list[str]) -> list[S3LogFile]:
         """S3에서 로그 파일 목록을 간단하게 가져옵니다."""
         self.console.print("[blue]📋 S3에서 로그 파일 검색 중...[/blue]")
 

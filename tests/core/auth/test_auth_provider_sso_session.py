@@ -8,13 +8,13 @@ core/auth/provider/sso_session.py 테스트
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from core.auth.cache import TokenCache
 from core.auth.provider.sso_session import SSOSessionConfig, SSOSessionProvider
-from core.auth.types import ProviderError, ProviderType, TokenExpiredError
+from core.auth.types import ProviderType, TokenExpiredError
 
 
 class TestSSOSessionConfig:
@@ -206,10 +206,12 @@ class TestSSOSessionProvider:
             }.get(service, MagicMock())
             mock_session_class.return_value = mock_session
 
-            with patch("core.auth.provider.sso_session.webbrowser"):
-                with patch("core.auth.provider.sso_session.sleep"):
-                    provider = SSOSessionProvider(config)
-                    provider.authenticate(force=True)
+            with (
+                patch("core.auth.provider.sso_session.webbrowser"),
+                patch("core.auth.provider.sso_session.sleep"),
+            ):
+                provider = SSOSessionProvider(config)
+                provider.authenticate(force=True)
 
         mock_cache_manager.delete.assert_called_once()
         assert provider._authenticated is True
@@ -450,11 +452,13 @@ class TestSSOSessionProvider:
             }.get(service, MagicMock())
             mock_session_class.return_value = mock_session
 
-            with patch("core.auth.provider.sso_session.webbrowser"):
-                with patch("core.auth.provider.sso_session.sleep"):
-                    provider = SSOSessionProvider(config)
-                    provider.authenticate()
-                    provider.refresh()
+            with (
+                patch("core.auth.provider.sso_session.webbrowser"),
+                patch("core.auth.provider.sso_session.sleep"),
+            ):
+                provider = SSOSessionProvider(config)
+                provider.authenticate()
+                provider.refresh()
 
         mock_sso_oidc.register_client.assert_called()
 
@@ -511,12 +515,14 @@ class TestSSOSessionProviderEdgeCases:
             }.get(service, MagicMock())
             mock_session_class.return_value = mock_session
 
-            with patch("core.auth.provider.sso_session.webbrowser"):
-                with patch("core.auth.provider.sso_session.sleep"):
-                    provider = SSOSessionProvider(config)
+            with (
+                patch("core.auth.provider.sso_session.webbrowser"),
+                patch("core.auth.provider.sso_session.sleep"),
+            ):
+                provider = SSOSessionProvider(config)
 
-                    with pytest.raises(TokenExpiredError) as exc_info:
-                        provider.authenticate()
+                with pytest.raises(TokenExpiredError) as exc_info:
+                    provider.authenticate()
 
                     assert "시간 초과" in str(exc_info.value)
 
@@ -568,10 +574,12 @@ class TestSSOSessionProviderEdgeCases:
             }.get(service, MagicMock())
             mock_session_class.return_value = mock_session
 
-            with patch("core.auth.provider.sso_session.webbrowser"):
-                with patch("core.auth.provider.sso_session.sleep"):
-                    provider = SSOSessionProvider(config)
-                    provider.authenticate()
+            with (
+                patch("core.auth.provider.sso_session.webbrowser"),
+                patch("core.auth.provider.sso_session.sleep"),
+            ):
+                provider = SSOSessionProvider(config)
+                provider.authenticate()
 
         assert provider._authenticated is True
 
@@ -620,9 +628,7 @@ class TestSSOSessionProviderEdgeCases:
                 },
             )
 
-            session = provider.get_session(
-                account_id="111111111111", role_name="AdminRole"
-            )
+            provider.get_session(account_id="111111111111", role_name="AdminRole")
 
         # SSO API 호출되지 않아야 함 (캐시 사용)
         mock_sso.get_role_credentials.assert_not_called()

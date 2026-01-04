@@ -12,7 +12,7 @@ IAM Identity Center(SSO) 보안 감사:
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from botocore.exceptions import ClientError
 from rich.console import Console
@@ -52,7 +52,7 @@ def run(ctx) -> None:
     collected = False
 
     with SessionIterator(ctx) as sessions:
-        for session, identifier, region in sessions:
+        for session, identifier, _region in sessions:
             # SSO는 글로벌 서비스이므로 한 번만 수집
             if collected:
                 break
@@ -147,7 +147,7 @@ def run(ctx) -> None:
     open_in_explorer(output_path)
 
 
-def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
+def _print_summary(stats_list: list[dict[str, Any]]) -> None:
     """분석 결과 요약 출력"""
     # 전체 통계 계산
     totals = {

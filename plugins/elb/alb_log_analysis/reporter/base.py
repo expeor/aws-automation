@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 from .config import (
     COLUMN_STYLE_MAP,
@@ -32,7 +32,8 @@ def get_column_letter(col_idx: int) -> str:
     """Get Excel column letter from index (1-based)."""
     from openpyxl.utils import get_column_letter as _gcl
 
-    return _gcl(col_idx)
+    result: str = _gcl(col_idx)
+    return result
 
 
 class BaseSheetWriter:
@@ -40,9 +41,9 @@ class BaseSheetWriter:
 
     def __init__(
         self,
-        workbook: "Workbook",
-        data: Dict[str, Any],
-        abuse_ip_set: Optional[Set[str]] = None,
+        workbook: Workbook,
+        data: dict[str, Any],
+        abuse_ip_set: set[str] | None = None,
     ) -> None:
         self.workbook = workbook
         self.data = data
@@ -50,11 +51,11 @@ class BaseSheetWriter:
         self.styles = get_style_cache()
         self.config = SheetConfig()
 
-    def create_sheet(self, name: str) -> "Worksheet":
+    def create_sheet(self, name: str) -> Worksheet:
         return self.workbook.create_sheet(name)
 
     def write_header_row(
-        self, ws: "Worksheet", headers: Union[List[str], Tuple[str, ...]], row: int = 1
+        self, ws: Worksheet, headers: list[str] | tuple[str, ...], row: int = 1
     ) -> None:
         style = self.styles.get_header_style()
         for col, header in enumerate(headers, 1):
@@ -65,7 +66,7 @@ class BaseSheetWriter:
             cell.border = style["border"]
 
     def write_empty_message(
-        self, ws: "Worksheet", message: str, row: int, col_count: int
+        self, ws: Worksheet, message: str, row: int, col_count: int
     ) -> None:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
         cell = ws.cell(row=row, column=1, value=message)
@@ -75,8 +76,8 @@ class BaseSheetWriter:
 
     def finalize_sheet(
         self,
-        ws: "Worksheet",
-        headers: Union[List[str], Tuple[str, ...]],
+        ws: Worksheet,
+        headers: list[str] | tuple[str, ...],
         data_count: int = 0,
     ) -> None:
         self._apply_column_widths(ws, headers)
@@ -87,14 +88,14 @@ class BaseSheetWriter:
         ws.sheet_view.zoomScale = self.config.ZOOM_SCALE
 
     def _apply_column_widths(
-        self, ws: "Worksheet", headers: Union[List[str], Tuple[str, ...]]
+        self, ws: Worksheet, headers: list[str] | tuple[str, ...]
     ) -> None:
         for col, header in enumerate(headers, 1):
             ws.column_dimensions[get_column_letter(col)].width = COLUMN_WIDTH_MAP.get(
                 header, self.config.DEFAULT_COLUMN_WIDTH
             )
 
-    def apply_cell_style(self, cell: "Cell", header: str, value: Any) -> None:
+    def apply_cell_style(self, cell: Cell, header: str, value: Any) -> None:
         style_type = COLUMN_STYLE_MAP.get(header, STYLE_DATA)
         if style_type == STYLE_NUMBER:
             cell.alignment = self.styles.align_right
@@ -118,9 +119,9 @@ class BaseSheetWriter:
 
     def write_data_rows(
         self,
-        ws: "Worksheet",
-        data: List[Dict[str, Any]],
-        headers: Union[List[str], Tuple[str, ...]],
+        ws: Worksheet,
+        data: list[dict[str, Any]],
+        headers: list[str] | tuple[str, ...],
         start_row: int = 2,
         highlight_abuse: bool = True,
         client_column: str = "Client",
@@ -160,7 +161,7 @@ class BaseSheetWriter:
         return len(data)
 
     def apply_wrap_text(
-        self, ws: "Worksheet", headers: Union[List[str], Tuple[str, ...]]
+        self, ws: Worksheet, headers: list[str] | tuple[str, ...]
     ) -> None:
         from openpyxl.styles import Alignment
 
@@ -177,7 +178,7 @@ class BaseSheetWriter:
                         horizontal=h_align, vertical="center", wrap_text=True
                     )
 
-    def convert_status_code(self, code: Any) -> Union[int, str]:
+    def convert_status_code(self, code: Any) -> int | str:
         if code is None or code == "" or code == "-":
             return ""
         if isinstance(code, int):
@@ -194,7 +195,7 @@ class BaseSheetWriter:
             return int(code)
         return ""
 
-    def format_bytes(self, size: Union[int, float, str, None]) -> str:
+    def format_bytes(self, size: int | float | str | None) -> str:
         try:
             size = float(size or 0)
             for unit in ("", "KB", "MB", "GB", "TB"):
@@ -211,22 +212,23 @@ class BaseSheetWriter:
         return str(ts) if ts else "N/A"
 
     def get_country_code(self, client_ip: str) -> str:
-        return self.data.get("ip_country_mapping", {}).get(client_ip, "N/A")
+        result: str = self.data.get("ip_country_mapping", {}).get(client_ip, "N/A")
+        return result
 
-    def get_matching_abuse_ips(self) -> Set[str]:
+    def get_matching_abuse_ips(self) -> set[str]:
         client_ips = set(self.data.get("client_ip_counts", {}).keys())
         abuse_list, _ = self.get_normalized_abuse_ips()
         return client_ips.intersection(abuse_list)
 
-    def get_normalized_abuse_ips(self) -> Tuple[List[str], Dict[str, Any]]:
+    def get_normalized_abuse_ips(self) -> tuple[list[str], dict[str, Any]]:
         excluded = {"abuse_ips", "abuse_ip_details", "timestamp"}
 
         def valid(ip: Any) -> bool:
             s = str(ip).strip() if ip else ""
             return bool(s) and not any(k in s for k in excluded)
 
-        ips: List[str] = []
-        details: Dict[str, Any] = {}
+        ips: list[str] = []
+        details: dict[str, Any] = {}
 
         if self.data.get("abuse_ips_list"):
             ips = [str(ip).strip() for ip in self.data["abuse_ips_list"] if valid(ip)]
@@ -235,7 +237,7 @@ class BaseSheetWriter:
             if isinstance(abuse, (list, set)):
                 ips = [str(ip).strip() for ip in abuse if valid(ip)]
             elif isinstance(abuse, dict):
-                ips = [str(ip).strip() for ip in abuse.keys() if valid(ip)]
+                ips = [str(ip).strip() for ip in abuse if valid(ip)]
                 details = abuse
 
         if self.data.get("abuse_ip_details"):
@@ -247,14 +249,14 @@ class BaseSheetWriter:
 class SummarySheetHelper:
     """Helper for summary sheet layout."""
 
-    def __init__(self, ws: "Worksheet") -> None:
+    def __init__(self, ws: Worksheet) -> None:
         self.ws = ws
         self.styles = get_style_cache()
         self.row = 1
         ws.column_dimensions["A"].width = 25
         ws.column_dimensions["B"].width = 25
 
-    def add_title(self, title: str) -> "SummarySheetHelper":
+    def add_title(self, title: str) -> SummarySheetHelper:
         self.ws.merge_cells(f"A{self.row}:B{self.row}")
         cell = self.ws.cell(row=self.row, column=1, value=title)
         cell.font = self.styles.title_font
@@ -266,7 +268,7 @@ class SummarySheetHelper:
         self.row += 2
         return self
 
-    def add_section(self, name: str) -> "SummarySheetHelper":
+    def add_section(self, name: str) -> SummarySheetHelper:
         self.ws.merge_cells(f"A{self.row}:B{self.row}")
         cell = self.ws.cell(row=self.row, column=1, value=name)
         cell.font = self.styles.header_font
@@ -281,9 +283,9 @@ class SummarySheetHelper:
         self,
         label: str,
         value: Any,
-        highlight: Optional[str] = None,
-        number_format: Optional[str] = None,
-    ) -> "SummarySheetHelper":
+        highlight: str | None = None,
+        number_format: str | None = None,
+    ) -> SummarySheetHelper:
         label_cell = self.ws.cell(row=self.row, column=1, value=label)
         label_cell.font = self.styles.label_font
         label_cell.alignment = self.styles.align_left
@@ -304,17 +306,17 @@ class SummarySheetHelper:
         self.row += 1
         return self
 
-    def add_blank_row(self) -> "SummarySheetHelper":
+    def add_blank_row(self) -> SummarySheetHelper:
         self.row += 1
         return self
 
     def add_list_section(
         self,
         label: str,
-        items: List[Tuple[str, Any]],
+        items: list[tuple[str, Any]],
         max_items: int = 5,
         suffix: str = "",
-    ) -> "SummarySheetHelper":
+    ) -> SummarySheetHelper:
         label_cell = self.ws.cell(row=self.row, column=1, value=f"{label}:")
         label_cell.font = self.styles.label_font
         label_cell.alignment = self.styles.align_left

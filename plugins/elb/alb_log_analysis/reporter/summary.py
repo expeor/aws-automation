@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Tuple
 
 from .base import BaseSheetWriter, SummarySheetHelper
 from .config import SHEET_NAMES, SheetConfig
@@ -118,7 +117,7 @@ class SummarySheetWriter(BaseSheetWriter):
         except Exception as e:
             logger.error(f"Summary 시트 생성 중 오류 발생: {e}")
 
-    def _parse_s3_uri(self, s3_uri: str) -> Tuple[str, str, str, str]:
+    def _parse_s3_uri(self, s3_uri: str) -> tuple[str, str, str, str]:
         """Parse S3 URI into components."""
         bucket_name = account_id = region = service_prefix = "N/A"
 
@@ -243,7 +242,7 @@ class SummarySheetWriter(BaseSheetWriter):
             highlight = highlight_type if count > 0 else None
             helper.add_item(label, display_value, highlight=highlight)
 
-    def _get_top_request_urls(self, limit: int) -> List[Tuple[str, int]]:
+    def _get_top_request_urls(self, limit: int) -> list[tuple[str, int]]:
         """Get top requested URLs."""
         try:
             url_counts = self.data.get("request_url_counts", {})
@@ -256,7 +255,7 @@ class SummarySheetWriter(BaseSheetWriter):
             logger.error(f"상위 요청 URL 계산 중 오류: {e}")
             return []
 
-    def _get_top_user_agents(self, limit: int) -> List[Tuple[str, int]]:
+    def _get_top_user_agents(self, limit: int) -> list[tuple[str, int]]:
         """Get top user agents."""
         try:
             ua_counts = self.data.get("user_agent_counts", {})
@@ -269,7 +268,7 @@ class SummarySheetWriter(BaseSheetWriter):
             logger.error(f"상위 User Agent 계산 중 오류: {e}")
             return []
 
-    def _get_top_countries(self, limit: int) -> List[Tuple[str, int]]:
+    def _get_top_countries(self, limit: int) -> list[tuple[str, int]]:
         """Get top countries."""
         try:
             country_stats = self.data.get("country_statistics", {})
@@ -284,7 +283,7 @@ class SummarySheetWriter(BaseSheetWriter):
             logger.error(f"상위 국가 계산 중 오류: {e}")
             return []
 
-    def _calculate_response_time_stats(self) -> Dict[str, str]:
+    def _calculate_response_time_stats(self) -> dict[str, str]:
         """Calculate response time statistics."""
         try:
             long_response_times = self.data.get("long_response_times", [])
@@ -304,10 +303,11 @@ class SummarySheetWriter(BaseSheetWriter):
             response_times.sort()
             n = len(response_times)
 
-            if n % 2 == 0:
-                median = (response_times[n // 2 - 1] + response_times[n // 2]) / 2
-            else:
-                median = response_times[n // 2]
+            median = (
+                (response_times[n // 2 - 1] + response_times[n // 2]) / 2
+                if n % 2 == 0
+                else response_times[n // 2]
+            )
 
             return {
                 "max": f"{response_times[-1]:.3f}초",

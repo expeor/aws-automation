@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from secrets import token_hex
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.progress import (
@@ -45,25 +46,25 @@ class ALBExcelReporter:
 
     def __init__(
         self,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         output_dir: str = "reports",
     ) -> None:
         self.output_dir = output_dir
-        self.data: Dict[str, Any] = data or {}
+        self.data: dict[str, Any] = data or {}
         os.makedirs(output_dir, exist_ok=True)
 
         from .reporter.styles import get_style_cache
 
         self._style_cache = get_style_cache()
 
-    def generate_report(self, report_name: Optional[str] = None) -> str:
+    def generate_report(self, report_name: str | None = None) -> str:
         """Generate Excel report."""
         return self._create_report(self.data, report_name)
 
     def _create_report(
         self,
-        data: Dict[str, Any],
-        report_name: Optional[str] = None,
+        data: dict[str, Any],
+        report_name: str | None = None,
     ) -> str:
         """Create Excel report from data."""
         from openpyxl import Workbook
@@ -98,10 +99,10 @@ class ALBExcelReporter:
 
     def _build_sheets(
         self,
-        wb: "Workbook",
-        data: Dict[str, Any],
-        report_name: Optional[str],
-        progress: Optional[Callable[[str, bool], None]],
+        wb: Workbook,
+        data: dict[str, Any],
+        report_name: str | None,
+        progress: Callable[[str, bool], None] | None,
     ) -> str:
         """Build all sheets."""
         from .reporter.abuse import AbuseIPSheetWriter, AbuseRequestsSheetWriter
@@ -188,9 +189,9 @@ class ALBExcelReporter:
 
     def _save(
         self,
-        wb: "Workbook",
-        data: Dict[str, Any],
-        report_name: Optional[str],
+        wb: Workbook,
+        data: dict[str, Any],
+        report_name: str | None,
     ) -> str:
         """Save workbook."""
         if report_name:
@@ -208,7 +209,7 @@ class ALBExcelReporter:
         wb.save(path)
         return path
 
-    def _generate_filename(self, data: Dict[str, Any]) -> str:
+    def _generate_filename(self, data: dict[str, Any]) -> str:
         """Generate filename from S3 URI."""
         s3_uri = data.get("s3_uri", "")
         account_id = "acct"
@@ -233,15 +234,15 @@ class ALBExcelReporter:
             f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx",
         )
 
-    def _get_matching_abuse_ips(self, data: Dict[str, Any]) -> Set[str]:
+    def _get_matching_abuse_ips(self, data: dict[str, Any]) -> set[str]:
         """Get abuse IPs matching actual client IPs."""
         client_ips = set(data.get("client_ip_counts", {}).keys())
         abuse_list, _ = self._get_normalized_abuse_ips(data)
         return client_ips.intersection(abuse_list)
 
     def _get_normalized_abuse_ips(
-        self, data: Dict[str, Any]
-    ) -> Tuple[List[str], Dict[str, Any]]:
+        self, data: dict[str, Any]
+    ) -> tuple[list[str], dict[str, Any]]:
         """Normalize abuse IP data."""
         excluded = {"abuse_ips", "abuse_ip_details", "timestamp"}
 
@@ -249,8 +250,8 @@ class ALBExcelReporter:
             s = str(ip).strip() if ip else ""
             return bool(s) and not any(k in s for k in excluded)
 
-        ips: List[str] = []
-        details: Dict[str, Any] = {}
+        ips: list[str] = []
+        details: dict[str, Any] = {}
 
         if data.get("abuse_ips_list"):
             ips = [str(ip).strip() for ip in data["abuse_ips_list"] if valid(ip)]
@@ -259,7 +260,7 @@ class ALBExcelReporter:
             if isinstance(abuse, (list, set)):
                 ips = [str(ip).strip() for ip in abuse if valid(ip)]
             elif isinstance(abuse, dict):
-                ips = [str(ip).strip() for ip in abuse.keys() if valid(ip)]
+                ips = [str(ip).strip() for ip in abuse if valid(ip)]
                 details = abuse
 
         if data.get("abuse_ip_details"):

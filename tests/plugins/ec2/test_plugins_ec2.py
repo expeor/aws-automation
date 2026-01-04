@@ -4,7 +4,7 @@ tests/test_plugins_ec2.py - EC2 플러그인 테스트
 EC2 관련 분석 도구의 단위 테스트
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

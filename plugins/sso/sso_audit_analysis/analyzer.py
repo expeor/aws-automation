@@ -9,9 +9,8 @@ SSO Analyzer - IAM Identity Center 보안 분석
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .collector import SSOData, SSOGroup, SSOPermissionSet, SSOUser
 
@@ -59,7 +58,7 @@ class Issue:
     resource_id: str
     description: str
     recommendation: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -67,7 +66,7 @@ class PermissionSetAnalysis:
     """Permission Set 분석 결과"""
 
     permission_set: SSOPermissionSet
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
     risk_score: int = 0  # 0-100
 
 
@@ -76,7 +75,7 @@ class UserAnalysis:
     """User 분석 결과"""
 
     user: SSOUser
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
     risk_score: int = 0
 
 
@@ -85,7 +84,7 @@ class GroupAnalysis:
     """Group 분석 결과"""
 
     group: SSOGroup
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
 
 
 @dataclass
@@ -94,9 +93,9 @@ class AdminAccountSummary:
 
     account_id: str
     account_name: str
-    admin_users: List[str] = field(default_factory=list)  # display_name
-    admin_groups: List[str] = field(default_factory=list)  # group_name
-    permission_sets: List[str] = field(default_factory=list)  # ps_name
+    admin_users: list[str] = field(default_factory=list)  # display_name
+    admin_groups: list[str] = field(default_factory=list)  # group_name
+    permission_sets: list[str] = field(default_factory=list)  # ps_name
 
 
 @dataclass
@@ -104,11 +103,11 @@ class SSOAnalysisResult:
     """SSO 전체 분석 결과"""
 
     sso_data: SSOData
-    permission_set_analyses: List[PermissionSetAnalysis] = field(default_factory=list)
-    user_analyses: List[UserAnalysis] = field(default_factory=list)
-    group_analyses: List[GroupAnalysis] = field(default_factory=list)
-    admin_account_summary: List[AdminAccountSummary] = field(default_factory=list)
-    all_issues: List[Issue] = field(default_factory=list)
+    permission_set_analyses: list[PermissionSetAnalysis] = field(default_factory=list)
+    user_analyses: list[UserAnalysis] = field(default_factory=list)
+    group_analyses: list[GroupAnalysis] = field(default_factory=list)
+    admin_account_summary: list[AdminAccountSummary] = field(default_factory=list)
+    all_issues: list[Issue] = field(default_factory=list)
     # 요약 통계
     total_users: int = 0
     total_groups: int = 0
@@ -125,7 +124,7 @@ class SSOAnalyzer:
 
     def __init__(self, sso_data: SSOData):
         self.sso_data = sso_data
-        self._admin_by_account: Dict[str, AdminAccountSummary] = {}
+        self._admin_by_account: dict[str, AdminAccountSummary] = {}
 
     def analyze(self) -> SSOAnalysisResult:
         """전체 분석 수행"""
@@ -432,7 +431,7 @@ class SSOAnalyzer:
             1 for g in self.sso_data.groups if g.member_count == 0
         )
 
-    def get_summary_stats(self, result: SSOAnalysisResult) -> Dict[str, Any]:
+    def get_summary_stats(self, result: SSOAnalysisResult) -> dict[str, Any]:
         """요약 통계 반환"""
         # Issue 통계
         critical_count = sum(

@@ -4,10 +4,10 @@ pkg/io/file/io.py - 파일 I/O 유틸리티
 
 import json
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 
-def ensure_dir(path: Union[str, Path]) -> Path:
+def ensure_dir(path: str | Path) -> Path:
     """디렉토리 존재 확인 및 생성
 
     Args:
@@ -22,9 +22,9 @@ def ensure_dir(path: Union[str, Path]) -> Path:
 
 
 def read_file(
-    filepath: Union[str, Path],
+    filepath: str | Path,
     encoding: str = "utf-8",
-) -> Optional[str]:
+) -> str | None:
     """파일 읽기
 
     Args:
@@ -42,7 +42,7 @@ def read_file(
 
 
 def write_file(
-    filepath: Union[str, Path],
+    filepath: str | Path,
     content: str,
     encoding: str = "utf-8",
 ) -> bool:
@@ -65,7 +65,7 @@ def write_file(
         return False
 
 
-def read_json(filepath: Union[str, Path]) -> Optional[Any]:
+def read_json(filepath: str | Path) -> Any | None:
     """JSON 파일 읽기
 
     Args:
@@ -84,7 +84,7 @@ def read_json(filepath: Union[str, Path]) -> Optional[Any]:
 
 
 def write_json(
-    filepath: Union[str, Path],
+    filepath: str | Path,
     data: Any,
     indent: int = 2,
 ) -> bool:

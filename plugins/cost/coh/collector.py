@@ -23,8 +23,9 @@ Cost Optimization Hub에서 권장사항을 수집하고 필터링합니다.
 import logging
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 
 from .analyzer import CostOptimizationAnalyzer, Recommendation
 
@@ -35,10 +36,10 @@ logger = logging.getLogger(__name__)
 class AccountFilter:
     """계정 필터링 설정"""
 
-    exclude_ids: Set[str] = field(default_factory=set)
-    exclude_names: Set[str] = field(default_factory=set)
-    exclude_name_patterns: List[str] = field(default_factory=list)
-    include_ids: Set[str] = field(default_factory=set)
+    exclude_ids: set[str] = field(default_factory=set)
+    exclude_names: set[str] = field(default_factory=set)
+    exclude_name_patterns: list[str] = field(default_factory=list)
+    include_ids: set[str] = field(default_factory=set)
 
     @classmethod
     def from_env(cls) -> "AccountFilter":
@@ -72,7 +73,7 @@ class AccountFilter:
     def should_exclude(
         self,
         account_id: str,
-        account_name: Optional[str] = None,
+        account_name: str | None = None,
     ) -> bool:
         """계정을 제외해야 하는지 확인"""
         if self.include_ids and account_id not in self.include_ids:
@@ -97,46 +98,44 @@ class AccountFilter:
 class CollectionResult:
     """권장사항 수집 결과"""
 
-    recommendations: List[Recommendation]
+    recommendations: list[Recommendation]
     total_count: int
     filtered_count: int
-    excluded_accounts: Set[str]
-    summary_by_resource: Dict[str, Dict[str, Any]]
-    summary_by_action: Dict[str, Dict[str, Any]]
+    excluded_accounts: set[str]
+    summary_by_resource: dict[str, dict[str, Any]]
+    summary_by_action: dict[str, dict[str, Any]]
 
     @property
     def total_savings(self) -> float:
         """총 잠재적 월간 절약액"""
-        return round(
-            sum(r.estimated_monthly_savings for r in self.recommendations), 2
-        )
+        return round(sum(r.estimated_monthly_savings for r in self.recommendations), 2)
 
     @property
     def total_cost(self) -> float:
         """총 월간 비용"""
         return round(sum(r.estimated_monthly_cost for r in self.recommendations), 2)
 
-    def get_by_action_type(self) -> Dict[str, List[Recommendation]]:
+    def get_by_action_type(self) -> dict[str, list[Recommendation]]:
         """액션 타입별 권장사항 그룹화"""
-        grouped = {}
+        grouped: dict[str, list[Recommendation]] = {}
         for rec in self.recommendations:
             if rec.action_type not in grouped:
                 grouped[rec.action_type] = []
             grouped[rec.action_type].append(rec)
         return grouped
 
-    def get_by_resource_type(self) -> Dict[str, List[Recommendation]]:
+    def get_by_resource_type(self) -> dict[str, list[Recommendation]]:
         """리소스 타입별 권장사항 그룹화"""
-        grouped = {}
+        grouped: dict[str, list[Recommendation]] = {}
         for rec in self.recommendations:
             if rec.current_resource_type not in grouped:
                 grouped[rec.current_resource_type] = []
             grouped[rec.current_resource_type].append(rec)
         return grouped
 
-    def get_by_account(self) -> Dict[str, List[Recommendation]]:
+    def get_by_account(self) -> dict[str, list[Recommendation]]:
         """계정별 권장사항 그룹화"""
-        grouped = {}
+        grouped: dict[str, list[Recommendation]] = {}
         for rec in self.recommendations:
             if rec.account_id not in grouped:
                 grouped[rec.account_id] = []
@@ -153,8 +152,8 @@ class CostOptimizationCollector:
     def __init__(
         self,
         session,
-        account_filter: Optional[AccountFilter] = None,
-        account_name_resolver: Optional[Callable[[str], Optional[str]]] = None,
+        account_filter: AccountFilter | None = None,
+        account_name_resolver: Callable[[str], str | None] | None = None,
     ):
         """초기화
 
@@ -167,16 +166,16 @@ class CostOptimizationCollector:
         self.analyzer = CostOptimizationAnalyzer(session)
         self.account_filter = account_filter or AccountFilter.from_env()
         self.account_name_resolver = account_name_resolver
-        self._account_name_cache: Dict[str, str] = {}
+        self._account_name_cache: dict[str, str] = {}
 
     def collect(
         self,
-        action_types: Optional[List[str]] = None,
-        resource_types: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
-        lookback_periods: Optional[List[int]] = None,
-        exclude_account_ids: Optional[List[str]] = None,
-        include_account_ids: Optional[List[str]] = None,
+        action_types: list[str] | None = None,
+        resource_types: list[str] | None = None,
+        regions: list[str] | None = None,
+        lookback_periods: list[int] | None = None,
+        exclude_account_ids: list[str] | None = None,
+        include_account_ids: list[str] | None = None,
         include_all: bool = True,
     ) -> CollectionResult:
         """권장사항 수집 및 필터링
@@ -248,15 +247,15 @@ class CostOptimizationCollector:
 
     def collect_all(
         self,
-        exclude_account_ids: Optional[List[str]] = None,
+        exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
         """모든 권장사항 수집 (편의 메서드)"""
         return self.collect(exclude_account_ids=exclude_account_ids)
 
     def collect_rightsizing(
         self,
-        resource_types: Optional[List[str]] = None,
-        exclude_account_ids: Optional[List[str]] = None,
+        resource_types: list[str] | None = None,
+        exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
         """라이트사이징 권장사항만 수집"""
         default_resource_types = [
@@ -274,7 +273,7 @@ class CostOptimizationCollector:
 
     def collect_idle_resources(
         self,
-        exclude_account_ids: Optional[List[str]] = None,
+        exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
         """유휴 리소스 권장사항 수집 (Stop, Delete)"""
         return self.collect(
@@ -284,7 +283,7 @@ class CostOptimizationCollector:
 
     def collect_commitment_opportunities(
         self,
-        exclude_account_ids: Optional[List[str]] = None,
+        exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
         """Savings Plans/Reserved Instances 권장사항 수집"""
         return self.collect(
@@ -294,7 +293,7 @@ class CostOptimizationCollector:
 
     def collect_graviton_migration(
         self,
-        exclude_account_ids: Optional[List[str]] = None,
+        exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
         """Graviton 마이그레이션 권장사항 수집"""
         return self.collect(
@@ -304,7 +303,7 @@ class CostOptimizationCollector:
 
     def collect_upgrades(
         self,
-        exclude_account_ids: Optional[List[str]] = None,
+        exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
         """업그레이드 권장사항 수집"""
         return self.collect(
@@ -312,7 +311,7 @@ class CostOptimizationCollector:
             exclude_account_ids=exclude_account_ids,
         )
 
-    def _resolve_account_name(self, account_id: str) -> Optional[str]:
+    def _resolve_account_name(self, account_id: str) -> str | None:
         """계정 ID에서 이름 조회 (캐시 사용)"""
         if account_id in self._account_name_cache:
             return self._account_name_cache[account_id]
@@ -325,6 +324,6 @@ class CostOptimizationCollector:
 
         return None
 
-    def set_account_names(self, account_map: Dict[str, str]) -> None:
+    def set_account_names(self, account_map: dict[str, str]) -> None:
         """계정 ID → 이름 매핑 설정"""
         self._account_name_cache.update(account_map)

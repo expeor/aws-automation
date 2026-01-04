@@ -47,10 +47,9 @@ Usage:
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional
 
 # =============================================================================
 # 프로젝트 경로 설정
@@ -109,7 +108,7 @@ class Settings:
     MAX_LOG_LINE_LENGTH: int = 2000
 
     # 플러그인 설정
-    PLUGIN_EXCLUDE_DIRS: FrozenSet[str] = frozenset(
+    PLUGIN_EXCLUDE_DIRS: frozenset[str] = frozenset(
         {"__pycache__", "_templates", "_legacy", ".git"}
     )
 
@@ -137,12 +136,12 @@ class Settings:
     # 취약 프로토콜 목록
     # - SSLv3: POODLE 취약점
     # - TLSv1/1.1: 2020년 deprecated (RFC 8996)
-    SECURITY_VULNERABLE_PROTOCOLS: FrozenSet[str] = frozenset(
+    SECURITY_VULNERABLE_PROTOCOLS: frozenset[str] = frozenset(
         {"SSLv3", "TLSv1", "TLSv1.1"}
     )
 
     # 안전한 프로토콜 목록
-    SECURITY_SECURE_PROTOCOLS: FrozenSet[str] = frozenset({"TLSv1.2", "TLSv1.3"})
+    SECURITY_SECURE_PROTOCOLS: frozenset[str] = frozenset({"TLSv1.2", "TLSv1.3"})
 
     # 취약한 암호화 스위트 패턴
     # - RC4: 스트림 암호 취약 (2015 금지)
@@ -151,7 +150,7 @@ class Settings:
     # - NULL: 암호화 없음
     # - EXPORT: 약한 키 길이
     # - anon: 인증 없음 (MITM 취약)
-    SECURITY_WEAK_CIPHER_PATTERNS: FrozenSet[str] = frozenset(
+    SECURITY_WEAK_CIPHER_PATTERNS: frozenset[str] = frozenset(
         {"RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon"}
     )
 
@@ -187,7 +186,7 @@ settings = Settings()
 # =============================================================================
 
 
-def get_default_profile() -> Optional[str]:
+def get_default_profile() -> str | None:
     """기본 AWS 프로파일 반환
 
     우선순위:
@@ -316,7 +315,7 @@ class LogConfig:
 # =============================================================================
 
 # 도구 메타데이터 필수 필드
-TOOL_REQUIRED_FIELDS: FrozenSet[str] = frozenset(
+TOOL_REQUIRED_FIELDS: frozenset[str] = frozenset(
     {
         "name",
         "description",
@@ -325,7 +324,7 @@ TOOL_REQUIRED_FIELDS: FrozenSet[str] = frozenset(
 )
 
 # 유효한 permission 값
-VALID_PERMISSIONS: FrozenSet[str] = frozenset(
+VALID_PERMISSIONS: frozenset[str] = frozenset(
     {
         "read",
         "write",
@@ -334,7 +333,7 @@ VALID_PERMISSIONS: FrozenSet[str] = frozenset(
 )
 
 # 유효한 area 값
-VALID_AREAS: FrozenSet[str] = frozenset(
+VALID_AREAS: frozenset[str] = frozenset(
     {
         "security",
         "cost",
@@ -349,7 +348,7 @@ VALID_AREAS: FrozenSet[str] = frozenset(
 )
 
 
-def validate_tool_metadata(tool: Dict) -> List[str]:
+def validate_tool_metadata(tool: dict) -> list[str]:
     """도구 메타데이터 유효성 검사
 
     Args:

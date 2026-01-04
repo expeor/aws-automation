@@ -3,9 +3,6 @@ tests/test_plugins_lambda.py - Lambda 플러그인 테스트
 """
 
 from datetime import date
-from unittest.mock import patch
-
-import pytest
 
 from plugins.fn.common.runtime_eol import (
     RUNTIME_EOL_DATA,
@@ -130,7 +127,7 @@ class TestGetExpiringRuntimes:
         """지원 종료 예정 런타임"""
         # 이미 지원 종료된 것은 제외됨
         expiring = get_expiring_runtimes(days=365)
-        for runtime_id, info in expiring.items():
+        for _runtime_id, info in expiring.items():
             days = info.days_until_deprecation
             assert days is not None
             assert 0 < days <= 365

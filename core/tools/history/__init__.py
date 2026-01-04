@@ -8,7 +8,7 @@ from .favorites import FavoriteItem, FavoritesManager
 from .profile_groups import ProfileGroup, ProfileGroupsManager
 from .recent import RecentHistory, RecentItem
 
-__all__ = [
+__all__: list[str] = [
     "RecentHistory",
     "RecentItem",
     "FavoritesManager",

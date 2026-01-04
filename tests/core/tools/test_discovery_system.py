@@ -4,10 +4,6 @@ tests/test_discovery_system.py - 플러그인 디스커버리 테스트
 플러그인 발견 시스템의 단위 테스트
 """
 
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 
 class TestDiscoverCategories:
     """discover_categories 함수 테스트"""
@@ -37,9 +33,6 @@ class TestDiscoverCategories:
         from core.tools.discovery import discover_categories
 
         categories = discover_categories(include_aws_services=True, use_cache=False)
-
-        # AWS 서비스 카테고리도 포함되어야 함
-        category_names = {cat["name"] for cat in categories}
 
         # 최소한 일부 AWS 서비스가 있어야 함 (ec2, s3 등)
         assert len(categories) > 0

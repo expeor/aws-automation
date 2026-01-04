@@ -9,12 +9,11 @@ SSO Profile Provider 구현
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import boto3
 
-from ..cache import TokenCacheManager
-from ..types import AccountInfo, ProviderError, ProviderType
+from ..types import AccountInfo, ProviderType
 from .sso_session import SSOSessionConfig, SSOSessionProvider
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,7 @@ class SSOProfileConfig:
     region: str
     start_url: str
     sso_region: str
-    sso_session: Optional[str] = None
+    sso_session: str | None = None
 
 
 class SSOProfileProvider(SSOSessionProvider):
@@ -113,9 +112,10 @@ class SSOProfileProvider(SSOSessionProvider):
 
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
+        retry_on_expired: bool = True,
     ) -> boto3.Session:
         """세션 획득 (기본값 사용 가능)
 
@@ -125,6 +125,7 @@ class SSOProfileProvider(SSOSessionProvider):
             account_id: AWS 계정 ID (기본값 사용 가능)
             role_name: 역할 이름 (기본값 사용 가능)
             region: AWS 리전
+            retry_on_expired: 토큰 만료 시 재인증 후 재시도 여부 (기본: True)
 
         Returns:
             boto3.Session 객체
@@ -133,14 +134,15 @@ class SSOProfileProvider(SSOSessionProvider):
             account_id=account_id or self._default_account_id,
             role_name=role_name or self._default_role_name,
             region=region,
+            retry_on_expired=retry_on_expired,
         )
 
     def get_aws_config(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
+    ) -> dict[str, Any]:
         """AWS 설정 정보 반환 (기본값 사용 가능)"""
         return super().get_aws_config(
             account_id=account_id or self._default_account_id,

@@ -36,8 +36,7 @@ Usage:
         )
 """
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # =============================================================================
 # 베이스 예외
@@ -58,8 +57,8 @@ class AAError(Exception):
     def __init__(
         self,
         message: str,
-        cause: Optional[Exception] = None,
-        details: Optional[Dict[str, Any]] = None,
+        cause: Exception | None = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.message = message
@@ -71,7 +70,7 @@ class AAError(Exception):
             return f"{self.message}: {self.cause}"
         return self.message
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """예외 정보를 딕셔너리로 반환"""
         return {
             "error_type": self.__class__.__name__,
@@ -92,8 +91,8 @@ class DiscoveryError(AAError):
     def __init__(
         self,
         message: str,
-        plugin_path: Optional[str] = None,
-        cause: Optional[Exception] = None,
+        plugin_path: str | None = None,
+        cause: Exception | None = None,
     ):
         super().__init__(message, cause)
         self.plugin_path = plugin_path
@@ -108,7 +107,7 @@ class PluginLoadError(DiscoveryError):
         self,
         plugin_name: str,
         reason: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         message = f"플러그인 로드 실패 [{plugin_name}]: {reason}"
         super().__init__(message, plugin_path=plugin_name, cause=cause)
@@ -122,8 +121,8 @@ class MetadataValidationError(DiscoveryError):
     def __init__(
         self,
         plugin_name: str,
-        errors: List[str],
-        cause: Optional[Exception] = None,
+        errors: list[str],
+        cause: Exception | None = None,
     ):
         message = f"메타데이터 검증 실패 [{plugin_name}]: {', '.join(errors)}"
         super().__init__(message, plugin_path=plugin_name, cause=cause)
@@ -144,7 +143,7 @@ class ToolExecutionError(AAError):
         self,
         tool_name: str,
         message: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         full_message = f"도구 실행 오류 [{tool_name}]: {message}"
         super().__init__(full_message, cause)
@@ -160,7 +159,7 @@ class SessionError(ToolExecutionError):
         identifier: str,  # account_id or profile_name
         region: str,
         message: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         full_message = f"세션 오류 [{identifier}/{region}]: {message}"
         super().__init__(tool_name="session", message=full_message, cause=cause)
@@ -180,9 +179,9 @@ class APICallError(ToolExecutionError):
         self,
         service: str,
         operation: str,
-        error_code: Optional[str] = None,
-        error_message: Optional[str] = None,
-        cause: Optional[Exception] = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
+        cause: Exception | None = None,
     ):
         message = f"{service}.{operation}"
         if error_code:
@@ -250,7 +249,7 @@ class FlowError(AAError):
         self,
         step_name: str,
         message: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         full_message = f"플로우 오류 [{step_name}]: {message}"
         super().__init__(full_message, cause)
@@ -294,7 +293,7 @@ class ConfigError(AAError):
         self,
         key: str,
         message: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         full_message = f"설정 오류 [{key}]: {message}"
         super().__init__(full_message, cause)
@@ -310,7 +309,7 @@ class ValidationError(AAError):
         field: str,
         value: Any,
         expected: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         message = f"검증 오류 [{field}]: 예상값 '{expected}', 실제값 '{value}'"
         super().__init__(message, cause)

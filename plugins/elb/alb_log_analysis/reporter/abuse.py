@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Set
+from typing import TYPE_CHECKING, Any
 
 from .base import BaseSheetWriter, get_column_letter
 from .config import HEADERS, SHEET_NAMES, STATUS_CODE_TYPES, SheetConfig
@@ -52,9 +52,9 @@ class AbuseIPSheetWriter(BaseSheetWriter):
 
     def _write_abuse_ip_rows(
         self,
-        ws: "Worksheet",
-        sorted_ips: List[str],
-        abuse_ip_details: Dict[str, Any],
+        ws: Worksheet,
+        sorted_ips: list[str],
+        abuse_ip_details: dict[str, Any],
     ) -> None:
         """Write abuse IP rows."""
         client_ip_counts = self.data.get("client_ip_counts", {})
@@ -98,8 +98,8 @@ class AbuseIPSheetWriter(BaseSheetWriter):
 
     def _finalize_abuse_sheet(
         self,
-        ws: "Worksheet",
-        headers: List[str],
+        ws: Worksheet,
+        headers: list[str],
         data_count: int,
     ) -> None:
         """Finalize abuse IP sheet."""
@@ -154,7 +154,7 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
         except Exception as e:
             logger.error(f"악성 IP 요청 분석 시트 생성 중 오류: {e}")
 
-    def _collect_abuse_requests(self, abuse_ips: Set[str]) -> List[Dict[str, Any]]:
+    def _collect_abuse_requests(self, abuse_ips: set[str]) -> list[dict[str, Any]]:
         """Collect all requests from abuse IPs."""
         all_logs = []
 
@@ -167,7 +167,7 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
         # Filter for abuse IPs
         return [log for log in all_logs if log.get("client_ip", "N/A") in abuse_ips]
 
-    def _safe_timestamp_key(self, entry: Dict[str, Any]) -> datetime:
+    def _safe_timestamp_key(self, entry: dict[str, Any]) -> datetime:
         """Get timestamp for sorting."""
         ts = entry.get("timestamp")
         if isinstance(ts, datetime):
@@ -181,9 +181,9 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
 
     def _write_abuse_request_rows(
         self,
-        ws: "Worksheet",
-        requests: List[Dict[str, Any]],
-        headers: List[str],
+        ws: Worksheet,
+        requests: list[dict[str, Any]],
+        headers: list[str],
     ) -> None:
         """Write abuse request rows."""
         border = self.styles.thin_border

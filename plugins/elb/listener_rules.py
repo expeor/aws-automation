@@ -15,12 +15,14 @@ Usage:
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from core.parallel import get_client
 from core.tools.base import BaseToolRunner
-from core.tools.output import OutputBuilder
+from core.tools.io.excel import save_dict_list_to_excel
+from core.tools.output import OutputPath
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -60,8 +62,8 @@ class RuleFinding:
     category: FindingCategory
     title: str
     description: str
-    rule_arn: Optional[str] = None
-    rule_priority: Optional[int] = None
+    rule_arn: str | None = None
+    rule_priority: int | None = None
     recommendation: str = ""
 
 
@@ -71,24 +73,24 @@ class RuleAnalysis:
 
     rule_arn: str
     priority: int
-    conditions: List[Dict[str, Any]]
-    actions: List[Dict[str, Any]]
+    conditions: list[dict[str, Any]]
+    actions: list[dict[str, Any]]
     is_default: bool = False
 
     # 분석 결과
     condition_count: int = 0
     action_count: int = 0
-    condition_types: List[str] = field(default_factory=list)
-    action_types: List[str] = field(default_factory=list)
+    condition_types: list[str] = field(default_factory=list)
+    action_types: list[str] = field(default_factory=list)
     complexity_score: float = 0.0
 
     # 조건 세부 정보
-    host_headers: List[str] = field(default_factory=list)
-    path_patterns: List[str] = field(default_factory=list)
-    http_methods: List[str] = field(default_factory=list)
-    source_ips: List[str] = field(default_factory=list)
-    query_strings: List[Dict] = field(default_factory=list)
-    headers: List[Dict] = field(default_factory=list)
+    host_headers: list[str] = field(default_factory=list)
+    path_patterns: list[str] = field(default_factory=list)
+    http_methods: list[str] = field(default_factory=list)
+    source_ips: list[str] = field(default_factory=list)
+    query_strings: list[dict] = field(default_factory=list)
+    headers: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -100,8 +102,8 @@ class ListenerAnalysis:
     lb_name: str
     protocol: str
     port: int
-    rules: List[RuleAnalysis]
-    findings: List[RuleFinding]
+    rules: list[RuleAnalysis]
+    findings: list[RuleFinding]
 
     # 통계
     total_rules: int = 0
@@ -148,17 +150,17 @@ class ListenerRulesAnalyzer:
     def __init__(self, elbv2_client):
         self.elbv2 = elbv2_client
 
-    def analyze_load_balancer(self, lb: Dict[str, Any]) -> List[ListenerAnalysis]:
+    def analyze_load_balancer(self, lb: dict[str, Any]) -> list[ListenerAnalysis]:
         """로드밸런서의 모든 리스너 분석"""
         lb_arn = lb["LoadBalancerArn"]
         lb_name = lb["LoadBalancerName"]
-        results = []
+        results: list[ListenerAnalysis] = []
 
         # 리스너 조회
         try:
             listeners_resp = self.elbv2.describe_listeners(LoadBalancerArn=lb_arn)
             listeners = listeners_resp.get("Listeners", [])
-        except Exception as e:
+        except Exception:
             return results
 
         for listener in listeners:
@@ -169,8 +171,8 @@ class ListenerRulesAnalyzer:
         return results
 
     def _analyze_listener(
-        self, listener: Dict[str, Any], lb_name: str
-    ) -> Optional[ListenerAnalysis]:
+        self, listener: dict[str, Any], lb_name: str
+    ) -> ListenerAnalysis | None:
         """단일 리스너 분석"""
         listener_arn = listener["ListenerArn"]
         lb_arn = listener["LoadBalancerArn"]
@@ -218,7 +220,7 @@ class ListenerRulesAnalyzer:
             max_complexity=max_complexity,
         )
 
-    def _analyze_rule(self, rule: Dict[str, Any]) -> RuleAnalysis:
+    def _analyze_rule(self, rule: dict[str, Any]) -> RuleAnalysis:
         """단일 규칙 분석"""
         rule_arn = rule.get("RuleArn", "")
         priority_str = rule.get("Priority", "default")
@@ -250,7 +252,7 @@ class ListenerRulesAnalyzer:
         return analysis
 
     def _analyze_conditions(
-        self, analysis: RuleAnalysis, conditions: List[Dict]
+        self, analysis: RuleAnalysis, conditions: list[dict]
     ) -> None:
         """조건 세부 분석"""
         for cond in conditions:
@@ -278,7 +280,7 @@ class ListenerRulesAnalyzer:
                 qs_config = cond.get("QueryStringConfig", {})
                 analysis.query_strings.extend(qs_config.get("Values", []))
 
-    def _analyze_actions(self, analysis: RuleAnalysis, actions: List[Dict]) -> None:
+    def _analyze_actions(self, analysis: RuleAnalysis, actions: list[dict]) -> None:
         """액션 세부 분석"""
         for action in actions:
             action_type = action.get("Type", "")
@@ -316,8 +318,8 @@ class ListenerRulesAnalyzer:
         return round(score, 2)
 
     def _generate_findings(
-        self, rules: List[RuleAnalysis], listener_arn: str
-    ) -> List[RuleFinding]:
+        self, rules: list[RuleAnalysis], listener_arn: str
+    ) -> list[RuleFinding]:
         """분석 결과로부터 발견 항목 생성"""
         findings = []
 
@@ -335,7 +337,7 @@ class ListenerRulesAnalyzer:
 
         return findings
 
-    def _check_complexity(self, rules: List[RuleAnalysis]) -> List[RuleFinding]:
+    def _check_complexity(self, rules: list[RuleAnalysis]) -> list[RuleFinding]:
         """복잡도 이슈 체크"""
         findings = []
 
@@ -386,9 +388,9 @@ class ListenerRulesAnalyzer:
 
         return findings
 
-    def _check_priority_issues(self, rules: List[RuleAnalysis]) -> List[RuleFinding]:
+    def _check_priority_issues(self, rules: list[RuleAnalysis]) -> list[RuleFinding]:
         """우선순위 이슈 체크"""
-        findings = []
+        findings: list[RuleFinding] = []
 
         # 기본 규칙 제외
         non_default_rules = [r for r in rules if not r.is_default]
@@ -419,8 +421,8 @@ class ListenerRulesAnalyzer:
                 )
 
         # 겹치는 조건 탐지 (동일 호스트/경로)
-        host_rules: Dict[str, List[RuleAnalysis]] = {}
-        path_rules: Dict[str, List[RuleAnalysis]] = {}
+        host_rules: dict[str, list[RuleAnalysis]] = {}
+        path_rules: dict[str, list[RuleAnalysis]] = {}
 
         for rule in non_default_rules:
             for host in rule.host_headers:
@@ -450,15 +452,15 @@ class ListenerRulesAnalyzer:
         return findings
 
     def _check_optimization_opportunities(
-        self, rules: List[RuleAnalysis]
-    ) -> List[RuleFinding]:
+        self, rules: list[RuleAnalysis]
+    ) -> list[RuleFinding]:
         """최적화 기회 탐지"""
         findings = []
 
         non_default_rules = [r for r in rules if not r.is_default]
 
         # 동일 액션 규칙 통합 가능성
-        action_groups: Dict[str, List[RuleAnalysis]] = {}
+        action_groups: dict[str, list[RuleAnalysis]] = {}
         for rule in non_default_rules:
             # 액션을 문자열로 변환하여 그룹핑
             action_key = str(sorted([a.get("Type", "") for a in rule.actions]))
@@ -466,7 +468,7 @@ class ListenerRulesAnalyzer:
                 action_groups[action_key] = []
             action_groups[action_key].append(rule)
 
-        for action_key, action_rule_list in action_groups.items():
+        for _action_key, action_rule_list in action_groups.items():
             if len(action_rule_list) >= 5:
                 # 동일 타겟으로 가는 규칙이 많으면 통합 검토
                 sample_rule = action_rule_list[0]
@@ -502,7 +504,7 @@ class ListenerRulesAnalyzer:
 
         return findings
 
-    def _check_best_practices(self, rules: List[RuleAnalysis]) -> List[RuleFinding]:
+    def _check_best_practices(self, rules: list[RuleAnalysis]) -> list[RuleFinding]:
         """베스트 프랙티스 체크"""
         findings = []
 
@@ -576,7 +578,7 @@ class ListenerRulesAnalyzer:
 class ToolRunner(BaseToolRunner):
     """Listener Rules Analyzer Runner"""
 
-    def get_tools(self) -> Dict:
+    def get_tools(self) -> dict:
         return {"Listener Rules 분석": self._run_analysis}
 
     def _run_analysis(self) -> None:
@@ -585,8 +587,8 @@ class ToolRunner(BaseToolRunner):
         from rich.table import Table
 
         console = Console()
-        all_results: List[Dict[str, Any]] = []
-        all_findings: List[Dict[str, Any]] = []
+        all_results: list[dict[str, Any]] = []
+        all_findings: list[dict[str, Any]] = []
 
         # 심각도별 카운터
         severity_counts = {s.value: 0 for s in FindingSeverity}
@@ -700,19 +702,22 @@ class ToolRunner(BaseToolRunner):
             console.print(findings_table)
 
         # 엑셀 출력
-        if all_results:
-            output = OutputBuilder("ALB_Listener_Rules_Analysis")
+        if all_results and self.ctx:
+            # 출력 디렉토리 생성
+            output_dir = (
+                OutputPath(self.ctx.profile_name or "default")
+                .sub("elb")
+                .with_date()
+                .build()
+            )
 
-            # 리스너 요약 시트
-            output.add_sheet("Listener_Summary", all_results)
-
-            # 발견 항목 시트
-            if all_findings:
-                output.add_sheet("Findings", all_findings)
-
-            # 규칙 상세는 별도로 추가 가능
-
-            output.save()
+            # 엑셀 파일로 저장
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_path = f"{output_dir}/ALB_Listener_Rules_{timestamp}.xlsx"
+            save_dict_list_to_excel(
+                all_results, output_path, sheet_name="Listener_Summary"
+            )
+            console.print(f"\n[bold green]보고서 저장: {output_path}[/bold green]")
 
 
 def run(ctx) -> None:

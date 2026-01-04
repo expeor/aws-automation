@@ -14,20 +14,13 @@ IAM Audit Excel 보고서 생성기
 
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from core.tools.io.excel import ColumnDef, Workbook
 
 from .analyzer import (
-    AccountAnalysisResult,
-    GroupAnalysisResult,
     IAMAnalysisResult,
-    IssueType,
-    KeyAnalysisResult,
-    PolicyAnalysisResult,
-    RoleAnalysisResult,
     Severity,
-    UserAnalysisResult,
 )
 
 
@@ -36,8 +29,8 @@ class IAMExcelReporter:
 
     def __init__(
         self,
-        results: List[IAMAnalysisResult],
-        summary_stats: List[Dict[str, Any]],
+        results: list[IAMAnalysisResult],
+        summary_stats: list[dict[str, Any]],
     ):
         self.results = results
         self.summary_stats = summary_stats

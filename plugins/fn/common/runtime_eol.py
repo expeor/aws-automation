@@ -6,9 +6,8 @@ https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from enum import Enum
-from typing import Dict, Optional
 
 
 class EOLStatus(Enum):
@@ -28,9 +27,9 @@ class RuntimeInfo:
 
     runtime_id: str
     name: str
-    deprecation_date: Optional[date]  # Phase 1: 생성 차단
-    block_update_date: Optional[date]  # Phase 2: 업데이트 차단
-    eol_date: Optional[date]  # 완전 종료 (있는 경우)
+    deprecation_date: date | None  # Phase 1: 생성 차단
+    block_update_date: date | None  # Phase 2: 업데이트 차단
+    eol_date: date | None  # 완전 종료 (있는 경우)
 
     @property
     def is_deprecated(self) -> bool:
@@ -40,7 +39,7 @@ class RuntimeInfo:
         return date.today() >= self.deprecation_date
 
     @property
-    def days_until_deprecation(self) -> Optional[int]:
+    def days_until_deprecation(self) -> int | None:
         """지원 종료까지 남은 일수"""
         if not self.deprecation_date:
             return None
@@ -69,7 +68,7 @@ class RuntimeInfo:
 
 # Lambda 런타임 EOL 정보 (2024년 12월 기준)
 # 출처: https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
-RUNTIME_EOL_DATA: Dict[str, RuntimeInfo] = {
+RUNTIME_EOL_DATA: dict[str, RuntimeInfo] = {
     # Python
     "python3.13": RuntimeInfo("python3.13", "Python 3.13", None, None, None),
     "python3.12": RuntimeInfo("python3.12", "Python 3.12", None, None, None),
@@ -135,7 +134,7 @@ RUNTIME_EOL_DATA: Dict[str, RuntimeInfo] = {
 }
 
 
-def get_runtime_info(runtime_id: str) -> Optional[RuntimeInfo]:
+def get_runtime_info(runtime_id: str) -> RuntimeInfo | None:
     """런타임 정보 조회"""
     return RUNTIME_EOL_DATA.get(runtime_id)
 
@@ -149,12 +148,12 @@ def get_runtime_status(runtime_id: str) -> EOLStatus:
     return EOLStatus.SUPPORTED
 
 
-def get_deprecated_runtimes() -> Dict[str, RuntimeInfo]:
+def get_deprecated_runtimes() -> dict[str, RuntimeInfo]:
     """지원 종료된 런타임 목록"""
     return {k: v for k, v in RUNTIME_EOL_DATA.items() if v.is_deprecated}
 
 
-def get_expiring_runtimes(days: int = 180) -> Dict[str, RuntimeInfo]:
+def get_expiring_runtimes(days: int = 180) -> dict[str, RuntimeInfo]:
     """곧 지원 종료될 런타임 목록"""
     result = {}
     for k, v in RUNTIME_EOL_DATA.items():
@@ -164,7 +163,7 @@ def get_expiring_runtimes(days: int = 180) -> Dict[str, RuntimeInfo]:
     return result
 
 
-def get_recommended_upgrade(runtime_id: str) -> Optional[str]:
+def get_recommended_upgrade(runtime_id: str) -> str | None:
     """권장 업그레이드 런타임"""
     upgrades = {
         # Python

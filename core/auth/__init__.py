@@ -1,67 +1,4 @@
 # core/auth/__init__.py
-from typing import TYPE_CHECKING
-
-# Pylance/타입 체커용 정적 임포트
-if TYPE_CHECKING:
-    from .account import (
-        format_account_identifier,
-        get_account_alias,
-        get_account_display_name,
-        get_account_display_name_from_ctx,
-        get_account_id,
-        get_account_info,
-    )
-    from .auth import Manager, create_manager
-    from .cache import (
-        AccountCache,
-        CacheEntry,
-        CredentialsCache,
-        TokenCache,
-        TokenCacheManager,
-    )
-    from .config import (
-        AWSProfile,
-        AWSSession,
-        Loader,
-        ParsedConfig,
-        detect_provider_type,
-        list_profiles,
-        list_sso_sessions,
-        load_config,
-    )
-    from .provider import (
-        BaseProvider,
-        SSOProfileConfig,
-        SSOProfileProvider,
-        SSOSessionConfig,
-        SSOSessionProvider,
-        StaticCredentialsConfig,
-        StaticCredentialsProvider,
-    )
-    from .session import (
-        ParallelSessionIterator,
-        SessionIterator,
-        clear_cache,
-        get_context_session,
-        get_current_context_info,
-        get_session,
-        iter_context_sessions,
-        iter_profiles,
-        iter_regions,
-        iter_sessions,
-    )
-    from .types import (
-        AccountInfo,
-        AccountNotFoundError,
-        AuthError,
-        ConfigurationError,
-        NotAuthenticatedError,
-        Provider,
-        ProviderError,
-        ProviderType,
-        TokenExpiredError,
-    )
-
 """
 AWS 통합 인증 모듈 (core/auth)
 
@@ -74,44 +11,68 @@ AWS 통합 인증 모듈 (core/auth)
 - SSOSessionProvider: AWS SSO 세션 기반 인증 (멀티 계정 지원)
 - SSOProfileProvider: SSO 프로파일 기반 인증 (단일/다중 프로파일)
 - StaticCredentialsProvider: 정적 액세스 키 (단일/다중 프로파일)
-
-사용 예시:
-    from core.auth import (
-        Manager, create_manager,
-        SSOSessionProvider, SSOSessionConfig,
-        ProviderType, AccountInfo,
-    )
-    
-    # Provider 생성 및 인증
-    config = SSOSessionConfig(
-        session_name="my-sso",
-        start_url="https://my-sso.awsapps.com/start",
-        region="ap-northeast-2",
-    )
-    provider = SSOSessionProvider(config)
-    
-    # Manager 사용
-    manager = create_manager()
-    manager.register_provider(provider)
-    manager.set_active_provider(provider)
-    manager.authenticate()
-    
-    # 계정 목록 조회
-    accounts = manager.list_accounts()
-    
-    # 세션 획득
-    session = manager.get_session(
-        account_id="123456789012",
-        role_name="AdminRole",
-        region="ap-northeast-2"
-    )
-
-Note:
-    이 모듈은 Lazy Import 패턴을 사용합니다.
-    실제 사용 시점에만 하위 모듈이 로드되어 CLI 시작 시간을 최적화합니다.
 """
 
-__all__ = [
+from .account import (
+    format_account_identifier,
+    get_account_alias,
+    get_account_display_name,
+    get_account_display_name_from_ctx,
+    get_account_id,
+    get_account_info,
+)
+from .auth import Manager, create_manager
+from .cache import (
+    AccountCache,
+    CacheEntry,
+    CredentialsCache,
+    TokenCache,
+    TokenCacheManager,
+)
+from .config import (
+    AWSProfile,
+    AWSSession,
+    Loader,
+    ParsedConfig,
+    detect_provider_type,
+    list_profiles,
+    list_sso_sessions,
+    load_config,
+)
+from .provider import (
+    BaseProvider,
+    SSOProfileConfig,
+    SSOProfileProvider,
+    SSOSessionConfig,
+    SSOSessionProvider,
+    StaticCredentialsConfig,
+    StaticCredentialsProvider,
+)
+from .session import (
+    ParallelSessionIterator,
+    SessionIterator,
+    clear_cache,
+    get_context_session,
+    get_current_context_info,
+    get_session,
+    iter_context_sessions,
+    iter_profiles,
+    iter_regions,
+    iter_sessions,
+)
+from .types import (
+    AccountInfo,
+    AccountNotFoundError,
+    AuthError,
+    ConfigurationError,
+    NotAuthenticatedError,
+    Provider,
+    ProviderError,
+    ProviderType,
+    TokenExpiredError,
+)
+
+__all__: list[str] = [
     # Types
     "ProviderType",
     "Provider",
@@ -148,20 +109,20 @@ __all__ = [
     # Manager
     "Manager",
     "create_manager",
-    # Session 헬퍼
+    # Session helpers
     "get_session",
     "iter_regions",
     "iter_profiles",
     "iter_sessions",
     "clear_cache",
-    # Context 기반 세션 헬퍼
+    # Context-based session helpers
     "SessionIterator",
     "ParallelSessionIterator",
     "iter_context_sessions",
     "get_context_session",
-    # Context 정보 조회
+    # Context info
     "get_current_context_info",
-    # Account 유틸리티
+    # Account utilities
     "get_account_display_name",
     "get_account_display_name_from_ctx",
     "get_account_id",
@@ -169,82 +130,3 @@ __all__ = [
     "get_account_info",
     "format_account_identifier",
 ]
-
-# Lazy import 매핑 테이블
-_IMPORT_MAPPING = {
-    # Types
-    "ProviderType": (".types", "ProviderType"),
-    "Provider": (".types", "Provider"),
-    "AccountInfo": (".types", "AccountInfo"),
-    "AuthError": (".types", "AuthError"),
-    "NotAuthenticatedError": (".types", "NotAuthenticatedError"),
-    "AccountNotFoundError": (".types", "AccountNotFoundError"),
-    "ProviderError": (".types", "ProviderError"),
-    "TokenExpiredError": (".types", "TokenExpiredError"),
-    "ConfigurationError": (".types", "ConfigurationError"),
-    # Cache
-    "TokenCache": (".cache", "TokenCache"),
-    "TokenCacheManager": (".cache", "TokenCacheManager"),
-    "AccountCache": (".cache", "AccountCache"),
-    "CredentialsCache": (".cache", "CredentialsCache"),
-    "CacheEntry": (".cache", "CacheEntry"),
-    # Config
-    "Loader": (".config", "Loader"),
-    "AWSProfile": (".config", "AWSProfile"),
-    "AWSSession": (".config", "AWSSession"),
-    "ParsedConfig": (".config", "ParsedConfig"),
-    "load_config": (".config", "load_config"),
-    "detect_provider_type": (".config", "detect_provider_type"),
-    "list_profiles": (".config", "list_profiles"),
-    "list_sso_sessions": (".config", "list_sso_sessions"),
-    # Providers
-    "BaseProvider": (".provider", "BaseProvider"),
-    "SSOSessionProvider": (".provider", "SSOSessionProvider"),
-    "SSOSessionConfig": (".provider", "SSOSessionConfig"),
-    "SSOProfileProvider": (".provider", "SSOProfileProvider"),
-    "SSOProfileConfig": (".provider", "SSOProfileConfig"),
-    "StaticCredentialsProvider": (".provider", "StaticCredentialsProvider"),
-    "StaticCredentialsConfig": (".provider", "StaticCredentialsConfig"),
-    # Manager
-    "Manager": (".auth", "Manager"),
-    "create_manager": (".auth", "create_manager"),
-    # Session 헬퍼
-    "get_session": (".session", "get_session"),
-    "iter_regions": (".session", "iter_regions"),
-    "iter_profiles": (".session", "iter_profiles"),
-    "iter_sessions": (".session", "iter_sessions"),
-    "clear_cache": (".session", "clear_cache"),
-    # Context 기반 세션 헬퍼
-    "SessionIterator": (".session", "SessionIterator"),
-    "ParallelSessionIterator": (".session", "ParallelSessionIterator"),
-    "iter_context_sessions": (".session", "iter_context_sessions"),
-    "get_context_session": (".session", "get_context_session"),
-    # Context 정보 조회
-    "get_current_context_info": (".session", "get_current_context_info"),
-    # Account 유틸리티
-    "get_account_display_name": (".account", "get_account_display_name"),
-    "get_account_display_name_from_ctx": (
-        ".account",
-        "get_account_display_name_from_ctx",
-    ),
-    "get_account_id": (".account", "get_account_id"),
-    "get_account_alias": (".account", "get_account_alias"),
-    "get_account_info": (".account", "get_account_info"),
-    "format_account_identifier": (".account", "format_account_identifier"),
-}
-
-
-def __getattr__(name: str):
-    """Lazy import - 실제 사용 시점에만 모듈 로드
-
-    CLI 시작 시간 최적화를 위해 무거운 의존성(boto3 등)을
-    실제 필요한 시점에만 로드합니다.
-    """
-    if name in _IMPORT_MAPPING:
-        module_name, attr_name = _IMPORT_MAPPING[name]
-        import importlib
-
-        module = importlib.import_module(module_name, __name__)
-        return getattr(module, attr_name)
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

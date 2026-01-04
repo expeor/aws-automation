@@ -10,7 +10,7 @@ IAM 분석기
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .collector import (
     AccountSummary,
@@ -89,7 +89,7 @@ class UserAnalysisResult:
     user: IAMUser
     account_id: str
     account_name: str
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
     risk_score: int = 0  # 0-100
 
     @property
@@ -108,7 +108,7 @@ class KeyAnalysisResult:
     key: IAMAccessKey
     account_id: str
     account_name: str
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
 
     @property
     def is_old(self) -> bool:
@@ -126,7 +126,7 @@ class RoleAnalysisResult:
     role: IAMRole
     account_id: str
     account_name: str
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
     risk_score: int = 0
 
     @property
@@ -143,7 +143,7 @@ class GroupAnalysisResult:
     group: IAMGroup
     account_id: str
     account_name: str
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
@@ -157,7 +157,7 @@ class PolicyAnalysisResult:
     policy: PasswordPolicy
     account_id: str
     account_name: str
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
     score: int = 0  # 0-100, 높을수록 좋음
 
 
@@ -166,7 +166,7 @@ class AccountAnalysisResult:
     """Account 분석 결과"""
 
     summary: AccountSummary
-    issues: List[Issue] = field(default_factory=list)
+    issues: list[Issue] = field(default_factory=list)
 
 
 @dataclass
@@ -175,12 +175,12 @@ class IAMAnalysisResult:
 
     account_id: str
     account_name: str
-    user_results: List[UserAnalysisResult] = field(default_factory=list)
-    key_results: List[KeyAnalysisResult] = field(default_factory=list)
-    role_results: List[RoleAnalysisResult] = field(default_factory=list)
-    group_results: List[GroupAnalysisResult] = field(default_factory=list)
-    policy_result: Optional[PolicyAnalysisResult] = None
-    account_result: Optional[AccountAnalysisResult] = None
+    user_results: list[UserAnalysisResult] = field(default_factory=list)
+    key_results: list[KeyAnalysisResult] = field(default_factory=list)
+    role_results: list[RoleAnalysisResult] = field(default_factory=list)
+    group_results: list[GroupAnalysisResult] = field(default_factory=list)
+    policy_result: PolicyAnalysisResult | None = None
+    account_result: AccountAnalysisResult | None = None
 
 
 class IAMAnalyzer:
@@ -926,9 +926,9 @@ class IAMAnalyzer:
 
         return min(score, 100)
 
-    def get_summary_stats(self, result: IAMAnalysisResult) -> Dict[str, Any]:
+    def get_summary_stats(self, result: IAMAnalysisResult) -> dict[str, Any]:
         """분석 결과 요약 통계"""
-        stats = {
+        stats: dict[str, Any] = {
             "account_id": result.account_id,
             "account_name": result.account_name,
             # User 통계
@@ -1010,7 +1010,7 @@ class IAMAnalyzer:
 
         return stats
 
-    def _count_severity(self, stats: Dict, severity: Severity) -> None:
+    def _count_severity(self, stats: dict, severity: Severity) -> None:
         """심각도별 이슈 카운트"""
         if severity == Severity.CRITICAL:
             stats["critical_issues"] += 1
@@ -1023,10 +1023,10 @@ class IAMAnalyzer:
 
     def _check_privesc_paths(
         self,
-        dangerous_permissions: List[str],
-        attached_policies: List[str],
+        dangerous_permissions: list[str],
+        attached_policies: list[str],
         has_passrole_wildcard: bool,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """권한 상승 경로(Privilege Escalation Paths) 탐지
 
         Args:
@@ -1038,7 +1038,7 @@ class IAMAnalyzer:
             탐지된 privesc 경로 목록 (name, severity, description 포함)
         """
         # 1. 실제 권한 집합 구성
-        effective_permissions: set = set()
+        effective_permissions: set[str] = set()
 
         # 1-1. dangerous_permissions에서 권한 추출
         for perm in dangerous_permissions:
@@ -1067,7 +1067,7 @@ class IAMAnalyzer:
         # 2. 각 privesc 경로 검사
         detected_paths = []
         for path in self.PRIVESC_PATHS:
-            required_perms = path["permissions"]
+            required_perms: set[str] = set(path["permissions"])
             # 모든 필요 권한이 effective_permissions에 있는지 확인
             if required_perms.issubset(effective_permissions):
                 detected_paths.append(

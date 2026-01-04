@@ -9,8 +9,9 @@ import functools
 import logging
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional, Set, TypeVar, Union
+from typing import TypeVar
 
 from botocore.exceptions import ClientError
 
@@ -67,7 +68,7 @@ class RetryConfig:
 DEFAULT_RETRY_CONFIG = RetryConfig()
 
 # 재시도 가능한 AWS 에러 코드
-RETRYABLE_ERROR_CODES: Set[str] = {
+RETRYABLE_ERROR_CODES: set[str] = {
     "Throttling",
     "ThrottlingException",
     "RequestLimitExceeded",
@@ -128,7 +129,8 @@ def get_error_code(error: Exception) -> str:
         에러 코드 문자열
     """
     if hasattr(error, "response"):
-        return error.response.get("Error", {}).get("Code", "Unknown")
+        code: str = error.response.get("Error", {}).get("Code", "Unknown")
+        return code
     return error.__class__.__name__
 
 
@@ -151,11 +153,11 @@ def is_retryable(error: Exception) -> bool:
 def safe_aws_call(
     service: str = "default",
     operation: str = "",
-    retry_config: Optional[RetryConfig] = None,
-    rate_limiter: Optional[TokenBucketRateLimiter] = None,
+    retry_config: RetryConfig | None = None,
+    rate_limiter: TokenBucketRateLimiter | None = None,
     identifier: str = "",
     region: str = "",
-) -> Callable[[Callable[..., T]], Callable[..., Union[T, TaskError]]]:
+) -> Callable[[Callable[..., T]], Callable[..., T | TaskError]]:
     """AWS API 호출을 안전하게 래핑하는 데코레이터
 
     기능:
@@ -189,10 +191,10 @@ def safe_aws_call(
     config = retry_config or DEFAULT_RETRY_CONFIG
     limiter = rate_limiter or get_rate_limiter(service)
 
-    def decorator(func: Callable[..., T]) -> Callable[..., Union[T, TaskError]]:
+    def decorator(func: Callable[..., T]) -> Callable[..., T | TaskError]:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Union[T, TaskError]:
-            last_error: Optional[Exception] = None
+        def wrapper(*args, **kwargs) -> T | TaskError:
+            last_error: Exception | None = None
             op_name = operation or func.__name__
 
             for attempt in range(config.max_retries + 1):
@@ -319,7 +321,7 @@ def with_retry(
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> T:
-            last_error: Optional[Exception] = None
+            last_error: Exception | None = None
 
             for attempt in range(config.max_retries + 1):
                 try:

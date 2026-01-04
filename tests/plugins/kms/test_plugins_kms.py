@@ -5,11 +5,8 @@ tests/test_plugins_kms.py - KMS 플러그인 테스트
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-import pytest
-
 from plugins.kms.unused import (
     KMSKeyAnalysisResult,
-    KMSKeyFinding,
     KMSKeyInfo,
     KMSKeyStatus,
     analyze_kms_keys,

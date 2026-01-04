@@ -10,11 +10,10 @@ NAT Gateway 데이터 수집기
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
 
 from botocore.exceptions import ClientError
 
-from core.parallel import ErrorSeverity, get_client, try_or_default
+from core.parallel import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class NATGateway:
     public_ip: str = ""
     private_ip: str = ""
     connectivity_type: str = "public"  # public or private
-    create_time: Optional[datetime] = None
+    create_time: datetime | None = None
     age_days: int = 0
 
     # CloudWatch 메트릭 (14일간)
@@ -47,11 +46,11 @@ class NATGateway:
     connection_attempt_count: float = 0.0
 
     # 일별 데이터 (트렌드 분석용)
-    daily_bytes_out: List[float] = field(default_factory=list)
+    daily_bytes_out: list[float] = field(default_factory=list)
     days_with_traffic: int = 0  # 트래픽이 있었던 날 수
 
     # 태그
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
     name: str = ""
 
     # 비용 정보
@@ -67,8 +66,8 @@ class NATAuditData:
     account_id: str
     account_name: str
     region: str
-    nat_gateways: List[NATGateway] = field(default_factory=list)
-    collected_at: Optional[datetime] = None
+    nat_gateways: list[NATGateway] = field(default_factory=list)
+    collected_at: datetime | None = None
     metric_period_days: int = 14
 
 
@@ -79,7 +78,7 @@ class NATCollector:
     METRIC_PERIOD_DAYS = 14
 
     def __init__(self):
-        self.errors: List[str] = []
+        self.errors: list[str] = []
 
     def collect(
         self,
@@ -139,7 +138,7 @@ class NATCollector:
         account_id: str,
         account_name: str,
         region: str,
-    ) -> List[NATGateway]:
+    ) -> list[NATGateway]:
         """NAT Gateway 목록 수집"""
         nat_gateways = []
         now = datetime.now(timezone.utc)
@@ -193,7 +192,7 @@ class NATCollector:
 
         return nat_gateways
 
-    def _parse_tags(self, tags: List[Dict[str, str]]) -> Dict[str, str]:
+    def _parse_tags(self, tags: list[dict[str, str]]) -> dict[str, str]:
         """태그 파싱"""
         return {
             tag.get("Key", ""): tag.get("Value", "")

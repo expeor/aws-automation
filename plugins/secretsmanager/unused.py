@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -50,18 +49,18 @@ class SecretInfo:
     arn: str
     name: str
     description: str
-    created_date: Optional[datetime]
-    last_accessed_date: Optional[datetime]
-    last_changed_date: Optional[datetime]
+    created_date: datetime | None
+    last_accessed_date: datetime | None
+    last_changed_date: datetime | None
     rotation_enabled: bool
-    deleted_date: Optional[datetime] = None
+    deleted_date: datetime | None = None
 
     @property
     def monthly_cost(self) -> float:
         return get_secret_price(self.region)
 
     @property
-    def days_since_access(self) -> Optional[int]:
+    def days_since_access(self) -> int | None:
         if self.last_accessed_date:
             return (datetime.now(timezone.utc) - self.last_accessed_date).days
         return None
@@ -89,12 +88,12 @@ class SecretAnalysisResult:
     normal_count: int = 0
     total_monthly_cost: float = 0.0
     unused_monthly_cost: float = 0.0
-    findings: List[SecretFinding] = field(default_factory=list)
+    findings: list[SecretFinding] = field(default_factory=list)
 
 
 def collect_secrets(
     session, account_id: str, account_name: str, region: str
-) -> List[SecretInfo]:
+) -> list[SecretInfo]:
     """Secrets Manager 시크릿 수집"""
     sm = get_client(session, "secretsmanager", region_name=region)
     secrets = []
@@ -122,7 +121,7 @@ def collect_secrets(
 
 
 def analyze_secrets(
-    secrets: List[SecretInfo], account_id: str, account_name: str, region: str
+    secrets: list[SecretInfo], account_id: str, account_name: str, region: str
 ) -> SecretAnalysisResult:
     """시크릿 분석"""
     result = SecretAnalysisResult(
@@ -187,7 +186,7 @@ def analyze_secrets(
     return result
 
 
-def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[SecretAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -267,8 +266,8 @@ def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40
@@ -284,7 +283,7 @@ def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[SecretAnalysisResult]:
+) -> SecretAnalysisResult | None:
     """단일 계정/리전의 시크릿 수집 및 분석 (병렬 실행용)"""
     secrets = collect_secrets(session, account_id, account_name, region)
     if not secrets:
@@ -299,7 +298,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="secretsmanager"
     )
-    results: List[SecretAnalysisResult] = [
+    results: list[SecretAnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 
@@ -314,7 +313,7 @@ def run(ctx) -> None:
     unused = sum(r.unused_count for r in results)
     unused_cost = sum(r.unused_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"전체: {total}개 / 미사용: [yellow]{unused}개[/yellow] (${unused_cost:,.2f}/월)"
     )

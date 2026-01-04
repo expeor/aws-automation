@@ -7,7 +7,7 @@ AWS Personal Health Dashboard 전체 이벤트 분석 및 보고서 생성
     - run(ctx): 필수. 실행 함수.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from core.auth.session import get_context_session
 from core.tools.output import OutputPath
@@ -17,7 +17,7 @@ from .collector import HealthCollector
 from .reporter import PatchReporter
 
 
-def run(ctx) -> Dict[str, Any]:
+def run(ctx) -> dict[str, Any]:
     """PHD 전체 이벤트 분석 및 보고서 생성"""
     # AWS Health API는 us-east-1에서만 사용 가능
     session = get_context_session(ctx, "us-east-1")

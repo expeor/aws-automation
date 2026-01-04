@@ -4,8 +4,6 @@ tests/plugins/iam/test_plugins_iam_audit.py - IAM Audit 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestCollectAndAnalyze:
     """_collect_and_analyze 함수 테스트"""
@@ -210,7 +208,7 @@ class TestCreateOutputDirectory:
         )
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("123456789012")
         mock_path_instance.sub.assert_called_once_with("iam-audit")
@@ -232,7 +230,7 @@ class TestCreateOutputDirectory:
         )
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("my-profile")
 
@@ -251,7 +249,7 @@ class TestCreateOutputDirectory:
         mock_path_instance.build.return_value = "/output/default/iam-audit/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("default")
 

@@ -4,12 +4,9 @@ tests/test_plugins_route53.py - Route53 플러그인 테스트
 
 from unittest.mock import patch
 
-import pytest
-
 from plugins.route53.empty_zone import (
     HostedZoneInfo,
     Route53AnalysisResult,
-    ZoneFinding,
     ZoneStatus,
     analyze_hosted_zones,
 )

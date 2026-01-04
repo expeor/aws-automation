@@ -13,14 +13,13 @@ Security Group Audit Excel 보고서 생성기
 
 import os
 from datetime import datetime
-from typing import Dict, List, Union
 
 from core.tools.io.excel import ColumnDef, Workbook
 
 from .analyzer import RuleAnalysisResult, RuleStatus, SGAnalysisResult, SGStatus
 
 
-def _format_port_range(port_range: str) -> Union[int, str]:
+def _format_port_range(port_range: str) -> int | str:
     """Port Range를 적절한 타입으로 변환
 
     - 단일 포트 (예: "22", "443"): 정수로 변환 → Excel에서 숫자로 정렬
@@ -36,9 +35,9 @@ class SGExcelReporter:
 
     def __init__(
         self,
-        sg_results: List[SGAnalysisResult],
-        rule_results: List[RuleAnalysisResult],
-        summary: Dict[str, Dict[str, int]],
+        sg_results: list[SGAnalysisResult],
+        rule_results: list[RuleAnalysisResult],
+        summary: dict[str, dict[str, int]],
     ):
         self.sg_results = sg_results
         self.rule_results = rule_results
@@ -96,7 +95,7 @@ class SGExcelReporter:
 
         ws = wb.new_sheet("Summary", columns=columns)
 
-        for key, stats in sorted(self.summary.items()):
+        for _key, stats in sorted(self.summary.items()):
             ws.add_row(
                 [
                     str(stats["account_id"]),  # 텍스트 강제

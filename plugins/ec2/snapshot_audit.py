@@ -19,7 +19,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
 
 from rich.console import Console
 
@@ -78,13 +77,13 @@ class SnapshotInfo:
     state: str
     volume_id: str
     volume_size_gb: int
-    start_time: Optional[datetime]
+    start_time: datetime | None
     encrypted: bool
     owner_id: str
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
     # AMI 연결
-    ami_ids: List[str] = field(default_factory=list)
+    ami_ids: list[str] = field(default_factory=list)
 
     # 메타
     account_id: str = ""
@@ -132,7 +131,7 @@ class SnapshotAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[SnapshotFinding] = field(default_factory=list)
+    findings: list[SnapshotFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -155,7 +154,7 @@ class SnapshotAnalysisResult:
 
 def collect_snapshots(
     session, account_id: str, account_name: str, region: str
-) -> List[SnapshotInfo]:
+) -> list[SnapshotInfo]:
     """EBS Snapshot 목록 수집 (자체 소유만)"""
     from botocore.exceptions import ClientError
 
@@ -206,7 +205,7 @@ def collect_snapshots(
     return snapshots
 
 
-def get_ami_snapshot_mapping(session, region: str) -> Dict[str, List[str]]:
+def get_ami_snapshot_mapping(session, region: str) -> dict[str, list[str]]:
     """AMI가 사용하는 스냅샷 ID 매핑 조회
 
     Returns:
@@ -214,7 +213,7 @@ def get_ami_snapshot_mapping(session, region: str) -> Dict[str, List[str]]:
     """
     from botocore.exceptions import ClientError
 
-    mapping: Dict[str, List[str]] = {}
+    mapping: dict[str, list[str]] = {}
 
     try:
         ec2 = get_client(session, "ec2", region_name=region)
@@ -246,8 +245,8 @@ def get_ami_snapshot_mapping(session, region: str) -> Dict[str, List[str]]:
 
 
 def analyze_snapshots(
-    snapshots: List[SnapshotInfo],
-    ami_mapping: Dict[str, List[str]],
+    snapshots: list[SnapshotInfo],
+    ami_mapping: dict[str, list[str]],
     account_id: str,
     account_name: str,
     region: str,
@@ -348,7 +347,7 @@ def _analyze_single_snapshot(snapshot: SnapshotInfo) -> SnapshotFinding:
 # =============================================================================
 
 
-def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[SnapshotAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -510,7 +509,7 @@ def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> s
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[SnapshotAnalysisResult]:
+) -> SnapshotAnalysisResult | None:
     """단일 계정/리전의 스냅샷 수집 및 분석 (병렬 실행용)"""
     snapshots = collect_snapshots(session, account_id, account_name, region)
     if not snapshots:
@@ -534,7 +533,7 @@ def run(ctx) -> None:
     )
 
     # 결과 처리 (None 제외)
-    all_results: List[SnapshotAnalysisResult] = [
+    all_results: list[SnapshotAnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 

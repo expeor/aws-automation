@@ -12,7 +12,7 @@ core/auth/config/loader.py 테스트
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -480,21 +480,23 @@ class TestWarnLegacySso:
         _warned_legacy_profiles.clear()
 
         # ImportError를 발생시켜 logger fallback 테스트
-        with patch("core.auth.config.loader.logger") as mock_logger:
-            with patch.dict("sys.modules", {"rich.console": None, "rich.panel": None}):
-                # rich 모듈을 못 찾도록 설정
-                import builtins
+        with (
+            patch("core.auth.config.loader.logger") as mock_logger,
+            patch.dict("sys.modules", {"rich.console": None, "rich.panel": None}),
+        ):
+            # rich 모듈을 못 찾도록 설정
+            import builtins
 
-                original_import = builtins.__import__
+            original_import = builtins.__import__
 
-                def mock_import(name, *args, **kwargs):
-                    if name in ("rich.console", "rich.panel"):
-                        raise ImportError(f"No module named '{name}'")
-                    return original_import(name, *args, **kwargs)
+            def mock_import(name, *args, **kwargs):
+                if name in ("rich.console", "rich.panel"):
+                    raise ImportError(f"No module named '{name}'")
+                return original_import(name, *args, **kwargs)
 
-                with patch.object(builtins, "__import__", mock_import):
-                    _warn_legacy_sso("logger-test-profile")
-                    mock_logger.warning.assert_called_once()
+            with patch.object(builtins, "__import__", mock_import):
+                _warn_legacy_sso("logger-test-profile")
+                mock_logger.warning.assert_called_once()
 
 
 class TestModuleFunctions:

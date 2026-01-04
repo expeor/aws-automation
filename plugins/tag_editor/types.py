@@ -38,8 +38,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
-
 
 # =============================================================================
 # 상수 정의
@@ -278,9 +276,9 @@ class ResourceTagInfo:
     account_id: str
     account_name: str
     region: str
-    tags: Dict[str, str]  # 현재 태그들
+    tags: dict[str, str]  # 현재 태그들
     has_map_tag: bool
-    map_tag_value: Optional[str] = None
+    map_tag_value: str | None = None
 
 
 @dataclass
@@ -315,10 +313,10 @@ class MapTagAnalysisResult:
     untagged_resources: int = 0
 
     # 리소스 타입별 통계
-    type_stats: List[ResourceTypeStats] = field(default_factory=list)
+    type_stats: list[ResourceTypeStats] = field(default_factory=list)
 
     # 상세 리소스 목록
-    resources: List[ResourceTagInfo] = field(default_factory=list)
+    resources: list[ResourceTagInfo] = field(default_factory=list)
 
     @property
     def tag_rate(self) -> float:
@@ -338,9 +336,9 @@ class TagOperationLog:
     name: str
     operation: str  # "add", "update", "remove"
     result: TagOperationResult
-    error_message: Optional[str] = None
-    previous_value: Optional[str] = None
-    new_value: Optional[str] = None
+    error_message: str | None = None
+    previous_value: str | None = None
+    new_value: str | None = None
 
 
 @dataclass
@@ -359,7 +357,7 @@ class MapTagApplyResult:
     skipped_count: int = 0
 
     # 상세 로그
-    operation_logs: List[TagOperationLog] = field(default_factory=list)
+    operation_logs: list[TagOperationLog] = field(default_factory=list)
 
     @property
     def success_rate(self) -> float:

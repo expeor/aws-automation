@@ -4,14 +4,10 @@ tests/test_plugins_acm.py - ACM 플러그인 테스트
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from plugins.acm.unused import (
     ACMAnalysisResult,
-    CertFinding,
     CertInfo,
     CertStatus,
-    EXPIRING_DAYS_THRESHOLD,
     analyze_certificates,
 )
 

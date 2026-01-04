@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -53,7 +52,7 @@ class ECRRepoInfo:
     name: str
     arn: str
     uri: str
-    created_at: Optional[datetime]
+    created_at: datetime | None
     image_count: int = 0
     total_size_bytes: int = 0
     has_lifecycle_policy: bool = False
@@ -102,12 +101,12 @@ class ECRAnalysisResult:
     total_size_gb: float = 0.0
     old_images_size_gb: float = 0.0
     old_images_monthly_cost: float = 0.0
-    findings: List[ECRRepoFinding] = field(default_factory=list)
+    findings: list[ECRRepoFinding] = field(default_factory=list)
 
 
 def collect_ecr_repos(
     session, account_id: str, account_name: str, region: str
-) -> List[ECRRepoInfo]:
+) -> list[ECRRepoInfo]:
     """ECR 리포지토리 수집"""
     from botocore.exceptions import ClientError
 
@@ -153,9 +152,13 @@ def collect_ecr_repos(
 
                         # 마지막 pull이 90일 이상 전이거나 push 후 한번도 pull 안 된 경우
                         is_old = False
-                        if last_pull and last_pull < threshold_date:
-                            is_old = True
-                        elif not last_pull and pushed_at and pushed_at < threshold_date:
+                        if (
+                            last_pull
+                            and last_pull < threshold_date
+                            or not last_pull
+                            and pushed_at
+                            and pushed_at < threshold_date
+                        ):
                             is_old = True
 
                         if is_old:
@@ -171,7 +174,7 @@ def collect_ecr_repos(
 
 
 def analyze_ecr_repos(
-    repos: List[ECRRepoInfo], account_id: str, account_name: str, region: str
+    repos: list[ECRRepoInfo], account_id: str, account_name: str, region: str
 ) -> ECRAnalysisResult:
     """ECR 리포지토리 분석"""
     result = ECRAnalysisResult(
@@ -239,7 +242,7 @@ def analyze_ecr_repos(
     return result
 
 
-def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[ECRAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -328,8 +331,8 @@ def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40
@@ -345,7 +348,7 @@ def generate_report(results: List[ECRAnalysisResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[ECRAnalysisResult]:
+) -> ECRAnalysisResult | None:
     """단일 계정/리전의 ECR 리포지토리 수집 및 분석 (병렬 실행용)"""
     repos = collect_ecr_repos(session, account_id, account_name, region)
     if not repos:
@@ -358,7 +361,7 @@ def run(ctx) -> None:
     console.print("[bold]ECR 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ecr")
-    results: List[ECRAnalysisResult] = [r for r in result.get_data() if r is not None]
+    results: list[ECRAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -370,7 +373,7 @@ def run(ctx) -> None:
     total_old = sum(r.old_images for r in results)
     total_cost = sum(r.old_images_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"오래된 이미지: [yellow]{total_old}개[/yellow] (${total_cost:,.2f}/월)")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:

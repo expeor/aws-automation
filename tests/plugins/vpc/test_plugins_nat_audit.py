@@ -4,8 +4,6 @@ tests/plugins/vpc/test_plugins_nat_audit.py - NAT Gateway Audit 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestPrintSummary:
     """_print_summary 함수 테스트"""
@@ -141,7 +139,7 @@ class TestCreateOutputDirectory:
         )
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("my-profile")
 
@@ -160,7 +158,7 @@ class TestCreateOutputDirectory:
         mock_path_instance.build.return_value = "/output/default/nat-audit/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("default")
 

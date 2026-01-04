@@ -7,7 +7,6 @@ aa_cli/aa/ui/console.py - Rich 콘솔 유틸리티
 import logging
 import platform
 import sys
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -41,7 +40,7 @@ def get_console() -> Console:
         record=True,
         soft_wrap=True,
         markup=True,
-        emoji=False if is_windows else True,
+        emoji=not is_windows,
     )
 
 
@@ -148,7 +147,7 @@ def print_step(step: int, total: int, message: str) -> None:
     console.print(f"[dim]({step}/{total})[/dim] {message}")
 
 
-def print_panel_header(title: str, subtitle: Optional[str] = None) -> None:
+def print_panel_header(title: str, subtitle: str | None = None) -> None:
     """제목과 부제목을 포함한 패널 헤더를 출력합니다.
 
     Args:
@@ -175,8 +174,8 @@ def print_panel_header(title: str, subtitle: Optional[str] = None) -> None:
 
 def print_table(
     title: str,
-    columns: List[str],
-    rows: List[List],
+    columns: list[str],
+    rows: list[list],
 ) -> None:
     """테이블 형식으로 데이터를 출력합니다.
 
@@ -196,7 +195,7 @@ def print_table(
     console.print(table)
 
 
-def print_legend(items: List[tuple]) -> None:
+def print_legend(items: list[tuple]) -> None:
     """색상 범례를 출력합니다.
 
     Args:
@@ -242,7 +241,7 @@ BOX_STYLE = "#FF9900"  # AWS 오렌지 (배너와 통일)
 
 def print_section_box(
     title: str,
-    content_lines: Optional[List[str]] = None,
+    content_lines: list[str] | None = None,
     style: str = BOX_STYLE,
 ) -> None:
     """섹션 박스를 출력합니다.
@@ -326,7 +325,7 @@ def print_tool_start(tool_name: str, description: str = "") -> None:
     console.print("[dim]" + "─" * 50 + "[/]")
 
 
-def print_tool_complete(message: str = "완료", elapsed: float = None) -> None:
+def print_tool_complete(message: str = "완료", elapsed: float | None = None) -> None:
     """도구 실행 완료 표시
 
     Args:

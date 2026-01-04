@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.tools.io.excel import ColumnDef, Workbook
 
@@ -41,12 +41,12 @@ class TagSyncResult:
 
     instance_id: str
     instance_name: str
-    volume_ids: List[str]
-    tags_applied: List[Dict[str, str]]
+    volume_ids: list[str]
+    tags_applied: list[dict[str, str]]
     status: str  # success, failed, skipped
     error: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "instance_id": self.instance_id,
             "instance_name": self.instance_name,
@@ -67,7 +67,7 @@ class SyncSummary:
     success_count: int = 0
     failed_count: int = 0
     skipped_count: int = 0
-    results: List[TagSyncResult] = field(default_factory=list)
+    results: list[TagSyncResult] = field(default_factory=list)
 
 
 class EC2ToEBSTagSync:
@@ -83,7 +83,7 @@ class EC2ToEBSTagSync:
     def __init__(
         self,
         session,
-        region: str = None,
+        region: str | None = None,
         dry_run: bool = False,
     ):
         """초기화
@@ -100,8 +100,8 @@ class EC2ToEBSTagSync:
 
     def sync_all(
         self,
-        instance_ids: Optional[List[str]] = None,
-        tag_keys: Optional[List[str]] = None,
+        instance_ids: list[str] | None = None,
+        tag_keys: list[str] | None = None,
     ) -> SyncSummary:
         """모든 EC2 인스턴스의 태그를 EBS에 동기화
 
@@ -140,8 +140,8 @@ class EC2ToEBSTagSync:
         return summary
 
     def _get_instances(
-        self, instance_ids: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+        self, instance_ids: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """EC2 인스턴스 목록 조회"""
         instances = []
 
@@ -162,8 +162,8 @@ class EC2ToEBSTagSync:
 
     def _sync_instance(
         self,
-        instance: Dict[str, Any],
-        tag_keys: Optional[List[str]] = None,
+        instance: dict[str, Any],
+        tag_keys: list[str] | None = None,
     ) -> TagSyncResult:
         """단일 인스턴스의 태그를 EBS에 동기화"""
         instance_id = instance["InstanceId"]
@@ -208,8 +208,7 @@ class EC2ToEBSTagSync:
                 )
 
             logger.info(
-                f"{instance_id}: {len(volume_ids)}개 볼륨에 "
-                f"{len(tags_to_apply)}개 태그 적용"
+                f"{instance_id}: {len(volume_ids)}개 볼륨에 " f"{len(tags_to_apply)}개 태그 적용"
             )
 
             return TagSyncResult(
@@ -233,9 +232,9 @@ class EC2ToEBSTagSync:
 
     def _filter_tags(
         self,
-        tags: List[Dict[str, str]],
-        tag_keys: Optional[List[str]] = None,
-    ) -> List[Dict[str, str]]:
+        tags: list[dict[str, str]],
+        tag_keys: list[str] | None = None,
+    ) -> list[dict[str, str]]:
         """동기화할 태그 필터링"""
         filtered = []
 
@@ -254,11 +253,12 @@ class EC2ToEBSTagSync:
 
         return filtered
 
-    def _get_instance_name(self, instance: Dict[str, Any]) -> str:
+    def _get_instance_name(self, instance: dict[str, Any]) -> str:
         """인스턴스 Name 태그 추출"""
         for tag in instance.get("Tags", []):
             if tag.get("Key") == "Name":
-                return tag.get("Value", "")
+                value: str = tag.get("Value", "")
+                return value
         return ""
 
 
@@ -349,7 +349,7 @@ class TagSyncReporter:
 
     def print_summary(self) -> None:
         """콘솔에 요약 출력"""
-        print(f"\n=== EC2 → EBS 태그 동기화 결과 ===")
+        print("\n=== EC2 → EBS 태그 동기화 결과 ===")
         print(f"처리된 인스턴스: {self.summary.total_instances}개")
         print(f"태그 적용된 볼륨: {self.summary.total_volumes}개")
         print(f"적용된 태그 수: {self.summary.total_tags_applied}개")
@@ -360,9 +360,9 @@ class TagSyncReporter:
 
 def sync_tags(
     session,
-    region: str = None,
-    instance_ids: Optional[List[str]] = None,
-    tag_keys: Optional[List[str]] = None,
+    region: str | None = None,
+    instance_ids: list[str] | None = None,
+    tag_keys: list[str] | None = None,
     dry_run: bool = False,
 ) -> SyncSummary:
     """EC2 태그를 EBS에 동기화 (편의 함수)
@@ -381,7 +381,7 @@ def sync_tags(
     return syncer.sync_all(instance_ids, tag_keys)
 
 
-def run_sync(ctx) -> None:
+def run_sync(ctx) -> dict[str, Any] | None:
     """EC2 태그를 EBS에 동기화 (CLI 진입점)"""
     from core.auth.session import get_context_session
     from core.tools.output import OutputPath

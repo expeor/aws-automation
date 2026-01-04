@@ -3,13 +3,11 @@ tests/test_plugins_ebs.py - EBS 플러그인 테스트
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from moto import mock_aws
 
 from plugins.ec2.ebs_audit import (
-    EBSFinding,
     EBSInfo,
     Severity,
     UsageStatus,
@@ -298,7 +296,7 @@ class TestCollectEBS:
 
         # EC2 리소스 생성
         ec2 = boto3.client("ec2", region_name="ap-northeast-2")
-        volume = ec2.create_volume(
+        ec2.create_volume(
             AvailabilityZone="ap-northeast-2a",
             Size=100,
             VolumeType="gp3",

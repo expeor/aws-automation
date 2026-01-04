@@ -11,9 +11,9 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import pytz
+import pytz  # type: ignore[import-untyped]
 
 # DuckDB - optional dependency
 try:
@@ -38,6 +38,8 @@ except ImportError:
 
     console = Console()
     logger = logging.getLogger(__name__)
+
+import contextlib
 
 from core.tools.cache import get_cache_dir
 
@@ -64,7 +66,7 @@ class ALBLogAnalyzer:
         bucket_name: str,
         prefix: str,
         start_datetime: Any,
-        end_datetime: Optional[Any] = None,
+        end_datetime: Any | None = None,
         timezone: str = "Asia/Seoul",
         max_workers: int = 5,
     ):
@@ -100,7 +102,7 @@ class ALBLogAnalyzer:
         # 타임존 설정
         try:
             self.timezone = pytz.timezone(timezone)
-        except pytz.exceptions.UnknownTimeZoneError as e:
+        except pytz.exceptions.UnknownTimeZoneError:
             logger.warning(f"알 수 없는 타임존 '{timezone}'입니다. UTC를 사용합니다.")
             self.timezone = pytz.UTC
 
@@ -181,8 +183,8 @@ class ALBLogAnalyzer:
         functions = [
             # UTC 타임스탬프를 파싱 후 사용자 타임존으로 변환
             f"""CREATE OR REPLACE MACRO extract_timestamp(log_line) AS (
-                   timezone('{tz_name}', 
-                       strptime(regexp_extract(log_line, '\\S+ (\\S+) ', 1), '%Y-%m-%dT%H:%M:%S.%fZ') 
+                   timezone('{tz_name}',
+                       strptime(regexp_extract(log_line, '\\S+ (\\S+) ', 1), '%Y-%m-%dT%H:%M:%S.%fZ')
                        AT TIME ZONE 'UTC'
                    )
                )""",
@@ -190,7 +192,7 @@ class ALBLogAnalyzer:
                    split_part(regexp_extract(log_line, '\\S+ \\S+ \\S+ (\\S+) ', 1), ':', 1)
                )""",
             """CREATE OR REPLACE MACRO extract_target_ip(log_line) AS (
-                   CASE 
+                   CASE
                        WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) = '-' THEN ''
                        ELSE split_part(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ (\\S+) ', 1), ':', 1)
                    END
@@ -202,8 +204,8 @@ class ALBLogAnalyzer:
                    regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1)
                )""",
             """CREATE OR REPLACE MACRO extract_response_time(log_line) AS (
-                   CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) + 
-                   CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) + 
+                   CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) +
+                   CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) +
                    CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE)
                )""",
             """CREATE OR REPLACE MACRO extract_request(log_line) AS (
@@ -226,33 +228,33 @@ class ALBLogAnalyzer:
                )""",
             # 추가 필드: target_port
             """CREATE OR REPLACE MACRO extract_target_port(log_line) AS (
-                   CASE 
+                   CASE
                        WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) = '-' THEN ''
                        ELSE split_part(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ (\\S+) ', 1), ':', 2)
                    END
                )""",
             # 처리 시간 3필드 분리 (-1은 타임아웃/연결실패를 의미, NULL로 처리)
             """CREATE OR REPLACE MACRO extract_request_proc_time(log_line) AS (
-                   CASE WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) IN ('-', '-1') THEN NULL 
+                   CASE WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) IN ('-', '-1') THEN NULL
                         WHEN CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) < 0 THEN NULL
                         ELSE CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) END
                )""",
             """CREATE OR REPLACE MACRO extract_target_proc_time(log_line) AS (
-                   CASE WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) IN ('-', '-1') THEN NULL 
+                   CASE WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) IN ('-', '-1') THEN NULL
                         WHEN CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) < 0 THEN NULL
                         ELSE CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) END
                )""",
             """CREATE OR REPLACE MACRO extract_response_proc_time(log_line) AS (
-                   CASE WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) IN ('-', '-1') THEN NULL 
+                   CASE WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) IN ('-', '-1') THEN NULL
                         WHEN CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) < 0 THEN NULL
                         ELSE CAST(regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) AS DOUBLE) END
                )""",
             # 총 응답 시간: 모든 필드가 NULL이면 NULL, 아니면 합산 (NULL은 0으로 처리)
             """CREATE OR REPLACE MACRO extract_total_response_time(log_line) AS (
-                   CASE 
-                       WHEN extract_request_proc_time(log_line) IS NULL 
-                            AND extract_target_proc_time(log_line) IS NULL 
-                            AND extract_response_proc_time(log_line) IS NULL 
+                   CASE
+                       WHEN extract_request_proc_time(log_line) IS NULL
+                            AND extract_target_proc_time(log_line) IS NULL
+                            AND extract_response_proc_time(log_line) IS NULL
                        THEN NULL
                        ELSE coalesce(extract_request_proc_time(log_line), 0) +
                             coalesce(extract_target_proc_time(log_line), 0) +
@@ -261,7 +263,7 @@ class ALBLogAnalyzer:
                )""",
             # target 필드 (5번째 space-separated field, target:port 형태)
             """CREATE OR REPLACE MACRO extract_target(log_line) AS (
-                   CASE 
+                   CASE
                        WHEN regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ (\\S+) ', 1) = '-' THEN ''
                        ELSE regexp_extract(log_line, '\\S+ \\S+ \\S+ \\S+ (\\S+) ', 1)
                    END
@@ -297,7 +299,7 @@ class ALBLogAnalyzer:
             except Exception as e:
                 logger.debug(f"함수 생성 중 오류 (무시됨): {str(e)}")
 
-    def download_logs(self) -> List[str]:
+    def download_logs(self) -> list[str]:
         """S3에서 로그 파일을 다운로드합니다."""
         return self.downloader.download_logs()
 
@@ -305,7 +307,7 @@ class ALBLogAnalyzer:
         """압축된 로그 파일을 해제합니다."""
         return self.downloader.decompress_logs(gz_directory)
 
-    def analyze_logs(self, log_directory: str) -> Dict[str, Any]:
+    def analyze_logs(self, log_directory: str) -> dict[str, Any]:
         """🚀 DuckDB 기반 로그 파일들을 분석합니다."""
         try:
             self.console.print("[bold blue]🚀 ALB 로그 분석을 시작합니다...[/bold blue]")
@@ -360,9 +362,9 @@ class ALBLogAnalyzer:
 
         except Exception as e:
             logger.error(f"❌ 로그 분석 중 오류 발생: {str(e)}")
-            raise Exception(f"로그 분석 중 오류 발생: {str(e)}")
+            raise Exception(f"로그 분석 중 오류 발생: {str(e)}") from e
 
-    def _load_logs_to_duckdb(self, log_directory: str) -> Optional[str]:
+    def _load_logs_to_duckdb(self, log_directory: str) -> str | None:
         """로그 파일들을 DuckDB 테이블로 로드합니다."""
         try:
             # 로그 파일 찾기
@@ -379,7 +381,7 @@ class ALBLogAnalyzer:
             logger.debug(f"📁 {len(log_files)}개의 로그 파일 발견")
 
             # 각 날짜별 파일 수 계산 - 파일명에서 날짜 정보 추출
-            date_counts = {}
+            date_counts: dict[str, int] = {}
             for log_file in log_files:
                 # 1) 파일 경로에서 날짜 추출 (기존 방식)
                 date_match = re.search(r"(\d{4})[/\\](\d{2})[/\\](\d{2})", log_file)
@@ -436,7 +438,7 @@ class ALBLogAnalyzer:
             if date_counts:
                 logger.debug(f"📅 날짜별 파일 분포: {date_counts}")
                 # 정렬된 날짜로 표시
-                sorted_dates = sorted([k for k in date_counts.keys() if k != "unknown"])
+                sorted_dates = sorted([k for k in date_counts if k != "unknown"])
                 if sorted_dates:
                     logger.debug(f"📊 날짜 범위: {sorted_dates[0]} ~ {sorted_dates[-1]}")
 
@@ -449,12 +451,15 @@ class ALBLogAnalyzer:
                 pass
 
             # 파일 리스트를 DuckDB가 이해할 수 있는 리스트 리터럴로 변환
-            file_list_sql = ", ".join([f"'{p.replace('\\', '/')}'" for p in log_files])
+            backslash = "\\"
+            file_list_sql = ", ".join(
+                [f"'{p.replace(backslash, '/')}'" for p in log_files]
+            )
 
             # 로그 파일들을 하나의 테이블로 로드
             create_table_query = f"""
             CREATE OR REPLACE TABLE alb_logs AS
-            SELECT 
+            SELECT
                 line as raw_line,
                 extract_timestamp(line) as timestamp,
                 extract_client_ip(line) as client_ip,
@@ -479,23 +484,21 @@ class ALBLogAnalyzer:
                 extract_error_reason(line) as error_reason,
                 extract_received_bytes(line) as received_bytes,
                 extract_sent_bytes(line) as sent_bytes
-            FROM read_csv_auto([{file_list_sql}], 
-                              delim='\\t', 
-                              header=false, 
+            FROM read_csv_auto([{file_list_sql}],
+                              delim='\\t',
+                              header=false,
                               columns={{'line': 'VARCHAR'}},
                               ignore_errors=true)
-            WHERE line IS NOT NULL 
-              AND line != '' 
+            WHERE line IS NOT NULL
+              AND line != ''
               AND length(line) > 50
             """
 
             # 로그 로드 및 체크포인트 (상위 Progress에서 관리)
             self.conn.execute(create_table_query)
             # 로드 직후 디스크에 플러시하여 메모리 압박을 줄임
-            try:
+            with contextlib.suppress(Exception):
                 self.conn.execute("CHECKPOINT")
-            except Exception:
-                pass
 
             # 로드된 레코드 수 확인
             count_result = self.conn.execute("SELECT COUNT(*) FROM alb_logs").fetchone()
@@ -511,9 +514,9 @@ class ALBLogAnalyzer:
 
     def _analyze_with_duckdb(
         self,
-        progress: Optional[Progress] = None,
-        task_id: Optional[Any] = None,
-    ) -> Dict[str, Any]:
+        progress: Progress | None = None,
+        task_id: Any | None = None,
+    ) -> dict[str, Any]:
         """DuckDB를 사용하여 로그를 분석합니다."""
         try:
             # 🎯 타임스탬프는 이미 사용자 타임존으로 변환되어 저장되므로
@@ -522,7 +525,7 @@ class ALBLogAnalyzer:
             end_local = self.end_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
             summary_query = f"""
-            SELECT 
+            SELECT
                 COUNT(*) as total_logs,
                 COUNT(DISTINCT client_ip) as unique_client_ips,
                 MIN(timestamp) as start_time,
@@ -536,8 +539,8 @@ class ALBLogAnalyzer:
                 SUM(CASE WHEN elb_status_code LIKE '5%' AND elb_status_code != '-' AND elb_status_code IS NOT NULL THEN 1 ELSE 0 END) as elb_5xx_count,
                 SUM(CASE WHEN target_status_code LIKE '4%' AND target_status_code != '-' AND target_status_code IS NOT NULL THEN 1 ELSE 0 END) as backend_4xx_count,
                 SUM(CASE WHEN target_status_code LIKE '5%' AND target_status_code != '-' AND target_status_code IS NOT NULL THEN 1 ELSE 0 END) as backend_5xx_count
-            FROM alb_logs 
-            WHERE timestamp IS NOT NULL 
+            FROM alb_logs
+            WHERE timestamp IS NOT NULL
               AND timestamp >= '{start_local}'
               AND timestamp <= '{end_local}'
             """
@@ -546,6 +549,8 @@ class ALBLogAnalyzer:
             if progress is not None and task_id is not None:
                 progress.update(task_id, description="[cyan]요약 통계 계산 중...")
             summary_result = self.conn.execute(summary_query).fetchone()
+            if summary_result is None:
+                raise ValueError("Failed to get summary statistics from database")
             if progress is not None and task_id is not None:
                 progress.advance(task_id)
 
@@ -554,7 +559,7 @@ class ALBLogAnalyzer:
                 progress.update(task_id, description="[cyan]IP/URL/User Agent 카운트 중...")
             client_ip_query = """
             SELECT client_ip, COUNT(*) as count
-            FROM alb_logs 
+            FROM alb_logs
             WHERE client_ip != '' AND client_ip IS NOT NULL
             GROUP BY client_ip
             ORDER BY count DESC
@@ -565,14 +570,14 @@ class ALBLogAnalyzer:
             # Client별 상태코드 통계
             client_status_query = """
             SELECT client_ip, elb_status_code, COUNT(*) as count
-            FROM alb_logs 
-            WHERE client_ip != '' AND client_ip IS NOT NULL 
+            FROM alb_logs
+            WHERE client_ip != '' AND client_ip IS NOT NULL
               AND elb_status_code IS NOT NULL AND elb_status_code != '-'
             GROUP BY client_ip, elb_status_code
             ORDER BY client_ip, elb_status_code
             """
             client_status_results = self.conn.execute(client_status_query).fetchall()
-            client_status_statistics = {}
+            client_status_statistics: dict[str, dict[str, int]] = {}
             for client_ip, status_code, count in client_status_results:
                 if client_ip not in client_status_statistics:
                     client_status_statistics[client_ip] = {}
@@ -581,21 +586,21 @@ class ALBLogAnalyzer:
             # Target별 상태코드 통계 (target이 있는 경우만)
             target_status_query = """
             SELECT target, target_group_name, target_group_arn, elb_status_code, target_status_code, COUNT(*) as count
-            FROM alb_logs 
-            WHERE target != '' AND target IS NOT NULL 
+            FROM alb_logs
+            WHERE target != '' AND target IS NOT NULL
               AND (
-                (elb_status_code IS NOT NULL AND elb_status_code != '-') OR 
+                (elb_status_code IS NOT NULL AND elb_status_code != '-') OR
                 (target_status_code IS NOT NULL AND target_status_code != '-')
               )
             GROUP BY target, target_group_name, target_group_arn, elb_status_code, target_status_code
             ORDER BY target, target_group_name, elb_status_code, target_status_code
             """
             target_status_results = self.conn.execute(target_status_query).fetchall()
-            target_status_statistics = {}
+            target_status_statistics: dict[str, Any] = {}
             for (
                 target,
                 target_group_name,
-                target_group_arn,
+                _target_group_arn,
                 elb_status,
                 target_status,
                 count,
@@ -630,7 +635,7 @@ class ALBLogAnalyzer:
             # 요청 URL 카운트
             request_url_query = """
             SELECT TRIM(url) as url, COUNT(*) as count
-            FROM alb_logs 
+            FROM alb_logs
             WHERE url IS NOT NULL AND TRIM(url) != ''
             GROUP BY url
             ORDER BY count DESC
@@ -641,7 +646,7 @@ class ALBLogAnalyzer:
             # User Agent 카운트
             user_agent_query = """
             SELECT user_agent, COUNT(*) as count
-            FROM alb_logs 
+            FROM alb_logs
             WHERE user_agent != '' AND user_agent IS NOT NULL
             GROUP BY user_agent
             ORDER BY count DESC
@@ -655,7 +660,7 @@ class ALBLogAnalyzer:
                 progress.advance(task_id)
 
             # URL 별 상세 통계 (Top 100 URL 대상)
-            request_url_details = {}
+            request_url_details: dict[str, dict[str, Any]] = {}
             try:
                 top_urls = [
                     str(url).strip() for url, _ in request_url_results[:100] if url
@@ -707,7 +712,7 @@ class ALBLogAnalyzer:
                     avg_rt_sql = f"""
                     SELECT TRIM(url) as url, AVG(response_time) as avg_rt
                     FROM alb_logs
-                    WHERE TRIM(url) IN ({in_list_sql}) AND url IS NOT NULL AND TRIM(url) != '' 
+                    WHERE TRIM(url) IN ({in_list_sql}) AND url IS NOT NULL AND TRIM(url) != ''
                       AND response_time IS NOT NULL
                     GROUP BY url
                     """
@@ -780,7 +785,7 @@ class ALBLogAnalyzer:
                    user_agent,
                    target_group_arn,
                    target_group_name
-            FROM alb_logs 
+            FROM alb_logs
             ORDER BY response_time DESC
             LIMIT 100
             """
@@ -821,7 +826,7 @@ class ALBLogAnalyzer:
             # 바이트 분석
             received_bytes_query = """
             SELECT url, SUM(received_bytes) as total_bytes
-            FROM alb_logs 
+            FROM alb_logs
             WHERE received_bytes > 0
             GROUP BY url
             ORDER BY total_bytes DESC
@@ -833,7 +838,7 @@ class ALBLogAnalyzer:
 
             sent_bytes_query = """
             SELECT url, SUM(sent_bytes) as total_bytes
-            FROM alb_logs 
+            FROM alb_logs
             WHERE sent_bytes > 0
             GROUP BY url
             ORDER BY total_bytes DESC
@@ -872,9 +877,9 @@ class ALBLogAnalyzer:
                        error_reason,
                        target_group_arn,
                        target_group_name
-                FROM alb_logs 
-                WHERE elb_status_code LIKE '{status_prefix}%' 
-                  AND elb_status_code != '-' 
+                FROM alb_logs
+                WHERE elb_status_code LIKE '{status_prefix}%'
+                  AND elb_status_code != '-'
                   AND elb_status_code IS NOT NULL
                   AND timestamp IS NOT NULL
                   AND timestamp >= '{start_local}'
@@ -951,9 +956,9 @@ class ALBLogAnalyzer:
                        error_reason,
                        target_group_arn,
                        target_group_name
-                FROM alb_logs 
-                WHERE target_status_code LIKE '{status_prefix}%' 
-                  AND target_status_code != '-' 
+                FROM alb_logs
+                WHERE target_status_code LIKE '{status_prefix}%'
+                  AND target_status_code != '-'
                   AND target_status_code IS NOT NULL
                   AND timestamp IS NOT NULL
                   AND timestamp >= '{start_local}'
@@ -1018,15 +1023,17 @@ class ALBLogAnalyzer:
             end_time = self.end_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
             # 실제 로그 데이터의 시간 범위 - 이미 사용자 타임존으로 변환되어 있음
-            if summary_result[2]:
-                actual_start_time = summary_result[2].strftime("%Y-%m-%d %H:%M:%S")
-            else:
-                actual_start_time = "N/A"
+            actual_start_time = (
+                summary_result[2].strftime("%Y-%m-%d %H:%M:%S")
+                if summary_result[2]
+                else "N/A"
+            )
 
-            if summary_result[3]:
-                actual_end_time = summary_result[3].strftime("%Y-%m-%d %H:%M:%S")
-            else:
-                actual_end_time = "N/A"
+            actual_end_time = (
+                summary_result[3].strftime("%Y-%m-%d %H:%M:%S")
+                if summary_result[3]
+                else "N/A"
+            )
 
             # 분석 결과 구성
             analysis_results = {
@@ -1073,7 +1080,6 @@ class ALBLogAnalyzer:
                 "elb_5xx_timestamps": [],
                 "backend_4xx_timestamps": [],
                 "backend_5xx_timestamps": [],
-                "request_url_details": request_url_details,
             }
 
             # elb/alb 이름 추출 (가능한 경우)
@@ -1142,7 +1148,7 @@ class ALBLogAnalyzer:
             logger.error(f"❌ DuckDB 분석 실패: {str(e)}")
             return self._get_empty_analysis_results()
 
-    def _get_empty_analysis_results(self) -> Dict[str, Any]:
+    def _get_empty_analysis_results(self) -> dict[str, Any]:
         """빈 분석 결과를 반환합니다."""
         return {
             # 기본 정보
@@ -1269,7 +1275,7 @@ class ALBLogAnalyzer:
             "request_url_details": {},
         }
 
-    def clean_up(self, directories: List[str]) -> None:
+    def clean_up(self, directories: list[str]) -> None:
         """임시 파일 및 디렉토리를 정리합니다."""
         try:
             # DuckDB 연결 정리

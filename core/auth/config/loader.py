@@ -12,14 +12,13 @@ import configparser
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
 from ..types import ConfigurationError, ProviderType
 
 logger = logging.getLogger(__name__)
 
 # Legacy SSO 경고를 이미 표시한 프로파일 추적 (중복 경고 방지)
-_warned_legacy_profiles: Set[str] = set()
+_warned_legacy_profiles: set[str] = set()
 
 
 def _warn_legacy_sso(profile_name: str) -> None:
@@ -102,7 +101,7 @@ class AWSSession:
     name: str
     start_url: str
     region: str
-    registration_scopes: Optional[str] = None
+    registration_scopes: str | None = None
 
     def __post_init__(self):
         if not self.start_url:
@@ -139,27 +138,27 @@ class AWSProfile:
     """
 
     name: str
-    region: Optional[str] = None
-    output: Optional[str] = None
+    region: str | None = None
+    output: str | None = None
     # SSO 관련 (권장: sso_session 사용)
-    sso_session: Optional[str] = None
-    sso_account_id: Optional[str] = None
-    sso_role_name: Optional[str] = None
+    sso_session: str | None = None
+    sso_account_id: str | None = None
+    sso_role_name: str | None = None
     # ⚠️ 구버전 SSO (Deprecated: sso_session 없이 직접 설정)
-    sso_start_url: Optional[str] = None
-    sso_region: Optional[str] = None
+    sso_start_url: str | None = None
+    sso_region: str | None = None
     # AssumeRole 관련
-    role_arn: Optional[str] = None
-    source_profile: Optional[str] = None
-    external_id: Optional[str] = None
-    mfa_serial: Optional[str] = None
-    duration_seconds: Optional[int] = None
+    role_arn: str | None = None
+    source_profile: str | None = None
+    external_id: str | None = None
+    mfa_serial: str | None = None
+    duration_seconds: int | None = None
     # 기타
-    credential_process: Optional[str] = None
+    credential_process: str | None = None
     # Credentials (from ~/.aws/credentials)
-    aws_access_key_id: Optional[str] = None
-    aws_secret_access_key: Optional[str] = None
-    aws_session_token: Optional[str] = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_session_token: str | None = None
 
 
 @dataclass
@@ -174,11 +173,11 @@ class ParsedConfig:
         credentials_path: credentials 파일 경로
     """
 
-    sessions: Dict[str, AWSSession] = field(default_factory=dict)
-    profiles: Dict[str, AWSProfile] = field(default_factory=dict)
-    default_profile: Optional[str] = None
-    config_path: Optional[str] = None
-    credentials_path: Optional[str] = None
+    sessions: dict[str, AWSSession] = field(default_factory=dict)
+    profiles: dict[str, AWSProfile] = field(default_factory=dict)
+    default_profile: str | None = None
+    config_path: str | None = None
+    credentials_path: str | None = None
 
 
 # =============================================================================
@@ -202,8 +201,8 @@ class Loader:
 
     def __init__(
         self,
-        config_path: Optional[str] = None,
-        credentials_path: Optional[str] = None,
+        config_path: str | None = None,
+        credentials_path: str | None = None,
     ):
         """Loader 초기화
 
@@ -252,12 +251,14 @@ class Loader:
     def _parse_config_file(self, result: ParsedConfig) -> None:
         """~/.aws/config 파일 파싱"""
         config = configparser.ConfigParser()
-        config.optionxform = str  # 대소문자 유지
+        config.optionxform = str  # type: ignore[assignment,method-assign]  # 대소문자 유지
 
         try:
             config.read(str(self.config_path), encoding="utf-8")
         except Exception as e:
-            raise ConfigurationError(f"config 파일 파싱 실패: {self.config_path}", cause=e)
+            raise ConfigurationError(
+                f"config 파일 파싱 실패: {self.config_path}", cause=e
+            ) from e
 
         for section in config.sections():
             try:
@@ -286,7 +287,7 @@ class Loader:
 
             except ConfigurationError:
                 raise
-            except Exception as e:
+            except Exception:
                 # 개별 섹션 파싱 오류는 경고만 하고 계속 진행
                 pass
 
@@ -319,14 +320,14 @@ class Loader:
     def _parse_credentials_file(self, result: ParsedConfig) -> None:
         """~/.aws/credentials 파일 파싱 및 프로파일에 병합"""
         config = configparser.ConfigParser()
-        config.optionxform = str
+        config.optionxform = str  # type: ignore[assignment,method-assign]  # 대소문자 유지
 
         try:
             config.read(str(self.credentials_path), encoding="utf-8")
         except Exception as e:
             raise ConfigurationError(
                 f"credentials 파일 파싱 실패: {self.credentials_path}", cause=e
-            )
+            ) from e
 
         for section in config.sections():
             profile_name = section
@@ -354,7 +355,7 @@ class Loader:
                 )
 
     @staticmethod
-    def detect_provider_type(profile: AWSProfile) -> Optional[ProviderType]:
+    def detect_provider_type(profile: AWSProfile) -> ProviderType | None:
         """프로파일에서 Provider 타입을 감지
 
         Args:
@@ -381,7 +382,7 @@ class Loader:
         # AssumeRole 및 Ambient는 지원하지 않음
         return None
 
-    def list_profiles(self, config: Optional[ParsedConfig] = None) -> List[str]:
+    def list_profiles(self, config: ParsedConfig | None = None) -> list[str]:
         """프로파일 이름 목록 반환
 
         Args:
@@ -394,7 +395,7 @@ class Loader:
             config = self.load()
         return list(config.profiles.keys())
 
-    def list_sso_sessions(self, config: Optional[ParsedConfig] = None) -> List[str]:
+    def list_sso_sessions(self, config: ParsedConfig | None = None) -> list[str]:
         """SSO 세션 이름 목록 반환
 
         Args:
@@ -414,8 +415,8 @@ class Loader:
 
 
 def load_config(
-    config_path: Optional[str] = None,
-    credentials_path: Optional[str] = None,
+    config_path: str | None = None,
+    credentials_path: str | None = None,
 ) -> ParsedConfig:
     """AWS 설정 파일 로드 (편의 함수)
 
@@ -430,24 +431,24 @@ def load_config(
     return loader.load()
 
 
-def detect_provider_type(profile: AWSProfile) -> Optional[ProviderType]:
+def detect_provider_type(profile: AWSProfile) -> ProviderType | None:
     """Provider 타입 감지 (편의 함수)"""
     return Loader.detect_provider_type(profile)
 
 
 def list_profiles(
-    config_path: Optional[str] = None,
-    credentials_path: Optional[str] = None,
-) -> List[str]:
+    config_path: str | None = None,
+    credentials_path: str | None = None,
+) -> list[str]:
     """프로파일 목록 반환 (편의 함수)"""
     loader = Loader(config_path, credentials_path)
     return loader.list_profiles()
 
 
 def list_sso_sessions(
-    config_path: Optional[str] = None,
-    credentials_path: Optional[str] = None,
-) -> List[str]:
+    config_path: str | None = None,
+    credentials_path: str | None = None,
+) -> list[str]:
     """SSO 세션 목록 반환 (편의 함수)"""
     loader = Loader(config_path, credentials_path)
     return loader.list_sso_sessions()

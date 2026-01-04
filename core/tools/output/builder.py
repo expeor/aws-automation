@@ -202,7 +202,7 @@ def open_in_explorer(path: str) -> bool:
     try:
         system = platform.system()
         if system == "Windows":
-            os.startfile(path)  # type: ignore
+            os.startfile(path)
         elif system == "Darwin":  # macOS
             subprocess.run(["open", path], check=False)
         else:  # Linux
@@ -227,7 +227,7 @@ def open_file(filepath: str) -> bool:
     try:
         system = platform.system()
         if system == "Windows":
-            os.startfile(filepath)  # type: ignore
+            os.startfile(filepath)
         elif system == "Darwin":  # macOS
             subprocess.run(["open", filepath], check=False)
         else:  # Linux

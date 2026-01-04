@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -50,7 +49,7 @@ class HostedZoneInfo:
     is_private: bool
     record_count: int
     comment: str
-    vpcs: List[str] = field(default_factory=list)
+    vpcs: list[str] = field(default_factory=list)
     has_real_records: bool = False
 
     @property
@@ -80,12 +79,12 @@ class Route53AnalysisResult:
     private_zones: int = 0
     public_zones: int = 0
     wasted_monthly_cost: float = 0.0
-    findings: List[ZoneFinding] = field(default_factory=list)
+    findings: list[ZoneFinding] = field(default_factory=list)
 
 
 def collect_hosted_zones(
     session, account_id: str, account_name: str
-) -> List[HostedZoneInfo]:
+) -> list[HostedZoneInfo]:
     """Hosted Zone 수집 (글로벌 서비스)"""
     from botocore.exceptions import ClientError
 
@@ -137,7 +136,7 @@ def collect_hosted_zones(
 
 
 def analyze_hosted_zones(
-    zones: List[HostedZoneInfo], account_id: str, account_name: str
+    zones: list[HostedZoneInfo], account_id: str, account_name: str
 ) -> Route53AnalysisResult:
     """Hosted Zone 분석"""
     result = Route53AnalysisResult(
@@ -189,7 +188,7 @@ def analyze_hosted_zones(
     return result
 
 
-def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[Route53AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -271,8 +270,8 @@ def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> st
     # 컬럼 너비 자동 조정
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -288,7 +287,7 @@ def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> st
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[Route53AnalysisResult]:
+) -> Route53AnalysisResult | None:
     """단일 계정의 Hosted Zone 수집 및 분석 (병렬 실행용)
 
     Route53는 글로벌 서비스이므로 region은 무시됩니다.
@@ -307,7 +306,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="route53"
     )
-    results: List[Route53AnalysisResult] = [
+    results: list[Route53AnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 
@@ -321,7 +320,7 @@ def run(ctx) -> None:
     total_unused = sum(r.empty_zones + r.ns_soa_only_zones for r in results)
     total_cost = sum(r.wasted_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용 Hosted Zone: [yellow]{total_unused}개[/yellow] (${total_cost:,.2f}/월)"
     )

@@ -3,4 +3,4 @@
 
 from .data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
 
-__all__ = ["ALL_REGIONS", "REGION_NAMES", "COMMON_REGIONS"]
+__all__: list[str] = ["ALL_REGIONS", "REGION_NAMES", "COMMON_REGIONS"]

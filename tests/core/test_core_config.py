@@ -13,7 +13,6 @@ from core.config import (
     VALID_AREAS,
     VALID_PERMISSIONS,
     LogConfig,
-    Settings,
     get_default_profile,
     get_default_region,
     get_env_bool,
@@ -31,7 +30,9 @@ class TestSettings:
 
     def test_settings_is_frozen(self):
         """설정이 불변인지 확인"""
-        with pytest.raises(Exception):  # FrozenInstanceError
+        from dataclasses import FrozenInstanceError
+
+        with pytest.raises(FrozenInstanceError):
             settings.DEFAULT_REGION = "us-east-1"
 
     def test_default_values(self):

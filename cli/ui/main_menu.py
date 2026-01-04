@@ -7,18 +7,22 @@ cli/ui/main_menu.py - 메인 메뉴 UI (V2)
 - 통합 입력 (번호/키워드)
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
 from cli.ui.banner import print_banner
+
+if TYPE_CHECKING:
+    from cli.ui.search import ToolSearchEngine
+    from core.auth.config.loader import AWSProfile
+    from core.tools.history import FavoritesManager, RecentHistory
+    from core.tools.types import AreaInfo
 from cli.ui.console import console as default_console
 from cli.ui.console import (
-    print_box_end,
-    print_box_line,
-    print_box_start,
     wait_for_any_key,
 )
+from core.tools.types import AREA_COMMANDS, AREA_KEYWORDS, AREA_REGISTRY
 
 # 권한별 색상
 PERMISSION_COLORS = {
@@ -44,20 +48,17 @@ SHORTCUTS = {
     "exit": "exit",
 }
 
-# Area 정의는 core/tools/types.py에서 import (단일 소스)
-from core.tools.types import AREA_COMMANDS, AREA_KEYWORDS, AREA_REGISTRY
-
 
 class MainMenu:
     """메인 메뉴 클래스 (V2 - 확장성 대응)"""
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Console | None = None):
         """초기화"""
         self.console = console or default_console
-        self._categories: List[Dict] = []
-        self._search_engine = None
-        self._recent_history = None
-        self._favorites = None
+        self._categories: list[dict] = []
+        self._search_engine: ToolSearchEngine | None = None
+        self._recent_history: RecentHistory | None = None
+        self._favorites: FavoritesManager | None = None
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
@@ -83,7 +84,7 @@ class MainMenu:
 
         self._initialized = True
 
-    def show(self) -> Tuple[str, Any]:
+    def show(self) -> tuple[str, Any]:
         """메인 메뉴 표시 및 선택 받기
 
         Returns:
@@ -108,12 +109,13 @@ class MainMenu:
         # 통합 입력
         return self._get_unified_input(fav_items)
 
-    def _print_favorites_section(self) -> List[Any]:
+    def _print_favorites_section(self) -> list[Any]:
         """즐겨찾기 섹션 출력 (최대 5개)
 
         Returns:
             favorite items 리스트
         """
+        assert self._favorites is not None
         all_favs = self._favorites.get_all()
         fav_items = all_favs[:5]
 
@@ -208,8 +210,8 @@ class MainMenu:
 
     def _get_unified_input(
         self,
-        fav_items: List,
-    ) -> Tuple[str, Any]:
+        fav_items: list,
+    ) -> tuple[str, Any]:
         """통합 입력 처리
 
         - 숫자: 즐겨찾기 선택
@@ -750,6 +752,7 @@ class MainMenu:
             self.console.print("[bold]즐겨찾기 관리[/bold]")
             self.console.print()
 
+            assert self._favorites is not None
             fav_items = self._favorites.get_all()
 
             if fav_items:
@@ -810,6 +813,7 @@ class MainMenu:
             return
 
         # 검색 결과 표시
+        assert self._favorites is not None
         self.console.print()
         for i, r in enumerate(results, 1):
             is_fav = self._favorites.is_favorite(r.category, r.tool_module)
@@ -839,7 +843,7 @@ class MainMenu:
                     else:
                         self.console.print("[dim]추가 실패 (최대 20개)[/dim]")
 
-    def _remove_favorite_interactive(self, fav_items: List) -> None:
+    def _remove_favorite_interactive(self, fav_items: list) -> None:
         """즐겨찾기 삭제"""
         self.console.print()
         self.console.print("[bold]삭제할 번호[/bold] [dim](취소: Enter)[/dim]")
@@ -853,12 +857,13 @@ class MainMenu:
             idx = int(choice)
             if 1 <= idx <= len(fav_items):
                 item = fav_items[idx - 1]
+                assert self._favorites is not None
                 self._favorites.remove(item.category, item.tool_module)
                 self.console.print(f"[dim]'{item.tool_name}' 삭제됨[/dim]")
             else:
                 self.console.print(f"[dim]1-{len(fav_items)} 범위[/dim]")
 
-    def _reorder_favorite_interactive(self, fav_items: List, direction: str) -> None:
+    def _reorder_favorite_interactive(self, fav_items: list, direction: str) -> None:
         """즐겨찾기 순서 변경"""
         self.console.print()
         label = "위로" if direction == "up" else "아래로"
@@ -873,6 +878,7 @@ class MainMenu:
             idx = int(choice)
             if 1 <= idx <= len(fav_items):
                 item = fav_items[idx - 1]
+                assert self._favorites is not None
                 if direction == "up":
                     success = self._favorites.move_up(item.category, item.tool_module)
                 else:
@@ -920,9 +926,9 @@ class MainMenu:
             # 프로파일 목록 (타입별 그룹화)
             profiles = list_profiles()
             if profiles:
-                sso_profiles = []
-                static_profiles = []
-                other_profiles = []
+                sso_profiles: list[tuple[str, AWSProfile]] = []
+                static_profiles: list[tuple[str, AWSProfile]] = []
+                other_profiles: list[tuple[str, AWSProfile | None]] = []
 
                 for name in profiles:
                     profile_config = config.profiles.get(name)
@@ -1011,7 +1017,7 @@ class MainMenu:
                 )
 
         # 영역별 도구 수 계산
-        area_tool_counts = {}
+        area_tool_counts: dict[str, int] = {}
         for tool in all_tools:
             area = tool.get("area", "")
             if area:
@@ -1061,7 +1067,7 @@ class MainMenu:
                 else:
                     self.console.print(f"[red]1-{len(AREA_REGISTRY)} 범위의 번호를 입력하세요.[/]")
 
-    def _show_tools_in_area(self, area: dict, all_tools: list) -> None:
+    def _show_tools_in_area(self, area: "AreaInfo", all_tools: list) -> None:
         """영역 내 도구 목록 표시 및 선택"""
         from rich.table import Table
 
@@ -1182,7 +1188,7 @@ class MainMenu:
                         f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]"
                     )
 
-    def _show_services_in_category(self, aws_category: Dict) -> None:
+    def _show_services_in_category(self, aws_category: dict) -> None:
         """AWS 카테고리 내 서비스(플러그인) 목록 표시"""
         from rich.table import Table
 
@@ -1234,7 +1240,7 @@ class MainMenu:
                 else:
                     self.console.print(f"[red]1-{len(plugins)} 범위의 번호를 입력하세요.[/]")
 
-    def _show_tools_in_service(self, plugin: Dict) -> None:
+    def _show_tools_in_service(self, plugin: dict) -> None:
         """서비스 내 도구 목록 표시 및 선택"""
         from rich.table import Table
 
@@ -1326,11 +1332,13 @@ class MainMenu:
 
                 provider_type = detect_provider_type(profile_config)
 
-                if kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE:
-                    result.append(profile_name)
-                elif (
-                    kind == "static"
-                    and provider_type == ProviderType.STATIC_CREDENTIALS
+                if (
+                    kind == "sso_profile"
+                    and provider_type == ProviderType.SSO_PROFILE
+                    or (
+                        kind == "static"
+                        and provider_type == ProviderType.STATIC_CREDENTIALS
+                    )
                 ):
                     result.append(profile_name)
         except Exception:
@@ -1472,9 +1480,9 @@ class MainMenu:
         for part in parts:
             if "-" in part and not part.startswith("-"):
                 try:
-                    start, end = part.split("-", 1)
-                    start, end = int(start), int(end)
-                    for i in range(start, end + 1):
+                    start_str, end_str = part.split("-", 1)
+                    start_int, end_int = int(start_str), int(end_str)
+                    for i in range(start_int, end_int + 1):
                         if 1 <= i <= max_count:
                             result.add(i - 1)
                 except ValueError:
@@ -1586,10 +1594,11 @@ class MainMenu:
             idx = int(choice)
             if 1 <= idx <= len(groups):
                 group = groups[idx - 1]
-                if direction == "up":
-                    success = manager.move_up(group.name)
-                else:
-                    success = manager.move_down(group.name)
+                success = (
+                    manager.move_up(group.name)
+                    if direction == "up"
+                    else manager.move_down(group.name)
+                )
 
                 if success:
                     self.console.print(f"[dim]'{group.name}' 이동됨[/dim]")

@@ -24,10 +24,8 @@ Usage:
     -q, --quiet: 최소 출력 모드
 """
 
-import json
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -49,11 +47,11 @@ class HeadlessConfig:
     profile: str
 
     # 대상
-    regions: List[str] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
 
     # 출력
     format: str = "console"  # console, json, csv
-    output: Optional[str] = None
+    output: str | None = None
     quiet: bool = False
 
 
@@ -66,7 +64,7 @@ class HeadlessRunner:
 
     def __init__(self, config: HeadlessConfig):
         self.config = config
-        self._ctx: Optional[ExecutionContext] = None
+        self._ctx: ExecutionContext | None = None
 
     def run(self) -> int:
         """Headless 실행
@@ -107,7 +105,7 @@ class HeadlessRunner:
                 traceback.print_exc()
             return 1
 
-    def _load_tool(self) -> Optional[dict]:
+    def _load_tool(self) -> dict | None:
         """도구 메타데이터 로드"""
         from core.tools.discovery import discover_categories
 
@@ -157,7 +155,9 @@ class HeadlessRunner:
 
         # SSO Session은 지원하지 않음
         if profile_name in config.sessions:
-            console.print(f"[red]SSO Session은 headless 모드에서 지원하지 않습니다: {profile_name}[/red]")
+            console.print(
+                f"[red]SSO Session은 headless 모드에서 지원하지 않습니다: {profile_name}[/red]"
+            )
             console.print("[dim]SSO Profile 또는 Access Key 프로파일을 사용하세요.[/dim]")
             return False
 
@@ -183,6 +183,7 @@ class HeadlessRunner:
 
     def _setup_sso_profile(self) -> bool:
         """SSO Profile 인증 설정"""
+        assert self._ctx is not None
         self._ctx.provider_kind = ProviderKind.SSO_PROFILE
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -194,6 +195,7 @@ class HeadlessRunner:
 
     def _setup_static(self) -> bool:
         """Static Credentials 인증 설정"""
+        assert self._ctx is not None
         self._ctx.provider_kind = ProviderKind.STATIC_CREDENTIALS
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -205,7 +207,8 @@ class HeadlessRunner:
 
     def _setup_regions(self) -> bool:
         """리전 설정"""
-        regions = []
+        assert self._ctx is not None
+        regions: list[str] = []
 
         for r in self.config.regions:
             if r.lower() == "all":
@@ -219,8 +222,8 @@ class HeadlessRunner:
                 regions.append(r)
 
         # 중복 제거
-        seen = set()
-        unique_regions = []
+        seen: set[str] = set()
+        unique_regions: list[str] = []
         for r in regions:
             if r not in seen:
                 seen.add(r)
@@ -238,6 +241,9 @@ class HeadlessRunner:
 
     def _execute(self) -> int:
         """도구 실행"""
+        assert self._ctx is not None
+        assert self._ctx.tool is not None
+        assert self._ctx.category is not None
         from core.tools.discovery import load_tool
 
         tool = load_tool(self._ctx.category, self._ctx.tool.name)
@@ -263,6 +269,8 @@ class HeadlessRunner:
 
     def _print_summary(self) -> None:
         """실행 요약 출력"""
+        assert self._ctx is not None
+        assert self._ctx.tool is not None
         console.print(f"[bold]{self._ctx.tool.name}[/bold]")
         console.print(f"  프로파일: {self._ctx.profile_name}")
 
@@ -275,9 +283,9 @@ class HeadlessRunner:
 def run_headless(
     tool_path: str,
     profile: str,
-    regions: List[str],
+    regions: list[str],
     format: str = "console",
-    output: Optional[str] = None,
+    output: str | None = None,
     quiet: bool = False,
 ) -> int:
     """Headless 실행 편의 함수

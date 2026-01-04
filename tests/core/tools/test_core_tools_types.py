@@ -2,7 +2,6 @@
 tests/test_core_tools_types.py - core/tools/types.py 테스트
 """
 
-import pytest
 
 from core.tools.types import (
     AREA_COMMANDS,
@@ -125,7 +124,7 @@ class TestAreaDisplayByKey:
 
     def test_display_has_required_fields(self):
         """디스플레이에 필수 필드 존재"""
-        for key, display in AREA_DISPLAY_BY_KEY.items():
+        for _key, display in AREA_DISPLAY_BY_KEY.items():
             assert "label" in display
             assert "color" in display
             assert "icon" in display

@@ -6,16 +6,44 @@ plugins/cost/unused_all/collectors.py - 개별 리소스 수집/분석 함수
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict
+from collections.abc import Callable
+from typing import Any
+
+from plugins.acm.unused import (
+    analyze_certificates as analyze_acm_certificates,
+)
+from plugins.acm.unused import (
+    collect_certificates as collect_acm_certificates,
+)
+from plugins.apigateway.unused import (
+    analyze_apis as analyze_apigateway_apis,
+)
+from plugins.apigateway.unused import (
+    collect_apis as collect_apigateway_apis,
+)
+from plugins.cloudwatch.alarm_orphan import (
+    analyze_alarms as analyze_cw_alarms,
+)
+from plugins.cloudwatch.alarm_orphan import (
+    collect_alarms as collect_cw_alarms,
+)
 
 # 각 도구에서 수집/분석 함수 import
 from plugins.cloudwatch.loggroup_audit import (
     analyze_log_groups,
     collect_log_groups,
 )
-from plugins.cloudwatch.alarm_orphan import (
-    analyze_alarms as analyze_cw_alarms,
-    collect_alarms as collect_cw_alarms,
+from plugins.codecommit.unused import (
+    analyze_repos as analyze_codecommit_repos,
+)
+from plugins.codecommit.unused import (
+    collect_repos as collect_codecommit_repos,
+)
+from plugins.dynamodb.unused import (
+    analyze_tables as analyze_dynamodb_tables,
+)
+from plugins.dynamodb.unused import (
+    collect_dynamodb_tables,
 )
 from plugins.ec2.ami_audit import (
     analyze_amis,
@@ -30,6 +58,20 @@ from plugins.ec2.snapshot_audit import (
     get_ami_snapshot_mapping,
 )
 from plugins.ecr.unused import analyze_ecr_repos, collect_ecr_repos
+from plugins.efs.unused import (
+    analyze_filesystems as analyze_efs_filesystems,
+)
+from plugins.efs.unused import (
+    collect_efs_filesystems,
+)
+
+# 신규 추가된 미사용 리소스 분석 모듈
+from plugins.elasticache.unused import (
+    analyze_clusters as analyze_elasticache_clusters,
+)
+from plugins.elasticache.unused import (
+    collect_elasticache_clusters,
+)
 from plugins.elb.target_group_audit import (
     analyze_target_groups,
     collect_target_groups,
@@ -39,12 +81,24 @@ from plugins.elb.unused import (
     collect_classic_load_balancers,
     collect_v2_load_balancers,
 )
+from plugins.eventbridge.unused import (
+    analyze_rules as analyze_eventbridge_rules,
+)
+from plugins.eventbridge.unused import (
+    collect_rules as collect_eventbridge_rules,
+)
 from plugins.fn.common.collector import collect_functions_with_metrics
 from plugins.fn.unused import analyze_functions as analyze_lambda_functions
 from plugins.kms.unused import analyze_kms_keys, collect_kms_keys
 from plugins.rds.snapshot_audit import (
     analyze_rds_snapshots,
     collect_rds_snapshots,
+)
+from plugins.rds.unused import (
+    analyze_instances as analyze_rds_instances,
+)
+from plugins.rds.unused import (
+    collect_rds_instances,
 )
 from plugins.route53.empty_zone import (
     analyze_hosted_zones,
@@ -55,55 +109,24 @@ from plugins.secretsmanager.unused import (
     analyze_secrets,
     collect_secrets,
 )
+from plugins.sns.unused import (
+    analyze_topics as analyze_sns_topics,
+)
+from plugins.sns.unused import (
+    collect_sns_topics,
+)
+from plugins.sqs.unused import (
+    analyze_queues as analyze_sqs_queues,
+)
+from plugins.sqs.unused import (
+    collect_sqs_queues,
+)
 from plugins.vpc.endpoint_audit import (
     analyze_endpoints,
     collect_endpoints,
 )
 from plugins.vpc.eni_audit import analyze_enis, collect_enis
 from plugins.vpc.nat_audit_analysis import NATAnalyzer, NATCollector
-
-# 신규 추가된 미사용 리소스 분석 모듈
-from plugins.elasticache.unused import (
-    analyze_clusters as analyze_elasticache_clusters,
-    collect_elasticache_clusters,
-)
-from plugins.rds.unused import (
-    analyze_instances as analyze_rds_instances,
-    collect_rds_instances,
-)
-from plugins.efs.unused import (
-    analyze_filesystems as analyze_efs_filesystems,
-    collect_efs_filesystems,
-)
-from plugins.sqs.unused import (
-    analyze_queues as analyze_sqs_queues,
-    collect_sqs_queues,
-)
-from plugins.sns.unused import (
-    analyze_topics as analyze_sns_topics,
-    collect_sns_topics,
-)
-from plugins.acm.unused import (
-    analyze_certificates as analyze_acm_certificates,
-    collect_certificates as collect_acm_certificates,
-)
-from plugins.apigateway.unused import (
-    analyze_apis as analyze_apigateway_apis,
-    collect_apis as collect_apigateway_apis,
-)
-from plugins.eventbridge.unused import (
-    analyze_rules as analyze_eventbridge_rules,
-    collect_rules as collect_eventbridge_rules,
-)
-from plugins.dynamodb.unused import (
-    analyze_tables as analyze_dynamodb_tables,
-    collect_dynamodb_tables,
-)
-from plugins.codecommit.unused import (
-    analyze_repos as analyze_codecommit_repos,
-    collect_repos as collect_codecommit_repos,
-)
-
 
 # =============================================================================
 # 개별 리소스 수집/분석 함수 (병렬 실행용)
@@ -112,7 +135,7 @@ from plugins.codecommit.unused import (
 
 def collect_nat(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """NAT Gateway 수집 및 분석"""
     try:
         collector = NATCollector()
@@ -136,7 +159,7 @@ def collect_nat(
 
 def collect_eni(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """ENI 수집 및 분석"""
     try:
         enis = collect_enis(session, account_id, account_name, region)
@@ -155,7 +178,7 @@ def collect_eni(
 
 def collect_ebs_volumes(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """EBS 수집 및 분석"""
     try:
         volumes = collect_ebs(session, account_id, account_name, region)
@@ -175,7 +198,7 @@ def collect_ebs_volumes(
 
 def collect_eip_addresses(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """EIP 수집 및 분석"""
     try:
         eips = collect_eips(session, account_id, account_name, region)
@@ -195,7 +218,7 @@ def collect_eip_addresses(
 
 def collect_elb(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """ELB 수집 및 분석"""
     try:
         v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
@@ -219,7 +242,7 @@ def collect_elb(
 
 def collect_snapshot(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """EBS Snapshot 수집 및 분석"""
     try:
         snapshots = collect_snapshots(session, account_id, account_name, region)
@@ -242,7 +265,7 @@ def collect_snapshot(
 
 def collect_ami(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """AMI 수집 및 분석"""
     try:
         amis = collect_amis(session, account_id, account_name, region)
@@ -263,7 +286,7 @@ def collect_ami(
 
 def collect_rds_snapshot(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """RDS Snapshot 수집 및 분석"""
     try:
         rds_snaps = collect_rds_snapshots(session, account_id, account_name, region)
@@ -283,7 +306,7 @@ def collect_rds_snapshot(
 
 def collect_loggroup(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """CloudWatch Log Group 수집 및 분석"""
     try:
         log_groups = collect_log_groups(session, account_id, account_name, region)
@@ -303,7 +326,7 @@ def collect_loggroup(
 
 def collect_target_group(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Target Group 수집 및 분석"""
     try:
         tgs = collect_target_groups(session, account_id, account_name, region)
@@ -322,7 +345,7 @@ def collect_target_group(
 
 def collect_endpoint(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """VPC Endpoint 수집 및 분석"""
     try:
         endpoints = collect_endpoints(session, account_id, account_name, region)
@@ -342,7 +365,7 @@ def collect_endpoint(
 
 def collect_secret(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Secrets Manager 수집 및 분석"""
     try:
         secrets = collect_secrets(session, account_id, account_name, region)
@@ -362,7 +385,7 @@ def collect_secret(
 
 def collect_kms(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """KMS 수집 및 분석"""
     try:
         kms_keys = collect_kms_keys(session, account_id, account_name, region)
@@ -382,7 +405,7 @@ def collect_kms(
 
 def collect_ecr(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """ECR 수집 및 분석"""
     try:
         repos = collect_ecr_repos(session, account_id, account_name, region)
@@ -402,7 +425,7 @@ def collect_ecr(
 
 def collect_lambda(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Lambda 수집 및 분석"""
     try:
         functions = collect_functions_with_metrics(
@@ -424,7 +447,7 @@ def collect_lambda(
 
 def collect_elasticache(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """ElastiCache 수집 및 분석"""
     try:
         clusters = collect_elasticache_clusters(
@@ -448,7 +471,7 @@ def collect_elasticache(
 
 def collect_rds_instance(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """RDS Instance 수집 및 분석"""
     try:
         instances = collect_rds_instances(session, account_id, account_name, region)
@@ -470,7 +493,7 @@ def collect_rds_instance(
 
 def collect_efs(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """EFS 수집 및 분석"""
     try:
         filesystems = collect_efs_filesystems(session, account_id, account_name, region)
@@ -490,7 +513,7 @@ def collect_efs(
 
 def collect_sqs(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """SQS 수집 및 분석"""
     try:
         queues = collect_sqs_queues(session, account_id, account_name, region)
@@ -509,7 +532,7 @@ def collect_sqs(
 
 def collect_sns(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """SNS 수집 및 분석"""
     try:
         topics = collect_sns_topics(session, account_id, account_name, region)
@@ -528,7 +551,7 @@ def collect_sns(
 
 def collect_acm(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """ACM 수집 및 분석"""
     try:
         certs = collect_acm_certificates(session, account_id, account_name, region)
@@ -547,7 +570,7 @@ def collect_acm(
 
 def collect_apigateway(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """API Gateway 수집 및 분석"""
     try:
         apis = collect_apigateway_apis(session, account_id, account_name, region)
@@ -566,7 +589,7 @@ def collect_apigateway(
 
 def collect_eventbridge(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """EventBridge 수집 및 분석"""
     try:
         rules = collect_eventbridge_rules(session, account_id, account_name, region)
@@ -585,7 +608,7 @@ def collect_eventbridge(
 
 def collect_cw_alarm(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """CloudWatch Alarm 수집 및 분석"""
     try:
         alarms = collect_cw_alarms(session, account_id, account_name, region)
@@ -604,7 +627,7 @@ def collect_cw_alarm(
 
 def collect_dynamodb(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """DynamoDB 수집 및 분석"""
     try:
         tables = collect_dynamodb_tables(session, account_id, account_name, region)
@@ -624,7 +647,7 @@ def collect_dynamodb(
 
 def collect_codecommit(
     session, account_id: str, account_name: str, region: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """CodeCommit 수집 및 분석"""
     try:
         repos = collect_codecommit_repos(session, account_id, account_name, region)
@@ -642,7 +665,7 @@ def collect_codecommit(
         return {"error": f"CodeCommit: {e}"}
 
 
-def collect_route53(session, account_id: str, account_name: str) -> Dict[str, Any]:
+def collect_route53(session, account_id: str, account_name: str) -> dict[str, Any]:
     """Route53 수집 및 분석 (글로벌 서비스)"""
     try:
         zones = collect_hosted_zones(session, account_id, account_name)
@@ -660,7 +683,7 @@ def collect_route53(session, account_id: str, account_name: str) -> Dict[str, An
         return {"error": f"Route53: {e}"}
 
 
-def collect_s3(session, account_id: str, account_name: str) -> Dict[str, Any]:
+def collect_s3(session, account_id: str, account_name: str) -> dict[str, Any]:
     """S3 수집 및 분석 (글로벌 서비스)"""
     try:
         buckets = collect_buckets(session, account_id, account_name)
@@ -681,7 +704,7 @@ def collect_s3(session, account_id: str, account_name: str) -> Dict[str, Any]:
 # 리전별 리소스 수집기 매핑 (카테고리별 정렬)
 # =============================================================================
 
-REGIONAL_COLLECTORS: Dict[str, Callable] = {
+REGIONAL_COLLECTORS: dict[str, Callable] = {
     # Compute (EC2)
     "ami": collect_ami,
     "ebs": collect_ebs_volumes,
@@ -721,7 +744,7 @@ REGIONAL_COLLECTORS: Dict[str, Callable] = {
 }
 
 # 글로벌 수집기 (DNS)
-GLOBAL_COLLECTORS: Dict[str, Callable] = {
+GLOBAL_COLLECTORS: dict[str, Callable] = {
     "route53": collect_route53,
     "s3": collect_s3,
 }

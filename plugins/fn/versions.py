@@ -10,11 +10,11 @@ Lambda Version/Alias 관리:
     - run(ctx): 필수. 실행 함수.
 """
 
+import contextlib
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 from rich.console import Console
 
@@ -59,7 +59,7 @@ class LambdaVersion:
     description: str
     runtime: str
     code_size_bytes: int
-    last_modified: Optional[datetime]
+    last_modified: datetime | None
     code_sha256: str
 
 
@@ -71,7 +71,7 @@ class LambdaAlias:
     alias_name: str
     function_version: str
     description: str
-    routing_config: Optional[Dict] = None
+    routing_config: dict | None = None
 
 
 @dataclass
@@ -86,13 +86,13 @@ class FunctionVersionInfo:
     region: str = ""
 
     # 버전 목록
-    versions: List[LambdaVersion] = field(default_factory=list)
-    aliases: List[LambdaAlias] = field(default_factory=list)
+    versions: list[LambdaVersion] = field(default_factory=list)
+    aliases: list[LambdaAlias] = field(default_factory=list)
 
     # 분석 결과
-    old_versions: List[str] = field(default_factory=list)
-    unused_versions: List[str] = field(default_factory=list)
-    inactive_aliases: List[str] = field(default_factory=list)
+    old_versions: list[str] = field(default_factory=list)
+    unused_versions: list[str] = field(default_factory=list)
+    inactive_aliases: list[str] = field(default_factory=list)
 
     @property
     def version_count(self) -> int:
@@ -124,7 +124,7 @@ class VersionAuditResult:
     old_version_count: int = 0
     unused_version_count: int = 0
     inactive_alias_count: int = 0
-    functions: List[FunctionVersionInfo] = field(default_factory=list)
+    functions: list[FunctionVersionInfo] = field(default_factory=list)
 
 
 # =============================================================================
@@ -137,7 +137,7 @@ def collect_versions(
     account_id: str,
     account_name: str,
     region: str,
-) -> List[FunctionVersionInfo]:
+) -> list[FunctionVersionInfo]:
     """Lambda 버전 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -176,12 +176,10 @@ def collect_versions(
                             last_modified = None
                             lm_str = v.get("LastModified")
                             if lm_str:
-                                try:
+                                with contextlib.suppress(ValueError):
                                     last_modified = datetime.fromisoformat(
                                         lm_str.replace("Z", "+00:00")
                                     )
-                                except ValueError:
-                                    pass
 
                             info.versions.append(
                                 LambdaVersion(
@@ -234,7 +232,7 @@ def collect_versions(
 
 
 def analyze_versions(
-    functions: List[FunctionVersionInfo],
+    functions: list[FunctionVersionInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -256,14 +254,12 @@ def analyze_versions(
         result.total_aliases += func.alias_count
 
         # Alias가 가리키는 버전 목록
-        aliased_versions: Set[str] = set()
+        aliased_versions: set[str] = set()
         for alias in func.aliases:
             aliased_versions.add(alias.function_version)
             # routing config에 있는 버전도 포함
             if alias.routing_config:
-                for v in alias.routing_config.get(
-                    "AdditionalVersionWeights", {}
-                ).keys():
+                for v in alias.routing_config.get("AdditionalVersionWeights", {}):
                     aliased_versions.add(v)
 
         # 버전 분석
@@ -303,7 +299,7 @@ def analyze_versions(
 # =============================================================================
 
 
-def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
+def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -424,7 +420,7 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
     for r in results:
         for func in r.functions:
             # Alias가 가리키는 버전
-            aliased_versions: Set[str] = set()
+            aliased_versions: set[str] = set()
             for alias in func.aliases:
                 aliased_versions.add(alias.function_version)
 
@@ -511,8 +507,8 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
     # 열 너비
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -535,7 +531,7 @@ def generate_report(results: List[VersionAuditResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[VersionAuditResult]:
+) -> VersionAuditResult | None:
     """단일 계정/리전의 Lambda 버전 수집 및 분석 (병렬 실행용)"""
     functions = collect_versions(session, account_id, account_name, region)
     if not functions:
@@ -550,7 +546,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="lambda"
     )
-    results: List[VersionAuditResult] = [r for r in result.get_data() if r is not None]
+    results: list[VersionAuditResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -566,7 +562,7 @@ def run(ctx) -> None:
     total_unused = sum(r.unused_version_count for r in results)
     total_cleanup = total_old + total_unused
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"총 버전: {total_versions}개")
     console.print(f"총 Alias: {total_aliases}개")
 

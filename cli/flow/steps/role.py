@@ -8,10 +8,8 @@ SSO 멀티계정 환경에서 사용할 Role을 선택.
 """
 
 from collections import defaultdict
-from typing import Dict, List, Set
 
 from rich.console import Console
-from rich.table import Table
 
 from cli.ui.console import print_box_end, print_box_line, print_box_start
 
@@ -101,13 +99,13 @@ class RoleStep:
 
         return ctx
 
-    def _aggregate_roles(self, ctx: ExecutionContext) -> Dict[str, List[str]]:
+    def _aggregate_roles(self, ctx: ExecutionContext) -> dict[str, list[str]]:
         """모든 계정에서 사용 가능한 Role 집계
 
         Returns:
             role_name -> [account_ids] 매핑
         """
-        role_account_map: Dict[str, List[str]] = defaultdict(list)
+        role_account_map: dict[str, list[str]] = defaultdict(list)
 
         console.print("[dim]Role 수집 중...[/dim]")
 
@@ -123,7 +121,7 @@ class RoleStep:
 
     def _select_primary_role(
         self,
-        role_account_map: Dict[str, List[str]],
+        role_account_map: dict[str, list[str]],
         total_accounts: int,
     ) -> str:
         """Primary Role 선택 UI"""
@@ -172,8 +170,8 @@ class RoleStep:
     def _handle_fallback(
         self,
         primary_role: str,
-        missing_accounts: Set[str],
-        role_account_map: Dict[str, List[str]],
+        missing_accounts: set[str],
+        role_account_map: dict[str, list[str]],
         total_accounts: int,
     ) -> tuple:
         """Fallback 처리
@@ -247,7 +245,7 @@ class RoleStep:
     def _print_summary(self, rs: RoleSelection, total: int) -> None:
         """선택 결과 요약 출력"""
         console.print()
-        effective_count = total - len(rs.skipped_accounts)
+        total - len(rs.skipped_accounts)
         summary = f"[dim]Role:[/dim] {rs.primary_role}"
         if rs.fallback_role:
             summary += f" / Fallback: {rs.fallback_role}"

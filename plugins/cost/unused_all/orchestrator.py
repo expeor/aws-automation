@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 import threading
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.progress import (
@@ -25,7 +25,7 @@ from rich.progress import (
 from core.parallel import is_quiet, parallel_collect, quiet_mode, set_quiet
 from core.tools.output import OutputPath, open_in_explorer
 
-from .collectors import GLOBAL_COLLECTORS, REGIONAL_COLLECTORS, collect_route53, collect_s3
+from .collectors import REGIONAL_COLLECTORS, collect_route53, collect_s3
 from .report import generate_report
 from .types import (
     RESOURCE_FIELD_MAP,
@@ -74,7 +74,7 @@ def _apply_result(
     summary: UnusedResourceSummary,
     session_result: SessionCollectionResult,
     resource_type: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
 ) -> None:
     """리소스 결과를 요약 및 세션 결과에 적용 (매핑 기반)"""
     if "error" in data:
@@ -114,7 +114,7 @@ def collect_session_resources(
     account_id: str,
     account_name: str,
     region: str,
-    selected_resources: Optional[set] = None,
+    selected_resources: set | None = None,
 ) -> SessionCollectionResult:
     """단일 세션의 모든 리소스를 병렬로 수집
 
@@ -147,7 +147,7 @@ def collect_session_resources(
 
     # 리전별 리소스 병렬 수집 (최대 10개 동시 실행)
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {}
+        futures_map: dict[Future[Any], str] = {}
         for name, collector in collectors_to_run.items():
             future = executor.submit(
                 _run_collector_quiet,
@@ -158,10 +158,10 @@ def collect_session_resources(
                 region,
                 parent_quiet,
             )
-            futures[future] = name
+            futures_map[future] = name
 
-        for future in as_completed(futures):
-            resource_type = futures[future]
+        for future in as_completed(futures_map):
+            resource_type = futures_map[future]
             try:
                 data = future.result()
                 _apply_result(summary, result, resource_type, data)
@@ -175,10 +175,10 @@ def collect_session_resources(
 
     if _should_collect_global(account_id) and (collect_route53_flag or collect_s3_flag):
         with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = {}
+            global_futures: dict[str, Future[Any]] = {}
 
             if collect_route53_flag:
-                futures["route53"] = executor.submit(
+                global_futures["route53"] = executor.submit(
                     _run_global_collector_quiet,
                     collect_route53,
                     session,
@@ -188,7 +188,7 @@ def collect_session_resources(
                 )
 
             if collect_s3_flag:
-                futures["s3"] = executor.submit(
+                global_futures["s3"] = executor.submit(
                     _run_global_collector_quiet,
                     collect_s3,
                     session,
@@ -197,7 +197,7 @@ def collect_session_resources(
                     parent_quiet,
                 )
 
-            for resource_type, future in futures.items():
+            for resource_type, future in global_futures.items():
                 try:
                     data = future.result()
                     _apply_result(summary, result, resource_type, data)
@@ -232,7 +232,7 @@ def _merge_session_result(
 # =============================================================================
 
 
-def collect_options(ctx: "ExecutionContext") -> None:
+def collect_options(ctx: ExecutionContext) -> None:
     """미사용 리소스 분석 옵션 수집
 
     사용자에게 전체 스캔 또는 선택 스캔 옵션을 제공합니다.
@@ -283,7 +283,7 @@ def collect_options(ctx: "ExecutionContext") -> None:
 # =============================================================================
 
 
-def run(ctx: "ExecutionContext", resources: Optional[List[str]] = None) -> None:
+def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
     """미사용 리소스 종합 분석 실행 (병렬 처리)
 
     Args:
@@ -340,7 +340,7 @@ def run(ctx: "ExecutionContext", resources: Optional[List[str]] = None) -> None:
 
     # 결과 집계
     final_result = UnusedAllResult()
-    all_errors: List[str] = []
+    all_errors: list[str] = []
 
     for task_result in parallel_result.results:
         if task_result.success and task_result.data:
@@ -412,11 +412,11 @@ def run(ctx: "ExecutionContext", resources: Optional[List[str]] = None) -> None:
     open_in_explorer(output_path)
 
 
-def _print_error_summary(errors: List[str]) -> None:
+def _print_error_summary(errors: list[str]) -> None:
     """오류 요약 출력 (유형별 그룹화)"""
     # 오류 코드별로 그룹화
     # 형식: "{profile}/{region}: {resource}: {message}"
-    error_groups: Dict[str, List[str]] = defaultdict(list)
+    error_groups: dict[str, list[str]] = defaultdict(list)
 
     for err in errors:
         # 오류 코드 추출 시도
@@ -429,11 +429,8 @@ def _print_error_summary(errors: List[str]) -> None:
             err,
         )
 
-        if code_match:
-            error_code = code_match.group(1)
-        else:
-            # 알 수 없는 오류는 "기타"로 분류
-            error_code = "기타"
+        # 알 수 없는 오류는 "기타"로 분류
+        error_code = code_match.group(1) if code_match else "기타"
 
         # 리전 추출
         region_match = re.match(r"[^/]+/([^:]+):", err)
@@ -455,10 +452,10 @@ def _print_error_summary(errors: List[str]) -> None:
 
 def _print_summary(
     name: str,
-    summaries: List,
+    summaries: list,
     total_attr: str,
     unused_attr: str,
-    waste_attr: Optional[str],
+    waste_attr: str | None,
 ) -> None:
     """요약 출력 헬퍼"""
     total = sum(getattr(s, total_attr, 0) for s in summaries)

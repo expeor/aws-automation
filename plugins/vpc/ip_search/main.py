@@ -8,7 +8,7 @@ plugins/vpc/ip_search/main.py - IP 검색 메인 모듈
 import csv
 import os
 from datetime import datetime
-from typing import List, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -48,7 +48,7 @@ def _get_cache(session_name: str):
     return None
 
 
-def _collect_enis(session, account_id: str, account_name: str, region: str) -> List:
+def _collect_enis(session, account_id: str, account_name: str, region: str) -> list:
     """단일 계정/리전의 ENI 수집 (병렬 실행용)"""
     from plugins.vpc.ip_search.private import fetch_enis_from_account
 
@@ -94,7 +94,11 @@ def _build_cache(ctx, session_name: str, force_refresh: bool = False):
 def _show_cache_menu(ctx, session_name: str):
     """통합 캐시 관리 메뉴"""
     from plugins.vpc.ip_search.private import ENICache
-    from plugins.vpc.ip_search.public import clear_public_cache, get_public_cache_status, refresh_public_cache
+    from plugins.vpc.ip_search.public import (
+        clear_public_cache,
+        get_public_cache_status,
+        refresh_public_cache,
+    )
 
     eni_cache = ENICache(session_name=session_name)
 
@@ -107,9 +111,11 @@ def _show_cache_menu(ctx, session_name: str):
     if eni_cache.is_valid():
         mtime = os.path.getmtime(eni_cache.cache_file)
         cache_time = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-        console.print(f"  상태: [green]유효[/green] | ENI: [cyan]{eni_cache.count()}[/cyan]개 | 생성: [dim]{cache_time}[/dim]")
+        console.print(
+            f"  상태: [green]유효[/green] | ENI: [cyan]{eni_cache.count()}[/cyan]개 | 생성: [dim]{cache_time}[/dim]"
+        )
     else:
-        console.print(f"  상태: [yellow]없음 또는 만료[/yellow]")
+        console.print("  상태: [yellow]없음 또는 만료[/yellow]")
 
     # Public (클라우드 대역) 캐시 상태
     console.print("\n[bold]Public (클라우드 대역)[/bold]")
@@ -117,10 +123,14 @@ def _show_cache_menu(ctx, session_name: str):
     if pub_status["total_files"] > 0:
         for provider, info in pub_status["providers"].items():
             if info.get("cached"):
-                valid = "[green]✓[/green]" if info.get("valid") else "[yellow]만료[/yellow]"
-                console.print(f"  {provider}: {valid} {info.get('count', 0)}개 ({info.get('time', '')})")
+                valid = (
+                    "[green]✓[/green]" if info.get("valid") else "[yellow]만료[/yellow]"
+                )
+                console.print(
+                    f"  {provider}: {valid} {info.get('count', 0)}개 ({info.get('time', '')})"
+                )
     else:
-        console.print(f"  상태: [yellow]캐시 없음[/yellow]")
+        console.print("  상태: [yellow]캐시 없음[/yellow]")
 
     console.print()
     console.print("  [cyan](1)[/cyan] Private 캐시 새로고침 (선택한 계정/리전)")
@@ -135,12 +145,16 @@ def _show_cache_menu(ctx, session_name: str):
     if choice == "1":
         _build_cache(ctx, session_name, force_refresh=True)
     elif choice == "2":
-        with console.status("[bold yellow]Public IP 범위 다운로드 중 (AWS, GCP, Azure, Oracle)..."):
+        with console.status(
+            "[bold yellow]Public IP 범위 다운로드 중 (AWS, GCP, Azure, Oracle)..."
+        ):
             result = refresh_public_cache()
 
         if result["success"]:
-            counts = ", ".join(f"{p}: {result['counts'].get(p, 0)}개" for p in result["success"])
-            console.print(f"[green]✓ Public 캐시 새로고침 완료[/green]")
+            counts = ", ".join(
+                f"{p}: {result['counts'].get(p, 0)}개" for p in result["success"]
+            )
+            console.print("[green]✓ Public 캐시 새로고침 완료[/green]")
             console.print(f"  [dim]{counts}[/dim]")
         if result["failed"]:
             console.print(f"[yellow]  실패: {', '.join(result['failed'])}[/yellow]")
@@ -161,7 +175,7 @@ def _show_cache_menu(ctx, session_name: str):
 # =============================================================================
 
 
-def _search_all(queries: List[str], cache, public_mode: bool = True) -> dict:
+def _search_all(queries: list[str], cache, public_mode: bool = True) -> dict:
     """
     Public + Private 통합 검색
 
@@ -173,10 +187,10 @@ def _search_all(queries: List[str], cache, public_mode: bool = True) -> dict:
     Returns:
         {"public": [...], "private": [...]}
     """
-    from plugins.vpc.ip_search.private import parse_query, QueryType, search_by_query
+    from plugins.vpc.ip_search.private import QueryType, parse_query, search_by_query
     from plugins.vpc.ip_search.public import search_public_ip
 
-    results = {"public": [], "private": []}
+    results: dict[str, list[Any]] = {"public": [], "private": []}
 
     # Public 검색 (단일 IP만, public_mode가 True일 때)
     if public_mode:
@@ -198,7 +212,7 @@ def _search_all(queries: List[str], cache, public_mode: bool = True) -> dict:
     return results
 
 
-def _search_public_filter(provider: str, filter_type: str, filter_value: str) -> List:
+def _search_public_filter(provider: str, filter_type: str, filter_value: str) -> list:
     """
     Public IP 범위를 region/service로 필터링 검색
 
@@ -218,7 +232,9 @@ def _search_public_filter(provider: str, filter_type: str, filter_value: str) ->
         elif filter_type == "service":
             return search_by_filter(provider=provider, service=filter_value)
         else:
-            return search_by_filter(provider=provider, region=filter_value, service=filter_value)
+            return search_by_filter(
+                provider=provider, region=filter_value, service=filter_value
+            )
 
 
 def _show_public_filter_menu():
@@ -235,7 +251,9 @@ def _show_public_filter_menu():
     console.print("  (4) Oracle")
     console.print("  (0) 돌아가기")
 
-    provider_choice = Prompt.ask("\n제공자 선택", choices=["0", "1", "2", "3", "4"], default="1")
+    provider_choice = Prompt.ask(
+        "\n제공자 선택", choices=["0", "1", "2", "3", "4"], default="1"
+    )
 
     if provider_choice == "0":
         return None, None
@@ -288,7 +306,7 @@ def _handle_public_filter_query(query: str, save_csv: bool):
         @aws ap-northeast-2,us-east-1  → 서울 + 버지니아 리전 (OR)
         @aws ap-northeast-2 ec2,route53 → 서울 리전 + EC2/Route53
     """
-    from plugins.vpc.ip_search.public import search_by_filter, get_available_filters
+    from plugins.vpc.ip_search.public import get_available_filters, search_by_filter
 
     query = query[1:].strip()  # @ 제거
 
@@ -339,7 +357,7 @@ def _handle_public_filter_query(query: str, save_csv: bool):
         if len(filters["services"]) > 20:
             console.print(f"  ... 외 {len(filters['services']) - 20}개")
 
-        console.print(f"\n[dim]검색 예:[/dim]")
+        console.print("\n[dim]검색 예:[/dim]")
         console.print(f"  [dim]@{provider} ap-northeast-2          리전 검색[/dim]")
         console.print(f"  [dim]@{provider} ec2                     서비스 검색[/dim]")
         console.print(f"  [dim]@{provider} ap-northeast-2 ec2      리전+서비스 (AND)[/dim]")
@@ -395,7 +413,9 @@ def _handle_public_filter_query(query: str, save_csv: bool):
         filter_desc.append(f"리전={','.join(region_filters)}")
     if service_filters:
         filter_desc.append(f"서비스={','.join(service_filters)}")
-    console.print(f"[dim]검색: {provider.upper()} → {' + '.join(filter_desc) if filter_desc else 'all'}[/dim]")
+    console.print(
+        f"[dim]검색: {provider.upper()} → {' + '.join(filter_desc) if filter_desc else 'all'}[/dim]"
+    )
 
     all_results = []
 
@@ -433,11 +453,13 @@ def _handle_public_filter_query(query: str, save_csv: bool):
             unique_results.append(r)
 
     if not unique_results:
-        console.print(f"[yellow]해당 조건에 맞는 IP 범위가 없습니다.[/yellow]")
+        console.print("[yellow]해당 조건에 맞는 IP 범위가 없습니다.[/yellow]")
         return
 
     # 결과 표시
-    console.print(f"\n[bold yellow]━━━ {provider.upper()} IP 범위 ({len(unique_results)}개) ━━━[/bold yellow]")
+    console.print(
+        f"\n[bold yellow]━━━ {provider.upper()} IP 범위 ({len(unique_results)}개) ━━━[/bold yellow]"
+    )
     _display_public_table(unique_results)
     console.print(f"\n[dim]{len(unique_results)}개 IP 범위[/dim]")
 
@@ -490,6 +512,7 @@ def _enrich_with_detail(ctx, private_results: list, cache, session_name: str) ->
                 if detailed_info:
                     # 새 결과 객체 생성 (원본 수정 방지)
                     from plugins.vpc.ip_search.private import PrivateIPResult
+
                     enriched_result = PrivateIPResult(
                         ip_address=result.ip_address,
                         account_id=result.account_id,
@@ -552,7 +575,11 @@ def _display_results(results: dict, save_csv: bool = False) -> None:
     if has_public:
         matched = [r for r in public_results if r.provider != "Unknown"]
         unknown = len(public_results) - len(matched)
-        console.print(f"[dim]Public: {len(matched)}개 매칭" + (f", {unknown}개 Unknown" if unknown else "") + "[/dim]")
+        console.print(
+            f"[dim]Public: {len(matched)}개 매칭"
+            + (f", {unknown}개 Unknown" if unknown else "")
+            + "[/dim]"
+        )
 
     if has_private:
         console.print(f"[dim]Private: {len(private_results)}개 ENI[/dim]")
@@ -643,7 +670,9 @@ def _save_public_csv(results) -> str:
 
         for r in results:
             extra = ", ".join(f"{k}={v}" for k, v in r.extra.items()) if r.extra else ""
-            writer.writerow([r.ip_address, r.provider, r.service, r.ip_prefix, r.region, extra])
+            writer.writerow(
+                [r.ip_address, r.provider, r.service, r.ip_prefix, r.region, extra]
+            )
 
     return filepath
 
@@ -659,20 +688,50 @@ def _save_private_csv(results) -> str:
 
     with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "IP 주소", "계정 ID", "계정명", "리전", "ENI ID", "VPC ID", "Subnet ID",
-            "Private IP", "Public IP", "인터페이스 타입", "상태", "설명",
-            "Security Groups", "이름", "관리형", "관리자", "리소스",
-        ])
+        writer.writerow(
+            [
+                "IP 주소",
+                "계정 ID",
+                "계정명",
+                "리전",
+                "ENI ID",
+                "VPC ID",
+                "Subnet ID",
+                "Private IP",
+                "Public IP",
+                "인터페이스 타입",
+                "상태",
+                "설명",
+                "Security Groups",
+                "이름",
+                "관리형",
+                "관리자",
+                "리소스",
+            ]
+        )
 
         for r in results:
-            writer.writerow([
-                r.ip_address, r.account_id, r.account_name, r.region,
-                r.eni_id, r.vpc_id, r.subnet_id, r.private_ip, r.public_ip,
-                r.interface_type, r.status, r.description,
-                ", ".join(r.security_groups), r.name,
-                "Yes" if r.is_managed else "No", r.managed_by, r.mapped_resource,
-            ])
+            writer.writerow(
+                [
+                    r.ip_address,
+                    r.account_id,
+                    r.account_name,
+                    r.region,
+                    r.eni_id,
+                    r.vpc_id,
+                    r.subnet_id,
+                    r.private_ip,
+                    r.public_ip,
+                    r.interface_type,
+                    r.status,
+                    r.description,
+                    ", ".join(r.security_groups),
+                    r.name,
+                    "Yes" if r.is_managed else "No",
+                    r.managed_by,
+                    r.mapped_resource,
+                ]
+            )
 
     return filepath
 
@@ -755,6 +814,7 @@ def _format_cache_status(cache) -> str:
 
     # 캐시 시간
     import os
+
     mtime = os.path.getmtime(cache.cache_file)
     cache_time = datetime.fromtimestamp(mtime).strftime("%m/%d %H:%M")
 
@@ -779,7 +839,7 @@ def run(ctx):
 
     # 옵션 상태
     save_csv = False
-    public_mode = True   # Public 검색 (클라우드 대역)
+    public_mode = True  # Public 검색 (클라우드 대역)
     detail_mode = False  # 상세 모드 (API 호출로 리소스 정보 조회)
 
     # 시작 메시지
@@ -787,14 +847,18 @@ def run(ctx):
 
     # 캐시 상태에 따른 안내
     if not cache or not cache.is_valid():
-        console.print(f"\n[yellow]Private 검색용 ENI 캐시가 없습니다.[/yellow]")
-        console.print(f"  [dim]• Private 검색: 선택한 계정/리전의 ENI 정보 검색 (cache로 생성)[/dim]")
-        console.print(f"  [dim]• Public 검색: 클라우드 IP 대역 검색 (인증 불필요, 바로 사용 가능)[/dim]")
-        console.print(f"  [dim]  → @aws, @gcp, @azure, @oracle 명령으로 Public IP 범위 검색[/dim]")
+        console.print("\n[yellow]Private 검색용 ENI 캐시가 없습니다.[/yellow]")
+        console.print("  [dim]• Private 검색: 선택한 계정/리전의 ENI 정보 검색 (cache로 생성)[/dim]")
+        console.print("  [dim]• Public 검색: 클라우드 IP 대역 검색 (인증 불필요, 바로 사용 가능)[/dim]")
+        console.print(
+            "  [dim]  → @aws, @gcp, @azure, @oracle 명령으로 Public IP 범위 검색[/dim]"
+        )
     else:
         console.print(f"  [dim]ENI 캐시:[/dim] {_format_cache_status(cache)}")
 
-    console.print(f"\n  [dim]토글:[/dim] [yellow]p[/yellow]=Public  [magenta]d[/magenta]=Detail  [green]c[/green]=CSV  |  [dim]@aws:리전  cache  h=도움말  q=종료[/dim]")
+    console.print(
+        "\n  [dim]토글:[/dim] [yellow]p[/yellow]=Public  [magenta]d[/magenta]=Detail  [green]c[/green]=CSV  |  [dim]@aws:리전  cache  h=도움말  q=종료[/dim]"
+    )
 
     # 검색 루프
     while True:
@@ -864,7 +928,9 @@ def run(ctx):
         # 상세 모드: API로 리소스 정보 enrichment
         if detail_mode and results.get("private"):
             with console.status("[bold magenta]리소스 상세 정보 조회 중..."):
-                results["private"] = _enrich_with_detail(ctx, results["private"], cache, session_name)
+                results["private"] = _enrich_with_detail(
+                    ctx, results["private"], cache, session_name
+                )
 
         # 결과 출력 및 저장
         _display_results(results, save_csv=save_csv)

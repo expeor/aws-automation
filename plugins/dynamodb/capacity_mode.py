@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -19,7 +18,6 @@ from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing.dynamodb import (
     estimate_ondemand_cost,
-    estimate_provisioned_cost,
     get_dynamodb_monthly_cost,
 )
 
@@ -64,8 +62,8 @@ class TableCapacityInfo:
     # Provisioned 설정
     provisioned_read: int = 0
     provisioned_write: int = 0
-    last_increase_dt: Optional[datetime] = None
-    last_decrease_dt: Optional[datetime] = None
+    last_increase_dt: datetime | None = None
+    last_decrease_dt: datetime | None = None
     decreases_today: int = 0
     # CloudWatch 지표 (평균)
     avg_consumed_read: float = 0.0
@@ -74,7 +72,7 @@ class TableCapacityInfo:
     max_consumed_write: float = 0.0
     throttled_read: float = 0.0
     throttled_write: float = 0.0
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     @property
     def size_mb(self) -> float:
@@ -141,12 +139,12 @@ class CapacityAnalysisResult:
     ondemand_tables: int = 0
     optimization_candidates: int = 0
     potential_savings: float = 0.0
-    findings: List[TableCapacityFinding] = field(default_factory=list)
+    findings: list[TableCapacityFinding] = field(default_factory=list)
 
 
 def collect_capacity_info(
     session, account_id: str, account_name: str, region: str
-) -> List[TableCapacityInfo]:
+) -> list[TableCapacityInfo]:
     """DynamoDB 테이블 용량 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -270,7 +268,7 @@ def collect_capacity_info(
 
 
 def analyze_capacity(
-    tables: List[TableCapacityInfo], account_id: str, account_name: str, region: str
+    tables: list[TableCapacityInfo], account_id: str, account_name: str, region: str
 ) -> CapacityAnalysisResult:
     """DynamoDB 용량 모드 분석"""
     result = CapacityAnalysisResult(
@@ -382,7 +380,7 @@ def analyze_capacity(
     return result
 
 
-def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[CapacityAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -476,14 +474,14 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
             ws_detail.cell(row=detail_row, column=4, value=t.billing_mode)
             ws_detail.cell(row=detail_row, column=5, value=t.provisioned_read)
             ws_detail.cell(row=detail_row, column=6, value=t.provisioned_write)
-            ws_detail.cell(
-                row=detail_row, column=7, value=f"{t.avg_consumed_read:.1f}"
-            )
+            ws_detail.cell(row=detail_row, column=7, value=f"{t.avg_consumed_read:.1f}")
             ws_detail.cell(
                 row=detail_row, column=8, value=f"{t.avg_consumed_write:.1f}"
             )
             ws_detail.cell(row=detail_row, column=9, value=f"{t.read_utilization:.1f}")
-            ws_detail.cell(row=detail_row, column=10, value=f"{t.write_utilization:.1f}")
+            ws_detail.cell(
+                row=detail_row, column=10, value=f"{t.write_utilization:.1f}"
+            )
             ws_detail.cell(
                 row=detail_row,
                 column=11,
@@ -515,8 +513,8 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -532,7 +530,7 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[CapacityAnalysisResult]:
+) -> CapacityAnalysisResult | None:
     """단일 계정/리전의 DynamoDB 용량 분석 (병렬 실행용)"""
     tables = collect_capacity_info(session, account_id, account_name, region)
     if not tables:
@@ -547,7 +545,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="dynamodb"
     )
-    results: List[CapacityAnalysisResult] = [
+    results: list[CapacityAnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 
@@ -564,7 +562,7 @@ def run(ctx) -> None:
     total_candidates = sum(r.optimization_candidates for r in results)
     total_savings = sum(r.potential_savings for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"전체 테이블: {total_tables}개")
     console.print(f"  Provisioned: {total_provisioned}개 / On-Demand: {total_ondemand}개")
     console.print(

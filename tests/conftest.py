@@ -14,7 +14,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -187,7 +187,7 @@ class MockAccountInfo:
     id: str = "123456789012"
     name: str = "test-account"
     email: str = "test@example.com"
-    roles: List[str] = field(default_factory=lambda: ["AdminRole", "ReadOnlyRole"])
+    roles: list[str] = field(default_factory=lambda: ["AdminRole", "ReadOnlyRole"])
 
 
 @dataclass
@@ -195,7 +195,7 @@ class MockProvider:
     """테스트용 Provider"""
 
     _authenticated: bool = True
-    _accounts: Dict[str, MockAccountInfo] = field(default_factory=dict)
+    _accounts: dict[str, MockAccountInfo] = field(default_factory=dict)
 
     def __post_init__(self):
         if not self._accounts:
@@ -209,15 +209,15 @@ class MockProvider:
 
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
     ):
         mock_session = MagicMock()
         mock_session.region_name = region or "ap-northeast-2"
         return mock_session
 
-    def list_accounts(self) -> Dict[str, MockAccountInfo]:
+    def list_accounts(self) -> dict[str, MockAccountInfo]:
         return self._accounts
 
     def supports_multi_account(self) -> bool:
@@ -311,9 +311,9 @@ def mock_session_iterator(mock_boto3_session):
 
 
 def create_mock_response(
-    data: Dict[str, Any],
-    next_token: Optional[str] = None,
-) -> Dict[str, Any]:
+    data: dict[str, Any],
+    next_token: str | None = None,
+) -> dict[str, Any]:
     """페이지네이션 응답 생성 헬퍼"""
     response = data.copy()
     if next_token:
@@ -324,7 +324,7 @@ def create_mock_response(
 def create_mock_client_error(
     error_code: str,
     error_message: str = "Test error",
-) -> Exception:
+):
     """ClientError 생성 헬퍼"""
     from botocore.exceptions import ClientError
 

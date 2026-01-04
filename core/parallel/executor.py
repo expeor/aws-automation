@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeVar
 
 from .decorators import RetryConfig, categorize_error, get_error_code, is_retryable
 from .quiet import is_quiet, set_quiet
@@ -38,8 +39,8 @@ class ParallelConfig:
     """
 
     max_workers: int = 20
-    retry_config: Optional[RetryConfig] = None
-    rate_limiter_config: Optional[RateLimiterConfig] = None
+    retry_config: RetryConfig | None = None
+    rate_limiter_config: RateLimiterConfig | None = None
 
 
 @dataclass
@@ -49,7 +50,7 @@ class _TaskSpec:
     account_id: str
     account_name: str
     region: str
-    session_getter: Callable[[], "boto3.Session"]
+    session_getter: Callable[[], boto3.Session]
 
 
 class ParallelSessionExecutor:
@@ -79,8 +80,8 @@ class ParallelSessionExecutor:
 
     def __init__(
         self,
-        ctx: "ExecutionContext",
-        config: Optional[ParallelConfig] = None,
+        ctx: ExecutionContext,
+        config: ParallelConfig | None = None,
     ):
         """초기화
 
@@ -100,7 +101,7 @@ class ParallelSessionExecutor:
 
     def execute(
         self,
-        func: Callable[["boto3.Session", str, str, str], T],
+        func: Callable[[boto3.Session, str, str, str], T],
         service: str = "default",
     ) -> ParallelExecutionResult[T]:
         """작업 함수를 모든 세션에 병렬 실행
@@ -124,7 +125,7 @@ class ParallelSessionExecutor:
             f"max_workers={self.config.max_workers}, service={service}"
         )
 
-        results: List[TaskResult[T]] = []
+        results: list[TaskResult[T]] = []
         start_time = time.monotonic()
 
         # 부모 스레드의 quiet 상태를 저장하여 워커 스레드에 전파
@@ -179,9 +180,9 @@ class ParallelSessionExecutor:
 
         return exec_result
 
-    def _build_task_list(self) -> List[_TaskSpec]:
+    def _build_task_list(self) -> list[_TaskSpec]:
         """실행할 작업 목록 생성"""
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
 
         if self.ctx.is_sso_session():
             tasks = self._build_sso_tasks()
@@ -192,9 +193,9 @@ class ParallelSessionExecutor:
 
         return tasks
 
-    def _build_sso_tasks(self) -> List[_TaskSpec]:
+    def _build_sso_tasks(self) -> list[_TaskSpec]:
         """SSO Session 기반 작업 목록"""
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
         target_accounts = self.ctx.get_target_accounts()
 
         for account in target_accounts:
@@ -223,11 +224,11 @@ class ParallelSessionExecutor:
 
         return tasks
 
-    def _build_multi_profile_tasks(self) -> List[_TaskSpec]:
+    def _build_multi_profile_tasks(self) -> list[_TaskSpec]:
         """다중 프로파일 기반 작업 목록"""
         from core.auth.session import get_session
 
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
 
         for profile in self.ctx.profiles:
             for region in self.ctx.regions:
@@ -246,11 +247,11 @@ class ParallelSessionExecutor:
 
         return tasks
 
-    def _build_single_profile_tasks(self) -> List[_TaskSpec]:
+    def _build_single_profile_tasks(self) -> list[_TaskSpec]:
         """단일 프로파일 기반 작업 목록"""
         from core.auth.session import get_session
 
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
         profile = self.ctx.profile_name or "default"
 
         for region in self.ctx.regions:
@@ -271,7 +272,7 @@ class ParallelSessionExecutor:
 
     def _execute_single(
         self,
-        func: Callable[["boto3.Session", str, str, str], T],
+        func: Callable[[boto3.Session, str, str, str], T],
         task: _TaskSpec,
         service: str,
         quiet: bool = False,
@@ -323,14 +324,14 @@ class ParallelSessionExecutor:
 
     def _execute_with_retry(
         self,
-        func: Callable[["boto3.Session", str, str, str], T],
-        session: "boto3.Session",
+        func: Callable[[boto3.Session, str, str, str], T],
+        session: boto3.Session,
         task: _TaskSpec,
         service: str,
         start_time: float,
     ) -> TaskResult[T]:
         """재시도 로직을 포함한 작업 실행"""
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
 
         for attempt in range(self._retry_config.max_retries + 1):
             try:
@@ -395,8 +396,8 @@ class ParallelSessionExecutor:
 
 
 def parallel_collect(
-    ctx: "ExecutionContext",
-    collector_func: Callable[["boto3.Session", str, str, str], T],
+    ctx: ExecutionContext,
+    collector_func: Callable[[boto3.Session, str, str, str], T],
     max_workers: int = 20,
     service: str = "default",
 ) -> ParallelExecutionResult[T]:

@@ -15,7 +15,6 @@ EC2 인스턴스 시간당/월간 비용을 조회합니다.
 """
 
 import logging
-from typing import Dict
 
 from .cache import PriceCache
 from .fetcher import PricingFetcher
@@ -76,7 +75,7 @@ def get_ec2_monthly_cost(
 def get_ec2_prices_bulk(
     region: str = "ap-northeast-2",
     refresh: bool = False,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """리전의 모든 EC2 가격 조회
 
     Args:
@@ -89,7 +88,7 @@ def get_ec2_prices_bulk(
     return _get_cached_prices(region, refresh)
 
 
-def _get_cached_prices(region: str, refresh: bool = False) -> Dict[str, float]:
+def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
     """캐시된 가격 조회 (없으면 API 호출)"""
     if not refresh:
         cached = _cache.get("ec2", region)

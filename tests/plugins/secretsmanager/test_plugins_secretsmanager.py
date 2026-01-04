@@ -5,14 +5,11 @@ tests/test_plugins_secretsmanager.py - Secrets Manager 플러그인 테스트
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-import pytest
-
 from plugins.secretsmanager.unused import (
+    UNUSED_DAYS_THRESHOLD,
     SecretAnalysisResult,
-    SecretFinding,
     SecretInfo,
     SecretStatus,
-    UNUSED_DAYS_THRESHOLD,
     analyze_secrets,
 )
 

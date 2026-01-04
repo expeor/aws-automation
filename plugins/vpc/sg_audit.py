@@ -8,7 +8,6 @@ SG 현황 및 미사용 SG/규칙 분석
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -31,7 +30,7 @@ REQUIRED_PERMISSIONS = {
 
 def _collect_sgs(
     session, account_id: str, account_name: str, region: str
-) -> Optional[List]:
+) -> list | None:
     """단일 계정/리전의 Security Group 수집 (병렬 실행용)"""
     collector = SGCollector()
     sgs = collector.collect(session, account_id, account_name, region)
@@ -95,7 +94,7 @@ def run(ctx) -> None:
     reporter = SGExcelReporter(sg_results, rule_results, summary)
     filepath = reporter.generate(output_path)
 
-    console.print(f"[bold green]보고서 생성 완료![/bold green]")
+    console.print("[bold green]보고서 생성 완료![/bold green]")
     console.print(f"  경로: {filepath}")
 
     # 폴더 열기

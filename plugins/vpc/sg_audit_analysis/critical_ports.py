@@ -13,7 +13,6 @@ Risk Level 결정은 포트 + Source 복합 조건으로 analyzer.py에서 수�
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Set
 
 
 @dataclass
@@ -25,12 +24,12 @@ class CriticalPort:
     protocol: str  # tcp / udp / both
     category: str  # database / remote_access / file_transfer / windows / unix
     description: str
-    sources: List[str]
+    sources: list[str]
 
 
 # AWS Trusted Advisor RED 포트 (9개)
 # 이 포트들이 0.0.0.0/0에 노출되면 HIGH
-TRUSTED_ADVISOR_RED_PORTS: Set[int] = {
+TRUSTED_ADVISOR_RED_PORTS: set[int] = {
     20,  # FTP Data
     21,  # FTP Control
     1433,  # MS SQL Server
@@ -44,7 +43,7 @@ TRUSTED_ADVISOR_RED_PORTS: Set[int] = {
 
 # AWS Trusted Advisor GREEN 포트 (4개)
 # 이 포트들은 0.0.0.0/0에 노출되어도 일반적으로 허용 (웹 서비스)
-WEB_PORTS: Set[int] = {
+WEB_PORTS: set[int] = {
     25,  # SMTP
     80,  # HTTP
     443,  # HTTPS
@@ -53,7 +52,7 @@ WEB_PORTS: Set[int] = {
 
 # 추가 위험 포트 (CIS/NIST 기준)
 # AWS Trusted Advisor에는 없지만 보안 기준상 위험한 포트
-ADDITIONAL_RISKY_PORTS: Set[int] = {
+ADDITIONAL_RISKY_PORTS: set[int] = {
     22,  # SSH (AWS Trusted Advisor에서는 YELLOW지만 CIS에서는 제한 권장)
     23,  # Telnet (평문 전송)
     111,  # RPC Portmapper
@@ -71,11 +70,11 @@ ADDITIONAL_RISKY_PORTS: Set[int] = {
 }
 
 # 모든 위험 포트 = Trusted Advisor RED + 추가 위험 포트
-ALL_RISKY_PORTS: Set[int] = TRUSTED_ADVISOR_RED_PORTS | ADDITIONAL_RISKY_PORTS
+ALL_RISKY_PORTS: set[int] = TRUSTED_ADVISOR_RED_PORTS | ADDITIONAL_RISKY_PORTS
 
 
 # 포트 상세 정보 (참조용)
-PORT_INFO: Dict[int, CriticalPort] = {
+PORT_INFO: dict[int, CriticalPort] = {
     # === Trusted Advisor RED: 파일 전송 ===
     20: CriticalPort(
         port=20,
@@ -323,7 +322,7 @@ def get_port_info(port: int) -> CriticalPort | None:
     return PORT_INFO.get(port)
 
 
-def check_port_range(from_port: int, to_port: int) -> List[CriticalPort]:
+def check_port_range(from_port: int, to_port: int) -> list[CriticalPort]:
     """포트 범위 내 위험 포트 조회 (웹 포트 제외)"""
     return [
         info
@@ -332,7 +331,7 @@ def check_port_range(from_port: int, to_port: int) -> List[CriticalPort]:
     ]
 
 
-def check_port_range_all(from_port: int, to_port: int) -> List[CriticalPort]:
+def check_port_range_all(from_port: int, to_port: int) -> list[CriticalPort]:
     """포트 범위 내 모든 정의된 포트 조회 (웹 포트 포함)"""
     return [info for port, info in PORT_INFO.items() if from_port <= port <= to_port]
 

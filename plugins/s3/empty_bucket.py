@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -54,7 +53,7 @@ class BucketInfo:
     account_name: str
     name: str
     region: str
-    created_at: Optional[datetime]
+    created_at: datetime | None
     object_count: int = 0
     total_size_bytes: int = 0
     versioning_enabled: bool = False
@@ -92,7 +91,7 @@ class S3AnalysisResult:
     versioning_only_buckets: int = 0
     small_buckets: int = 0
     total_size_gb: float = 0.0
-    findings: List[BucketFinding] = field(default_factory=list)
+    findings: list[BucketFinding] = field(default_factory=list)
 
 
 def get_bucket_region(s3_client, bucket_name: str) -> str:
@@ -103,7 +102,7 @@ def get_bucket_region(s3_client, bucket_name: str) -> str:
         response = s3_client.get_bucket_location(Bucket=bucket_name)
         location = response.get("LocationConstraint")
         # None은 us-east-1을 의미
-        return location if location else "us-east-1"
+        return str(location) if location else "us-east-1"
     except ClientError:
         return "unknown"
 
@@ -159,7 +158,7 @@ def get_bucket_size_from_cloudwatch(cw_client, bucket_name: str) -> tuple:
         return 0, 0, False
 
 
-def collect_buckets(session, account_id: str, account_name: str) -> List[BucketInfo]:
+def collect_buckets(session, account_id: str, account_name: str) -> list[BucketInfo]:
     """S3 버킷 수집"""
     from botocore.exceptions import ClientError
 
@@ -258,7 +257,7 @@ def collect_buckets(session, account_id: str, account_name: str) -> List[BucketI
 
 
 def analyze_buckets(
-    buckets: List[BucketInfo], account_id: str, account_name: str
+    buckets: list[BucketInfo], account_id: str, account_name: str
 ) -> S3AnalysisResult:
     """버킷 분석"""
     result = S3AnalysisResult(
@@ -317,7 +316,7 @@ def analyze_buckets(
     return result
 
 
-def generate_report(results: List[S3AnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -408,8 +407,8 @@ def generate_report(results: List[S3AnalysisResult], output_dir: str) -> str:
     # 컬럼 너비 자동 조정
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -425,7 +424,7 @@ def generate_report(results: List[S3AnalysisResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[S3AnalysisResult]:
+) -> S3AnalysisResult | None:
     """단일 계정의 S3 버킷 수집 및 분석 (병렬 실행용)
 
     S3는 글로벌 서비스이므로 region은 무시됩니다.
@@ -442,7 +441,7 @@ def run(ctx) -> None:
     console.print("[bold]S3 빈 버킷 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="s3")
-    results: List[S3AnalysisResult] = [r for r in result.get_data() if r is not None]
+    results: list[S3AnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -454,7 +453,7 @@ def run(ctx) -> None:
     total_empty = sum(r.empty_buckets for r in results)
     total_versioning = sum(r.versioning_only_buckets for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"빈 버킷: [yellow]{total_empty}개[/yellow], 버전만: [yellow]{total_versioning}개[/yellow]"
     )

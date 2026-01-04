@@ -5,12 +5,11 @@ AWS 공식 문서 기반 서비스 그룹 분류
 참조: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/
 """
 
-from typing import Dict, List
 
 # AWS 서비스 카테고리 정의 (AWS 공식 분류 기준)
 # services 리스트는 각 서비스 폴더의 CATEGORY["name"] 값과 매칭
 # 폴더 구조: plugins/{service}/ (예: plugins/rds/, plugins/ec2/)
-AWS_SERVICE_CATEGORIES: Dict[str, Dict] = {
+AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     # =========================================================================
     # Compute
     # =========================================================================
@@ -264,14 +263,14 @@ AWS_SERVICE_CATEGORIES: Dict[str, Dict] = {
 }
 
 # 서비스 → AWS 카테고리 역매핑 (첫 번째 매칭만 저장)
-SERVICE_TO_CATEGORY: Dict[str, str] = {}
+SERVICE_TO_CATEGORY: dict[str, str] = {}
 for cat_key, cat_info in AWS_SERVICE_CATEGORIES.items():
     for service in cat_info["services"]:
         if service not in SERVICE_TO_CATEGORY:
             SERVICE_TO_CATEGORY[service] = cat_key
 
 
-def get_aws_categories() -> List[Dict]:
+def get_aws_categories() -> list[dict]:
     """AWS 서비스 카테고리 목록 반환 (도구가 있는 카테고리만)
 
     Returns:
@@ -292,7 +291,7 @@ def get_aws_categories() -> List[Dict]:
     return result
 
 
-def get_services_by_aws_category(category_key: str) -> List[str]:
+def get_services_by_aws_category(category_key: str) -> list[str]:
     """특정 AWS 카테고리에 속한 서비스 목록 반환
 
     Args:
@@ -302,7 +301,8 @@ def get_services_by_aws_category(category_key: str) -> List[str]:
         서비스 이름 목록
     """
     if category_key in AWS_SERVICE_CATEGORIES:
-        return AWS_SERVICE_CATEGORIES[category_key]["services"]
+        services: list[str] = AWS_SERVICE_CATEGORIES[category_key]["services"]
+        return services
     return []
 
 
@@ -318,7 +318,7 @@ def get_aws_category_for_service(service_name: str) -> str:
     return SERVICE_TO_CATEGORY.get(service_name, "other")
 
 
-def get_aws_category_view() -> List[Dict]:
+def get_aws_category_view() -> list[dict]:
     """AWS 카테고리별로 플러그인을 그룹핑하여 반환
 
     discovery에서 발견된 플러그인을 AWS 공식 카테고리로 그룹핑합니다.

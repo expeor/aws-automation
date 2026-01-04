@@ -33,11 +33,15 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from rich.console import Console
 
 from core.config import settings
+from core.parallel import get_client, is_quiet, parallel_collect
+from core.tools.output import OutputPath, open_in_explorer
+
+console = Console()
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -50,10 +54,6 @@ REQUIRED_PERMISSIONS = {
         "acm:DescribeCertificate",
     ],
 }
-from core.parallel import get_client, is_quiet, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
-
-console = Console()
 
 
 # =============================================================================
@@ -86,9 +86,9 @@ class SSLPolicyAnalyzer:
     def __init__(self, elbv2_client, min_tls_version: str = DEFAULT_MIN_TLS_VERSION):
         self.client = elbv2_client
         self.min_tls_version = min_tls_version
-        self._policy_cache: Dict[str, Dict] = {}
+        self._policy_cache: dict[str, dict] = {}
 
-    def get_policy_details(self, policy_name: str) -> Optional[Dict]:
+    def get_policy_details(self, policy_name: str) -> dict | None:
         """AWS API로 정책 상세 정보 조회"""
         from botocore.exceptions import ClientError
 
@@ -99,13 +99,14 @@ class SSLPolicyAnalyzer:
             response = self.client.describe_ssl_policies(Names=[policy_name])
             policies = response.get("SslPolicies", [])
             if policies:
-                self._policy_cache[policy_name] = policies[0]
-                return policies[0]
+                policy: dict[str, Any] = policies[0]
+                self._policy_cache[policy_name] = policy
+                return policy
         except ClientError:
             pass
         return None
 
-    def analyze_policy(self, policy_name: str) -> Dict[str, Any]:
+    def analyze_policy(self, policy_name: str) -> dict[str, Any]:
         """정책 보안 분석
 
         Returns:
@@ -118,12 +119,15 @@ class SSLPolicyAnalyzer:
                 "recommendation": str
             }
         """
-        result = {
+        issues: list[str] = []
+        protocols: list[str] = []
+        weak_ciphers: list[str] = []
+        result: dict[str, Any] = {
             "is_vulnerable": False,
             "risk_level": "info",
-            "issues": [],
-            "protocols": [],
-            "weak_ciphers": [],
+            "issues": issues,
+            "protocols": protocols,
+            "weak_ciphers": weak_ciphers,
             "recommendation": "",
         }
 
@@ -169,14 +173,17 @@ class SSLPolicyAnalyzer:
 
         return result
 
-    def _analyze_by_name(self, policy_name: str) -> Dict[str, Any]:
+    def _analyze_by_name(self, policy_name: str) -> dict[str, Any]:
         """정책 이름 기반 휴리스틱 분석 (API 실패 시 fallback)"""
-        result = {
+        issues: list[str] = []
+        protocols: list[str] = []
+        weak_ciphers: list[str] = []
+        result: dict[str, Any] = {
             "is_vulnerable": False,
             "risk_level": "info",
-            "issues": [],
-            "protocols": [],
-            "weak_ciphers": [],
+            "issues": issues,
+            "protocols": protocols,
+            "weak_ciphers": weak_ciphers,
             "recommendation": "",
         }
 
@@ -203,7 +210,7 @@ class SSLPolicyAnalyzer:
 
         return result
 
-    def _get_recommendation(self, current_protocols: List[str]) -> str:
+    def _get_recommendation(self, current_protocols: list[str]) -> str:
         """상황에 맞는 권장 정책 반환"""
         if "TLSv1.3" in current_protocols:
             return "현재 TLS 1.3 지원 중. 취약 프로토콜만 제거 권장"
@@ -243,7 +250,7 @@ class SecurityFinding:
     title: str
     description: str
     recommendation: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -253,9 +260,9 @@ class ListenerInfo:
     arn: str
     protocol: str
     port: int
-    ssl_policy: Optional[str] = None
-    certificates: List[str] = field(default_factory=list)
-    default_actions: List[Dict] = field(default_factory=list)
+    ssl_policy: str | None = None
+    certificates: list[str] = field(default_factory=list)
+    default_actions: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -270,7 +277,7 @@ class LBSecurityInfo:
     dns_name: str
     vpc_id: str
     state: str
-    created_time: Optional[datetime]
+    created_time: datetime | None
 
     # 계정/리전
     account_id: str
@@ -281,13 +288,13 @@ class LBSecurityInfo:
     access_logs_enabled: bool = False
     access_logs_bucket: str = ""
     deletion_protection: bool = False
-    waf_web_acl_arn: Optional[str] = None
+    waf_web_acl_arn: str | None = None
 
     # 리스너
-    listeners: List[ListenerInfo] = field(default_factory=list)
+    listeners: list[ListenerInfo] = field(default_factory=list)
 
     # 발견 항목
-    findings: List[SecurityFinding] = field(default_factory=list)
+    findings: list[SecurityFinding] = field(default_factory=list)
 
     @property
     def is_internet_facing(self) -> bool:
@@ -295,7 +302,7 @@ class LBSecurityInfo:
 
     @property
     def has_https_listener(self) -> bool:
-        return any(l.protocol in ("HTTPS", "TLS") for l in self.listeners)
+        return any(listener.protocol in ("HTTPS", "TLS") for listener in self.listeners)
 
     @property
     def risk_score(self) -> int:
@@ -320,7 +327,7 @@ class SecurityAuditResult:
     account_id: str
     account_name: str
     region: str
-    load_balancers: List[LBSecurityInfo] = field(default_factory=list)
+    load_balancers: list[LBSecurityInfo] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -337,7 +344,7 @@ class SecurityAuditResult:
 
 def collect_v2_lb_security(
     session, account_id: str, account_name: str, region: str
-) -> List[LBSecurityInfo]:
+) -> list[LBSecurityInfo]:
     """ALB/NLB/GWLB 보안 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -409,7 +416,7 @@ def collect_v2_lb_security(
     return load_balancers
 
 
-def _get_listeners(elbv2, lb_arn: str) -> List[ListenerInfo]:
+def _get_listeners(elbv2, lb_arn: str) -> list[ListenerInfo]:
     """리스너 정보 조회"""
     from botocore.exceptions import ClientError
 
@@ -439,7 +446,7 @@ def _get_listeners(elbv2, lb_arn: str) -> List[ListenerInfo]:
 
 def collect_classic_lb_security(
     session, account_id: str, account_name: str, region: str
-) -> List[LBSecurityInfo]:
+) -> list[LBSecurityInfo]:
     """CLB 보안 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -512,7 +519,7 @@ def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
     from botocore.exceptions import ClientError
 
     # SSL 정책 분석기 생성 (ALB/NLB만, CLB는 None)
-    ssl_analyzer: Optional[SSLPolicyAnalyzer] = None
+    ssl_analyzer: SSLPolicyAnalyzer | None = None
     if lb.lb_type != "classic":
         try:
             elbv2 = get_client(session, "elbv2", region_name=region)
@@ -540,7 +547,7 @@ def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
 
 
 def _analyze_ssl_policy(
-    lb: LBSecurityInfo, ssl_analyzer: Optional[SSLPolicyAnalyzer]
+    lb: LBSecurityInfo, ssl_analyzer: SSLPolicyAnalyzer | None
 ) -> None:
     """SSL/TLS 정책 분석 (AWS API 기반 동적 분석)"""
     for listener in lb.listeners:
@@ -551,12 +558,12 @@ def _analyze_ssl_policy(
         if not policy:
             continue
 
-        # SSLPolicyAnalyzer로 동적 분석
-        if ssl_analyzer:
-            analysis = ssl_analyzer.analyze_policy(policy)
-        else:
-            # Fallback: 정책 이름 기반 휴리스틱
-            analysis = _fallback_policy_analysis(policy)
+        # SSLPolicyAnalyzer로 동적 분석, Fallback: 정책 이름 기반 휴리스틱
+        analysis = (
+            ssl_analyzer.analyze_policy(policy)
+            if ssl_analyzer
+            else _fallback_policy_analysis(policy)
+        )
 
         if not analysis["is_vulnerable"]:
             continue
@@ -588,14 +595,17 @@ def _analyze_ssl_policy(
         )
 
 
-def _fallback_policy_analysis(policy_name: str) -> Dict[str, Any]:
+def _fallback_policy_analysis(policy_name: str) -> dict[str, Any]:
     """API 없이 정책 이름 기반 휴리스틱 분석"""
-    result = {
+    issues: list[str] = []
+    protocols: list[str] = []
+    weak_ciphers: list[str] = []
+    result: dict[str, Any] = {
         "is_vulnerable": False,
         "risk_level": "info",
-        "issues": [],
-        "protocols": [],
-        "weak_ciphers": [],
+        "issues": issues,
+        "protocols": protocols,
+        "weak_ciphers": weak_ciphers,
         "recommendation": "",
     }
 
@@ -622,7 +632,7 @@ def _analyze_certificates(lb: LBSecurityInfo, session, region: str) -> None:
     """인증서 분석"""
     from botocore.exceptions import ClientError
 
-    cert_arns: Set[str] = set()
+    cert_arns: set[str] = set()
     for listener in lb.listeners:
         cert_arns.update(listener.certificates)
 
@@ -792,8 +802,8 @@ def _analyze_listener_security(lb: LBSecurityInfo) -> None:
     if not lb.listeners:
         return
 
-    has_http = any(l.protocol == "HTTP" for l in lb.listeners)
-    has_https = any(l.protocol in ("HTTPS", "TLS") for l in lb.listeners)
+    has_http = any(listener.protocol == "HTTP" for listener in lb.listeners)
+    has_https = any(listener.protocol in ("HTTPS", "TLS") for listener in lb.listeners)
 
     # HTTP만 있고 HTTPS 없는 인터넷 페이싱 LB
     if lb.is_internet_facing and has_http and not has_https:
@@ -805,14 +815,16 @@ def _analyze_listener_security(lb: LBSecurityInfo) -> None:
                 description="인터넷에 노출된 LB가 HTTPS 없이 HTTP만 사용",
                 recommendation="HTTPS 리스너 추가 및 인증서 적용",
                 details={
-                    "protocols": [l.protocol for l in lb.listeners],
+                    "protocols": [listener.protocol for listener in lb.listeners],
                 },
             )
         )
 
     # HTTP와 HTTPS 모두 있지만 리다이렉트 미설정
     if has_http and has_https and lb.lb_type == "application":
-        http_listeners = [l for l in lb.listeners if l.protocol == "HTTP"]
+        http_listeners = [
+            listener for listener in lb.listeners if listener.protocol == "HTTP"
+        ]
         for http_listener in http_listeners:
             has_redirect = any(
                 action.get("Type") == "redirect"
@@ -835,7 +847,7 @@ def _analyze_listener_security(lb: LBSecurityInfo) -> None:
 
 
 def analyze_all(
-    load_balancers: List[LBSecurityInfo],
+    load_balancers: list[LBSecurityInfo],
     session,
     region: str,
     account_id: str,
@@ -872,7 +884,7 @@ def analyze_all(
 # =============================================================================
 
 
-def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
+def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -1065,8 +1077,8 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
     # 열 너비 조정
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -1089,7 +1101,7 @@ def generate_report(results: List[SecurityAuditResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[SecurityAuditResult]:
+) -> SecurityAuditResult | None:
     """단일 계정/리전의 ELB 보안 정보 수집 및 분석 (병렬 실행용)"""
     v2_lbs = collect_v2_lb_security(session, account_id, account_name, region)
     classic_lbs = collect_classic_lb_security(session, account_id, account_name, region)
@@ -1107,7 +1119,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="elbv2"
     )
-    all_results: List[SecurityAuditResult] = [
+    all_results: list[SecurityAuditResult] = [
         r for r in result.get_data() if r is not None
     ]
 

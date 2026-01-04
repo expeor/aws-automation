@@ -17,7 +17,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -69,7 +68,7 @@ class EIPInfo:
     network_interface_id: str
     private_ip: str
     network_border_group: str
-    tags: Dict[str, str]
+    tags: dict[str, str]
     name: str
 
     # 메타
@@ -104,7 +103,7 @@ class EIPAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[EIPFinding] = field(default_factory=list)
+    findings: list[EIPFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -123,7 +122,7 @@ class EIPAnalysisResult:
 
 def collect_eips(
     session, account_id: str, account_name: str, region: str
-) -> List[EIPInfo]:
+) -> list[EIPInfo]:
     """EIP 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -179,7 +178,7 @@ def collect_eips(
 
 
 def analyze_eips(
-    eips: List[EIPInfo], account_id: str, account_name: str, region: str
+    eips: list[EIPInfo], account_id: str, account_name: str, region: str
 ) -> EIPAnalysisResult:
     """EIP 미사용 분석"""
     result = EIPAnalysisResult(
@@ -234,7 +233,7 @@ def _analyze_single_eip(eip: EIPInfo) -> EIPFinding:
 # =============================================================================
 
 
-def generate_report(results: List[EIPAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[EIPAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -409,7 +408,7 @@ def run(ctx) -> None:
     )
 
     # 결과 처리
-    all_results: List[EIPAnalysisResult] = result.get_data()
+    all_results: list[EIPAnalysisResult] = result.get_data()
 
     # 진행 상황 출력
     console.print(

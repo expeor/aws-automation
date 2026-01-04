@@ -4,10 +4,11 @@ plugins/fn/common/collector.py - Lambda 함수 수집
 Lambda 함수 정보 및 CloudWatch 메트릭 수집 공통 로직
 """
 
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import Any
 
 from core.parallel import ErrorSeverity, get_client, try_or_default
 
@@ -33,7 +34,7 @@ class LambdaMetrics:
 
     # 조회 기간
     period_days: int = 30
-    last_invocation_time: Optional[datetime] = None
+    last_invocation_time: datetime | None = None
 
 
 @dataclass
@@ -51,25 +52,25 @@ class LambdaFunctionInfo:
     memory_mb: int
     timeout_seconds: int
     code_size_bytes: int
-    last_modified: Optional[datetime]
+    last_modified: datetime | None
 
     # 실행 환경
     role: str
-    vpc_config: Optional[Dict] = None
+    vpc_config: dict | None = None
     environment_variables: int = 0
 
     # 메타
     account_id: str = ""
     account_name: str = ""
     region: str = ""
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
     # 메트릭 (나중에 채워짐)
-    metrics: Optional[LambdaMetrics] = None
+    metrics: LambdaMetrics | None = None
 
     # Provisioned Concurrency (있는 경우)
     provisioned_concurrency: int = 0
-    reserved_concurrency: Optional[int] = None
+    reserved_concurrency: int | None = None
 
     # 비용 추정
     estimated_monthly_cost: float = 0.0
@@ -99,7 +100,7 @@ def collect_functions(
     account_id: str,
     account_name: str,
     region: str,
-) -> List[LambdaFunctionInfo]:
+) -> list[LambdaFunctionInfo]:
     """Lambda 함수 목록 수집
 
     Args:
@@ -126,10 +127,11 @@ def collect_functions(
                 function_name = fn.get("FunctionName", "")
 
                 # 태그 조회 (옵션 - 실패해도 계속)
-                tags = try_or_default(
-                    lambda: lambda_client.list_tags(
-                        Resource=fn.get("FunctionArn", "")
-                    ).get("Tags", {}),
+                fn_arn = fn.get("FunctionArn", "")
+                tags: dict[str, str] = try_or_default(
+                    lambda arn=fn_arn: lambda_client.list_tags(Resource=arn).get(  # type: ignore[misc]
+                        "Tags", {}
+                    ),
                     default={},
                     account_id=account_id,
                     account_name=account_name,
@@ -150,13 +152,11 @@ def collect_functions(
                 last_modified = None
                 lm_str = fn.get("LastModified")
                 if lm_str:
-                    try:
+                    with contextlib.suppress(ValueError):
                         # ISO 8601 형식 파싱
                         last_modified = datetime.fromisoformat(
                             lm_str.replace("Z", "+00:00")
                         )
-                    except ValueError:
-                        pass
 
                 func_info = LambdaFunctionInfo(
                     function_name=function_name,
@@ -178,10 +178,12 @@ def collect_functions(
                 )
 
                 # Provisioned Concurrency 조회 (옵션)
-                pc_configs = try_or_default(
-                    lambda: lambda_client.list_provisioned_concurrency_configs(
-                        FunctionName=function_name
-                    ).get("ProvisionedConcurrencyConfigs", []),
+                pc_configs: list[dict[str, Any]] = try_or_default(
+                    lambda fname=function_name: lambda_client.list_provisioned_concurrency_configs(  # type: ignore[misc]
+                        FunctionName=fname
+                    ).get(
+                        "ProvisionedConcurrencyConfigs", []
+                    ),
                     default=[],
                     account_id=account_id,
                     account_name=account_name,
@@ -195,10 +197,12 @@ def collect_functions(
                     )
 
                 # Reserved Concurrency 조회 (옵션)
-                func_info.reserved_concurrency = try_or_default(
-                    lambda: lambda_client.get_function_concurrency(
-                        FunctionName=function_name
-                    ).get("ReservedConcurrentExecutions"),
+                reserved: int | None = try_or_default(
+                    lambda fname=function_name: lambda_client.get_function_concurrency(  # type: ignore[misc]
+                        FunctionName=fname
+                    ).get(
+                        "ReservedConcurrentExecutions"
+                    ),
                     default=None,
                     account_id=account_id,
                     account_name=account_name,
@@ -206,6 +210,7 @@ def collect_functions(
                     operation="get_function_concurrency",
                     severity=ErrorSeverity.DEBUG,
                 )
+                func_info.reserved_concurrency = reserved
 
                 functions.append(func_info)
 
@@ -350,7 +355,7 @@ def collect_functions_with_metrics(
     account_name: str,
     region: str,
     metric_days: int = 30,
-) -> List[LambdaFunctionInfo]:
+) -> list[LambdaFunctionInfo]:
     """Lambda 함수 목록과 메트릭을 함께 수집
 
     Args:

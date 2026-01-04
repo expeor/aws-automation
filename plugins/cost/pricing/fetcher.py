@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -28,7 +28,7 @@ class PricingFetcher:
     get_products API로 리전별 가격을 조회합니다.
     """
 
-    def __init__(self, session: Optional["boto3.Session"] = None):
+    def __init__(self, session: boto3.Session | None = None):
         """
         Args:
             session: boto3 세션 (None이면 기본 세션 사용)
@@ -50,7 +50,7 @@ class PricingFetcher:
             )
         return self._pricing_client
 
-    def get_ec2_prices(self, region: str) -> Dict[str, float]:
+    def get_ec2_prices(self, region: str) -> dict[str, float]:
         """EC2 인스턴스 가격 조회 (get_products API 사용)
 
         Args:
@@ -104,7 +104,7 @@ class PricingFetcher:
             logger.warning(f"EC2 가격 조회 실패 [{region}]: {e}")
             return {}
 
-    def get_ebs_prices(self, region: str) -> Dict[str, float]:
+    def get_ebs_prices(self, region: str) -> dict[str, float]:
         """EBS 볼륨 가격 조회 (get_products API 사용)
 
         Args:
@@ -163,7 +163,7 @@ class PricingFetcher:
                 "standard": 0.05,
             }
 
-    def get_vpc_endpoint_prices(self, region: str) -> Dict[str, float]:
+    def get_vpc_endpoint_prices(self, region: str) -> dict[str, float]:
         """VPC Endpoint 가격 조회 (Pricing API 사용)
 
         Args:
@@ -228,7 +228,7 @@ class PricingFetcher:
                 "data_per_gb": 0.01,
             }
 
-    def get_secrets_manager_prices(self, region: str) -> Dict[str, float]:
+    def get_secrets_manager_prices(self, region: str) -> dict[str, float]:
         """Secrets Manager 가격 조회
 
         Args:
@@ -275,7 +275,7 @@ class PricingFetcher:
             logger.warning(f"Secrets Manager 가격 조회 실패 [{region}]: {e}")
             return {"per_secret_monthly": 0.40, "per_10k_api_calls": 0.05}
 
-    def get_kms_prices(self, region: str) -> Dict[str, float]:
+    def get_kms_prices(self, region: str) -> dict[str, float]:
         """KMS 가격 조회
 
         Args:
@@ -323,7 +323,7 @@ class PricingFetcher:
             logger.warning(f"KMS 가격 조회 실패 [{region}]: {e}")
             return {"customer_key_monthly": 1.0, "per_10k_requests": 0.03}
 
-    def get_ecr_prices(self, region: str) -> Dict[str, float]:
+    def get_ecr_prices(self, region: str) -> dict[str, float]:
         """ECR 가격 조회
 
         Args:
@@ -367,7 +367,7 @@ class PricingFetcher:
             logger.warning(f"ECR 가격 조회 실패 [{region}]: {e}")
             return {"storage_per_gb_monthly": 0.10}
 
-    def get_route53_prices(self) -> Dict[str, float]:
+    def get_route53_prices(self) -> dict[str, float]:
         """Route53 가격 조회 (글로벌 서비스)
 
         Returns:
@@ -396,7 +396,7 @@ class PricingFetcher:
                 terms = data.get("terms", {}).get("OnDemand", {})
 
                 group = attrs.get("group", "").lower()
-                group_desc = attrs.get("groupDescription", "").lower()
+                attrs.get("groupDescription", "").lower()
 
                 for term in terms.values():
                     for dim in term.get("priceDimensions", {}).values():
@@ -425,7 +425,7 @@ class PricingFetcher:
                 "query_per_million": 0.40,
             }
 
-    def get_snapshot_prices(self, region: str) -> Dict[str, float]:
+    def get_snapshot_prices(self, region: str) -> dict[str, float]:
         """EBS Snapshot 가격 조회
 
         Args:
@@ -472,7 +472,7 @@ class PricingFetcher:
             logger.warning(f"EBS Snapshot 가격 조회 실패 [{region}]: {e}")
             return {"storage_per_gb_monthly": 0.05}
 
-    def get_eip_prices(self, region: str) -> Dict[str, float]:
+    def get_eip_prices(self, region: str) -> dict[str, float]:
         """Elastic IP 가격 조회
 
         Args:
@@ -524,7 +524,7 @@ class PricingFetcher:
             logger.warning(f"EIP 가격 조회 실패 [{region}]: {e}")
             return {"unused_hourly": 0.005, "additional_hourly": 0.005}
 
-    def get_elb_prices(self, region: str) -> Dict[str, float]:
+    def get_elb_prices(self, region: str) -> dict[str, float]:
         """ELB 가격 조회
 
         Args:
@@ -590,7 +590,7 @@ class PricingFetcher:
                 "clb_hourly": 0.025,
             }
 
-    def get_rds_snapshot_prices(self, region: str) -> Dict[str, float]:
+    def get_rds_snapshot_prices(self, region: str) -> dict[str, float]:
         """RDS Snapshot 가격 조회
 
         Args:
@@ -642,7 +642,7 @@ class PricingFetcher:
             logger.warning(f"RDS Snapshot 가격 조회 실패 [{region}]: {e}")
             return {"rds_per_gb_monthly": 0.02, "aurora_per_gb_monthly": 0.021}
 
-    def get_cloudwatch_prices(self, region: str) -> Dict[str, float]:
+    def get_cloudwatch_prices(self, region: str) -> dict[str, float]:
         """CloudWatch Logs 가격 조회
 
         Args:
@@ -690,7 +690,7 @@ class PricingFetcher:
             logger.warning(f"CloudWatch 가격 조회 실패 [{region}]: {e}")
             return {"storage_per_gb_monthly": 0.03, "ingestion_per_gb": 0.50}
 
-    def get_lambda_prices(self, region: str) -> Dict[str, float]:
+    def get_lambda_prices(self, region: str) -> dict[str, float]:
         """Lambda 가격 조회
 
         Args:
@@ -754,7 +754,7 @@ class PricingFetcher:
                 "provisioned_concurrency_per_gb_hour": 0.000004646,
             }
 
-    def get_dynamodb_prices(self, region: str) -> Dict[str, float]:
+    def get_dynamodb_prices(self, region: str) -> dict[str, float]:
         """DynamoDB 가격 조회
 
         Args:

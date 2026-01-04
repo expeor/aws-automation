@@ -2,13 +2,11 @@
 tests/test_plugins_eip.py - EIP 플러그인 테스트
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from moto import mock_aws
 
 from plugins.ec2.eip_audit import (
-    EIPFinding,
     EIPInfo,
     Severity,
     UsageStatus,

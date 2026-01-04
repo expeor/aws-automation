@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -56,7 +55,7 @@ class SQSQueueInfo:
     approximate_messages: int
     approximate_messages_delayed: int
     approximate_messages_not_visible: int
-    created_timestamp: Optional[datetime]
+    created_timestamp: datetime | None
     # CloudWatch 지표
     messages_sent: float = 0.0
     messages_received: float = 0.0
@@ -83,12 +82,12 @@ class SQSAnalysisResult:
     unused_queues: int = 0
     empty_dlqs: int = 0
     normal_queues: int = 0
-    findings: List[QueueFinding] = field(default_factory=list)
+    findings: list[QueueFinding] = field(default_factory=list)
 
 
 def collect_sqs_queues(
     session, account_id: str, account_name: str, region: str
-) -> List[SQSQueueInfo]:
+) -> list[SQSQueueInfo]:
     """SQS 큐 수집"""
     from botocore.exceptions import ClientError
 
@@ -206,7 +205,7 @@ def collect_sqs_queues(
 
 
 def analyze_queues(
-    queues: List[SQSQueueInfo], account_id: str, account_name: str, region: str
+    queues: list[SQSQueueInfo], account_id: str, account_name: str, region: str
 ) -> SQSAnalysisResult:
     """SQS 큐 분석"""
     result = SQSAnalysisResult(
@@ -257,7 +256,7 @@ def analyze_queues(
     return result
 
 
-def generate_report(results: List[SQSAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -340,8 +339,8 @@ def generate_report(results: List[SQSAnalysisResult], output_dir: str) -> str:
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -357,7 +356,7 @@ def generate_report(results: List[SQSAnalysisResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[SQSAnalysisResult]:
+) -> SQSAnalysisResult | None:
     """단일 계정/리전의 SQS 큐 수집 및 분석 (병렬 실행용)"""
     queues = collect_sqs_queues(session, account_id, account_name, region)
     if not queues:
@@ -370,7 +369,7 @@ def run(ctx) -> None:
     console.print("[bold]SQS 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="sqs")
-    results: List[SQSAnalysisResult] = [r for r in result.get_data() if r is not None]
+    results: list[SQSAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -382,7 +381,7 @@ def run(ctx) -> None:
     total_unused = sum(r.unused_queues for r in results)
     total_empty_dlq = sum(r.empty_dlqs for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용 큐: [red]{total_unused}개[/red] / 빈 DLQ: [yellow]{total_empty_dlq}개[/yellow]"
     )

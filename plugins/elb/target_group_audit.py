@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Set
 
 from rich.console import Console
 
@@ -47,11 +46,11 @@ class TargetGroupInfo:
     region: str
     arn: str
     name: str
-    protocol: Optional[str]
-    port: Optional[int]
+    protocol: str | None
+    port: int | None
     target_type: str  # instance, ip, lambda, alb
-    vpc_id: Optional[str]
-    load_balancer_arns: List[str] = field(default_factory=list)
+    vpc_id: str | None
+    load_balancer_arns: list[str] = field(default_factory=list)
     total_targets: int = 0
     healthy_targets: int = 0
     unhealthy_targets: int = 0
@@ -82,7 +81,7 @@ class TargetGroupAnalysisResult:
     no_targets_count: int = 0
     unhealthy_count: int = 0
     normal_count: int = 0
-    findings: List[TargetGroupFinding] = field(default_factory=list)
+    findings: list[TargetGroupFinding] = field(default_factory=list)
 
 
 # =============================================================================
@@ -92,7 +91,7 @@ class TargetGroupAnalysisResult:
 
 def collect_target_groups(
     session, account_id: str, account_name: str, region: str
-) -> List[TargetGroupInfo]:
+) -> list[TargetGroupInfo]:
     """Target Groups 수집"""
     from botocore.exceptions import ClientError
 
@@ -144,7 +143,7 @@ def collect_target_groups(
 
 
 def analyze_target_groups(
-    target_groups: List[TargetGroupInfo],
+    target_groups: list[TargetGroupInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -211,7 +210,7 @@ def analyze_target_groups(
 # =============================================================================
 
 
-def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -301,8 +300,8 @@ def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -
     # 열 너비 조정
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40
@@ -325,7 +324,7 @@ def generate_report(results: List[TargetGroupAnalysisResult], output_dir: str) -
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[TargetGroupAnalysisResult]:
+) -> TargetGroupAnalysisResult | None:
     """단일 계정/리전의 Target Group 수집 및 분석 (병렬 실행용)"""
     target_groups = collect_target_groups(session, account_id, account_name, region)
     if not target_groups:
@@ -340,7 +339,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="elbv2"
     )
-    results: List[TargetGroupAnalysisResult] = [
+    results: list[TargetGroupAnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 
@@ -356,7 +355,7 @@ def run(ctx) -> None:
     total_no_targets = sum(r.no_targets_count for r in results)
     total_unhealthy = sum(r.unhealthy_count for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"미연결: [red]{total_unattached}개[/red]")
     console.print(f"타겟 없음: [yellow]{total_no_targets}개[/yellow]")
     console.print(f"전체 비정상: [red]{total_unhealthy}개[/red]")

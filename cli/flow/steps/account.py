@@ -5,7 +5,6 @@
 SSO 멀티계정 환경에서 작업할 계정을 선택.
 """
 
-from typing import List
 
 from rich.console import Console
 
@@ -148,7 +147,7 @@ class AccountStep:
 
     def _parse_selection(
         self, selection: str, max_num: int, single_only: bool = False
-    ) -> List[int]:
+    ) -> list[int]:
         """선택 문자열 파싱
 
         Args:
@@ -186,7 +185,7 @@ class AccountStep:
                     start = int(range_parts[0].strip())
                     end = int(range_parts[1].strip())
                 except ValueError:
-                    raise ValueError(f"잘못된 숫자: {part}")
+                    raise ValueError(f"잘못된 숫자: {part}") from None
 
                 if start > end:
                     start, end = end, start
@@ -201,7 +200,7 @@ class AccountStep:
                 try:
                     num = int(part)
                 except ValueError:
-                    raise ValueError(f"잘못된 숫자: {part}")
+                    raise ValueError(f"잘못된 숫자: {part}") from None
 
                 if 1 <= num <= max_num:
                     indices.add(num)

@@ -4,12 +4,8 @@ tests/test_plugins_rds.py - RDS 플러그인 테스트
 
 from datetime import datetime, timezone
 
-import pytest
-
 from plugins.rds.unused import (
-    InstanceFinding,
     InstanceStatus,
-    LOW_USAGE_CPU_THRESHOLD,
     RDSAnalysisResult,
     RDSInstanceInfo,
     analyze_instances,

@@ -6,7 +6,6 @@ core/tools/cache/path.py - 캐시 경로 유틸리티
 
 import os
 from pathlib import Path
-from typing import Optional
 
 
 def _get_project_root() -> str:
@@ -36,10 +35,7 @@ def get_cache_dir(category: str = "") -> str:
         >>> get_cache_dir("ip")
         '/path/to/project/temp/ip'
     """
-    if category:
-        cache_dir = os.path.join(CACHE_ROOT, category)
-    else:
-        cache_dir = CACHE_ROOT
+    cache_dir = os.path.join(CACHE_ROOT, category) if category else CACHE_ROOT
 
     # 디렉토리 자동 생성
     os.makedirs(cache_dir, exist_ok=True)

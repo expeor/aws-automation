@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -58,7 +57,7 @@ class RDSInstanceInfo:
     multi_az: bool
     storage_type: str
     allocated_storage: int  # GB
-    created_at: Optional[datetime]
+    created_at: datetime | None
     # CloudWatch 지표
     avg_connections: float = 0.0
     avg_cpu: float = 0.0
@@ -117,12 +116,12 @@ class RDSAnalysisResult:
     normal_instances: int = 0
     unused_monthly_cost: float = 0.0
     low_usage_monthly_cost: float = 0.0
-    findings: List[InstanceFinding] = field(default_factory=list)
+    findings: list[InstanceFinding] = field(default_factory=list)
 
 
 def collect_rds_instances(
     session, account_id: str, account_name: str, region: str
-) -> List[RDSInstanceInfo]:
+) -> list[RDSInstanceInfo]:
     """RDS 인스턴스 수집"""
     from botocore.exceptions import ClientError
 
@@ -232,7 +231,7 @@ def collect_rds_instances(
 
 
 def analyze_instances(
-    instances: List[RDSInstanceInfo], account_id: str, account_name: str, region: str
+    instances: list[RDSInstanceInfo], account_id: str, account_name: str, region: str
 ) -> RDSAnalysisResult:
     """RDS 인스턴스 분석"""
     result = RDSAnalysisResult(
@@ -293,7 +292,7 @@ def analyze_instances(
     return result
 
 
-def generate_report(results: List[RDSAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -403,8 +402,8 @@ def generate_report(results: List[RDSAnalysisResult], output_dir: str) -> str:
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40
@@ -420,7 +419,7 @@ def generate_report(results: List[RDSAnalysisResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[RDSAnalysisResult]:
+) -> RDSAnalysisResult | None:
     """단일 계정/리전의 RDS 인스턴스 수집 및 분석 (병렬 실행용)"""
     instances = collect_rds_instances(session, account_id, account_name, region)
     if not instances:
@@ -433,7 +432,7 @@ def run(ctx) -> None:
     console.print("[bold]RDS 유휴 인스턴스 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="rds")
-    results: List[RDSAnalysisResult] = [r for r in result.get_data() if r is not None]
+    results: list[RDSAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -448,7 +447,7 @@ def run(ctx) -> None:
     unused_cost = sum(r.unused_monthly_cost for r in results)
     low_cost = sum(r.low_usage_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용: [red]{total_unused}개[/red] (${unused_cost:,.2f}/월) / "
         f"저사용: [yellow]{total_low}개[/yellow] (${low_cost:,.2f}/월) / "

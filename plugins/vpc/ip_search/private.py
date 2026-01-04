@@ -16,14 +16,13 @@ import time
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import msgpack
 from botocore.exceptions import ClientError
 
 from core.auth import SessionIterator
 from core.parallel import get_client
-
 
 # =============================================================================
 # 데이터 구조
@@ -47,7 +46,7 @@ class PrivateIPResult:
     interface_type: str
     status: str
     description: str
-    security_groups: List[str] = field(default_factory=list)
+    security_groups: list[str] = field(default_factory=list)
     name: str = ""
     is_managed: bool = False
     managed_by: str = "User"
@@ -71,7 +70,7 @@ class ENICache:
     def __init__(
         self,
         session_name: str = "default",
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
         expiry_hours: int = DEFAULT_EXPIRY_HOURS,
     ):
         # 캐시 디렉토리 설정 (프로젝트 루트의 temp 폴더)
@@ -80,7 +79,9 @@ class ENICache:
         else:
             # plugins/vpc/ip_search -> vpc -> plugins -> project_root
             project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                )
             )
             self.cache_dir = os.path.join(project_root, "temp", "eni")
 
@@ -92,8 +93,8 @@ class ENICache:
         self.expiry = timedelta(hours=expiry_hours)
 
         # 캐시 데이터
-        self.cache: Dict[str, Dict[str, Any]] = {}
-        self.sorted_ips: List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = []
+        self.cache: dict[str, dict[str, Any]] = {}
+        self.sorted_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
         self.lock = threading.Lock()
 
         # 캐시 로드
@@ -133,7 +134,7 @@ class ENICache:
     def _rebuild_ip_index(self) -> None:
         """IP 인덱스 재구성 (CIDR 검색용)"""
         parsed = []
-        for ip_str in self.cache.keys():
+        for ip_str in self.cache:
             try:
                 parsed.append(ipaddress.ip_address(ip_str))
             except ValueError:
@@ -142,9 +143,8 @@ class ENICache:
 
     def save(self) -> None:
         """캐시 저장"""
-        with self.lock:
-            with open(self.cache_file, "wb") as f:
-                msgpack.dump(self._convert_datetime(self.cache), f)
+        with self.lock, open(self.cache_file, "wb") as f:
+            msgpack.dump(self._convert_datetime(self.cache), f)
 
     def _convert_datetime(self, obj: Any) -> Any:
         """datetime 객체를 문자열로 변환"""
@@ -164,16 +164,17 @@ class ENICache:
         age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(self.cache_file))
         return age < self.expiry
 
-    def get_by_ip(self, ip: str) -> List[Dict[str, Any]]:
+    def get_by_ip(self, ip: str) -> list[dict[str, Any]]:
         """IP 주소로 ENI 검색"""
         with self.lock:
             entry = self.cache.get(ip)
             if entry:
                 entry["last_accessed"] = time.time()
-                return entry["interfaces"]
+                interfaces: list[dict[str, Any]] = entry["interfaces"]
+                return interfaces
         return []
 
-    def get_by_cidr(self, cidr: str) -> List[Tuple[str, Dict[str, Any]]]:
+    def get_by_cidr(self, cidr: str) -> list[tuple[str, dict[str, Any]]]:
         """CIDR 범위로 ENI 검색"""
         try:
             network = ipaddress.ip_network(cidr, strict=False)
@@ -200,7 +201,7 @@ class ENICache:
 
         return results
 
-    def update(self, interfaces: List[Dict[str, Any]]) -> None:
+    def update(self, interfaces: list[dict[str, Any]]) -> None:
         """ENI 데이터로 캐시 업데이트"""
         current = time.time()
 
@@ -225,7 +226,7 @@ class ENICache:
 
         self._rebuild_ip_index()
 
-    def _add_to_cache(self, ip: str, eni: Dict[str, Any], timestamp: float) -> None:
+    def _add_to_cache(self, ip: str, eni: dict[str, Any], timestamp: float) -> None:
         """캐시에 IP-ENI 매핑 추가"""
         if ip not in self.cache:
             self.cache[ip] = {"interfaces": [], "last_accessed": timestamp}
@@ -248,10 +249,10 @@ class ENICache:
         """캐시된 ENI 수 반환"""
         return len(self.cache)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """캐시 통계 반환 (리전별, 계정별 ENI 수)"""
-        regions: Dict[str, int] = {}
-        accounts: Dict[str, str] = {}  # account_id -> account_name
+        regions: dict[str, int] = {}
+        accounts: dict[str, str] = {}  # account_id -> account_name
 
         with self.lock:
             for entry in self.cache.values():
@@ -280,9 +281,9 @@ def fetch_enis_from_account(
     session,
     account_id: str,
     account_name: str,
-    regions: List[str],
+    regions: list[str],
     progress_callback=None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """계정에서 ENI 목록 수집"""
     interfaces = []
 
@@ -342,7 +343,7 @@ def fetch_enis_from_account(
 # =============================================================================
 
 
-def map_eni_to_resource(eni: Dict[str, Any]) -> str:
+def map_eni_to_resource(eni: dict[str, Any]) -> str:
     """ENI Description을 파싱하여 연결된 리소스 추출 (빠른 매핑)"""
     import re
 
@@ -431,7 +432,9 @@ def map_eni_to_resource(eni: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def eni_to_result(ip: str, eni: Dict[str, Any], detailed: bool = False) -> PrivateIPResult:
+def eni_to_result(
+    ip: str, eni: dict[str, Any], detailed: bool = False
+) -> PrivateIPResult:
     """ENI 데이터를 검색 결과로 변환"""
     name = ""
     for tag in eni.get("TagSet", []):
@@ -491,7 +494,7 @@ class QueryType:
     TEXT = "text"
 
 
-def parse_query(query: str) -> Tuple[str, str]:
+def parse_query(query: str) -> tuple[str, str]:
     """검색 쿼리 파싱하여 타입과 값 반환"""
     query = query.strip()
     if not query:
@@ -530,10 +533,10 @@ def parse_query(query: str) -> Tuple[str, str]:
 
 
 def search_private_ip(
-    ip_list: List[str],
+    ip_list: list[str],
     cache: ENICache,
     detailed: bool = False,
-) -> List[PrivateIPResult]:
+) -> list[PrivateIPResult]:
     """사설 IP 검색 (캐시 기반)"""
     results = []
 
@@ -543,18 +546,18 @@ def search_private_ip(
             continue
 
         if "/" in ip_or_cidr:
-            matches = cache.get_by_cidr(ip_or_cidr)
-            for ip, eni in matches:
+            cidr_matches = cache.get_by_cidr(ip_or_cidr)
+            for ip, eni in cidr_matches:
                 results.append(eni_to_result(ip, eni, detailed))
         else:
-            matches = cache.get_by_ip(ip_or_cidr)
-            for eni in matches:
+            ip_matches = cache.get_by_ip(ip_or_cidr)
+            for eni in ip_matches:
                 results.append(eni_to_result(ip_or_cidr, eni, detailed))
 
     return results
 
 
-def search_by_query(queries: List[str], cache: ENICache) -> List[PrivateIPResult]:
+def search_by_query(queries: list[str], cache: ENICache) -> list[PrivateIPResult]:
     """다양한 쿼리 타입으로 검색 (통합 검색용)"""
     results = []
     seen_enis = set()
@@ -594,7 +597,7 @@ def search_by_query(queries: List[str], cache: ENICache) -> List[PrivateIPResult
 
 def _search_by_field(
     cache: ENICache, query_type: str, value: str
-) -> List[Tuple[str, Dict[str, Any]]]:
+) -> list[tuple[str, dict[str, Any]]]:
     """필드 기반 검색 (캐시 전체 순회)"""
     results = []
     value_lower = value.lower()
@@ -649,19 +652,16 @@ def _search_by_field(
 def refresh_cache(
     cache: ENICache,
     session_iterator: SessionIterator,
-    regions: Optional[List[str]] = None,
+    regions: list[str] | None = None,
     progress_callback=None,
 ) -> int:
     """캐시 새로고침"""
-    from core.region import get_active_regions
+    from core.region import ALL_REGIONS
 
     total_count = 0
 
     for account_id, account_name, session in session_iterator:
-        if regions:
-            target_regions = regions
-        else:
-            target_regions = get_active_regions(session)
+        target_regions = regions or ALL_REGIONS
 
         interfaces = fetch_enis_from_account(
             session=session,

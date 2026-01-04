@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import List
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -178,9 +177,10 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
 
     # 열 너비 조정
     for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+        for col_cells in sheet.columns:
+            col_tuple = tuple(col_cells)
+            max_len = max(len(str(c.value) if c.value else "") for c in col_tuple)
+            col_idx = col_tuple[0].column
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40

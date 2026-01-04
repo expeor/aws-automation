@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional
 
 from .base import BaseSheetWriter
 from .config import HEADERS, SHEET_NAMES, SPECIAL_COUNTRY_CODES, SheetConfig
@@ -21,15 +20,15 @@ class CountrySheetWriter(BaseSheetWriter):
             if not country_stats:
                 return
 
-            client_ip_counts: Dict[str, int] = (
+            client_ip_counts: dict[str, int] = (
                 self.data.get("client_ip_counts", {}) or {}
             )
-            ip_country_mapping: Dict[str, Optional[str]] = (
+            ip_country_mapping: dict[str, str | None] = (
                 self.data.get("ip_country_mapping", {}) or {}
             )
 
             # Calculate country request counts
-            country_request_counts: Dict[str, int] = {}
+            country_request_counts: dict[str, int] = {}
             for ip, req_count in client_ip_counts.items():
                 country_code = ip_country_mapping.get(ip) or "ZZ"
                 if country_code in SPECIAL_COUNTRY_CODES:

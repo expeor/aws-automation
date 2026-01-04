@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -56,7 +55,7 @@ class EFSInfo:
     throughput_mode: str
     size_bytes: int
     mount_target_count: int
-    created_at: Optional[datetime]
+    created_at: datetime | None
     # CloudWatch 지표
     avg_client_connections: float = 0.0
     total_io_bytes: float = 0.0
@@ -93,12 +92,12 @@ class EFSAnalysisResult:
     empty: int = 0
     normal: int = 0
     unused_monthly_cost: float = 0.0
-    findings: List[EFSFinding] = field(default_factory=list)
+    findings: list[EFSFinding] = field(default_factory=list)
 
 
 def collect_efs_filesystems(
     session, account_id: str, account_name: str, region: str
-) -> List[EFSInfo]:
+) -> list[EFSInfo]:
     """EFS 파일시스템 수집"""
     from botocore.exceptions import ClientError
 
@@ -187,7 +186,7 @@ def collect_efs_filesystems(
 
 
 def analyze_filesystems(
-    filesystems: List[EFSInfo], account_id: str, account_name: str, region: str
+    filesystems: list[EFSInfo], account_id: str, account_name: str, region: str
 ) -> EFSAnalysisResult:
     """EFS 파일시스템 분석"""
     result = EFSAnalysisResult(
@@ -248,7 +247,7 @@ def analyze_filesystems(
     return result
 
 
-def generate_report(results: List[EFSAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -353,8 +352,8 @@ def generate_report(results: List[EFSAnalysisResult], output_dir: str) -> str:
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40
@@ -370,7 +369,7 @@ def generate_report(results: List[EFSAnalysisResult], output_dir: str) -> str:
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[EFSAnalysisResult]:
+) -> EFSAnalysisResult | None:
     """단일 계정/리전의 EFS 수집 및 분석 (병렬 실행용)"""
     filesystems = collect_efs_filesystems(session, account_id, account_name, region)
     if not filesystems:
@@ -383,7 +382,7 @@ def run(ctx) -> None:
     console.print("[bold]EFS 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="efs")
-    results: List[EFSAnalysisResult] = [r for r in result.get_data() if r is not None]
+    results: list[EFSAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -395,7 +394,7 @@ def run(ctx) -> None:
     total_unused = sum(r.no_mount_target + r.no_io + r.empty for r in results)
     unused_cost = sum(r.unused_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"미사용: [red]{total_unused}개[/red] (${unused_cost:,.2f}/월)")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:

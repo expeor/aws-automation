@@ -16,13 +16,12 @@ plugins/cloudformation/resource_finder.py - CloudFormation Stack 리소스 검�
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from core.tools.io.excel import ColumnDef, Styles, Workbook
+from core.tools.io.excel import ColumnDef, Workbook
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +47,10 @@ class StackResource:
     region: str
     account_id: str = ""
     account_name: str = ""
-    stack_creation_time: Optional[datetime] = None
-    last_updated_time: Optional[datetime] = None
+    stack_creation_time: datetime | None = None
+    last_updated_time: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환"""
         return {
             "account_id": self.account_id,
@@ -72,17 +71,17 @@ class StackResource:
 class SearchResult:
     """검색 결과"""
 
-    resources: List[StackResource] = field(default_factory=list)
+    resources: list[StackResource] = field(default_factory=list)
     total_stacks_searched: int = 0
-    regions_searched: List[str] = field(default_factory=list)
+    regions_searched: list[str] = field(default_factory=list)
 
     @property
     def count(self) -> int:
         return len(self.resources)
 
-    def get_by_stack(self) -> Dict[str, List[StackResource]]:
+    def get_by_stack(self) -> dict[str, list[StackResource]]:
         """Stack별로 그룹화"""
-        grouped = {}
+        grouped: dict[str, list[StackResource]] = {}
         for res in self.resources:
             key = f"{res.account_name}/{res.region}/{res.stack_name}"
             if key not in grouped:
@@ -90,9 +89,9 @@ class SearchResult:
             grouped[key].append(res)
         return grouped
 
-    def get_by_resource_type(self) -> Dict[str, List[StackResource]]:
+    def get_by_resource_type(self) -> dict[str, list[StackResource]]:
         """Resource Type별로 그룹화"""
-        grouped = {}
+        grouped: dict[str, list[StackResource]] = {}
         for res in self.resources:
             if res.resource_type not in grouped:
                 grouped[res.resource_type] = []
@@ -109,7 +108,7 @@ class ResourceFinder:
     def __init__(
         self,
         session,
-        regions: Optional[List[str]] = None,
+        regions: list[str] | None = None,
         max_workers: int = 5,
     ):
         """초기화
@@ -125,9 +124,9 @@ class ResourceFinder:
 
     def search(
         self,
-        physical_id: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        stack_name_filter: Optional[str] = None,
+        physical_id: str | None = None,
+        resource_type: str | None = None,
+        stack_name_filter: str | None = None,
     ) -> SearchResult:
         """리소스 검색
 
@@ -153,8 +152,7 @@ class ResourceFinder:
             total_stacks += stack_count
 
         logger.info(
-            f"검색 완료: {len(all_resources)}개 리소스 발견 "
-            f"({total_stacks}개 Stack 검색)"
+            f"검색 완료: {len(all_resources)}개 리소스 발견 " f"({total_stacks}개 Stack 검색)"
         )
 
         return SearchResult(
@@ -166,10 +164,10 @@ class ResourceFinder:
     def _search_in_region(
         self,
         region: str,
-        physical_id: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        stack_name_filter: Optional[str] = None,
-    ) -> tuple[List[StackResource], int]:
+        physical_id: str | None = None,
+        resource_type: str | None = None,
+        stack_name_filter: str | None = None,
+    ) -> tuple[list[StackResource], int]:
         """특정 리전에서 검색"""
         matched_resources = []
         stack_count = 0
@@ -189,14 +187,18 @@ class ResourceFinder:
 
                 for res in resources:
                     # Physical ID 필터링
-                    if physical_id:
-                        if physical_id.lower() not in res.physical_id.lower():
-                            continue
+                    if (
+                        physical_id
+                        and physical_id.lower() not in res.physical_id.lower()
+                    ):
+                        continue
 
                     # Resource Type 필터링
-                    if resource_type:
-                        if resource_type.lower() not in res.resource_type.lower():
-                            continue
+                    if (
+                        resource_type
+                        and resource_type.lower() not in res.resource_type.lower()
+                    ):
+                        continue
 
                     matched_resources.append(res)
 
@@ -208,8 +210,8 @@ class ResourceFinder:
     def _get_all_stacks(
         self,
         cfn,
-        name_filter: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        name_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
         """모든 Stack 조회"""
         stacks = []
 
@@ -222,9 +224,11 @@ class ResourceFinder:
                         continue
 
                     # 이름 필터
-                    if name_filter:
-                        if name_filter.lower() not in stack["StackName"].lower():
-                            continue
+                    if (
+                        name_filter
+                        and name_filter.lower() not in stack["StackName"].lower()
+                    ):
+                        continue
 
                     stacks.append(stack)
 
@@ -236,9 +240,9 @@ class ResourceFinder:
     def _get_stack_resources(
         self,
         cfn,
-        stack: Dict[str, Any],
+        stack: dict[str, Any],
         region: str,
-    ) -> List[StackResource]:
+    ) -> list[StackResource]:
         """Stack의 모든 리소스 조회"""
         resources = []
         stack_name = stack["StackName"]
@@ -360,15 +364,17 @@ class ResourceFinderReporter:
             ]
             sheet.add_row(row)
 
-        sheet.add_summary_row([
-            "합계",
-            f"{self.result.count}개",
-            "",
-            "",
-            "",
-            "",
-            "",
-        ])
+        sheet.add_summary_row(
+            [
+                "합계",
+                f"{self.result.count}개",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
 
     def _create_by_type_sheets(self, wb: Workbook) -> None:
         """Resource Type별 시트 (상위 5개만)"""
@@ -394,7 +400,7 @@ class ResourceFinderReporter:
 
     def print_summary(self) -> None:
         """콘솔에 요약 출력"""
-        print(f"\n=== CloudFormation 리소스 검색 결과 ===")
+        print("\n=== CloudFormation 리소스 검색 결과 ===")
         print(f"검색된 리소스: {self.result.count}개")
         print(f"검색된 Stack: {self.result.total_stacks_searched}개")
         print(f"검색 리전: {', '.join(self.result.regions_searched)}")
@@ -424,7 +430,7 @@ def generate_report(
 # =============================================================================
 
 
-def run_search(ctx) -> None:
+def run_search(ctx) -> dict[str, Any] | None:
     """CloudFormation 리소스 검색"""
     from core.auth.session import get_context_session
     from core.tools.output import OutputPath
@@ -471,7 +477,7 @@ def run_search(ctx) -> None:
     }
 
 
-def run_search_by_physical_id(ctx) -> None:
+def run_search_by_physical_id(ctx) -> dict[str, Any] | None:
     """Physical ID로 Stack 검색"""
     physical_id = ctx.options.get("physical_id")
     if not physical_id:

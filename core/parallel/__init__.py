@@ -65,7 +65,7 @@ from .rate_limiter import (
 )
 from .types import ErrorCategory, ParallelExecutionResult, TaskError, TaskResult
 
-__all__ = [
+__all__: list[str] = [
     # Executor
     "ParallelSessionExecutor",
     "ParallelConfig",

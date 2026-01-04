@@ -6,12 +6,8 @@ pkg/output/builder.py 단위 테스트
 """
 
 import os
-import tempfile
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from core.tools.output.builder import (
     DatePattern,
@@ -180,22 +176,26 @@ class TestOutputPathBuild:
 
     def test_build_with_date_string(self, tmp_path):
         """문자열 날짜 패턴 테스트"""
-        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
-            with patch("core.tools.output.builder.datetime") as mock_dt:
-                mock_dt.now.return_value = datetime(2025, 12, 10)
-                path = OutputPath("test-profile").with_date("monthly").build()
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 10)
+            path = OutputPath("test-profile").with_date("monthly").build()
 
-                assert "2025" in path
-                assert "12" in path
+            assert "2025" in path
+            assert "12" in path
 
     def test_build_with_date_enum(self, tmp_path):
         """Enum 날짜 패턴 테스트"""
-        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
-            with patch("core.tools.output.builder.datetime") as mock_dt:
-                mock_dt.now.return_value = datetime(2025, 12, 10)
-                path = OutputPath("test-profile").with_date(DatePattern.YEARLY).build()
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 10)
+            path = OutputPath("test-profile").with_date(DatePattern.YEARLY).build()
 
-                assert "2025" in path
+            assert "2025" in path
 
     def test_build_creates_directory(self, tmp_path):
         """디렉토리 자동 생성 확인"""
@@ -230,7 +230,7 @@ class TestOutputPathSaveFile:
             result = OutputPath("test-profile").save_file("test.txt", content)
 
             assert os.path.exists(result.path)
-            with open(result.path, "r", encoding="utf-8") as f:
+            with open(result.path, encoding="utf-8") as f:
                 assert f.read() == content
 
 
@@ -256,21 +256,23 @@ class TestOutputPathChaining:
 
     def test_full_chain(self, tmp_path):
         """전체 체이닝 테스트"""
-        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
-            with patch("core.tools.output.builder.datetime") as mock_dt:
-                mock_dt.now.return_value = datetime(2025, 12, 10)
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 10)
 
-                path = (
-                    OutputPath("test-profile")
-                    .sub("AWS_EBS_Reports")
-                    .with_date("monthly")
-                    .build()
-                )
+            path = (
+                OutputPath("test-profile")
+                .sub("AWS_EBS_Reports")
+                .with_date("monthly")
+                .build()
+            )
 
-                assert "test-profile" in path
-                assert "AWS_EBS_Reports" in path
-                assert "2025" in path
-                assert "12" in path
+            assert "test-profile" in path
+            assert "AWS_EBS_Reports" in path
+            assert "2025" in path
+            assert "12" in path
 
 
 # =============================================================================
@@ -286,9 +288,11 @@ class TestOpenInExplorer:
         new_dir = tmp_path / "new_folder"
         assert not new_dir.exists()
 
-        with patch("core.tools.output.builder.platform.system", return_value="Windows"):
-            with patch("os.startfile", create=True):
-                open_in_explorer(str(new_dir))
+        with (
+            patch("core.tools.output.builder.platform.system", return_value="Windows"),
+            patch("os.startfile", create=True),
+        ):
+            open_in_explorer(str(new_dir))
 
         assert new_dir.exists()
 
@@ -388,33 +392,39 @@ class TestCreateReportDirectory:
 
     def test_creates_tools_subdirectory(self, tmp_path):
         """tools 하위 디렉토리 생성"""
-        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
-            with patch("core.tools.output.builder.datetime") as mock_dt:
-                mock_dt.now.return_value = datetime(2025, 12, 10)
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 10)
 
-                path = create_report_directory("ebs", "my-profile")
+            path = create_report_directory("ebs", "my-profile")
 
-                assert os.path.isdir(path)
-                assert "tools" in path
-                assert "ebs" in path
-                assert "my-profile" in path
+            assert os.path.isdir(path)
+            assert "tools" in path
+            assert "ebs" in path
+            assert "my-profile" in path
 
     def test_uses_default_identifier(self, tmp_path):
         """기본 identifier 사용"""
-        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
-            with patch("core.tools.output.builder.datetime") as mock_dt:
-                mock_dt.now.return_value = datetime(2025, 12, 10)
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 10)
 
-                path = create_report_directory("ebs")
+            path = create_report_directory("ebs")
 
-                assert "default" in path
+            assert "default" in path
 
     def test_respects_date_pattern(self, tmp_path):
         """날짜 패턴 적용"""
-        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
-            with patch("core.tools.output.builder.datetime") as mock_dt:
-                mock_dt.now.return_value = datetime(2025, 12, 10)
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 10)
 
-                path = create_report_directory("ebs", "test", "daily")
+            path = create_report_directory("ebs", "test", "daily")
 
-                assert "2025-12-10" in path
+            assert "2025-12-10" in path

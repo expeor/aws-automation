@@ -7,12 +7,15 @@ core/parallel/errors.py - 에러 수집 및 관리
 - 에러 카테고리 분류
 """
 
+from __future__ import annotations
+
 import logging
 import threading
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, List, Optional, TypeVar
+from typing import TypeVar
 
 from botocore.exceptions import ClientError
 
@@ -56,7 +59,7 @@ class CollectedError:
     error_message: str
     severity: ErrorSeverity
     category: ErrorCategory
-    resource_id: Optional[str] = None
+    resource_id: str | None = None
 
     def __str__(self) -> str:
         loc = f"{self.account_name}/{self.region}"
@@ -119,7 +122,7 @@ class ErrorCollector:
 
     def __init__(self, service: str):
         self.service = service
-        self._errors: List[CollectedError] = []
+        self._errors: list[CollectedError] = []
         self._lock = threading.Lock()
 
     def collect(
@@ -130,7 +133,7 @@ class ErrorCollector:
         region: str,
         operation: str,
         severity: ErrorSeverity = ErrorSeverity.WARNING,
-        resource_id: Optional[str] = None,
+        resource_id: str | None = None,
     ) -> None:
         """ClientError 수집"""
         error_info = error.response.get("Error", {})
@@ -179,7 +182,7 @@ class ErrorCollector:
         region: str,
         operation: str,
         severity: ErrorSeverity = ErrorSeverity.WARNING,
-        resource_id: Optional[str] = None,
+        resource_id: str | None = None,
     ) -> None:
         """일반 에러 수집"""
         category = categorize_error(error_code)
@@ -210,7 +213,7 @@ class ErrorCollector:
             logger.info(log_msg)
 
     @property
-    def errors(self) -> List[CollectedError]:
+    def errors(self) -> list[CollectedError]:
         """모든 에러"""
         with self._lock:
             return list(self._errors)
@@ -222,13 +225,13 @@ class ErrorCollector:
             return len(self._errors) > 0
 
     @property
-    def critical_errors(self) -> List[CollectedError]:
+    def critical_errors(self) -> list[CollectedError]:
         """CRITICAL 에러만"""
         with self._lock:
             return [e for e in self._errors if e.severity == ErrorSeverity.CRITICAL]
 
     @property
-    def warning_errors(self) -> List[CollectedError]:
+    def warning_errors(self) -> list[CollectedError]:
         """WARNING 에러만"""
         with self._lock:
             return [e for e in self._errors if e.severity == ErrorSeverity.WARNING]
@@ -239,17 +242,17 @@ class ErrorCollector:
             if not self._errors:
                 return "에러 없음"
 
-            by_severity = {}
+            by_severity: dict[str, int] = {}
             for e in self._errors:
                 by_severity[e.severity.value] = by_severity.get(e.severity.value, 0) + 1
 
             parts = [f"{k}: {v}건" for k, v in sorted(by_severity.items())]
             return f"에러 {len(self._errors)}건 ({', '.join(parts)})"
 
-    def get_by_account(self) -> dict:
+    def get_by_account(self) -> dict[str, list[CollectedError]]:
         """계정별 에러 그룹핑"""
         with self._lock:
-            result = {}
+            result: dict[str, list[CollectedError]] = {}
             for e in self._errors:
                 key = f"{e.account_name} ({e.account_id})"
                 if key not in result:
@@ -264,14 +267,14 @@ class ErrorCollector:
 
 
 def safe_collect(
-    collector: Optional[ErrorCollector],
+    collector: ErrorCollector | None,
     error: ClientError,
     account_id: str,
     account_name: str,
     region: str,
     operation: str,
     severity: ErrorSeverity = ErrorSeverity.WARNING,
-    resource_id: Optional[str] = None,
+    resource_id: str | None = None,
 ) -> None:
     """안전한 에러 수집 (collector가 None이어도 동작)"""
     if collector:
@@ -288,7 +291,7 @@ def safe_collect(
 def try_or_default(
     func: Callable[[], T],
     default: T,
-    collector: Optional[ErrorCollector] = None,
+    collector: ErrorCollector | None = None,
     account_id: str = "",
     account_name: str = "",
     region: str = "",

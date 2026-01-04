@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli.flow.context import ExecutionContext, ProviderKind, RoleSelection
+from cli.flow.context import ExecutionContext, RoleSelection
 from core.tools.base import BaseToolRunner, _get_console
 
 # =============================================================================
@@ -151,7 +151,7 @@ class TestGetTools:
     def test_tools_are_callable(self, runner):
         """도구가 callable인지 확인"""
         tools = runner.get_tools()
-        for name, func in tools.items():
+        for _name, func in tools.items():
             assert callable(func)
 
     def test_contains_expected_tools(self, runner):
@@ -205,7 +205,7 @@ class TestGetSession:
         mock_context.role_selection = RoleSelection(primary_role="AdminRole")
 
         runner = ConcreteToolRunner(ctx=mock_context)
-        session = runner.get_session("ap-northeast-2", account_id="111111111111")
+        runner.get_session("ap-northeast-2", account_id="111111111111")
 
         mock_provider.get_session.assert_called_with(
             account_id="111111111111",

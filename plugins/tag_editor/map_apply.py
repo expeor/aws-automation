@@ -15,13 +15,27 @@ AWS 리소스에 map-migrated 태그 일괄 적용
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from core.parallel import parallel_collect, get_client
+from core.parallel import get_client, parallel_collect
+
+from .map_audit import collect_resources_with_tags
+from .report import generate_apply_report
+from .types import (
+    MAP_TAG_KEY,
+    RESOURCE_TYPE_GROUPS,
+    MapTagApplyResult,
+    ResourceTagInfo,
+    TagOperationLog,
+    TagOperationResult,
+)
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -32,20 +46,6 @@ REQUIRED_PERMISSIONS = {
         "tag:TagResources",
     ],
 }
-
-from .types import (
-    MAP_TAG_KEY,
-    RESOURCE_TYPE_GROUPS,
-    MapTagApplyResult,
-    ResourceTagInfo,
-    TagOperationLog,
-    TagOperationResult,
-)
-from .map_audit import collect_resources_with_tags
-from .report import generate_apply_report
-
-if TYPE_CHECKING:
-    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -60,7 +60,7 @@ def apply_map_tag(
     account_id: str,
     account_name: str,
     region: str,
-    resources: List[ResourceTagInfo],
+    resources: list[ResourceTagInfo],
     tag_value: str,
     dry_run: bool = True,
 ) -> MapTagApplyResult:
@@ -140,7 +140,9 @@ def apply_map_tag(
                                 name=res.name,
                                 operation="add",
                                 result=TagOperationResult.FAILED,
-                                error_message=error_info.get("ErrorMessage", "Unknown error"),
+                                error_message=error_info.get(
+                                    "ErrorMessage", "Unknown error"
+                                ),
                                 previous_value=res.map_tag_value,
                                 new_value=tag_value,
                             )
@@ -186,7 +188,7 @@ def apply_map_tag(
 # =============================================================================
 
 
-def _select_resource_types() -> Optional[List[str]]:
+def _select_resource_types() -> list[str] | None:
     """리소스 타입 선택"""
     console.print("\n[bold]리소스 타입 선택[/bold]")
     console.print("1. 전체 리소스")
@@ -223,12 +225,12 @@ def _select_resource_types() -> Optional[List[str]]:
     return None
 
 
-def collect_options(ctx: "ExecutionContext") -> None:
+def collect_options(ctx: ExecutionContext) -> None:
     """MAP 태그 적용 옵션 수집"""
     console.print("\n[bold cyan]MAP 태그 적용 설정[/bold cyan]")
 
     # 1. MAP 태그 값 입력
-    console.print(f"\n[bold]태그 설정[/bold]")
+    console.print("\n[bold]태그 설정[/bold]")
     console.print(f"태그 키: {MAP_TAG_KEY}")
     console.print("\n[dim]태그 값 형식 (MPE ID 기반):[/dim]")
     console.print("[dim]  - 일반 마이그레이션: mig12345 또는 migABCDE12345[/dim]")
@@ -284,13 +286,16 @@ def _collect_and_apply(
 ) -> MapTagApplyResult:
     """단일 계정/리전의 MAP 태그 적용"""
     # 1. 리소스 수집
-    audit_result = collect_resources_with_tags(session, account_id, account_name, region)
+    audit_result = collect_resources_with_tags(
+        session, account_id, account_name, region
+    )
 
     # 2. 대상 필터링
-    if untagged_only:
-        targets = [r for r in audit_result.resources if not r.has_map_tag]
-    else:
-        targets = audit_result.resources
+    targets = (
+        [r for r in audit_result.resources if not r.has_map_tag]
+        if untagged_only
+        else audit_result.resources
+    )
 
     if not targets:
         return MapTagApplyResult(
@@ -306,7 +311,7 @@ def _collect_and_apply(
     )
 
 
-def run(ctx: "ExecutionContext") -> None:
+def run(ctx: ExecutionContext) -> None:
     """MAP 태그 적용 실행"""
     tag_value = ctx.options.get("tag_value", "")
     if not tag_value:
@@ -326,13 +331,14 @@ def run(ctx: "ExecutionContext") -> None:
     # 병렬 수집 및 적용
     def worker(session, account_id: str, account_name: str, region: str):
         return _collect_and_apply(
-            session, account_id, account_name, region,
-            tag_value, untagged_only, dry_run
+            session, account_id, account_name, region, tag_value, untagged_only, dry_run
         )
 
-    result = parallel_collect(ctx, worker, max_workers=10, service="resourcegroupstaggingapi")
+    result = parallel_collect(
+        ctx, worker, max_workers=10, service="resourcegroupstaggingapi"
+    )
 
-    results: List[MapTagApplyResult] = result.get_data()
+    results: list[MapTagApplyResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:
@@ -356,7 +362,7 @@ def run(ctx: "ExecutionContext") -> None:
     total_failed = sum(r.failed_count for r in results)
     total_skipped = sum(r.skipped_count for r in results)
 
-    console.print(f"\n[bold]적용 결과[/bold]")
+    console.print("\n[bold]적용 결과[/bold]")
 
     table = Table(show_header=True)
     table.add_column("항목", style="cyan")

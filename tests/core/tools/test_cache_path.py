@@ -6,8 +6,6 @@ pkg/cache/path.py 단위 테스트
 """
 
 import os
-from pathlib import Path
-from unittest.mock import patch
 
 from core.tools.cache.path import (
     CACHE_ROOT,

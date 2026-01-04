@@ -15,11 +15,11 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from openpyxl import Workbook as OpenpyxlWorkbook
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment
     from openpyxl.worksheet.worksheet import Worksheet
 
 # 문자열 상수와 함수만 모듈 레벨에서 import (openpyxl 필요 없음)
@@ -39,31 +39,31 @@ from .styles import (
 
 
 # Alignment 상수는 lazy import (사용 시점에 로드)
-def _get_align_center() -> "Alignment":
+def _get_align_center() -> Alignment:
     from .styles import ALIGN_CENTER
 
     return ALIGN_CENTER
 
 
-def _get_align_center_wrap() -> "Alignment":
+def _get_align_center_wrap() -> Alignment:
     from .styles import ALIGN_CENTER_WRAP
 
     return ALIGN_CENTER_WRAP
 
 
-def _get_align_left() -> "Alignment":
+def _get_align_left() -> Alignment:
     from .styles import ALIGN_LEFT
 
     return ALIGN_LEFT
 
 
-def _get_align_right_wrap() -> "Alignment":
+def _get_align_right_wrap() -> Alignment:
     from .styles import ALIGN_RIGHT_WRAP
 
     return ALIGN_RIGHT_WRAP
 
 
-def _get_align_wrap() -> "Alignment":
+def _get_align_wrap() -> Alignment:
     from .styles import ALIGN_WRAP
 
     return ALIGN_WRAP
@@ -73,7 +73,9 @@ logger = logging.getLogger(__name__)
 
 
 # Style 타입 정의
-StyleType = Literal["data", "center", "wrap", "number", "currency", "percent", "text"]
+StyleType = Literal[
+    "data", "center", "wrap", "number", "currency", "percent", "text", "date"
+]
 
 
 @dataclass
@@ -106,7 +108,7 @@ class SummaryItem:
     label: str
     value: Any = ""
     is_header: bool = False
-    highlight: Optional[str] = None
+    highlight: str | None = None
 
 
 class SummarySheet:
@@ -125,7 +127,7 @@ class SummarySheet:
         summary.add_item("탐지된 Abuse IP", "15개", highlight="danger")
     """
 
-    def __init__(self, ws: Worksheet, workbook: "Workbook"):
+    def __init__(self, ws: Worksheet, workbook: Workbook):
         self._ws = ws
         self._workbook = workbook
         self._current_row = 1
@@ -137,7 +139,7 @@ class SummarySheet:
         # 줌 비율 85% 설정
         ws.sheet_view.zoomScale = 85
 
-    def add_title(self, title: str) -> "SummarySheet":
+    def add_title(self, title: str) -> SummarySheet:
         """제목 추가 (병합 + 큰 폰트)
 
         Args:
@@ -163,7 +165,7 @@ class SummarySheet:
         self._current_row += 2
         return self
 
-    def add_section(self, section_name: str) -> "SummarySheet":
+    def add_section(self, section_name: str) -> SummarySheet:
         """섹션 헤더 추가 (병합 + 강조 배경)
 
         Args:
@@ -191,9 +193,9 @@ class SummarySheet:
         self,
         label: str,
         value: Any,
-        highlight: Optional[str] = None,
-        number_format: Optional[str] = None,
-    ) -> "SummarySheet":
+        highlight: str | None = None,
+        number_format: str | None = None,
+    ) -> SummarySheet:
         """항목 추가 (레이블 + 값)
 
         Args:
@@ -244,7 +246,7 @@ class SummarySheet:
         self._current_row += 1
         return self
 
-    def add_blank_row(self) -> "SummarySheet":
+    def add_blank_row(self) -> SummarySheet:
         """빈 행 추가
 
         Returns:
@@ -256,9 +258,9 @@ class SummarySheet:
     def add_list_section(
         self,
         section_name: str,
-        items: List[tuple],
+        items: list[tuple],
         max_items: int = 5,
-    ) -> "SummarySheet":
+    ) -> SummarySheet:
         """순위 리스트 섹션 추가 (예: Top 5 URL)
 
         Args:
@@ -303,10 +305,9 @@ class SummarySheet:
                 name_cell.border = border
 
                 # 값 포맷팅
-                if isinstance(count, (int, float)):
-                    display_value = f"{count:,}"
-                else:
-                    display_value = str(count)
+                display_value = (
+                    f"{count:,}" if isinstance(count, (int, float)) else str(count)
+                )
                 count_cell = ws.cell(
                     row=self._current_row, column=2, value=display_value
                 )
@@ -328,14 +329,14 @@ class Sheet:
     """시트 래퍼 클래스"""
 
     _ws: Worksheet
-    _columns: List[ColumnDef]
+    _columns: list[ColumnDef]
     _current_row: int = 2  # 1은 헤더
-    _workbook: "Workbook" = field(repr=False, default=None)
+    _workbook: Workbook | None = field(repr=False, default=None)
 
     def add_row(
         self,
-        values: List[Any],
-        style: Optional[dict] = None,
+        values: list[Any],
+        style: dict | None = None,
     ) -> int:
         """데이터 행 추가
 
@@ -371,7 +372,7 @@ class Sheet:
         self._current_row += 1
         return row_num
 
-    def add_summary_row(self, values: List[Any]) -> int:
+    def add_summary_row(self, values: list[Any]) -> int:
         """요약 행 추가 (연한 노랑 배경, 볼드)
 
         Args:
@@ -445,7 +446,7 @@ class Workbook:
         # 기본 시트 제거
         if "Sheet" in self._wb.sheetnames:
             del self._wb["Sheet"]
-        self._sheets: List[Sheet] = []
+        self._sheets: list[Sheet] = []
 
     @property
     def styles(self) -> type:
@@ -455,7 +456,7 @@ class Workbook:
     def new_sheet(
         self,
         name: str,
-        columns: List[ColumnDef],
+        columns: list[ColumnDef],
     ) -> Sheet:
         """새 시트 생성
 
@@ -520,7 +521,7 @@ class Workbook:
         """내부 openpyxl Workbook 접근 (고급 사용)"""
         return self._wb
 
-    def save(self, filepath: Union[str, Path]) -> Path:
+    def save(self, filepath: str | Path) -> Path:
         """워크북 저장
 
         Args:
@@ -540,10 +541,10 @@ class Workbook:
 
     def save_as(
         self,
-        output_dir: Union[str, Path],
+        output_dir: str | Path,
         prefix: str,
-        region: Optional[str] = None,
-        suffix: Optional[str] = None,
+        region: str | None = None,
+        suffix: str | None = None,
     ) -> Path:
         """규칙에 따라 파일명 생성 후 저장
 
@@ -660,7 +661,7 @@ def calculate_optimal_row_height(
 
 
 def apply_detail_sheet_formatting(
-    worksheet: "Worksheet",
+    worksheet: Worksheet,
     has_header: bool = True,
 ) -> None:
     """상세 시트용 포맷팅 적용
@@ -686,8 +687,8 @@ def apply_detail_sheet_formatting(
         thin_border = get_thin_border()
         center_alignment = get_center_alignment(wrap_text=True)
 
-        for row_idx, row in enumerate(worksheet.iter_rows(), 1):
-            for col_idx, cell in enumerate(row, 1):
+        for _row_idx, row in enumerate(worksheet.iter_rows(), 1):
+            for _col_idx, cell in enumerate(row, 1):
                 cell.border = thin_border
                 cell.alignment = center_alignment
 
@@ -750,7 +751,7 @@ def apply_summary_formatting(worksheet: Worksheet) -> None:
 
 def apply_worksheet_settings(
     worksheet: Worksheet,
-    zoom_scale: Optional[int] = 85,
+    zoom_scale: int | None = 85,
     wrap_text: bool = True,
 ) -> None:
     """워크시트 기본 설정 적용
@@ -780,9 +781,9 @@ def apply_worksheet_settings(
 
 
 def save_to_csv(
-    data: Union[List[Dict[str, Any]], List[List[Any]]],
+    data: list[dict[str, Any]] | list[list[Any]],
     output_file: str,
-    headers: Optional[List[str]] = None,
+    headers: list[str] | None = None,
     encoding: str = "utf-8-sig",
 ) -> None:
     """데이터를 CSV로 저장
@@ -801,16 +802,18 @@ def save_to_csv(
 
             # 딕셔너리 리스트인 경우
             if isinstance(data[0], dict):
-                fieldnames = headers or list(data[0].keys())
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(data)
+                dict_data: list[dict[str, Any]] = data  # type: ignore[assignment]
+                fieldnames = headers or list(dict_data[0].keys())
+                dict_writer = csv.DictWriter(f, fieldnames=fieldnames)
+                dict_writer.writeheader()
+                dict_writer.writerows(dict_data)
             # 리스트 리스트인 경우
             else:
-                writer = csv.writer(f)
+                list_data: list[list[Any]] = data  # type: ignore[assignment]
+                list_writer = csv.writer(f)
                 if headers:
-                    writer.writerow(headers)
-                writer.writerows(data)
+                    list_writer.writerow(headers)
+                list_writer.writerows(list_data)
 
         logger.info(f"CSV 저장 완료: {output_file}")
     except Exception as e:
@@ -818,10 +821,10 @@ def save_to_csv(
 
 
 def save_dict_list_to_excel(
-    data: List[Dict[str, Any]],
+    data: list[dict[str, Any]],
     output_file: str,
     sheet_name: str = "Sheet1",
-    columns: Optional[List[str]] = None,
+    columns: list[str] | None = None,
 ) -> None:
     """딕셔너리 리스트를 Excel 파일로 저장 (pandas 대체용)
 
@@ -854,10 +857,7 @@ def save_dict_list_to_excel(
         return
 
     # 컬럼 순서 결정
-    if columns:
-        headers = columns
-    else:
-        headers = list(data[0].keys())
+    headers = columns or list(data[0].keys())
 
     # 헤더 작성
     for col_idx, header in enumerate(headers, 1):
@@ -888,11 +888,11 @@ def save_dict_list_to_excel(
 
 
 def add_sheet_from_dict_list(
-    workbook: "OpenpyxlWorkbook",
-    data: List[Dict[str, Any]],
+    workbook: OpenpyxlWorkbook,
+    data: list[dict[str, Any]],
     sheet_name: str,
-    columns: Optional[List[str]] = None,
-) -> "Worksheet":
+    columns: list[str] | None = None,
+) -> Worksheet:
     """기존 Workbook에 딕셔너리 리스트로 새 시트 추가 (pandas 대체용)
 
     pd.DataFrame(data).to_excel(writer, sheet_name=...) 패턴을 대체합니다.
@@ -926,10 +926,7 @@ def add_sheet_from_dict_list(
         return ws
 
     # 컬럼 순서 결정
-    if columns:
-        headers = columns
-    else:
-        headers = list(data[0].keys())
+    headers = columns or list(data[0].keys())
 
     # 헤더 작성
     for col_idx, header in enumerate(headers, 1):

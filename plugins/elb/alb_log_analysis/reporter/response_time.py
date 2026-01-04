@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from .base import BaseSheetWriter, get_column_letter
 from .config import HEADERS, SHEET_NAMES, SheetConfig
@@ -72,9 +71,9 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
     def _write_response_time_rows(
         self,
         ws,
-        logs: List[Dict[str, Any]],
-        headers: List[str],
-        abuse_ips: Set[str],
+        logs: list[dict[str, Any]],
+        headers: list[str],
+        abuse_ips: set[str],
     ) -> None:
         """Write response time rows."""
         border = self.styles.thin_border

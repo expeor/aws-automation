@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -54,7 +53,7 @@ class APIInfo:
     protocol_type: str
     endpoint_type: str
     stage_count: int
-    created_date: Optional[datetime]
+    created_date: datetime | None
     # CloudWatch 지표
     total_requests: float = 0.0
     error_4xx: float = 0.0
@@ -82,12 +81,12 @@ class APIGatewayAnalysisResult:
     no_stages: int = 0
     low_usage: int = 0
     normal_apis: int = 0
-    findings: List[APIFinding] = field(default_factory=list)
+    findings: list[APIFinding] = field(default_factory=list)
 
 
 def collect_rest_apis(
     session, account_id: str, account_name: str, region: str, cloudwatch
-) -> List[APIInfo]:
+) -> list[APIInfo]:
     """REST API 수집"""
     from botocore.exceptions import ClientError
 
@@ -188,7 +187,7 @@ def collect_rest_apis(
 
 def collect_http_apis(
     session, account_id: str, account_name: str, region: str, cloudwatch
-) -> List[APIInfo]:
+) -> list[APIInfo]:
     """HTTP API (API Gateway v2) 수집"""
     from botocore.exceptions import ClientError
 
@@ -257,7 +256,7 @@ def collect_http_apis(
 
 def collect_apis(
     session, account_id: str, account_name: str, region: str
-) -> List[APIInfo]:
+) -> list[APIInfo]:
     """모든 API Gateway 수집"""
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
@@ -268,7 +267,7 @@ def collect_apis(
 
 
 def analyze_apis(
-    apis: List[APIInfo], account_id: str, account_name: str, region: str
+    apis: list[APIInfo], account_id: str, account_name: str, region: str
 ) -> APIGatewayAnalysisResult:
     """API Gateway 분석"""
     result = APIGatewayAnalysisResult(
@@ -328,7 +327,7 @@ def analyze_apis(
     return result
 
 
-def generate_report(results: List[APIGatewayAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -407,8 +406,8 @@ def generate_report(results: List[APIGatewayAnalysisResult], output_dir: str) ->
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 50
@@ -424,7 +423,7 @@ def generate_report(results: List[APIGatewayAnalysisResult], output_dir: str) ->
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[APIGatewayAnalysisResult]:
+) -> APIGatewayAnalysisResult | None:
     """단일 계정/리전의 API Gateway 수집 및 분석 (병렬 실행용)"""
     apis = collect_apis(session, account_id, account_name, region)
     if not apis:
@@ -439,7 +438,7 @@ def run(ctx) -> None:
     result = parallel_collect(
         ctx, _collect_and_analyze, max_workers=20, service="apigateway"
     )
-    results: List[APIGatewayAnalysisResult] = [
+    results: list[APIGatewayAnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 
@@ -454,7 +453,7 @@ def run(ctx) -> None:
     total_no_stages = sum(r.no_stages for r in results)
     total_low = sum(r.low_usage for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용: [red]{total_unused}개[/red] / "
         f"스테이지없음: [yellow]{total_no_stages}개[/yellow] / "

@@ -160,6 +160,7 @@ jobs:
         continue-on-error: true  # Advisory: doesn't block PR merge
 
       - name: Run Bandit security linter
-        run: bandit -r cli core plugins -ll --skip B101,B311
+        run: bandit -r cli core plugins -ll --skip B101,B311,B608
         # B101: assert usage (normal in tests)
-        # B311: random usage (not for security purposes)
+        # B311: random usage (not for security)
+        # B608: DuckDB queries with internal AWS data, not user input

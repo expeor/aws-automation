@@ -9,7 +9,7 @@ import csv
 import logging
 import platform
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     import chardet
@@ -30,7 +30,7 @@ ENCODING_PRIORITIES = [
 ]
 
 
-def detect_csv_encoding(file_path: str) -> Tuple[Optional[str], Optional[str]]:
+def detect_csv_encoding(file_path: str) -> tuple[str | None, str | None]:
     """CSV 파일의 인코딩을 자동 감지합니다.
 
     chardet 라이브러리를 우선 사용하고, 실패시 폴백 방식으로 순차 시도합니다.
@@ -42,12 +42,12 @@ def detect_csv_encoding(file_path: str) -> Tuple[Optional[str], Optional[str]]:
         Tuple[Optional[str], Optional[str]]: (감지된_인코딩, 오류_메시지)
         성공시 (인코딩, None), 실패시 (None, 오류_메시지)
     """
-    file_path = Path(file_path)
+    path = Path(file_path)
 
-    if not file_path.exists():
+    if not path.exists():
         return None, f"파일을 찾을 수 없습니다: {file_path}"
 
-    if not file_path.is_file():
+    if not path.is_file():
         return None, f"경로가 파일이 아닙니다: {file_path}"
 
     # 1단계: chardet을 사용한 인코딩 자동 감지 (권장 방법)
@@ -64,7 +64,7 @@ def detect_csv_encoding(file_path: str) -> Tuple[Optional[str], Optional[str]]:
 
                     # 감지된 인코딩으로 CSV 파싱 테스트
                     try:
-                        with open(file_path, "r", encoding=detected_encoding) as f:
+                        with open(file_path, encoding=detected_encoding) as f:
                             sample = f.read(1024)
                             if sample:
                                 csv.Sniffer().sniff(sample)
@@ -88,7 +88,7 @@ def detect_csv_encoding(file_path: str) -> Tuple[Optional[str], Optional[str]]:
 
     for encoding in ENCODING_PRIORITIES:
         try:
-            with open(file_path, "r", encoding=encoding) as f:
+            with open(file_path, encoding=encoding) as f:
                 # 파일 시작 부분을 읽어서 올바른 CSV인지 확인
                 sample = f.read(1024)
                 if sample:
@@ -111,8 +111,8 @@ def detect_csv_encoding(file_path: str) -> Tuple[Optional[str], Optional[str]]:
 
 def read_csv_robust(
     file_path: str,
-    encoding: Optional[str] = None,
-) -> Tuple[Optional[List[Dict[str, Any]]], Optional[str], Optional[str]]:
+    encoding: str | None = None,
+) -> tuple[list[dict[str, Any]] | None, str | None, str | None]:
     """CSV 파일 읽기 함수.
 
     여러 인코딩을 시도하여 크로스 플랫폼 호환성을 보장합니다.
@@ -133,18 +133,17 @@ def read_csv_robust(
     else:
         # 자동 감지 시도
         detected_encoding, error = detect_csv_encoding(file_path)
-        if detected_encoding:
-            encodings_to_try = [detected_encoding]
-        else:
-            # 감지 실패시 모든 인코딩 시도
-            encodings_to_try = ENCODING_PRIORITIES
+        # 감지 성공 시 해당 인코딩만 사용, 실패 시 모든 인코딩 시도
+        encodings_to_try = (
+            [detected_encoding] if detected_encoding else ENCODING_PRIORITIES
+        )
 
     last_error = None
 
     for enc in encodings_to_try:
         try:
             data = []
-            with open(file_path, "r", encoding=enc) as f:
+            with open(file_path, encoding=enc) as f:
                 reader = csv.DictReader(f)
                 headers = reader.fieldnames
 
@@ -191,9 +190,9 @@ def read_csv_robust(
 
 def validate_csv_headers(
     file_path: str,
-    required_headers: List[str],
-    encoding: Optional[str] = None,
-) -> Tuple[bool, str, Optional[str]]:
+    required_headers: list[str],
+    encoding: str | None = None,
+) -> tuple[bool, str, str | None]:
     """CSV 파일의 헤더가 요구사항을 만족하는지 검증합니다.
 
     Args:

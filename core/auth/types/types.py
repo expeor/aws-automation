@@ -12,10 +12,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from botocore.config import Config
+    pass
 
 
 # =============================================================================
@@ -67,11 +67,11 @@ class AccountInfo:
 
     id: str
     name: str
-    email: Optional[str] = None
-    roles: List[str] = field(default_factory=list)
-    default_role: Optional[str] = None
+    email: str | None = None
+    roles: list[str] = field(default_factory=list)
+    default_role: str | None = None
     is_management: bool = False
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         """데이터 유효성 검사"""
@@ -81,7 +81,7 @@ class AccountInfo:
         if not self.name:
             self.name = f"account-{self.id}"
 
-    def get_role(self, preferred_role: str = "readonly") -> Optional[str]:
+    def get_role(self, preferred_role: str = "readonly") -> str | None:
         """선호하는 역할을 찾아 반환
 
         Args:
@@ -160,9 +160,9 @@ class Provider(ABC):
     @abstractmethod
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
     ) -> Any:  # boto3.Session
         """지정된 계정/역할/리전에 대한 boto3 Session을 반환합니다.
 
@@ -183,9 +183,9 @@ class Provider(ABC):
     @abstractmethod
     def get_aws_config(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
     ) -> Any:  # botocore.config.Config or aws.Config equivalent
         """지정된 계정/역할/리전에 대한 AWS Config를 반환합니다.
 
@@ -202,7 +202,7 @@ class Provider(ABC):
         pass
 
     @abstractmethod
-    def list_accounts(self) -> Dict[str, AccountInfo]:
+    def list_accounts(self) -> dict[str, AccountInfo]:
         """접근 가능한 계정 목록을 반환합니다.
 
         Returns:
@@ -224,7 +224,7 @@ class Provider(ABC):
         """기본 리전을 반환합니다."""
         pass
 
-    def refresh(self) -> None:
+    def refresh(self) -> None:  # noqa: B027
         """자격 증명을 갱신합니다.
 
         기본 구현은 아무것도 하지 않습니다.
@@ -232,7 +232,7 @@ class Provider(ABC):
         """
         pass
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: B027
         """리소스를 정리합니다.
 
         기본 구현은 아무것도 하지 않습니다.
@@ -249,7 +249,7 @@ class Provider(ABC):
 class AuthError(Exception):
     """인증 관련 기본 에러 클래스"""
 
-    def __init__(self, message: str, cause: Optional[Exception] = None):
+    def __init__(self, message: str, cause: Exception | None = None):
         super().__init__(message)
         self.message = message
         self.cause = cause
@@ -263,14 +263,14 @@ class AuthError(Exception):
 class NotAuthenticatedError(AuthError):
     """인증되지 않은 상태에서 작업을 시도할 때 발생하는 에러"""
 
-    def __init__(self, message: str = "인증이 필요합니다", cause: Optional[Exception] = None):
+    def __init__(self, message: str = "인증이 필요합니다", cause: Exception | None = None):
         super().__init__(message, cause)
 
 
 class AccountNotFoundError(AuthError):
     """계정을 찾을 수 없을 때 발생하는 에러"""
 
-    def __init__(self, account_id: str, cause: Optional[Exception] = None):
+    def __init__(self, account_id: str, cause: Exception | None = None):
         message = f"계정을 찾을 수 없습니다: {account_id}"
         super().__init__(message, cause)
         self.account_id = account_id
@@ -282,8 +282,8 @@ class TokenExpiredError(AuthError):
     def __init__(
         self,
         message: str = "토큰이 만료되었습니다",
-        expired_at: Optional[datetime] = None,
-        cause: Optional[Exception] = None,
+        expired_at: datetime | None = None,
+        cause: Exception | None = None,
     ):
         super().__init__(message, cause)
         self.expired_at = expired_at
@@ -295,8 +295,8 @@ class ConfigurationError(AuthError):
     def __init__(
         self,
         message: str,
-        config_key: Optional[str] = None,
-        cause: Optional[Exception] = None,
+        config_key: str | None = None,
+        cause: Exception | None = None,
     ):
         super().__init__(message, cause)
         self.config_key = config_key
@@ -313,7 +313,7 @@ class ProviderError(AuthError):
         provider: str,
         operation: str,
         message: str,
-        cause: Optional[Exception] = None,
+        cause: Exception | None = None,
     ):
         full_message = f"[{provider}] {operation}: {message}"
         super().__init__(full_message, cause)

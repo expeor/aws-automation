@@ -16,7 +16,6 @@ Route53 비용 계산 (글로벌 서비스):
 """
 
 import logging
-from typing import Dict
 
 from .cache import PriceCache
 from .fetcher import PricingFetcher
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 _cache = PriceCache()
 
 
-def get_route53_prices(refresh: bool = False) -> Dict[str, float]:
+def get_route53_prices(refresh: bool = False) -> dict[str, float]:
     """Route53 가격 조회 (글로벌 서비스)
 
     Args:
@@ -99,7 +98,7 @@ def get_query_monthly_cost(queries_millions: float = 0.0) -> float:
     return round(per_million * queries_millions, 2)
 
 
-def _get_cached_prices(refresh: bool = False) -> Dict[str, float]:
+def _get_cached_prices(refresh: bool = False) -> dict[str, float]:
     """캐시된 가격 조회 (없으면 API 호출)"""
     # Route53는 글로벌 서비스 - "global" 키 사용
     if not refresh:

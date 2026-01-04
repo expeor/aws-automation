@@ -4,15 +4,12 @@ tests/test_plugins_cloudwatch.py - CloudWatch 플러그인 테스트
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from plugins.cloudwatch.loggroup_audit import (
     COST_PER_GB_MONTH,
+    OLD_DAYS_THRESHOLD,
     LogGroupAnalysisResult,
-    LogGroupFinding,
     LogGroupInfo,
     LogGroupStatus,
-    OLD_DAYS_THRESHOLD,
     analyze_log_groups,
 )
 

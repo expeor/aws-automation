@@ -14,13 +14,12 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill
 
-from .analyzer import Confidence, NATAnalysisResult, NATFinding, Severity, UsageStatus
+from .analyzer import NATAnalysisResult, Severity, UsageStatus
 
 
 class NATExcelReporter:
@@ -28,12 +27,12 @@ class NATExcelReporter:
 
     # 스타일 캐시 (lazy initialization)
     _styles_initialized: bool = False
-    _HEADER_FILL: Optional["PatternFill"] = None
-    _HEADER_FONT: Optional["Font"] = None
-    _THIN_BORDER: Optional["Border"] = None
-    _CENTER_ALIGN: Optional["Alignment"] = None
-    _STATUS_FILLS: Optional[Dict[UsageStatus, "PatternFill"]] = None
-    _SEVERITY_FILLS: Optional[Dict[Severity, "PatternFill"]] = None
+    _HEADER_FILL: PatternFill | None = None
+    _HEADER_FONT: Font | None = None
+    _THIN_BORDER: Border | None = None
+    _CENTER_ALIGN: Alignment | None = None
+    _STATUS_FILLS: dict[UsageStatus, PatternFill] | None = None
+    _SEVERITY_FILLS: dict[Severity, PatternFill] | None = None
 
     @classmethod
     def _init_styles(cls) -> None:
@@ -93,39 +92,41 @@ class NATExcelReporter:
         cls._styles_initialized = True
 
     @property
-    def HEADER_FILL(self) -> "PatternFill":
+    def HEADER_FILL(self) -> PatternFill:
         self._init_styles()
-        return self._HEADER_FILL  # type: ignore
+        return self._HEADER_FILL
 
     @property
-    def HEADER_FONT(self) -> "Font":
+    def HEADER_FONT(self) -> Font:
         self._init_styles()
-        return self._HEADER_FONT  # type: ignore
+        return self._HEADER_FONT
 
     @property
-    def THIN_BORDER(self) -> "Border":
+    def THIN_BORDER(self) -> Border:
         self._init_styles()
-        return self._THIN_BORDER  # type: ignore
+        return self._THIN_BORDER
 
     @property
-    def CENTER_ALIGN(self) -> "Alignment":
+    def CENTER_ALIGN(self) -> Alignment:
         self._init_styles()
-        return self._CENTER_ALIGN  # type: ignore
+        return self._CENTER_ALIGN
 
     @property
-    def STATUS_FILLS(self) -> Dict[UsageStatus, "PatternFill"]:
+    def STATUS_FILLS(self) -> dict[UsageStatus, PatternFill]:
         self._init_styles()
-        return self._STATUS_FILLS  # type: ignore
+        assert self._STATUS_FILLS is not None
+        return self._STATUS_FILLS
 
     @property
-    def SEVERITY_FILLS(self) -> Dict[Severity, "PatternFill"]:
+    def SEVERITY_FILLS(self) -> dict[Severity, PatternFill]:
         self._init_styles()
-        return self._SEVERITY_FILLS  # type: ignore
+        assert self._SEVERITY_FILLS is not None
+        return self._SEVERITY_FILLS
 
     def __init__(
         self,
-        results: List[NATAnalysisResult],
-        stats_list: List[Dict[str, Any]],
+        results: list[NATAnalysisResult],
+        stats_list: list[dict[str, Any]],
     ):
         from openpyxl import Workbook as _Workbook
 

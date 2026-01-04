@@ -7,7 +7,7 @@ discovery 기반으로 도구를 자동 발견하고 실행합니다.
 
 import sys
 import traceback
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -20,7 +20,7 @@ console = Console()
 class FlowRunner:
     """통합 CLI Flow Runner (discovery 기반)"""
 
-    def run(self, entry_point: Optional[str] = None) -> None:
+    def run(self, entry_point: str | None = None) -> None:
         """Flow 실행"""
         while True:
             try:
@@ -129,7 +129,7 @@ class FlowRunner:
         self,
         category: str,
         tool_module: str,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """도구 메타데이터 조회"""
         from core.tools.discovery import discover_categories
 
@@ -179,7 +179,7 @@ class FlowRunner:
             if "--debug" in sys.argv:
                 console.print(f"[dim]이력 저장 실패: {e}[/dim]")
 
-    def _run_once(self, entry_point: Optional[str] = None) -> FlowResult:
+    def _run_once(self, entry_point: str | None = None) -> FlowResult:
         """한 번의 Flow 실행"""
         ctx = ExecutionContext()
 
@@ -238,7 +238,7 @@ class FlowRunner:
                             continue
                         if tool_meta.get("name") == ctx.tool.name:
                             # require_session 옵션 확인 (기본값: True)
-                            return tool_meta.get("require_session", True)
+                            return bool(tool_meta.get("require_session", True))
 
             # 찾지 못하면 기본값 True
             return True
@@ -406,9 +406,7 @@ class FlowRunner:
                     console.print(f"    - {perm}")
 
             console.print()
-            console.print(
-                "[dim]IAM 정책에 위 권한을 추가하거나 관리자에게 문의하세요.[/dim]"
-            )
+            console.print("[dim]IAM 정책에 위 권한을 추가하거나 관리자에게 문의하세요.[/dim]")
         console.print("[yellow]━━━━━━━━━━━━━━━━━[/yellow]")
 
 

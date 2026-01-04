@@ -9,7 +9,7 @@ SSO Collector - IAM Identity Center 데이터 수집
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from botocore.exceptions import ClientError
 from rich.console import Console
@@ -51,13 +51,13 @@ class SSOUser:
     user_type: str = ""
     status: str = "UNKNOWN"
     mfa_enabled: bool = False
-    created_date: Optional[datetime] = None
-    last_login: Optional[datetime] = None
+    created_date: datetime | None = None
+    last_login: datetime | None = None
     days_since_last_login: int = 0
     # 할당된 Permission Set 및 계정
-    assignments: List[Dict[str, str]] = field(default_factory=list)
+    assignments: list[dict[str, Any]] = field(default_factory=list)
     has_admin_access: bool = False
-    admin_accounts: List[str] = field(default_factory=list)
+    admin_accounts: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -70,9 +70,9 @@ class SSOGroup:
     description: str = ""
     identity_store_id: str = ""
     member_count: int = 0
-    members: List[str] = field(default_factory=list)  # user_ids
+    members: list[str] = field(default_factory=list)  # user_ids
     # 할당된 Permission Set 및 계정
-    assignments: List[Dict[str, str]] = field(default_factory=list)
+    assignments: list[dict[str, Any]] = field(default_factory=list)
     has_admin_access: bool = False
 
 
@@ -84,19 +84,19 @@ class SSOPermissionSet:
     name: str
     description: str = ""
     session_duration: str = ""
-    created_date: Optional[datetime] = None
+    created_date: datetime | None = None
     # 정책 정보
-    managed_policies: List[str] = field(default_factory=list)
-    inline_policy: Optional[str] = None
-    customer_managed_policies: List[Dict[str, str]] = field(default_factory=list)
-    permissions_boundary: Optional[Dict[str, str]] = None
+    managed_policies: list[str] = field(default_factory=list)
+    inline_policy: str | None = None
+    customer_managed_policies: list[dict[str, str]] = field(default_factory=list)
+    permissions_boundary: dict[str, str] | None = None
     # 위험 분석
     has_admin_access: bool = False
-    high_risk_policies: List[str] = field(default_factory=list)
-    dangerous_permissions: List[str] = field(default_factory=list)
+    high_risk_policies: list[str] = field(default_factory=list)
+    dangerous_permissions: list[str] = field(default_factory=list)
     # 계정 할당
-    assigned_accounts: List[str] = field(default_factory=list)
-    assigned_account_names: List[str] = field(default_factory=list)
+    assigned_accounts: list[str] = field(default_factory=list)
+    assigned_account_names: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -119,29 +119,29 @@ class SSOData:
     instance_arn: str
     identity_store_id: str
     region: str = ""
-    users: List[SSOUser] = field(default_factory=list)
-    groups: List[SSOGroup] = field(default_factory=list)
-    permission_sets: List[SSOPermissionSet] = field(default_factory=list)
-    account_assignments: List[SSOAccountAssignment] = field(default_factory=list)
+    users: list[SSOUser] = field(default_factory=list)
+    groups: list[SSOGroup] = field(default_factory=list)
+    permission_sets: list[SSOPermissionSet] = field(default_factory=list)
+    account_assignments: list[SSOAccountAssignment] = field(default_factory=list)
     # 조회 메타
-    collected_at: Optional[datetime] = None
+    collected_at: datetime | None = None
 
 
 class SSOCollector:
     """IAM Identity Center 데이터 수집기"""
 
     def __init__(self):
-        self.errors: List[str] = []
-        self._user_cache: Dict[str, SSOUser] = {}
-        self._group_cache: Dict[str, SSOGroup] = {}
-        self._account_name_cache: Dict[str, str] = {}
+        self.errors: list[str] = []
+        self._user_cache: dict[str, SSOUser] = {}
+        self._group_cache: dict[str, SSOGroup] = {}
+        self._account_name_cache: dict[str, str] = {}
 
     def collect(
         self,
         session,
         central_account_id: str,
         central_account_name: str,
-    ) -> Optional[SSOData]:
+    ) -> SSOData | None:
         """SSO 전체 데이터 수집
 
         Args:
@@ -223,7 +223,7 @@ class SSOCollector:
 
     def _collect_permission_sets(
         self, sso_admin, instance_arn: str
-    ) -> List[SSOPermissionSet]:
+    ) -> list[SSOPermissionSet]:
         """Permission Sets 수집"""
         permission_sets = []
 
@@ -245,7 +245,7 @@ class SSOCollector:
 
     def _get_permission_set_detail(
         self, sso_admin, instance_arn: str, ps_arn: str
-    ) -> Optional[SSOPermissionSet]:
+    ) -> SSOPermissionSet | None:
         """Permission Set 상세 정보 조회"""
         try:
             # 기본 정보
@@ -410,7 +410,7 @@ class SSOCollector:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    def _collect_users(self, identity_store, identity_store_id: str) -> List[SSOUser]:
+    def _collect_users(self, identity_store, identity_store_id: str) -> list[SSOUser]:
         """Identity Store Users 수집"""
         users = []
 
@@ -441,7 +441,7 @@ class SSOCollector:
 
         return users
 
-    def _collect_groups(self, identity_store, identity_store_id: str) -> List[SSOGroup]:
+    def _collect_groups(self, identity_store, identity_store_id: str) -> list[SSOGroup]:
         """Identity Store Groups 수집"""
         groups = []
 
@@ -474,7 +474,7 @@ class SSOCollector:
 
     def _get_group_members(
         self, identity_store, identity_store_id: str, group_id: str
-    ) -> List[str]:
+    ) -> list[str]:
         """그룹 멤버 목록 조회"""
         members = []
         try:
@@ -494,8 +494,8 @@ class SSOCollector:
         self,
         sso_admin,
         instance_arn: str,
-        permission_sets: List[SSOPermissionSet],
-    ) -> List[SSOAccountAssignment]:
+        permission_sets: list[SSOPermissionSet],
+    ) -> list[SSOAccountAssignment]:
         """계정별 권한 할당 수집"""
         assignments = []
 

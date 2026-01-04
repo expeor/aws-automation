@@ -15,7 +15,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List
 
 from rich.console import Console
 
@@ -72,7 +71,7 @@ class LambdaAnalysisResult:
     low_usage_count: int = 0
     normal_count: int = 0
     unused_monthly_cost: float = 0.0
-    findings: List[LambdaFinding] = field(default_factory=list)
+    findings: list[LambdaFinding] = field(default_factory=list)
 
 
 # =============================================================================
@@ -81,7 +80,7 @@ class LambdaAnalysisResult:
 
 
 def analyze_functions(
-    functions: List[LambdaFunctionInfo],
+    functions: list[LambdaFunctionInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -98,10 +97,10 @@ def analyze_functions(
         finding = _analyze_single_function(func, region)
         result.findings.append(finding)
 
-        if finding.status == UsageStatus.UNUSED:
-            result.unused_count += 1
-            result.unused_monthly_cost += finding.monthly_waste
-        elif finding.status == UsageStatus.UNUSED_PROVISIONED:
+        if (
+            finding.status == UsageStatus.UNUSED
+            or finding.status == UsageStatus.UNUSED_PROVISIONED
+        ):
             result.unused_count += 1
             result.unused_monthly_cost += finding.monthly_waste
         elif finding.status == UsageStatus.LOW_USAGE:
@@ -187,7 +186,7 @@ def _analyze_single_function(func: LambdaFunctionInfo, region: str) -> LambdaFin
 # =============================================================================
 
 
-def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -301,9 +300,10 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
                 ws_unused.cell(row=unused_row, column=12, value=f.recommendation)
 
                 # 상태별 색상
-                if f.status == UsageStatus.UNUSED_PROVISIONED:
-                    ws_unused.cell(row=unused_row, column=10).fill = red_fill
-                elif f.status == UsageStatus.UNUSED:
+                if (
+                    f.status == UsageStatus.UNUSED_PROVISIONED
+                    or f.status == UsageStatus.UNUSED
+                ):
                     ws_unused.cell(row=unused_row, column=10).fill = red_fill
                 elif f.status == UsageStatus.LOW_USAGE:
                     ws_unused.cell(row=unused_row, column=10).fill = yellow_fill
@@ -377,8 +377,8 @@ def generate_report(results: List[LambdaAnalysisResult], output_dir: str) -> str
     # 열 너비
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(
                     max(max_len + 2, 10), 40
@@ -418,7 +418,7 @@ def run(ctx) -> None:
         ctx, _collect_and_analyze, max_workers=20, service="lambda"
     )
 
-    results: List[LambdaAnalysisResult] = result.get_data()
+    results: list[LambdaAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:
@@ -435,7 +435,7 @@ def run(ctx) -> None:
     total_low = sum(r.low_usage_count for r in results)
     total_waste = sum(r.unused_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"전체 Lambda 함수: {total_functions}개")
     if total_unused > 0:
         console.print(f"[red]미사용: {total_unused}개[/red]")

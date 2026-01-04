@@ -9,7 +9,6 @@ Thread-safe하며, 버스트 트래픽을 허용하면서 장기적으로
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 
 @dataclass
@@ -54,7 +53,7 @@ class TokenBucketRateLimiter:
             print("Rate limit 초과")
     """
 
-    def __init__(self, config: Optional[RateLimiterConfig] = None):
+    def __init__(self, config: RateLimiterConfig | None = None):
         """초기화
 
         Args:
@@ -146,7 +145,7 @@ class TokenBucketRateLimiter:
 
 # AWS 서비스별 API Rate Limit 참고 설정
 # 실제 AWS 제한보다 보수적으로 설정하여 안전 마진 확보
-SERVICE_RATE_LIMITS: Dict[str, RateLimiterConfig] = {
+SERVICE_RATE_LIMITS: dict[str, RateLimiterConfig] = {
     # EC2: 대부분의 Describe API는 초당 100회까지 가능
     "ec2": RateLimiterConfig(requests_per_second=20, burst_size=40),
     # IAM: 초당 20회 정도
@@ -183,7 +182,7 @@ SERVICE_RATE_LIMITS: Dict[str, RateLimiterConfig] = {
 }
 
 # 서비스별 Rate Limiter 인스턴스 캐시 (싱글톤)
-_rate_limiters: Dict[str, TokenBucketRateLimiter] = {}
+_rate_limiters: dict[str, TokenBucketRateLimiter] = {}
 _limiter_lock = threading.Lock()
 
 

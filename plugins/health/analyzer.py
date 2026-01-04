@@ -21,9 +21,10 @@ Note:
 """
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +45,16 @@ REQUIRED_PERMISSIONS = {
 class EventFilter:
     """AWS Health 이벤트 필터"""
 
-    event_type_categories: List[str] = field(default_factory=list)
-    services: List[str] = field(default_factory=list)
-    regions: List[str] = field(default_factory=list)
-    availability_zones: List[str] = field(default_factory=list)
-    event_type_codes: List[str] = field(default_factory=list)
-    event_status_codes: List[str] = field(default_factory=list)
-    start_time_from: Optional[datetime] = None
-    start_time_to: Optional[datetime] = None
-    end_time_from: Optional[datetime] = None
-    end_time_to: Optional[datetime] = None
+    event_type_categories: list[str] = field(default_factory=list)
+    services: list[str] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
+    availability_zones: list[str] = field(default_factory=list)
+    event_type_codes: list[str] = field(default_factory=list)
+    event_status_codes: list[str] = field(default_factory=list)
+    start_time_from: datetime | None = None
+    start_time_to: datetime | None = None
+    end_time_from: datetime | None = None
+    end_time_to: datetime | None = None
 
     # 지원되는 Event Type Categories
     VALID_EVENT_CATEGORIES = [
@@ -70,9 +71,9 @@ class EventFilter:
         "closed",  # 완료됨
     ]
 
-    def to_api_filter(self) -> Dict[str, Any]:
+    def to_api_filter(self) -> dict[str, Any]:
         """AWS API 필터 형식으로 변환"""
-        api_filter = {}
+        api_filter: dict[str, Any] = {}
 
         if self.event_type_categories:
             api_filter["eventTypeCategories"] = self.event_type_categories
@@ -119,11 +120,11 @@ class AffectedEntity:
     aws_account_id: str
     entity_url: str
     status_code: str  # PENDING, RESOLVED, etc.
-    last_updated_time: Optional[datetime] = None
-    tags: Dict[str, str] = field(default_factory=dict)
+    last_updated_time: datetime | None = None
+    tags: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_api_response(cls, item: Dict[str, Any]) -> "AffectedEntity":
+    def from_api_response(cls, item: dict[str, Any]) -> "AffectedEntity":
         """API 응답에서 AffectedEntity 객체 생성"""
         tags_list = item.get("tags", {})
         tags_dict = tags_list if isinstance(tags_list, dict) else {}
@@ -148,13 +149,13 @@ class HealthEvent:
     event_type_category: str
     region: str
     availability_zone: str
-    start_time: Optional[datetime]
-    end_time: Optional[datetime]
-    last_updated_time: Optional[datetime]
+    start_time: datetime | None
+    end_time: datetime | None
+    last_updated_time: datetime | None
     status_code: str
     event_scope_code: str  # ACCOUNT_SPECIFIC, PUBLIC, etc.
     description: str
-    affected_entities: List[AffectedEntity] = field(default_factory=list)
+    affected_entities: list[AffectedEntity] = field(default_factory=list)
 
     @property
     def is_scheduled_change(self) -> bool:
@@ -177,7 +178,7 @@ class HealthEvent:
         return self.status_code == "open"
 
     @property
-    def days_until_start(self) -> Optional[int]:
+    def days_until_start(self) -> int | None:
         """시작까지 남은 일수"""
         if not self.start_time:
             return None
@@ -203,8 +204,8 @@ class HealthEvent:
     @classmethod
     def from_api_response(
         cls,
-        event_item: Dict[str, Any],
-        detail_item: Optional[Dict[str, Any]] = None,
+        event_item: dict[str, Any],
+        detail_item: dict[str, Any] | None = None,
     ) -> "HealthEvent":
         """API 응답에서 HealthEvent 객체 생성"""
         description = ""
@@ -229,7 +230,7 @@ class HealthEvent:
             description=description,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환 (리포트용)"""
         return {
             "arn": self.arn,
@@ -289,16 +290,16 @@ class HealthAnalyzer:
 
     def get_events(
         self,
-        event_type_categories: Optional[List[str]] = None,
-        services: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
-        event_status_codes: Optional[List[str]] = None,
-        start_time_from: Optional[datetime] = None,
-        start_time_to: Optional[datetime] = None,
+        event_type_categories: list[str] | None = None,
+        services: list[str] | None = None,
+        regions: list[str] | None = None,
+        event_status_codes: list[str] | None = None,
+        start_time_from: datetime | None = None,
+        start_time_to: datetime | None = None,
         include_details: bool = True,
         include_affected_entities: bool = True,
         page_size: int = 100,
-    ) -> List[HealthEvent]:
+    ) -> list[HealthEvent]:
         """Health 이벤트 조회
 
         Args:
@@ -354,7 +355,7 @@ class HealthAnalyzer:
         self,
         event_filter: EventFilter,
         page_size: int,
-    ) -> Iterator[Dict[str, Any]]:
+    ) -> Iterator[dict[str, Any]]:
         """이벤트 페이지네이션 처리"""
         try:
             paginator = self.client.get_paginator("describe_events")
@@ -382,7 +383,7 @@ class HealthAnalyzer:
             logger.error(f"이벤트 조회 실패: {e}")
             raise
 
-    def _get_event_details(self, event_arns: List[str]) -> Dict[str, str]:
+    def _get_event_details(self, event_arns: list[str]) -> dict[str, str]:
         """이벤트 상세 설명 조회"""
         details = {}
 
@@ -393,9 +394,7 @@ class HealthAnalyzer:
                 response = self.client.describe_event_details(eventArns=batch)
                 for item in response.get("successfulSet", []):
                     arn = item.get("event", {}).get("arn", "")
-                    desc = item.get("eventDescription", {}).get(
-                        "latestDescription", ""
-                    )
+                    desc = item.get("eventDescription", {}).get("latestDescription", "")
                     if arn and desc:
                         details[arn] = desc
             except Exception as e:
@@ -404,8 +403,8 @@ class HealthAnalyzer:
         return details
 
     def _get_affected_entities(
-        self, event_arns: List[str]
-    ) -> Dict[str, List[AffectedEntity]]:
+        self, event_arns: list[str]
+    ) -> dict[str, list[AffectedEntity]]:
         """영향받는 리소스 조회"""
         affected = {}
 
@@ -432,10 +431,10 @@ class HealthAnalyzer:
 
     def get_scheduled_changes(
         self,
-        services: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
+        services: list[str] | None = None,
+        regions: list[str] | None = None,
         days_ahead: int = 90,
-    ) -> List[HealthEvent]:
+    ) -> list[HealthEvent]:
         """예정된 변경(패치/유지보수) 조회
 
         Args:
@@ -459,10 +458,10 @@ class HealthAnalyzer:
 
     def get_issues(
         self,
-        services: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
+        services: list[str] | None = None,
+        regions: list[str] | None = None,
         include_closed: bool = False,
-    ) -> List[HealthEvent]:
+    ) -> list[HealthEvent]:
         """서비스 장애 조회
 
         Args:
@@ -486,8 +485,8 @@ class HealthAnalyzer:
 
     def get_account_notifications(
         self,
-        services: Optional[List[str]] = None,
-    ) -> List[HealthEvent]:
+        services: list[str] | None = None,
+    ) -> list[HealthEvent]:
         """계정 알림 조회
 
         Args:
@@ -504,9 +503,9 @@ class HealthAnalyzer:
 
     def get_summary(
         self,
-        events: Optional[List[HealthEvent]] = None,
+        events: list[HealthEvent] | None = None,
         group_by: str = "service",
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         """이벤트 요약 통계
 
         Args:

@@ -14,9 +14,9 @@ Health 이벤트를 수집하고 패치/유지보수 중심으로 분류합니�
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .analyzer import HealthAnalyzer, HealthEvent
 
@@ -31,9 +31,9 @@ class PatchItem:
     service: str
     event_type: str
     urgency: str
-    scheduled_date: Optional[datetime]
-    deadline: Optional[datetime]
-    affected_resources: List[str]
+    scheduled_date: datetime | None
+    deadline: datetime | None
+    affected_resources: list[str]
     action_required: str
     description_summary: str
 
@@ -41,7 +41,11 @@ class PatchItem:
     def from_event(cls, event: HealthEvent) -> "PatchItem":
         """HealthEvent에서 PatchItem 생성"""
         # 설명에서 요약 추출 (첫 200자)
-        summary = event.description[:200] + "..." if len(event.description) > 200 else event.description
+        summary = (
+            event.description[:200] + "..."
+            if len(event.description) > 200
+            else event.description
+        )
         summary = summary.replace("\n", " ").strip()
 
         # 영향받는 리소스 목록
@@ -89,11 +93,11 @@ class PatchItem:
 class CollectionResult:
     """수집 결과"""
 
-    events: List[HealthEvent]
-    patches: List[PatchItem]
-    summary_by_urgency: Dict[str, Dict[str, Any]]
-    summary_by_service: Dict[str, Dict[str, Any]]
-    summary_by_month: Dict[str, List[PatchItem]]
+    events: list[HealthEvent]
+    patches: list[PatchItem]
+    summary_by_urgency: dict[str, dict[str, Any]]
+    summary_by_service: dict[str, dict[str, Any]]
+    summary_by_month: dict[str, list[PatchItem]]
 
     @property
     def total_count(self) -> int:
@@ -108,23 +112,25 @@ class CollectionResult:
     @property
     def critical_count(self) -> int:
         """긴급 패치 수"""
-        return self.summary_by_urgency.get("critical", {}).get("count", 0)
+        count: int = self.summary_by_urgency.get("critical", {}).get("count", 0)
+        return count
 
     @property
     def high_count(self) -> int:
         """높은 우선순위 패치 수"""
-        return self.summary_by_urgency.get("high", {}).get("count", 0)
+        count: int = self.summary_by_urgency.get("high", {}).get("count", 0)
+        return count
 
     @property
     def affected_resource_count(self) -> int:
         """영향받는 리소스 총 수"""
         return sum(len(p.affected_resources) for p in self.patches)
 
-    def get_patches_by_urgency(self, urgency: str) -> List[PatchItem]:
+    def get_patches_by_urgency(self, urgency: str) -> list[PatchItem]:
         """긴급도별 패치 목록"""
         return [p for p in self.patches if p.urgency == urgency]
 
-    def get_patches_by_service(self, service: str) -> List[PatchItem]:
+    def get_patches_by_service(self, service: str) -> list[PatchItem]:
         """서비스별 패치 목록"""
         return [p for p in self.patches if p.service == service]
 
@@ -146,8 +152,8 @@ class HealthCollector:
 
     def collect_patches(
         self,
-        services: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
+        services: list[str] | None = None,
+        regions: list[str] | None = None,
         days_ahead: int = 90,
         include_open: bool = True,
     ) -> CollectionResult:
@@ -178,7 +184,12 @@ class HealthCollector:
 
         # 긴급도순 정렬
         urgency_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        patches.sort(key=lambda p: (urgency_order.get(p.urgency, 99), p.scheduled_date or datetime.max.replace(tzinfo=timezone.utc)))
+        patches.sort(
+            key=lambda p: (
+                urgency_order.get(p.urgency, 99),
+                p.scheduled_date or datetime.max.replace(tzinfo=timezone.utc),
+            )
+        )
 
         # 요약 생성
         summary_by_urgency = self._summarize_by_urgency(patches)
@@ -200,8 +211,8 @@ class HealthCollector:
 
     def collect_all(
         self,
-        services: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
+        services: list[str] | None = None,
+        regions: list[str] | None = None,
     ) -> CollectionResult:
         """모든 Health 이벤트 수집
 
@@ -223,7 +234,12 @@ class HealthCollector:
         patches = [PatchItem.from_event(e) for e in patch_events]
 
         urgency_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        patches.sort(key=lambda p: (urgency_order.get(p.urgency, 99), p.scheduled_date or datetime.max.replace(tzinfo=timezone.utc)))
+        patches.sort(
+            key=lambda p: (
+                urgency_order.get(p.urgency, 99),
+                p.scheduled_date or datetime.max.replace(tzinfo=timezone.utc),
+            )
+        )
 
         summary_by_urgency = self._summarize_by_urgency(patches)
         summary_by_service = self._summarize_by_service(patches)
@@ -239,9 +255,9 @@ class HealthCollector:
 
     def collect_issues(
         self,
-        services: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
-    ) -> List[HealthEvent]:
+        services: list[str] | None = None,
+        regions: list[str] | None = None,
+    ) -> list[HealthEvent]:
         """서비스 장애 이벤트 수집
 
         Args:
@@ -251,15 +267,18 @@ class HealthCollector:
         Returns:
             장애 이벤트 리스트
         """
-        return self.analyzer.get_issues(
+        issues: list[HealthEvent] = self.analyzer.get_issues(
             services=services,
             regions=regions,
             include_closed=False,
         )
+        return issues
 
-    def _summarize_by_urgency(self, patches: List[PatchItem]) -> Dict[str, Dict[str, Any]]:
+    def _summarize_by_urgency(
+        self, patches: list[PatchItem]
+    ) -> dict[str, dict[str, Any]]:
         """긴급도별 요약"""
-        summary = {}
+        summary: dict[str, dict[str, Any]] = {}
 
         for patch in patches:
             urgency = patch.urgency
@@ -280,9 +299,11 @@ class HealthCollector:
 
         return summary
 
-    def _summarize_by_service(self, patches: List[PatchItem]) -> Dict[str, Dict[str, Any]]:
+    def _summarize_by_service(
+        self, patches: list[PatchItem]
+    ) -> dict[str, dict[str, Any]]:
         """서비스별 요약"""
-        summary = {}
+        summary: dict[str, dict[str, Any]] = {}
 
         for patch in patches:
             service = patch.service
@@ -302,15 +323,14 @@ class HealthCollector:
 
         return summary
 
-    def _group_by_month(self, patches: List[PatchItem]) -> Dict[str, List[PatchItem]]:
+    def _group_by_month(self, patches: list[PatchItem]) -> dict[str, list[PatchItem]]:
         """월별 그룹화"""
-        grouped = {}
+        grouped: dict[str, list[PatchItem]] = {}
 
         for patch in patches:
-            if patch.scheduled_date:
-                month_key = patch.scheduled_date.strftime("%Y-%m")
-            else:
-                month_key = "미정"
+            month_key = (
+                patch.scheduled_date.strftime("%Y-%m") if patch.scheduled_date else "미정"
+            )
 
             if month_key not in grouped:
                 grouped[month_key] = []

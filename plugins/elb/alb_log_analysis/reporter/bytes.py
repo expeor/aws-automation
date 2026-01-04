@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
 
 from .base import BaseSheetWriter
 from .config import HEADERS, SHEET_NAMES, SheetConfig
@@ -32,7 +31,7 @@ class BytesSheetWriter(BaseSheetWriter):
                 set(list(received_bytes.keys()) + list(sent_bytes.keys()))
             )
 
-            total_data: Dict[str, int] = {}
+            total_data: dict[str, int] = {}
             for url in all_urls:
                 total_data[url] = int(received_bytes.get(url, 0)) + int(
                     sent_bytes.get(url, 0)
@@ -78,8 +77,8 @@ class BytesSheetWriter(BaseSheetWriter):
     def _add_total_row(
         self,
         ws,
-        received_bytes: Dict[str, int],
-        sent_bytes: Dict[str, int],
+        received_bytes: dict[str, int],
+        sent_bytes: dict[str, int],
         data_count: int,
     ) -> None:
         """Add total/summary row."""

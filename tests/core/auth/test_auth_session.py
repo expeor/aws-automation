@@ -6,7 +6,7 @@ Mock 데이터를 사용하여 인증 모듈의 완전성을 테스트합니다.
 """
 
 import threading
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,7 +21,7 @@ from core.auth.session import (
     iter_regions,
     iter_sessions,
 )
-from core.auth.types import AccountInfo, ProviderError, TokenExpiredError
+from core.auth.types import AccountInfo, TokenExpiredError
 
 # =============================================================================
 # Fixtures

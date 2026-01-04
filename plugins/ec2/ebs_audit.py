@@ -14,7 +14,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -70,8 +70,8 @@ class EBSInfo:
     availability_zone: str
     create_time: datetime
     snapshot_id: str
-    attachments: List[Dict[str, Any]]
-    tags: Dict[str, str]
+    attachments: list[dict[str, Any]]
+    tags: dict[str, str]
 
     # 메타
     account_id: str
@@ -90,7 +90,7 @@ class EBSInfo:
     def attached_instance_id(self) -> str:
         """연결된 인스턴스 ID"""
         if self.attachments:
-            return self.attachments[0].get("InstanceId", "")
+            return str(self.attachments[0].get("InstanceId", ""))
         return ""
 
 
@@ -112,7 +112,7 @@ class EBSAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[EBSFinding] = field(default_factory=list)
+    findings: list[EBSFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -133,7 +133,7 @@ class EBSAnalysisResult:
 
 def collect_ebs(
     session, account_id: str, account_name: str, region: str
-) -> List[EBSInfo]:
+) -> list[EBSInfo]:
     """EBS 볼륨 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -195,7 +195,7 @@ def collect_ebs(
 
 
 def analyze_ebs(
-    volumes: List[EBSInfo], account_id: str, account_name: str, region: str
+    volumes: list[EBSInfo], account_id: str, account_name: str, region: str
 ) -> EBSAnalysisResult:
     """EBS 미사용 분석"""
     result = EBSAnalysisResult(
@@ -269,7 +269,7 @@ def _analyze_single_volume(volume: EBSInfo) -> EBSFinding:
 # =============================================================================
 
 
-def generate_report(results: List[EBSAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -448,7 +448,7 @@ def run(ctx) -> None:
     )
 
     # 결과 처리
-    all_results: List[EBSAnalysisResult] = result.get_data()
+    all_results: list[EBSAnalysisResult] = result.get_data()
 
     # 진행 상황 출력
     console.print(

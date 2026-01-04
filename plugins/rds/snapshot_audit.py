@@ -19,7 +19,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -84,11 +83,11 @@ class RDSSnapshotInfo:
     engine: str
     engine_version: str
     status: str
-    create_time: Optional[datetime]
+    create_time: datetime | None
     allocated_storage_gb: int
     encrypted: bool
     arn: str
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
     # 메타
     account_id: str = ""
@@ -131,7 +130,7 @@ class RDSSnapshotAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[RDSSnapshotFinding] = field(default_factory=list)
+    findings: list[RDSSnapshotFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -151,7 +150,7 @@ class RDSSnapshotAnalysisResult:
 
 def collect_rds_snapshots(
     session, account_id: str, account_name: str, region: str
-) -> List[RDSSnapshotInfo]:
+) -> list[RDSSnapshotInfo]:
     """RDS 수동 스냅샷 수집 (RDS + Aurora)"""
     from botocore.exceptions import ClientError
 
@@ -211,8 +210,8 @@ def collect_rds_snapshots(
 
 
 def _parse_rds_snapshot(
-    data: Dict, rds, account_id: str, account_name: str, region: str
-) -> Optional[RDSSnapshotInfo]:
+    data: dict, rds, account_id: str, account_name: str, region: str
+) -> RDSSnapshotInfo | None:
     """RDS 스냅샷 파싱"""
     try:
         arn = data.get("DBSnapshotArn", "")
@@ -257,8 +256,8 @@ def _parse_rds_snapshot(
 
 
 def _parse_aurora_snapshot(
-    data: Dict, rds, account_id: str, account_name: str, region: str
-) -> Optional[RDSSnapshotInfo]:
+    data: dict, rds, account_id: str, account_name: str, region: str
+) -> RDSSnapshotInfo | None:
     """Aurora 스냅샷 파싱"""
     try:
         arn = data.get("DBClusterSnapshotArn", "")
@@ -308,7 +307,7 @@ def _parse_aurora_snapshot(
 
 
 def analyze_rds_snapshots(
-    snapshots: List[RDSSnapshotInfo], account_id: str, account_name: str, region: str
+    snapshots: list[RDSSnapshotInfo], account_id: str, account_name: str, region: str
 ) -> RDSSnapshotAnalysisResult:
     """RDS Snapshot 미사용 분석"""
     result = RDSSnapshotAnalysisResult(
@@ -369,7 +368,7 @@ def _analyze_single_snapshot(snapshot: RDSSnapshotInfo) -> RDSSnapshotFinding:
 # =============================================================================
 
 
-def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -512,7 +511,7 @@ def generate_report(results: List[RDSSnapshotAnalysisResult], output_dir: str) -
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[RDSSnapshotAnalysisResult]:
+) -> RDSSnapshotAnalysisResult | None:
     """단일 계정/리전의 RDS 스냅샷 수집 및 분석 (병렬 실행용)"""
     snapshots = collect_rds_snapshots(session, account_id, account_name, region)
     if not snapshots:
@@ -526,7 +525,7 @@ def run(ctx) -> None:
     console.print(f"  [dim]기준: {OLD_SNAPSHOT_DAYS}일 이상 오래된 수동 스냅샷[/dim]")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="rds")
-    all_results: List[RDSSnapshotAnalysisResult] = [
+    all_results: list[RDSSnapshotAnalysisResult] = [
         r for r in result.get_data() if r is not None
     ]
 

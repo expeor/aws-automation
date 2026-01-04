@@ -6,7 +6,7 @@ cli/ui/search.py - 도구 검색 엔진
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 @dataclass
@@ -92,11 +92,11 @@ class ToolSearchEngine:
     """
 
     def __init__(self):
-        self._index: List[Dict[str, Any]] = []
-        self._chosung_index: Dict[str, List[int]] = {}  # 초성 → 인덱스 리스트
+        self._index: list[dict[str, Any]] = []
+        self._chosung_index: dict[str, list[int]] = {}  # 초성 → 인덱스 리스트
         self._built = False
 
-    def build_index(self, categories: List[Dict[str, Any]]) -> None:
+    def build_index(self, categories: list[dict[str, Any]]) -> None:
         """검색 인덱스 구축
 
         Args:
@@ -151,8 +151,8 @@ class ToolSearchEngine:
         self,
         query: str,
         limit: int = 15,
-        category_filter: Optional[str] = None,
-    ) -> List[SearchResult]:
+        category_filter: str | None = None,
+    ) -> list[SearchResult]:
         """검색 실행
 
         Args:
@@ -173,7 +173,7 @@ class ToolSearchEngine:
         norm_query = normalize_text(query)
         chosung_query = get_chosung(query)
 
-        results: List[Tuple[float, str, Dict]] = []  # (score, match_type, entry)
+        results: list[tuple[float, str, dict]] = []  # (score, match_type, entry)
 
         for entry in self._index:
             # 카테고리 필터
@@ -208,8 +208,8 @@ class ToolSearchEngine:
         self,
         norm_query: str,
         chosung_query: str,
-        entry: Dict,
-    ) -> Tuple[float, str]:
+        entry: dict,
+    ) -> tuple[float, str]:
         """매칭 점수 계산
 
         우선순위:
@@ -269,12 +269,11 @@ class ToolSearchEngine:
 
     def _is_chosung_only(self, text: str) -> bool:
         """초성만으로 구성되어 있는지 확인"""
-        for char in text:
-            if char not in CHOSUNG_LIST and not char.isspace():
-                return False
-        return True
+        return all(
+            not (char not in CHOSUNG_LIST and not char.isspace()) for char in text
+        )
 
-    def get_suggestions(self, prefix: str, limit: int = 5) -> List[str]:
+    def get_suggestions(self, prefix: str, limit: int = 5) -> list[str]:
         """자동완성 제안
 
         Args:
@@ -298,7 +297,7 @@ class ToolSearchEngine:
 
         return suggestions
 
-    def get_categories(self) -> List[str]:
+    def get_categories(self) -> list[str]:
         """인덱싱된 카테고리 목록"""
         categories = set()
         for entry in self._index:
@@ -311,7 +310,7 @@ class ToolSearchEngine:
 
 
 # 전역 검색 엔진 인스턴스 (싱글톤)
-_search_engine: Optional[ToolSearchEngine] = None
+_search_engine: ToolSearchEngine | None = None
 
 
 def get_search_engine() -> ToolSearchEngine:
@@ -322,7 +321,7 @@ def get_search_engine() -> ToolSearchEngine:
     return _search_engine
 
 
-def init_search_engine(categories: List[Dict[str, Any]]) -> ToolSearchEngine:
+def init_search_engine(categories: list[dict[str, Any]]) -> ToolSearchEngine:
     """검색 엔진 초기화 및 인덱스 구축
 
     Args:

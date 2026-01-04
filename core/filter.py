@@ -19,13 +19,12 @@ Example:
 """
 
 import fnmatch
-import re
-from typing import List, Optional, Sequence, Union
+from collections.abc import Sequence
 
 from core.auth.types import AccountInfo
 
 
-def parse_patterns(pattern_str: str) -> List[str]:
+def parse_patterns(pattern_str: str) -> list[str]:
     """패턴 문자열을 리스트로 파싱
 
     쉼표 또는 공백으로 구분된 패턴 문자열을 리스트로 변환합니다.
@@ -104,17 +103,14 @@ def match_any_pattern(
     if not patterns:
         return True  # 패턴 없으면 전체 선택
 
-    for pattern in patterns:
-        if match_pattern(name, pattern, case_sensitive):
-            return True
-    return False
+    return any(match_pattern(name, pattern, case_sensitive) for pattern in patterns)
 
 
 def filter_accounts_by_pattern(
-    accounts: List[AccountInfo],
-    patterns: Union[str, List[str], None],
+    accounts: list[AccountInfo],
+    patterns: str | list[str] | None,
     case_sensitive: bool = False,
-) -> List[AccountInfo]:
+) -> list[AccountInfo]:
     """패턴으로 계정 필터링
 
     계정 이름(name) 또는 ID에 대해 glob 패턴 매칭을 수행합니다.
@@ -155,20 +151,19 @@ def filter_accounts_by_pattern(
     result = []
     for account in accounts:
         # 이름으로 매칭
-        if match_any_pattern(account.name, patterns, case_sensitive):
-            result.append(account)
-        # ID로 매칭 (이름 매칭 실패 시)
-        elif match_any_pattern(account.id, patterns, case_sensitive):
+        if match_any_pattern(
+            account.name, patterns, case_sensitive
+        ) or match_any_pattern(account.id, patterns, case_sensitive):
             result.append(account)
 
     return result
 
 
 def filter_strings_by_pattern(
-    items: List[str],
-    patterns: Union[str, List[str], None],
+    items: list[str],
+    patterns: str | list[str] | None,
     case_sensitive: bool = False,
-) -> List[str]:
+) -> list[str]:
     """문자열 리스트를 패턴으로 필터링
 
     프로파일명, 리전명 등 문자열 리스트 필터링에 사용합니다.
@@ -198,7 +193,7 @@ def filter_strings_by_pattern(
     return [item for item in items if match_any_pattern(item, patterns, case_sensitive)]
 
 
-def expand_region_pattern(pattern: str) -> List[str]:
+def expand_region_pattern(pattern: str) -> list[str]:
     """리전 패턴을 실제 리전 목록으로 확장
 
     Args:
@@ -240,7 +235,7 @@ class AccountFilter:
 
     def __init__(
         self,
-        patterns: Union[str, List[str], None] = None,
+        patterns: str | list[str] | None = None,
         case_sensitive: bool = False,
     ):
         """초기화
@@ -252,7 +247,7 @@ class AccountFilter:
         self.case_sensitive = case_sensitive
 
         if patterns is None:
-            self.patterns: List[str] = []
+            self.patterns: list[str] = []
         elif isinstance(patterns, str):
             self.patterns = parse_patterns(patterns)
         else:
@@ -270,12 +265,9 @@ class AccountFilter:
 
         if match_any_pattern(account.name, self.patterns, self.case_sensitive):
             return True
-        if match_any_pattern(account.id, self.patterns, self.case_sensitive):
-            return True
+        return bool(match_any_pattern(account.id, self.patterns, self.case_sensitive))
 
-        return False
-
-    def apply(self, accounts: List[AccountInfo]) -> List[AccountInfo]:
+    def apply(self, accounts: list[AccountInfo]) -> list[AccountInfo]:
         """계정 목록에 필터 적용"""
         if not self.is_active:
             return accounts

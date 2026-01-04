@@ -10,7 +10,7 @@ NAT Gateway 비용 최적화:
     - run(ctx): 필수. 실행 함수.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from rich.console import Console
 
@@ -32,7 +32,7 @@ REQUIRED_PERMISSIONS = {
 
 def _collect_and_analyze(
     session, account_id: str, account_name: str, region: str
-) -> Optional[Tuple[Any, Dict[str, Any]]]:
+) -> tuple[Any, dict[str, Any]] | None:
     """단일 계정/리전의 NAT Gateway 수집 및 분석 (병렬 실행용)"""
     collector = NATCollector()
     audit_data = collector.collect(session, account_id, account_name, region)
@@ -91,7 +91,7 @@ def run(ctx) -> None:
     open_in_explorer(output_path)
 
 
-def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
+def _print_summary(stats_list: list[dict[str, Any]]) -> None:
     """분석 결과 요약 출력"""
     # 전체 통계
     totals = {
@@ -117,7 +117,7 @@ def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
     if totals["normal_count"] > 0:
         console.print(f"    [green]정상 사용: {totals['normal_count']}개[/green]")
 
-    console.print(f"\n  [bold]비용:[/bold]")
+    console.print("\n  [bold]비용:[/bold]")
     console.print(f"    월간 총 비용: ${totals['total_monthly_cost']:,.2f}")
 
     if totals["total_monthly_waste"] > 0:

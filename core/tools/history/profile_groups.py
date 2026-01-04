@@ -8,7 +8,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 
 @dataclass
@@ -17,7 +17,7 @@ class ProfileGroup:
 
     name: str  # 그룹 이름 (예: "개발 환경")
     kind: str  # "sso_profile" 또는 "static" (ProviderKind.value)
-    profiles: List[str] = field(default_factory=list)  # 프로파일 이름 목록
+    profiles: list[str] = field(default_factory=list)  # 프로파일 이름 목록
     added_at: str = ""  # ISO format
     order: int = 0  # 정렬 순서 (낮을수록 상위)
 
@@ -48,7 +48,7 @@ class ProfileGroupsManager:
         if self._initialized:
             return
         self._path = self._get_path()
-        self._groups: List[ProfileGroup] = []
+        self._groups: list[ProfileGroup] = []
         self._load()
         self._initialized = True
 
@@ -62,7 +62,7 @@ class ProfileGroupsManager:
         self,
         name: str,
         kind: str,
-        profiles: List[str],
+        profiles: list[str],
     ) -> bool:
         """그룹 추가
 
@@ -107,8 +107,8 @@ class ProfileGroupsManager:
     def update(
         self,
         name: str,
-        new_name: Optional[str] = None,
-        profiles: Optional[List[str]] = None,
+        new_name: str | None = None,
+        profiles: list[str] | None = None,
     ) -> bool:
         """그룹 수정
 
@@ -151,18 +151,18 @@ class ProfileGroupsManager:
                 return True
         return False
 
-    def get_by_name(self, name: str) -> Optional[ProfileGroup]:
+    def get_by_name(self, name: str) -> ProfileGroup | None:
         """이름으로 그룹 찾기"""
         for group in self._groups:
             if group.name == name:
                 return group
         return None
 
-    def get_all(self) -> List[ProfileGroup]:
+    def get_all(self) -> list[ProfileGroup]:
         """전체 그룹 목록 (순서대로)"""
         return sorted(self._groups, key=lambda x: x.order)
 
-    def get_by_kind(self, kind: str) -> List[ProfileGroup]:
+    def get_by_kind(self, kind: str) -> list[ProfileGroup]:
         """특정 타입의 그룹만 반환"""
         return [g for g in self.get_all() if g.kind == kind]
 

@@ -29,7 +29,7 @@ pkg/cache - 공통 캐시 경로 관리
 
 from .path import CACHE_ROOT, get_cache_dir, get_cache_path
 
-__all__ = [
+__all__: list[str] = [
     "get_cache_dir",
     "get_cache_path",
     "CACHE_ROOT",

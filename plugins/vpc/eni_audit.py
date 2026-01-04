@@ -15,7 +15,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -72,8 +71,8 @@ class ENIInfo:
     owner_id: str
     instance_id: str
     attachment_status: str
-    security_groups: List[str]
-    tags: Dict[str, str]
+    security_groups: list[str]
+    tags: dict[str, str]
     name: str
 
     # 메타
@@ -122,7 +121,7 @@ class ENIAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[ENIFinding] = field(default_factory=list)
+    findings: list[ENIFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -139,7 +138,7 @@ class ENIAnalysisResult:
 
 def collect_enis(
     session, account_id: str, account_name: str, region: str
-) -> List[ENIInfo]:
+) -> list[ENIInfo]:
     """ENI 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -205,7 +204,7 @@ def collect_enis(
 
 
 def analyze_enis(
-    enis: List[ENIInfo], account_id: str, account_name: str, region: str
+    enis: list[ENIInfo], account_id: str, account_name: str, region: str
 ) -> ENIAnalysisResult:
     """ENI 미사용 분석"""
     result = ENIAnalysisResult(
@@ -301,7 +300,7 @@ def _analyze_single_eni(eni: ENIInfo) -> ENIFinding:
 # =============================================================================
 
 
-def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -473,7 +472,7 @@ def run(ctx) -> None:
     # 병렬 수집 및 분석
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
-    all_results: List[ENIAnalysisResult] = result.get_data()
+    all_results: list[ENIAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:

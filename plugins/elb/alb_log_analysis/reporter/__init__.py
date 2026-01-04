@@ -8,4 +8,4 @@ from .base import BaseSheetWriter
 from .config import SheetConfig
 from .styles import StyleCache
 
-__all__ = ["BaseSheetWriter", "SheetConfig", "StyleCache"]
+__all__: list[str] = ["BaseSheetWriter", "SheetConfig", "StyleCache"]

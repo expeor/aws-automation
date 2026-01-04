@@ -24,9 +24,8 @@ import importlib
 import logging
 import threading
 import time
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from core.config import (
     get_plugins_path,
@@ -34,7 +33,7 @@ from core.config import (
     settings,
     validate_tool_metadata,
 )
-from core.exceptions import DiscoveryError, MetadataValidationError, PluginLoadError
+from core.exceptions import MetadataValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ SCAN_PATHS = [
 # =============================================================================
 
 # 캐시 데이터 저장소 (Thread-safe)
-_discovery_cache: Dict[str, Tuple[List[Dict[str, Any]], float]] = {}
+_discovery_cache: dict[str, tuple[list[dict[str, Any]], float]] = {}
 _cache_lock = threading.RLock()
 
 
@@ -151,10 +150,10 @@ AWS_SERVICE_NAMES = {
 
 def _validate_category_metadata(
     module_path: str,
-    category: Dict[str, Any],
-    tools: List[Dict[str, Any]],
+    category: dict[str, Any],
+    tools: list[dict[str, Any]],
     strict: bool = False,
-) -> Tuple[Dict[str, Any], List[str]]:
+) -> tuple[dict[str, Any], list[str]]:
     """카테고리 및 도구 메타데이터 검증
 
     Args:
@@ -205,7 +204,7 @@ def discover_categories(
     only_analysis: bool = False,
     use_cache: bool = True,
     validate: bool = True,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """모든 스캔 경로에서 카테고리/도구 자동 발견
 
     각 카테고리 폴더의 __init__.py에서 CATEGORY, TOOLS를 읽어옴.
@@ -335,7 +334,7 @@ def discover_categories(
     return categories
 
 
-def discover_all_categories() -> List[Dict[str, Any]]:
+def discover_all_categories() -> list[dict[str, Any]]:
     """모든 카테고리 발견 (AWS 서비스 포함)
 
     개발자/AI가 기존 코드를 참조할 때 사용.
@@ -346,9 +345,7 @@ def discover_all_categories() -> List[Dict[str, Any]]:
     return discover_categories(include_aws_services=True)
 
 
-def get_category(
-    name: str, include_aws_services: bool = True
-) -> Optional[Dict[str, Any]]:
+def get_category(name: str, include_aws_services: bool = True) -> dict[str, Any] | None:
     """카테고리 이름 또는 별칭으로 조회
 
     Args:
@@ -370,7 +367,7 @@ def get_category(
 
 def get_category_by_sub_service(
     sub_service_name: str, include_aws_services: bool = True
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """하위 서비스명으로 카테고리 조회 (도구 필터링 포함)
 
     sub_services에 정의된 하위 서비스명으로 조회 시,
@@ -408,7 +405,7 @@ def get_category_by_sub_service(
 
 def resolve_category(
     name: str, include_aws_services: bool = True
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """카테고리 또는 하위 서비스명으로 조회 (통합 함수)
 
     1. 먼저 정확한 카테고리명으로 검색
@@ -432,7 +429,7 @@ def resolve_category(
     return get_category_by_sub_service(name, include_aws_services)
 
 
-def load_tool(category_name: str, tool_name: str) -> Optional[Dict[str, Callable]]:
+def load_tool(category_name: str, tool_name: str) -> dict[str, Any] | None:
     """도구 동적 로드
 
     Args:
@@ -502,7 +499,7 @@ def load_tool(category_name: str, tool_name: str) -> Optional[Dict[str, Callable
         return None
 
 
-def _load_referenced_tool(tool_meta: Dict[str, Any]) -> Optional[Dict[str, Callable]]:
+def _load_referenced_tool(tool_meta: dict[str, Any]) -> dict[str, Any] | None:
     """참조된 도구 로드 (Collection용)
 
     Args:
@@ -571,12 +568,12 @@ def _load_referenced_tool(tool_meta: Dict[str, Any]) -> Optional[Dict[str, Calla
         return None
 
 
-def list_categories() -> List[str]:
+def list_categories() -> list[str]:
     """카테고리 이름 목록 반환"""
     return [cat["name"] for cat in discover_categories()]
 
 
-def list_tools(category_name: str) -> List[str]:
+def list_tools(category_name: str) -> list[str]:
     """카테고리 내 도구 이름 목록 반환"""
     category = get_category(category_name)
     if not category:
@@ -584,7 +581,7 @@ def list_tools(category_name: str) -> List[str]:
     return [tool["name"] for tool in category["tools"]]
 
 
-def list_tools_by_area(area: str) -> List[Dict[str, Any]]:
+def list_tools_by_area(area: str) -> list[dict[str, Any]]:
     """영역(area)별 도구 목록 반환
 
     Args:
@@ -614,13 +611,13 @@ def list_tools_by_area(area: str) -> List[Dict[str, Any]]:
     return results
 
 
-def get_area_summary() -> Dict[str, int]:
+def get_area_summary() -> dict[str, int]:
     """영역별 도구 개수 요약
 
     Returns:
         {"security": 15, "cost": 12, ...}
     """
-    summary: Dict[str, int] = {}
+    summary: dict[str, int] = {}
     for category in discover_categories():
         for tool in category["tools"]:
             area = tool.get("area", "unknown")

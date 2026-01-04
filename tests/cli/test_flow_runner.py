@@ -5,7 +5,7 @@ internal/flow/runner.py 단위 테스트
 FlowRunner 클래스 테스트.
 """
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch  # noqa: F401
 
 import pytest
 
@@ -475,7 +475,7 @@ class TestRunOnce:
         mock_requires.return_value = True
 
         # Execute
-        result = flow_runner._run_once()
+        flow_runner._run_once()
 
         # Verify - SSO_SESSION이므로 AccountStep, RoleStep 호출됨
         mock_account_step.return_value.execute.assert_called_once()
