@@ -122,25 +122,21 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions_for_selection = common_region_codes + other_regions
 
-        print_box_start(f"리전 선택 ({len(all_regions_for_selection)}개)")
+        print_box_start(f"리전 ({len(all_regions_for_selection)}개)")
 
-        # 2열 레이아웃
-        half = (len(all_regions_for_selection) + 1) // 2
-        for i in range(half):
-            left_idx = i + 1
-            left = all_regions_for_selection[i]
-            left_name = REGION_NAMES.get(left, "")[:8]
-            left_mark = "*" if left == self.default_region else " "
-            left_str = f"{left_idx:>2}){left_mark}{left:<16} {left_name:<8}"
-
-            if i + half < len(all_regions_for_selection):
-                right_idx = i + half + 1
-                right = all_regions_for_selection[i + half]
-                right_name = REGION_NAMES.get(right, "")[:8]
-                right_str = f"{right_idx:>2}) {right:<16} {right_name}"
-                print_box_line(f" {left_str}  {right_str}")
-            else:
-                print_box_line(f" {left_str}")
+        # 3열 레이아웃 (리전 코드만)
+        cols = 3
+        rows = (len(all_regions_for_selection) + cols - 1) // cols
+        for row in range(rows):
+            line_parts = []
+            for col in range(cols):
+                idx = row + col * rows
+                if idx < len(all_regions_for_selection):
+                    num = idx + 1
+                    region = all_regions_for_selection[idx]
+                    mark = "*" if region == self.default_region else " "
+                    line_parts.append(f"{num:>2}){mark}{region:<15}")
+            print_box_line(" " + "".join(line_parts))
 
         print_box_end()
 
@@ -169,27 +165,23 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions = common_region_codes + other_regions
 
-        print_box_start(f"리전 선택 ({len(all_regions)}개)")
+        print_box_start(f"리전 ({len(all_regions)}개)")
 
-        # 2열 레이아웃
-        half = (len(all_regions) + 1) // 2
-        for i in range(half):
-            left_idx = i + 1
-            left = all_regions[i]
-            left_name = REGION_NAMES.get(left, "")[:6]
-            left_str = f"{left_idx:>2}) {left:<14} {left_name:<6}"
-
-            if i + half < len(all_regions):
-                right_idx = i + half + 1
-                right = all_regions[i + half]
-                right_name = REGION_NAMES.get(right, "")[:6]
-                right_str = f"{right_idx:>2}) {right:<14} {right_name}"
-                print_box_line(f" {left_str}  {right_str}")
-            else:
-                print_box_line(f" {left_str}")
+        # 3열 레이아웃 (리전 코드만)
+        cols = 3
+        rows = (len(all_regions) + cols - 1) // cols
+        for row in range(rows):
+            line_parts = []
+            for col in range(cols):
+                idx = row + col * rows
+                if idx < len(all_regions):
+                    num = idx + 1
+                    region = all_regions[idx]
+                    line_parts.append(f"{num:>2}) {region:<16}")
+            print_box_line(" " + "".join(line_parts))
 
         print_box_line()
-        print_box_line("[dim]번호 입력 (쉼표/공백 구분) | a: 전체[/dim]")
+        print_box_line("[dim]번호 (쉼표 구분) | a: 전체[/dim]")
         print_box_end()
 
         while True:
