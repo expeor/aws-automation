@@ -1,5 +1,6 @@
 # AA (AWS Automation)
 
+[![PyPI](https://img.shields.io/pypi/v/aws-automation?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/aws-automation/)
 [![CI](https://github.com/expeor/aws-automation/actions/workflows/ci.yml/badge.svg)](https://github.com/expeor/aws-automation/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.10--3.13-3776AB?logo=python&logoColor=white)](https://python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -18,6 +19,14 @@ AWS 운영 자동화를 위한 CLI 도구입니다.
 - **플러그인 구조**: 새로운 도구를 쉽게 추가 가능
 
 ## 설치
+
+### PyPI (권장)
+
+```bash
+pip install aws-automation
+```
+
+### 소스에서 설치
 
 ```bash
 git clone https://github.com/expeor/aws-automation.git
@@ -152,6 +161,10 @@ aa group delete "개발 환경" # 그룹 삭제
 ## 업데이트
 
 ```bash
+# PyPI 설치 시
+pip install --upgrade aws-automation
+
+# 소스 설치 시
 git pull && pip install -e .
 ```
 
