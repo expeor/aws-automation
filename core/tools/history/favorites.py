@@ -8,7 +8,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 
 @dataclass
@@ -39,7 +39,7 @@ class FavoritesManager:
         if self._initialized:
             return
         self._path = self._get_favorites_path()
-        self._items: List[FavoriteItem] = []
+        self._items: list[FavoriteItem] = []
         self._load()
         self._initialized = True
 
@@ -124,12 +124,9 @@ class FavoritesManager:
 
     def is_favorite(self, category: str, tool_module: str) -> bool:
         """즐겨찾기 여부 확인"""
-        for item in self._items:
-            if item.category == category and item.tool_module == tool_module:
-                return True
-        return False
+        return any(item.category == category and item.tool_module == tool_module for item in self._items)
 
-    def get_all(self) -> List[FavoriteItem]:
+    def get_all(self) -> list[FavoriteItem]:
         """전체 즐겨찾기 목록 (순서대로)"""
         return sorted(self._items, key=lambda x: x.order)
 

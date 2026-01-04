@@ -5,7 +5,7 @@ core/auth/provider/static.py 단위 테스트
 StaticCredentialsProvider 테스트.
 """
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -364,7 +364,7 @@ class TestGetSession:
         mock_session_class.reset_mock()
         mock_session_class.return_value = MagicMock()
 
-        session = provider.get_session(region="us-west-2")
+        provider.get_session(region="us-west-2")
 
         # 새 세션 생성 확인
         mock_session_class.assert_called_with(

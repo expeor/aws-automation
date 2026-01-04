@@ -12,6 +12,28 @@ concurrency:
 
 jobs:
   # =============================================================================
+  # Linting
+  # =============================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff check
+        run: ruff check cli core plugins
+
+      - name: Run ruff format check
+        run: ruff format --check cli core plugins
+
+  # =============================================================================
   # Type Checking
   # =============================================================================
   typecheck:
@@ -30,9 +52,7 @@ jobs:
           pip install mypy types-requests types-python-dateutil
 
       - name: Run MyPy
-        run: mypy cli core --ignore-missing-imports --no-error-summary || true
-        # NOTE: --no-error-summary와 || true는 점진적 도입을 위함
-        # 완전 적용 시 제거
+        run: mypy cli core --ignore-missing-imports
 
   # =============================================================================
   # Unit Tests (Multi-Python)
@@ -136,10 +156,11 @@ jobs:
         run: pip install safety bandit
 
       - name: Check dependencies for vulnerabilities
-        run: safety check -r requirements.txt --output text || true
-        # NOTE: || true는 점진적 도입을 위함
+        run: safety check -r requirements.txt --output text
+        continue-on-error: true  # Advisory: doesn't block PR merge
 
       - name: Run Bandit security linter
-        run: bandit -r cli core plugins -ll --skip B101,B311 || true
-        # B101: assert 사용 (테스트에서 정상)
-        # B311: random 사용 (보안 목적 아님)
+        run: bandit -r cli core plugins -ll --skip B101,B311,B608
+        # B101: assert usage (normal in tests)
+        # B311: random usage (not for security)
+        # B608: DuckDB queries with internal AWS data, not user input

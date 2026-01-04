@@ -13,19 +13,29 @@ Lambda 함수 종합 분석:
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 from rich.console import Console
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import (
-    estimate_lambda_cost,
     get_lambda_monthly_cost,
     get_lambda_provisioned_monthly_cost,
 )
+
+from .common.collector import (
+    LambdaFunctionInfo,
+    collect_functions_with_metrics,
+)
+from .common.runtime_eol import (
+    EOLStatus,
+    get_recommended_upgrade,
+    get_runtime_info,
+)
+
+console = Console()
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -37,20 +47,6 @@ REQUIRED_PERMISSIONS = {
         "cloudwatch:GetMetricStatistics",
     ],
 }
-
-from .common.collector import (
-    LambdaFunctionInfo,
-    LambdaMetrics,
-    collect_functions_with_metrics,
-)
-from .common.runtime_eol import (
-    EOLStatus,
-    get_recommended_upgrade,
-    get_runtime_info,
-    get_runtime_status,
-)
-
-console = Console()
 
 
 class IssueType(Enum):
@@ -91,9 +87,9 @@ class LambdaComprehensiveResult:
     """Lambda 종합 분석 결과"""
 
     function: LambdaFunctionInfo
-    issues: List[LambdaIssue] = field(default_factory=list)
+    issues: list[LambdaIssue] = field(default_factory=list)
     estimated_monthly_cost: float = 0.0
-    memory_recommendation: Optional[int] = None
+    memory_recommendation: int | None = None
     potential_savings: float = 0.0
 
     @property
@@ -123,7 +119,7 @@ class ComprehensiveAnalysisResult:
     error_issue_count: int = 0
     total_monthly_cost: float = 0.0
     potential_savings: float = 0.0
-    results: List[LambdaComprehensiveResult] = field(default_factory=list)
+    results: list[LambdaComprehensiveResult] = field(default_factory=list)
 
 
 # =============================================================================
@@ -134,7 +130,7 @@ class ComprehensiveAnalysisResult:
 def analyze_function_comprehensive(
     func: LambdaFunctionInfo,
     region: str,
-    memory_stats: Optional[Dict] = None,
+    memory_stats: dict | None = None,
 ) -> LambdaComprehensiveResult:
     """Lambda 함수 종합 분석"""
     result = LambdaComprehensiveResult(function=func)
@@ -237,7 +233,7 @@ def _analyze_runtime_eol(func: LambdaFunctionInfo, result: LambdaComprehensiveRe
 def _analyze_memory(
     func: LambdaFunctionInfo,
     result: LambdaComprehensiveResult,
-    memory_stats: Optional[Dict] = None,
+    memory_stats: dict | None = None,
 ):
     """메모리 사용량 분석"""
     metrics = func.metrics
@@ -247,7 +243,7 @@ def _analyze_memory(
     # 메모리 통계가 있으면 사용 (CloudWatch Logs Insights 결과)
     if memory_stats:
         max_used = memory_stats.get("max_memory_used_mb", 0)
-        avg_used = memory_stats.get("avg_memory_used_mb", 0)
+        memory_stats.get("avg_memory_used_mb", 0)
 
         if max_used > 0:
             utilization = max_used / func.memory_mb * 100
@@ -442,7 +438,7 @@ def _analyze_timeout_risk(func: LambdaFunctionInfo, result: LambdaComprehensiveR
 
 
 def analyze_comprehensive(
-    functions: List[LambdaFunctionInfo],
+    functions: list[LambdaFunctionInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -484,7 +480,7 @@ def analyze_comprehensive(
 # =============================================================================
 
 
-def generate_report(results: List[ComprehensiveAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -494,24 +490,14 @@ def generate_report(results: List[ComprehensiveAnalysisResult], output_dir: str)
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     severity_fills = {
-        Severity.CRITICAL: PatternFill(
-            start_color="FF0000", end_color="FF0000", fill_type="solid"
-        ),
-        Severity.HIGH: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        Severity.MEDIUM: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        Severity.LOW: PatternFill(
-            start_color="90EE90", end_color="90EE90", fill_type="solid"
-        ),
+        Severity.CRITICAL: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
+        Severity.HIGH: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        Severity.MEDIUM: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        Severity.LOW: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
     }
 
     # Summary
@@ -559,9 +545,7 @@ def generate_report(results: List[ComprehensiveAnalysisResult], output_dir: str)
     ws.cell(row=row, column=3, value=total_functions).font = Font(bold=True)
     ws.cell(row=row, column=4, value=total_issues).font = Font(bold=True)
     ws.cell(row=row, column=8, value=f"${total_cost:,.2f}").font = Font(bold=True)
-    ws.cell(row=row, column=9, value=f"${total_savings:,.2f}").font = Font(
-        bold=True, color="FF0000"
-    )
+    ws.cell(row=row, column=9, value=f"${total_savings:,.2f}").font = Font(bold=True, color="FF0000")
 
     # Issues
     ws_issues = wb.create_sheet("Issues")
@@ -599,9 +583,7 @@ def generate_report(results: List[ComprehensiveAnalysisResult], output_dir: str)
                 ws_issues.cell(
                     row=issue_row,
                     column=10,
-                    value=f"${issue.potential_savings:,.2f}"
-                    if issue.potential_savings > 0
-                    else "-",
+                    value=f"${issue.potential_savings:,.2f}" if issue.potential_savings > 0 else "-",
                 )
 
                 fill = severity_fills.get(issue.severity)
@@ -641,32 +623,24 @@ def generate_report(results: List[ComprehensiveAnalysisResult], output_dir: str)
             ws_all.cell(row=all_row, column=4, value=fn.runtime)
             ws_all.cell(row=all_row, column=5, value=fn.memory_mb)
             ws_all.cell(row=all_row, column=6, value=fn.timeout_seconds)
-            ws_all.cell(
-                row=all_row, column=7, value=metrics.invocations if metrics else 0
-            )
+            ws_all.cell(row=all_row, column=7, value=metrics.invocations if metrics else 0)
             ws_all.cell(
                 row=all_row,
                 column=8,
                 value=f"{metrics.duration_avg_ms:.1f}ms" if metrics else "-",
             )
             ws_all.cell(row=all_row, column=9, value=metrics.errors if metrics else 0)
-            ws_all.cell(
-                row=all_row, column=10, value=metrics.throttles if metrics else 0
-            )
+            ws_all.cell(row=all_row, column=10, value=metrics.throttles if metrics else 0)
             ws_all.cell(row=all_row, column=11, value=comp.issue_count)
-            ws_all.cell(
-                row=all_row, column=12, value=f"${comp.estimated_monthly_cost:,.4f}"
-            )
+            ws_all.cell(row=all_row, column=12, value=f"${comp.estimated_monthly_cost:,.4f}")
 
     # 열 너비
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -683,13 +657,9 @@ def generate_report(results: List[ComprehensiveAnalysisResult], output_dir: str)
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> ComprehensiveAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ComprehensiveAnalysisResult:
     """단일 계정/리전의 Lambda 종합 분석 (병렬 실행용)"""
-    functions = collect_functions_with_metrics(
-        session, account_id, account_name, region
-    )
+    functions = collect_functions_with_metrics(session, account_id, account_name, region)
     return analyze_comprehensive(functions, account_id, account_name, region)
 
 
@@ -698,11 +668,9 @@ def run(ctx) -> None:
     console.print("[bold]Lambda 종합 분석 시작...[/bold]\n")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="lambda"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="lambda")
 
-    results: List[ComprehensiveAnalysisResult] = result.get_data()
+    results: list[ComprehensiveAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:
@@ -722,7 +690,7 @@ def run(ctx) -> None:
     total_cost = sum(r.total_monthly_cost for r in results)
     total_savings = sum(r.potential_savings for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"전체 Lambda 함수: {total_functions}개")
     console.print(f"이슈 함수: {total_issues}개")
     if total_runtime > 0:

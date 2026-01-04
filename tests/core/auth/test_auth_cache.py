@@ -5,14 +5,10 @@ core/auth/cache/cache.py 단위 테스트
 CacheEntry, TokenCache, TokenCacheManager, AccountCache, CredentialsCache 테스트.
 """
 
-import json
 import tempfile
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from core.auth.cache.cache import (
     AccountCache,

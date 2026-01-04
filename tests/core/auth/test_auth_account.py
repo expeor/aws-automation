@@ -11,9 +11,7 @@ core/auth/account.py 테스트
 - format_account_identifier: 포맷된 식별자 반환
 """
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from core.auth.account import (
     format_account_identifier,

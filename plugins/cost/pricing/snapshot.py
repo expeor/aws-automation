@@ -15,7 +15,6 @@ EBS Snapshot 비용 계산:
 """
 
 import logging
-from typing import Dict
 
 from .cache import PriceCache
 from .fetcher import PricingFetcher
@@ -29,7 +28,7 @@ _cache = PriceCache()
 def get_snapshot_prices(
     region: str = "ap-northeast-2",
     refresh: bool = False,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """EBS Snapshot 가격 조회
 
     Args:
@@ -72,7 +71,7 @@ def get_snapshot_monthly_cost(
     return round(per_gb * size_gb, 2)
 
 
-def _get_cached_prices(region: str, refresh: bool = False) -> Dict[str, float]:
+def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
     """캐시된 가격 조회 (없으면 API 호출)"""
     if not refresh:
         cached = _cache.get("snapshot", region)

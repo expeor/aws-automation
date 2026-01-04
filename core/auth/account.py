@@ -5,9 +5,7 @@ Account Alias, Account ID, Account Name 조회 및 표시용 식별자 생성.
 모든 도구에서 공통으로 사용.
 """
 
-from typing import TYPE_CHECKING, Optional, Tuple
-
-from botocore.exceptions import ClientError
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -36,11 +34,12 @@ def get_account_display_name(session, fallback: str = "unknown") -> str:
         iam = session.client("iam")
         aliases = iam.list_account_aliases().get("AccountAliases", [])
         if aliases:
-            return aliases[0]
+            alias: str = aliases[0]
+            return alias
 
         # 2. Alias 없으면 Account ID 반환
         sts = session.client("sts")
-        account_id = sts.get_caller_identity()["Account"]
+        account_id: str = sts.get_caller_identity()["Account"]
         return account_id
     except Exception:
         return fallback
@@ -94,12 +93,13 @@ def get_account_id(session, fallback: str = "unknown") -> str:
     """
     try:
         sts = session.client("sts")
-        return sts.get_caller_identity()["Account"]
+        account_id: str = sts.get_caller_identity()["Account"]
+        return account_id
     except Exception:
         return fallback
 
 
-def get_account_alias(session) -> Optional[str]:
+def get_account_alias(session) -> str | None:
     """Account Alias 반환 (없으면 None)
 
     Args:
@@ -116,7 +116,7 @@ def get_account_alias(session) -> Optional[str]:
         return None
 
 
-def get_account_info(session, fallback: str = "unknown") -> Tuple[str, Optional[str]]:
+def get_account_info(session, fallback: str = "unknown") -> tuple[str, str | None]:
     """Account ID와 Alias 모두 반환
 
     Args:
@@ -147,9 +147,7 @@ def get_account_info(session, fallback: str = "unknown") -> Tuple[str, Optional[
     return account_id, account_alias
 
 
-def format_account_identifier(
-    session, fallback: str = "unknown", format: str = "alias_or_id"
-) -> str:
+def format_account_identifier(session, fallback: str = "unknown", format: str = "alias_or_id") -> str:
     """포맷된 계정 식별자 반환
 
     Args:

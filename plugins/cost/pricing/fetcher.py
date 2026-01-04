@@ -3,11 +3,12 @@ plugins/cost/pricing/fetcher.py - AWS 가격 정보 가져오기
 
 AWS Pricing API (get_products)를 사용하여 리전별 가격을 조회합니다.
 """
+
 from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -28,7 +29,7 @@ class PricingFetcher:
     get_products API로 리전별 가격을 조회합니다.
     """
 
-    def __init__(self, session: Optional["boto3.Session"] = None):
+    def __init__(self, session: boto3.Session | None = None):
         """
         Args:
             session: boto3 세션 (None이면 기본 세션 사용)
@@ -45,12 +46,10 @@ class PricingFetcher:
     def pricing_client(self):
         """Pricing API 클라이언트 (지연 생성)"""
         if self._pricing_client is None:
-            self._pricing_client = get_client(
-                self.session, "pricing", region_name=PRICING_API_REGION
-            )
+            self._pricing_client = get_client(self.session, "pricing", region_name=PRICING_API_REGION)
         return self._pricing_client
 
-    def get_ec2_prices(self, region: str) -> Dict[str, float]:
+    def get_ec2_prices(self, region: str) -> dict[str, float]:
         """EC2 인스턴스 가격 조회 (get_products API 사용)
 
         Args:
@@ -78,11 +77,7 @@ class PricingFetcher:
 
             prices = {}
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -104,7 +99,7 @@ class PricingFetcher:
             logger.warning(f"EC2 가격 조회 실패 [{region}]: {e}")
             return {}
 
-    def get_ebs_prices(self, region: str) -> Dict[str, float]:
+    def get_ebs_prices(self, region: str) -> dict[str, float]:
         """EBS 볼륨 가격 조회 (get_products API 사용)
 
         Args:
@@ -129,11 +124,7 @@ class PricingFetcher:
 
             prices = {}
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -163,7 +154,7 @@ class PricingFetcher:
                 "standard": 0.05,
             }
 
-    def get_vpc_endpoint_prices(self, region: str) -> Dict[str, float]:
+    def get_vpc_endpoint_prices(self, region: str) -> dict[str, float]:
         """VPC Endpoint 가격 조회 (Pricing API 사용)
 
         Args:
@@ -199,11 +190,7 @@ class PricingFetcher:
             }
 
             for price_item in interface_response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 terms = data.get("terms", {}).get("OnDemand", {})
                 for term in terms.values():
                     for dim in term.get("priceDimensions", {}).values():
@@ -228,7 +215,7 @@ class PricingFetcher:
                 "data_per_gb": 0.01,
             }
 
-    def get_secrets_manager_prices(self, region: str) -> Dict[str, float]:
+    def get_secrets_manager_prices(self, region: str) -> dict[str, float]:
         """Secrets Manager 가격 조회
 
         Args:
@@ -249,11 +236,7 @@ class PricingFetcher:
             prices = {"per_secret_monthly": 0.0, "per_10k_api_calls": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -275,7 +258,7 @@ class PricingFetcher:
             logger.warning(f"Secrets Manager 가격 조회 실패 [{region}]: {e}")
             return {"per_secret_monthly": 0.40, "per_10k_api_calls": 0.05}
 
-    def get_kms_prices(self, region: str) -> Dict[str, float]:
+    def get_kms_prices(self, region: str) -> dict[str, float]:
         """KMS 가격 조회
 
         Args:
@@ -296,11 +279,7 @@ class PricingFetcher:
             prices = {"customer_key_monthly": 0.0, "per_10k_requests": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -323,7 +302,7 @@ class PricingFetcher:
             logger.warning(f"KMS 가격 조회 실패 [{region}]: {e}")
             return {"customer_key_monthly": 1.0, "per_10k_requests": 0.03}
 
-    def get_ecr_prices(self, region: str) -> Dict[str, float]:
+    def get_ecr_prices(self, region: str) -> dict[str, float]:
         """ECR 가격 조회
 
         Args:
@@ -344,11 +323,7 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -367,7 +342,7 @@ class PricingFetcher:
             logger.warning(f"ECR 가격 조회 실패 [{region}]: {e}")
             return {"storage_per_gb_monthly": 0.10}
 
-    def get_route53_prices(self) -> Dict[str, float]:
+    def get_route53_prices(self) -> dict[str, float]:
         """Route53 가격 조회 (글로벌 서비스)
 
         Returns:
@@ -387,16 +362,12 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
                 group = attrs.get("group", "").lower()
-                group_desc = attrs.get("groupDescription", "").lower()
+                attrs.get("groupDescription", "").lower()
 
                 for term in terms.values():
                     for dim in term.get("priceDimensions", {}).values():
@@ -404,10 +375,7 @@ class PricingFetcher:
                         desc = dim.get("description", "").lower()
                         if price > 0:
                             if "hosted zone" in desc or "zone" in group:
-                                if (
-                                    "first 25" in desc
-                                    or prices["hosted_zone_monthly"] == 0
-                                ):
+                                if "first 25" in desc or prices["hosted_zone_monthly"] == 0:
                                     prices["hosted_zone_monthly"] = price
                                 else:
                                     prices["additional_zone_monthly"] = price
@@ -425,7 +393,7 @@ class PricingFetcher:
                 "query_per_million": 0.40,
             }
 
-    def get_snapshot_prices(self, region: str) -> Dict[str, float]:
+    def get_snapshot_prices(self, region: str) -> dict[str, float]:
         """EBS Snapshot 가격 조회
 
         Args:
@@ -451,11 +419,7 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 terms = data.get("terms", {}).get("OnDemand", {})
 
                 for term in terms.values():
@@ -472,7 +436,7 @@ class PricingFetcher:
             logger.warning(f"EBS Snapshot 가격 조회 실패 [{region}]: {e}")
             return {"storage_per_gb_monthly": 0.05}
 
-    def get_eip_prices(self, region: str) -> Dict[str, float]:
+    def get_eip_prices(self, region: str) -> dict[str, float]:
         """Elastic IP 가격 조회
 
         Args:
@@ -498,11 +462,7 @@ class PricingFetcher:
             prices = {"unused_hourly": 0.0, "additional_hourly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -524,7 +484,7 @@ class PricingFetcher:
             logger.warning(f"EIP 가격 조회 실패 [{region}]: {e}")
             return {"unused_hourly": 0.005, "additional_hourly": 0.005}
 
-    def get_elb_prices(self, region: str) -> Dict[str, float]:
+    def get_elb_prices(self, region: str) -> dict[str, float]:
         """ELB 가격 조회
 
         Args:
@@ -551,11 +511,7 @@ class PricingFetcher:
             )
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -590,7 +546,7 @@ class PricingFetcher:
                 "clb_hourly": 0.025,
             }
 
-    def get_rds_snapshot_prices(self, region: str) -> Dict[str, float]:
+    def get_rds_snapshot_prices(self, region: str) -> dict[str, float]:
         """RDS Snapshot 가격 조회
 
         Args:
@@ -616,11 +572,7 @@ class PricingFetcher:
             prices = {"rds_per_gb_monthly": 0.0, "aurora_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -642,7 +594,7 @@ class PricingFetcher:
             logger.warning(f"RDS Snapshot 가격 조회 실패 [{region}]: {e}")
             return {"rds_per_gb_monthly": 0.02, "aurora_per_gb_monthly": 0.021}
 
-    def get_cloudwatch_prices(self, region: str) -> Dict[str, float]:
+    def get_cloudwatch_prices(self, region: str) -> dict[str, float]:
         """CloudWatch Logs 가격 조회
 
         Args:
@@ -663,11 +615,7 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0, "ingestion_per_gb": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -690,7 +638,7 @@ class PricingFetcher:
             logger.warning(f"CloudWatch 가격 조회 실패 [{region}]: {e}")
             return {"storage_per_gb_monthly": 0.03, "ingestion_per_gb": 0.50}
 
-    def get_lambda_prices(self, region: str) -> Dict[str, float]:
+    def get_lambda_prices(self, region: str) -> dict[str, float]:
         """Lambda 가격 조회
 
         Args:
@@ -719,11 +667,7 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -754,7 +698,7 @@ class PricingFetcher:
                 "provisioned_concurrency_per_gb_hour": 0.000004646,
             }
 
-    def get_dynamodb_prices(self, region: str) -> Dict[str, float]:
+    def get_dynamodb_prices(self, region: str) -> dict[str, float]:
         """DynamoDB 가격 조회
 
         Args:
@@ -787,11 +731,7 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 

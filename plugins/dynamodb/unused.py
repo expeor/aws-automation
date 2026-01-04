@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -62,7 +61,7 @@ class TableInfo:
     consumed_read: float = 0.0
     consumed_write: float = 0.0
     throttled_requests: float = 0.0
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     @property
     def size_mb(self) -> float:
@@ -117,12 +116,10 @@ class DynamoDBAnalysisResult:
     normal_tables: int = 0
     unused_monthly_cost: float = 0.0
     low_usage_monthly_cost: float = 0.0
-    findings: List[TableFinding] = field(default_factory=list)
+    findings: list[TableFinding] = field(default_factory=list)
 
 
-def collect_dynamodb_tables(
-    session, account_id: str, account_name: str, region: str
-) -> List[TableInfo]:
+def collect_dynamodb_tables(session, account_id: str, account_name: str, region: str) -> list[TableInfo]:
     """DynamoDB 테이블 수집"""
     from botocore.exceptions import ClientError
 
@@ -174,9 +171,9 @@ def collect_dynamodb_tables(
                             Statistics=["Sum"],
                         )
                         if read_resp.get("Datapoints"):
-                            table.consumed_read = sum(
-                                d["Sum"] for d in read_resp["Datapoints"]
-                            ) / len(read_resp["Datapoints"])
+                            table.consumed_read = sum(d["Sum"] for d in read_resp["Datapoints"]) / len(
+                                read_resp["Datapoints"]
+                            )
 
                         # ConsumedWriteCapacityUnits
                         write_resp = cloudwatch.get_metric_statistics(
@@ -189,9 +186,9 @@ def collect_dynamodb_tables(
                             Statistics=["Sum"],
                         )
                         if write_resp.get("Datapoints"):
-                            table.consumed_write = sum(
-                                d["Sum"] for d in write_resp["Datapoints"]
-                            ) / len(write_resp["Datapoints"])
+                            table.consumed_write = sum(d["Sum"] for d in write_resp["Datapoints"]) / len(
+                                write_resp["Datapoints"]
+                            )
 
                         # ThrottledRequests
                         throttle_resp = cloudwatch.get_metric_statistics(
@@ -204,9 +201,7 @@ def collect_dynamodb_tables(
                             Statistics=["Sum"],
                         )
                         if throttle_resp.get("Datapoints"):
-                            table.throttled_requests = sum(
-                                d["Sum"] for d in throttle_resp["Datapoints"]
-                            )
+                            table.throttled_requests = sum(d["Sum"] for d in throttle_resp["Datapoints"])
 
                     except ClientError:
                         pass
@@ -222,9 +217,7 @@ def collect_dynamodb_tables(
     return tables
 
 
-def analyze_tables(
-    tables: List[TableInfo], account_id: str, account_name: str, region: str
-) -> DynamoDBAnalysisResult:
+def analyze_tables(tables: list[TableInfo], account_id: str, account_name: str, region: str) -> DynamoDBAnalysisResult:
     """DynamoDB 테이블 분석"""
     result = DynamoDBAnalysisResult(
         account_id=account_id,
@@ -249,21 +242,10 @@ def analyze_tables(
 
         # 저사용: Provisioned 모드에서 사용량이 프로비저닝의 10% 미만
         if table.billing_mode == "PROVISIONED":
-            read_usage = (
-                (table.consumed_read / table.provisioned_read * 100)
-                if table.provisioned_read > 0
-                else 0
-            )
-            write_usage = (
-                (table.consumed_write / table.provisioned_write * 100)
-                if table.provisioned_write > 0
-                else 0
-            )
+            read_usage = (table.consumed_read / table.provisioned_read * 100) if table.provisioned_read > 0 else 0
+            write_usage = (table.consumed_write / table.provisioned_write * 100) if table.provisioned_write > 0 else 0
 
-            if (
-                read_usage < LOW_USAGE_THRESHOLD_PERCENT
-                and write_usage < LOW_USAGE_THRESHOLD_PERCENT
-            ):
+            if read_usage < LOW_USAGE_THRESHOLD_PERCENT and write_usage < LOW_USAGE_THRESHOLD_PERCENT:
                 result.low_usage_tables += 1
                 result.low_usage_monthly_cost += table.estimated_monthly_cost
                 result.findings.append(
@@ -287,7 +269,7 @@ def analyze_tables(
     return result
 
 
-def generate_report(results: List[DynamoDBAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[DynamoDBAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -297,14 +279,10 @@ def generate_report(results: List[DynamoDBAnalysisResult], output_dir: str) -> s
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -377,25 +355,17 @@ def generate_report(results: List[DynamoDBAnalysisResult], output_dir: str) -> s
                 ws_detail.cell(row=detail_row, column=7, value=f"{t.size_mb:.2f}")
                 ws_detail.cell(row=detail_row, column=8, value=t.provisioned_read)
                 ws_detail.cell(row=detail_row, column=9, value=t.provisioned_write)
-                ws_detail.cell(
-                    row=detail_row, column=10, value=f"{t.consumed_read:.1f}"
-                )
-                ws_detail.cell(
-                    row=detail_row, column=11, value=f"{t.consumed_write:.1f}"
-                )
-                ws_detail.cell(
-                    row=detail_row, column=12, value=f"${t.estimated_monthly_cost:.2f}"
-                )
+                ws_detail.cell(row=detail_row, column=10, value=f"{t.consumed_read:.1f}")
+                ws_detail.cell(row=detail_row, column=11, value=f"{t.consumed_write:.1f}")
+                ws_detail.cell(row=detail_row, column=12, value=f"${t.estimated_monthly_cost:.2f}")
                 ws_detail.cell(row=detail_row, column=13, value=f.recommendation)
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -405,9 +375,7 @@ def generate_report(results: List[DynamoDBAnalysisResult], output_dir: str) -> s
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[DynamoDBAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> DynamoDBAnalysisResult | None:
     """단일 계정/리전의 DynamoDB 테이블 수집 및 분석 (병렬 실행용)"""
     tables = collect_dynamodb_tables(session, account_id, account_name, region)
     if not tables:
@@ -419,12 +387,8 @@ def run(ctx) -> None:
     """DynamoDB 미사용 테이블 분석"""
     console.print("[bold]DynamoDB 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="dynamodb"
-    )
-    results: List[DynamoDBAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="dynamodb")
+    results: list[DynamoDBAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -438,7 +402,7 @@ def run(ctx) -> None:
     unused_cost = sum(r.unused_monthly_cost for r in results)
     low_cost = sum(r.low_usage_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용: [red]{total_unused}개[/red] (${unused_cost:,.2f}/월) / "
         f"저사용: [yellow]{total_low}개[/yellow] (${low_cost:,.2f}/월)"

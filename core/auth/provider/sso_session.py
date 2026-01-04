@@ -7,21 +7,20 @@ SSO Session Provider 구현
 - 토큰 캐시 관리 (AWS CLI 호환)
 """
 
+import contextlib
 import logging
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import sleep
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
 
-from ..cache import AccountCache, CredentialsCache, TokenCache, TokenCacheManager
+from ..cache import TokenCache, TokenCacheManager
 from ..types import (
     AccountInfo,
-    NotAuthenticatedError,
-    Provider,
     ProviderError,
     ProviderType,
     TokenExpiredError,
@@ -88,15 +87,13 @@ class SSOSessionProvider(BaseProvider):
             session_name=config.session_name,
             start_url=config.start_url,
         )
-        self._token_cache: Optional[TokenCache] = None
-        self._access_token: Optional[str] = None
+        self._token_cache: TokenCache | None = None
+        self._access_token: str | None = None
 
         # boto3 클라이언트
         self._base_session = boto3.Session(region_name=config.region)
         self._sso_client = self._base_session.client("sso", region_name=config.region)
-        self._sso_oidc_client = self._base_session.client(
-            "sso-oidc", region_name=config.region
-        )
+        self._sso_oidc_client = self._base_session.client("sso-oidc", region_name=config.region)
 
     @property
     def _provider_type(self) -> ProviderType:
@@ -162,10 +159,8 @@ class SSOSessionProvider(BaseProvider):
             verification_url = device_auth["verificationUriComplete"]
             logger.info(f"브라우저에서 인증하세요: {verification_url}")
 
-            try:
+            with contextlib.suppress(Exception):
                 webbrowser.open(verification_url, new=2)
-            except Exception:
-                pass
 
             # 토큰 폴링
             self._poll_for_token(
@@ -182,7 +177,7 @@ class SSOSessionProvider(BaseProvider):
                 operation="device_authorization",
                 message=f"디바이스 인증 실패: {e}",
                 cause=e,
-            )
+            ) from e
 
     def _poll_for_token(
         self,
@@ -216,29 +211,29 @@ class SSOSessionProvider(BaseProvider):
                 sleep(interval)
                 continue
             except self._sso_oidc_client.exceptions.ExpiredTokenException:
-                raise TokenExpiredError("디바이스 인증 시간 초과")
+                raise TokenExpiredError("디바이스 인증 시간 초과") from None
             except Exception as e:
                 raise ProviderError(
                     provider=self._name,
                     operation="create_token",
                     message=f"토큰 생성 실패: {e}",
                     cause=e,
-                )
+                ) from e
 
         raise TokenExpiredError("디바이스 인증 시간 초과")
 
     def _save_token_cache(
         self,
-        token_response: Dict[str, Any],
+        token_response: dict[str, Any],
         client_id: str,
         client_secret: str,
     ) -> None:
         """토큰 캐시 저장"""
         # 만료 시간 계산 (기존 aws_sso_helper.py 방식)
         expires_in = token_response.get("expiresIn", 28800)  # 기본 8시간
-        expires_at_str = datetime.fromtimestamp(
-            datetime.now(timezone.utc).timestamp() + expires_in
-        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        expires_at_str = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() + expires_in).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
 
         self._token_cache = TokenCache(
             access_token=token_response["accessToken"],
@@ -274,7 +269,7 @@ class SSOSessionProvider(BaseProvider):
             )
 
         except Exception as e:
-            raise TokenExpiredError(f"토큰 갱신 실패: {e}", cause=e)
+            raise TokenExpiredError(f"토큰 갱신 실패: {e}", cause=e) from e
 
     def refresh(self) -> None:
         """자격 증명 갱신"""
@@ -285,9 +280,9 @@ class SSOSessionProvider(BaseProvider):
 
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
         retry_on_expired: bool = True,
     ) -> boto3.Session:
         """특정 계정/역할에 대한 boto3 Session 반환
@@ -348,27 +343,25 @@ class SSOSessionProvider(BaseProvider):
                 if retry_on_expired:
                     logger.info("SSO 토큰 만료됨, 재인증 시도...")
                     self.authenticate(force=True)  # 강제 재인증
-                    return self.get_session(
-                        account_id, role_name, region, retry_on_expired=False
-                    )
+                    return self.get_session(account_id, role_name, region, retry_on_expired=False)
 
                 raise TokenExpiredError(
                     f"SSO 토큰이 만료되었습니다: {error_code}",
                     cause=e,
-                )
+                ) from e
             raise ProviderError(
                 provider=self._name,
                 operation="get_role_credentials",
                 message=f"자격증명 획득 실패: {e}",
                 cause=e,
-            )
+            ) from e
 
     def get_aws_config(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
+    ) -> dict[str, Any]:
         """AWS 설정 정보 반환"""
         session = self.get_session(account_id, role_name, region)
         return {
@@ -376,7 +369,7 @@ class SSOSessionProvider(BaseProvider):
             "credentials": session.get_credentials(),
         }
 
-    def list_accounts(self, retry_on_expired: bool = True) -> Dict[str, AccountInfo]:
+    def list_accounts(self, retry_on_expired: bool = True) -> dict[str, AccountInfo]:
         """접근 가능한 계정 목록 반환
 
         Args:
@@ -428,15 +421,15 @@ class SSOSessionProvider(BaseProvider):
                 raise TokenExpiredError(
                     f"SSO 토큰이 만료되었습니다: {error_code}",
                     cause=e,
-                )
+                ) from e
             raise ProviderError(
                 provider=self._name,
                 operation="list_accounts",
                 message=f"계정 목록 조회 실패: {e}",
                 cause=e,
-            )
+            ) from e
 
-    def _list_account_roles(self, account_id: str) -> List[str]:
+    def _list_account_roles(self, account_id: str) -> list[str]:
         """특정 계정의 역할 목록 조회"""
         try:
             response = self._sso_client.list_account_roles(

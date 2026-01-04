@@ -11,7 +11,7 @@ from .collector import (
     collect_functions,
 )
 
-__all__ = [
+__all__: list[str] = [
     "LambdaFunctionInfo",
     "LambdaMetrics",
     "collect_functions",

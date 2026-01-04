@@ -14,11 +14,11 @@ plugins/ec2/ami_audit.py - AMI 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+import contextlib
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
 
 from dateutil.parser import parse
 from rich.console import Console
@@ -78,17 +78,17 @@ class AMIInfo:
     architecture: str
     platform: str
     root_device_type: str
-    creation_date: Optional[datetime]
+    creation_date: datetime | None
     owner_id: str
     public: bool
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
     # 스냅샷 정보
-    snapshot_ids: List[str] = field(default_factory=list)
+    snapshot_ids: list[str] = field(default_factory=list)
     total_size_gb: int = 0
 
     # 사용 정보
-    used_by_instances: List[str] = field(default_factory=list)
+    used_by_instances: list[str] = field(default_factory=list)
 
     # 메타
     account_id: str = ""
@@ -136,7 +136,7 @@ class AMIAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[AMIFinding] = field(default_factory=list)
+    findings: list[AMIFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -154,9 +154,7 @@ class AMIAnalysisResult:
 # =============================================================================
 
 
-def collect_amis(
-    session, account_id: str, account_name: str, region: str
-) -> List[AMIInfo]:
+def collect_amis(session, account_id: str, account_name: str, region: str) -> list[AMIInfo]:
     """AMI 목록 수집 (자체 소유만)"""
     from botocore.exceptions import ClientError
 
@@ -192,10 +190,8 @@ def collect_amis(
             # 생성일 파싱
             creation_date = None
             if data.get("CreationDate"):
-                try:
+                with contextlib.suppress(Exception):
                     creation_date = parse(data["CreationDate"])
-                except Exception:
-                    pass
 
             monthly_cost = get_snapshot_monthly_cost(region, total_size_gb)
 
@@ -223,14 +219,12 @@ def collect_amis(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} AMI 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} AMI 수집 오류: {error_code}[/yellow]")
 
     return amis
 
 
-def get_used_ami_ids(session, region: str) -> Set[str]:
+def get_used_ami_ids(session, region: str) -> set[str]:
     """EC2 인스턴스에서 사용 중인 AMI ID 목록"""
     from botocore.exceptions import ClientError
 
@@ -259,8 +253,8 @@ def get_used_ami_ids(session, region: str) -> Set[str]:
 
 
 def analyze_amis(
-    amis: List[AMIInfo],
-    used_ami_ids: Set[str],
+    amis: list[AMIInfo],
+    used_ami_ids: set[str],
     account_id: str,
     account_name: str,
     region: str,
@@ -337,7 +331,7 @@ def _analyze_single_ami(ami: AMIInfo) -> AMIFinding:
 # =============================================================================
 
 
-def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[AMIAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -348,18 +342,12 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -458,9 +446,7 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 50
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
 
     ws2.freeze_panes = "A2"
 
@@ -478,9 +464,7 @@ def generate_report(results: List[AMIAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[AMIAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> AMIAnalysisResult | None:
     """단일 계정/리전의 AMI 수집 및 분석 (병렬 실행용)"""
     # 수집
     amis = collect_amis(session, account_id, account_name, region)
@@ -504,9 +488,7 @@ def run(ctx) -> None:
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
     # None 결과 필터링
-    all_results: List[AMIAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    all_results: list[AMIAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     # 에러 출력
     if result.error_count > 0:
@@ -527,9 +509,7 @@ def run(ctx) -> None:
         "unused_cost": sum(r.unused_monthly_cost for r in all_results),
     }
 
-    console.print(
-        f"\n[bold]전체 AMI: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
-    )
+    console.print(f"\n[bold]전체 AMI: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
     if totals["unused"] > 0:
         console.print(
             f"  [red bold]미사용: {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]"

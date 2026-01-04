@@ -2,8 +2,6 @@
 tests/test_parallel_decorators.py - core/parallel/decorators.py 테스트
 """
 
-import time
-from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError

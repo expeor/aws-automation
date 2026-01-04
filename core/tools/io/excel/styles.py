@@ -7,10 +7,11 @@ Note:
     이 모듈은 Lazy Import 패턴을 사용합니다.
     openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from openpyxl.styles import Alignment, Border, Font, PatternFill
@@ -66,7 +67,7 @@ FMT_TEXT = NUMBER_FORMAT_TEXT
 # =============================================================================
 
 
-def get_thin_border() -> "Border":
+def get_thin_border() -> Border:
     """얇은 테두리 스타일 반환"""
     from openpyxl.styles import Border, Side
 
@@ -79,7 +80,7 @@ def get_thin_border() -> "Border":
     )
 
 
-def get_header_font() -> "Font":
+def get_header_font() -> Font:
     """헤더 폰트 스타일 반환"""
     from openpyxl.styles import Font
 
@@ -91,7 +92,7 @@ def get_header_font() -> "Font":
     )
 
 
-def get_data_font() -> "Font":
+def get_data_font() -> Font:
     """데이터 폰트 스타일 반환"""
     from openpyxl.styles import Font
 
@@ -102,7 +103,7 @@ def get_data_font() -> "Font":
     )
 
 
-def get_summary_font() -> "Font":
+def get_summary_font() -> Font:
     """요약 행 폰트 스타일 반환"""
     from openpyxl.styles import Font
 
@@ -118,10 +119,10 @@ def get_summary_font() -> "Font":
 # =============================================================================
 
 # 캐시 저장소
-_alignment_cache: Dict[str, "Alignment"] = {}
+_alignment_cache: dict[str, Alignment] = {}
 
 
-def _get_alignment(name: str) -> "Alignment":
+def _get_alignment(name: str) -> Alignment:
     """정렬 상수 lazy 생성"""
     if name in _alignment_cache:
         return _alignment_cache[name]
@@ -130,22 +131,12 @@ def _get_alignment(name: str) -> "Alignment":
 
     alignments = {
         "ALIGN_LEFT": Alignment(horizontal="left", vertical="center", wrap_text=False),
-        "ALIGN_CENTER": Alignment(
-            horizontal="center", vertical="center", wrap_text=False
-        ),
-        "ALIGN_RIGHT": Alignment(
-            horizontal="right", vertical="center", wrap_text=False
-        ),
+        "ALIGN_CENTER": Alignment(horizontal="center", vertical="center", wrap_text=False),
+        "ALIGN_RIGHT": Alignment(horizontal="right", vertical="center", wrap_text=False),
         "ALIGN_WRAP": Alignment(horizontal="left", vertical="center", wrap_text=True),
-        "ALIGN_LEFT_WRAP": Alignment(
-            horizontal="left", vertical="center", wrap_text=True
-        ),
-        "ALIGN_CENTER_WRAP": Alignment(
-            horizontal="center", vertical="center", wrap_text=True
-        ),
-        "ALIGN_RIGHT_WRAP": Alignment(
-            horizontal="right", vertical="center", wrap_text=True
-        ),
+        "ALIGN_LEFT_WRAP": Alignment(horizontal="left", vertical="center", wrap_text=True),
+        "ALIGN_CENTER_WRAP": Alignment(horizontal="center", vertical="center", wrap_text=True),
+        "ALIGN_RIGHT_WRAP": Alignment(horizontal="right", vertical="center", wrap_text=True),
     }
 
     if name in alignments:
@@ -160,7 +151,7 @@ def _get_alignment(name: str) -> "Alignment":
 # =============================================================================
 
 
-def get_header_fill() -> "PatternFill":
+def get_header_fill() -> PatternFill:
     """헤더 채우기 스타일"""
     from openpyxl.styles import PatternFill
 
@@ -171,7 +162,7 @@ def get_header_fill() -> "PatternFill":
     )
 
 
-def get_summary_fill() -> "PatternFill":
+def get_summary_fill() -> PatternFill:
     """요약 행 채우기 스타일"""
     from openpyxl.styles import PatternFill
 
@@ -182,7 +173,7 @@ def get_summary_fill() -> "PatternFill":
     )
 
 
-def get_success_fill() -> "PatternFill":
+def get_success_fill() -> PatternFill:
     """성공 상태 채우기 스타일"""
     from openpyxl.styles import PatternFill
 
@@ -193,7 +184,7 @@ def get_success_fill() -> "PatternFill":
     )
 
 
-def get_warning_fill() -> "PatternFill":
+def get_warning_fill() -> PatternFill:
     """경고 상태 채우기 스타일"""
     from openpyxl.styles import PatternFill
 
@@ -204,7 +195,7 @@ def get_warning_fill() -> "PatternFill":
     )
 
 
-def get_danger_fill() -> "PatternFill":
+def get_danger_fill() -> PatternFill:
     """위험 상태 채우기 스타일"""
     from openpyxl.styles import PatternFill
 
@@ -215,7 +206,7 @@ def get_danger_fill() -> "PatternFill":
     )
 
 
-def get_abuse_fill() -> "PatternFill":
+def get_abuse_fill() -> PatternFill:
     """악성/차단 하이라이트 채우기 스타일 (진한 빨강)"""
     from openpyxl.styles import PatternFill
 
@@ -226,7 +217,7 @@ def get_abuse_fill() -> "PatternFill":
     )
 
 
-def get_error_fill() -> "PatternFill":
+def get_error_fill() -> PatternFill:
     """에러 하이라이트 채우기 스타일 (연한 빨강)"""
     from openpyxl.styles import PatternFill
 
@@ -237,7 +228,7 @@ def get_error_fill() -> "PatternFill":
     )
 
 
-def get_info_fill() -> "PatternFill":
+def get_info_fill() -> PatternFill:
     """정보 하이라이트 채우기 스타일 (연한 파랑)"""
     from openpyxl.styles import PatternFill
 
@@ -252,10 +243,10 @@ def get_info_fill() -> "PatternFill":
 # Fill 인스턴스 캐시 - lazy loading via __getattr__
 # =============================================================================
 
-_fill_cache: Dict[str, "PatternFill"] = {}
+_fill_cache: dict[str, PatternFill] = {}
 
 
-def _get_fill(name: str) -> "PatternFill":
+def _get_fill(name: str) -> PatternFill:
     """Fill 상수 lazy 생성"""
     if name in _fill_cache:
         return _fill_cache[name]
@@ -368,7 +359,7 @@ class Styles:
 # =============================================================================
 
 
-def get_header_style() -> Dict[str, Any]:
+def get_header_style() -> dict[str, Any]:
     """헤더 스타일 dict 반환 (셀 적용용)"""
     return {
         "font": get_header_font(),
@@ -378,35 +369,31 @@ def get_header_style() -> Dict[str, Any]:
     }
 
 
-def get_basic_header_style() -> Dict[str, Any]:
+def get_basic_header_style() -> dict[str, Any]:
     """기본 헤더 스타일 (Consolas 폰트, 연한 파랑 배경)"""
     from openpyxl.styles import Alignment, Font, PatternFill
 
     return {
         "font": Font(name="Consolas", bold=True),
-        "fill": PatternFill(
-            start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"
-        ),
+        "fill": PatternFill(start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"),
         "alignment": Alignment(horizontal="center", vertical="center"),
         "border": get_thin_border(),
     }
 
 
-def get_center_header_style() -> Dict[str, Any]:
+def get_center_header_style() -> dict[str, Any]:
     """중앙 정렬 헤더 스타일 (12pt)"""
     from openpyxl.styles import Font, PatternFill
 
     return {
         "font": Font(name="Consolas", bold=True, size=12),
-        "fill": PatternFill(
-            start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"
-        ),
+        "fill": PatternFill(start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"),
         "alignment": _get_alignment("ALIGN_CENTER"),
         "border": get_thin_border(),
     }
 
 
-def get_data_cell_style() -> Dict[str, Any]:
+def get_data_cell_style() -> dict[str, Any]:
     """데이터 셀 스타일"""
     from openpyxl.styles import Font
 
@@ -417,28 +404,26 @@ def get_data_cell_style() -> Dict[str, Any]:
     }
 
 
-def get_summary_cell_style() -> Dict[str, Any]:
+def get_summary_cell_style() -> dict[str, Any]:
     """요약/합계 셀 스타일"""
     from openpyxl.styles import Font, PatternFill
 
     return {
         "font": Font(name="Consolas", bold=True),
-        "fill": PatternFill(
-            start_color="F0F0F0", end_color="F0F0F0", fill_type="solid"
-        ),
+        "fill": PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid"),
         "alignment": _get_alignment("ALIGN_CENTER"),
         "border": get_thin_border(),
     }
 
 
-def get_center_alignment(wrap_text: bool = True) -> "Alignment":
+def get_center_alignment(wrap_text: bool = True) -> Alignment:
     """중앙 정렬 반환 (wrap_text 선택)"""
     from openpyxl.styles import Alignment
 
     return Alignment(horizontal="center", vertical="center", wrap_text=wrap_text)
 
 
-def create_status_style(status: str) -> Dict[str, Any]:
+def create_status_style(status: str) -> dict[str, Any]:
     """상태에 따른 스타일 반환
 
     Args:
@@ -465,21 +450,19 @@ def create_status_style(status: str) -> Dict[str, Any]:
     }
 
 
-def create_summary_cell_style() -> Dict[str, Any]:
+def create_summary_cell_style() -> dict[str, Any]:
     """요약/중요 셀 스타일"""
     from openpyxl.styles import Font, PatternFill
 
     return {
         "font": Font(bold=True),
         "alignment": _get_alignment("ALIGN_CENTER"),
-        "fill": PatternFill(
-            start_color="E0E0E0", end_color="E0E0E0", fill_type="solid"
-        ),
+        "fill": PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid"),
         "border": get_thin_border(),
     }
 
 
-def create_summary_dashboard_style() -> Dict[str, Any]:
+def create_summary_dashboard_style() -> dict[str, Any]:
     """대시보드 요약 섹션 스타일"""
     from openpyxl.styles import Font
 
@@ -491,7 +474,7 @@ def create_summary_dashboard_style() -> Dict[str, Any]:
     }
 
 
-def create_summary_value_style() -> Dict[str, Any]:
+def create_summary_value_style() -> dict[str, Any]:
     """요약 값 스타일"""
     from openpyxl.styles import Font
 
@@ -528,7 +511,7 @@ _FILL_NAMES = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     """Lazy loading for module-level constants"""
     if name in _ALIGNMENT_NAMES:
         return _get_alignment(name)

@@ -21,8 +21,9 @@ Note:
 """
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,14 @@ HOURS_PER_MONTH = 730
 class RecommendationFilter:
     """Cost Optimization Hub 권장사항 필터"""
 
-    action_types: List[str] = field(default_factory=list)
-    resource_types: List[str] = field(default_factory=list)
-    regions: List[str] = field(default_factory=list)
-    account_ids: List[str] = field(default_factory=list)
-    implementation_efforts: List[str] = field(default_factory=list)
-    restart_needed: Optional[bool] = None
-    rollback_possible: Optional[bool] = None
-    lookback_periods: List[int] = field(default_factory=list)
+    action_types: list[str] = field(default_factory=list)
+    resource_types: list[str] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
+    account_ids: list[str] = field(default_factory=list)
+    implementation_efforts: list[str] = field(default_factory=list)
+    restart_needed: bool | None = None
+    rollback_possible: bool | None = None
+    lookback_periods: list[int] = field(default_factory=list)
 
     # 지원되는 Action Types (AWS 문서 기준)
     VALID_ACTION_TYPES = [
@@ -109,9 +110,9 @@ class RecommendationFilter:
         "ElastiCache",
     ]
 
-    def to_api_filter(self) -> Dict[str, Any]:
+    def to_api_filter(self) -> dict[str, Any]:
         """AWS API 필터 형식으로 변환"""
-        api_filter = {}
+        api_filter: dict[str, Any] = {}
 
         if self.action_types:
             api_filter["actionTypes"] = self.action_types
@@ -152,12 +153,12 @@ class Recommendation:
     restart_needed: bool
     rollback_possible: bool
     lookback_period_days: int
-    tags: Dict[str, str]
+    tags: dict[str, str]
     source: str
-    last_refresh_timestamp: Optional[str] = None
+    last_refresh_timestamp: str | None = None
 
     @classmethod
-    def from_api_response(cls, item: Dict[str, Any]) -> "Recommendation":
+    def from_api_response(cls, item: dict[str, Any]) -> "Recommendation":
         """API 응답에서 Recommendation 객체 생성"""
         tags_list = item.get("tags", [])
         tags_dict = {tag["key"]: tag["value"] for tag in tags_list}
@@ -175,9 +176,7 @@ class Recommendation:
             action_type=item.get("actionType", ""),
             estimated_monthly_cost=float(item.get("estimatedMonthlyCost", 0)),
             estimated_monthly_savings=float(item.get("estimatedMonthlySavings", 0)),
-            estimated_savings_percentage=float(
-                item.get("estimatedSavingsPercentage", 0)
-            ),
+            estimated_savings_percentage=float(item.get("estimatedSavingsPercentage", 0)),
             implementation_effort=item.get("implementationEffort", ""),
             restart_needed=item.get("restartNeeded", False),
             rollback_possible=item.get("rollbackPossible", False),
@@ -187,7 +186,7 @@ class Recommendation:
             last_refresh_timestamp=item.get("lastRefreshTimestamp"),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환 (리포트용)"""
         return {
             "recommendation_id": self.recommendation_id,
@@ -253,14 +252,14 @@ class CostOptimizationAnalyzer:
 
     def get_recommendations(
         self,
-        action_types: Optional[List[str]] = None,
-        resource_types: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
-        account_ids: Optional[List[str]] = None,
-        lookback_periods: Optional[List[int]] = None,
+        action_types: list[str] | None = None,
+        resource_types: list[str] | None = None,
+        regions: list[str] | None = None,
+        account_ids: list[str] | None = None,
+        lookback_periods: list[int] | None = None,
         include_all: bool = True,
         page_size: int = 100,
-    ) -> List[Recommendation]:
+    ) -> list[Recommendation]:
         """비용 최적화 권장사항 조회
 
         Args:
@@ -303,7 +302,7 @@ class CostOptimizationAnalyzer:
         rec_filter: RecommendationFilter,
         include_all: bool,
         page_size: int,
-    ) -> Iterator[Dict[str, Any]]:
+    ) -> Iterator[dict[str, Any]]:
         """권장사항 페이지네이션 처리"""
         try:
             paginator = self.client.get_paginator("list_recommendations")
@@ -332,8 +331,8 @@ class CostOptimizationAnalyzer:
     def get_summary(
         self,
         group_by: str = "resource_type",
-        recommendations: Optional[List[Recommendation]] = None,
-    ) -> Dict[str, Dict[str, Any]]:
+        recommendations: list[Recommendation] | None = None,
+    ) -> dict[str, dict[str, Any]]:
         """권장사항 요약 통계
 
         Args:
@@ -374,9 +373,7 @@ class CostOptimizationAnalyzer:
 
         return summary
 
-    def get_total_savings(
-        self, recommendations: Optional[List[Recommendation]] = None
-    ) -> float:
+    def get_total_savings(self, recommendations: list[Recommendation] | None = None) -> float:
         """총 잠재적 월간 절약액 계산
 
         Args:
@@ -390,7 +387,7 @@ class CostOptimizationAnalyzer:
 
         return round(sum(rec.estimated_monthly_savings for rec in recommendations), 2)
 
-    def get_enrollment_status(self) -> Dict[str, Any]:
+    def get_enrollment_status(self) -> dict[str, Any]:
         """Cost Optimization Hub 등록 상태 확인
 
         Returns:
@@ -400,15 +397,13 @@ class CostOptimizationAnalyzer:
             response = self.client.list_enrollment_statuses()
             return {
                 "items": response.get("items", []),
-                "include_member_accounts": response.get(
-                    "includeMemberAccounts", False
-                ),
+                "include_member_accounts": response.get("includeMemberAccounts", False),
             }
         except Exception as e:
             logger.error(f"등록 상태 조회 실패: {e}")
             return {"items": [], "include_member_accounts": False}
 
-    def get_preferences(self) -> Dict[str, Any]:
+    def get_preferences(self) -> dict[str, Any]:
         """Cost Optimization Hub 설정 조회
 
         Returns:
@@ -418,9 +413,7 @@ class CostOptimizationAnalyzer:
             response = self.client.get_preferences()
             return {
                 "savings_estimation_mode": response.get("savingsEstimationMode", ""),
-                "member_account_discount_visibility": response.get(
-                    "memberAccountDiscountVisibility", ""
-                ),
+                "member_account_discount_visibility": response.get("memberAccountDiscountVisibility", ""),
             }
         except Exception as e:
             logger.error(f"설정 조회 실패: {e}")

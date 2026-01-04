@@ -2,14 +2,11 @@
 tests/test_plugins_ecr.py - ECR 플러그인 테스트
 """
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
-
-import pytest
+from datetime import datetime, timezone
+from unittest.mock import patch
 
 from plugins.ecr.unused import (
     ECRAnalysisResult,
-    ECRRepoFinding,
     ECRRepoInfo,
     ECRRepoStatus,
     analyze_ecr_repos,

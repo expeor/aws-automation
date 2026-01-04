@@ -63,7 +63,7 @@ Usage:
     provider.authenticate()
 """
 
-__all__ = [
+__all__: list[str] = [
     # 서브패키지
     "auth",
     "tools",

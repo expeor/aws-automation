@@ -60,9 +60,10 @@ Usage:
     target_accounts = ctx.get_target_accounts()
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
@@ -105,14 +106,14 @@ class RoleSelection:
     """Role 선택 결과"""
 
     primary_role: str
-    fallback_role: Optional[str] = None
+    fallback_role: str | None = None
     fallback_strategy: FallbackStrategy = FallbackStrategy.USE_FALLBACK
 
     # Role별 계정 매핑 (role_name -> [account_ids])
-    role_account_map: Dict[str, List[str]] = field(default_factory=dict)
+    role_account_map: dict[str, list[str]] = field(default_factory=dict)
 
     # 스킵될 계정 목록
-    skipped_accounts: List[str] = field(default_factory=list)
+    skipped_accounts: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -125,10 +126,10 @@ class ToolInfo:
     permission: str  # "read", "write", "delete"
 
     # 도구 실행 함수
-    runner: Optional[Callable[["ExecutionContext"], Any]] = None
+    runner: Callable[["ExecutionContext"], Any] | None = None
 
     # 도구별 추가 옵션 수집 함수 (Optional)
-    options_collector: Optional[Callable[["ExecutionContext"], Dict[str, Any]]] = None
+    options_collector: Callable[["ExecutionContext"], dict[str, Any]] | None = None
 
     # 선택 제약 옵션
     supports_single_region_only: bool = False  # 단일 리전만 지원
@@ -153,13 +154,13 @@ class AuthContext:
         regions: 대상 리전 목록
     """
 
-    profile_name: Optional[str] = None
-    profiles: List[str] = field(default_factory=list)
-    provider_kind: Optional[ProviderKind] = None
-    provider: Optional["Provider"] = None
-    role_selection: Optional[RoleSelection] = None
-    accounts: List["AccountInfo"] = field(default_factory=list)
-    regions: List[str] = field(default_factory=list)
+    profile_name: str | None = None
+    profiles: list[str] = field(default_factory=list)
+    provider_kind: ProviderKind | None = None
+    provider: "Provider | None" = None
+    role_selection: RoleSelection | None = None
+    accounts: list["AccountInfo"] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
 
     def is_sso(self) -> bool:
         """SSO 기반 인증인지 확인"""
@@ -192,7 +193,7 @@ class AuthContext:
         """역할 선택이 필요한지 확인"""
         return self.provider_kind == ProviderKind.SSO_SESSION
 
-    def get_effective_role(self, account_id: str) -> Optional[str]:
+    def get_effective_role(self, account_id: str) -> str | None:
         """특정 계정에 대한 실제 사용할 Role 반환"""
         if not self.role_selection:
             return None
@@ -212,7 +213,7 @@ class AuthContext:
 
         return None
 
-    def get_target_accounts(self) -> List["AccountInfo"]:
+    def get_target_accounts(self) -> list["AccountInfo"]:
         """실제 실행 대상 계정 목록 반환"""
         if not self.role_selection:
             return self.accounts
@@ -233,9 +234,9 @@ class ToolContext:
         options: 도구별 추가 옵션
     """
 
-    category: Optional[str] = None
-    tool: Optional[ToolInfo] = None
-    options: Dict[str, Any] = field(default_factory=dict)
+    category: str | None = None
+    tool: ToolInfo | None = None
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -260,33 +261,33 @@ class ExecutionContext:
     """
 
     # Step 1: 카테고리/도구 선택
-    category: Optional[str] = None
-    tool: Optional[ToolInfo] = None
+    category: str | None = None
+    tool: ToolInfo | None = None
 
     # Step 2: 프로파일 선택
-    profile_name: Optional[str] = None  # SSO: 단일 프로파일
-    profiles: List[str] = field(default_factory=list)  # Static/Multi: 다중 프로파일
-    provider_kind: Optional[ProviderKind] = None
-    provider: Optional["Provider"] = None  # SSO용 Provider
+    profile_name: str | None = None  # SSO: 단일 프로파일
+    profiles: list[str] = field(default_factory=list)  # Static/Multi: 다중 프로파일
+    provider_kind: ProviderKind | None = None
+    provider: "Provider | None" = None  # SSO용 Provider
 
     # Step 3: Role 선택 (SSO 전용)
-    role_selection: Optional[RoleSelection] = None
+    role_selection: RoleSelection | None = None
 
     # 대상 계정 목록 (SSO 인증 후 설정)
-    accounts: List["AccountInfo"] = field(default_factory=list)
+    accounts: list["AccountInfo"] = field(default_factory=list)
 
     # Step 4: 리전 선택
-    regions: List[str] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
 
     # Step 5: 도구별 추가 옵션
-    options: Dict[str, Any] = field(default_factory=dict)
+    options: dict[str, Any] = field(default_factory=dict)
 
     # Step 6: 계정 필터 (Headless CLI용)
-    target_filter: Optional["AccountFilter"] = None
+    target_filter: "AccountFilter | None" = None
 
     # 실행 결과
-    result: Optional[Any] = None
-    error: Optional[Exception] = None
+    result: Any | None = None
+    error: Exception | None = None
 
     def is_sso(self) -> bool:
         """SSO 기반 인증인지 확인 (SSO Session 또는 SSO Profile)"""
@@ -327,7 +328,7 @@ class ExecutionContext:
         """
         return self.provider_kind == ProviderKind.SSO_SESSION
 
-    def get_effective_role(self, account_id: str) -> Optional[str]:
+    def get_effective_role(self, account_id: str) -> str | None:
         """특정 계정에 대한 실제 사용할 Role 반환
 
         Args:
@@ -358,7 +359,7 @@ class ExecutionContext:
 
         return None
 
-    def get_target_accounts(self) -> List["AccountInfo"]:
+    def get_target_accounts(self) -> list["AccountInfo"]:
         """실제 실행 대상 계정 목록 반환 (스킵 계정 + 필터 적용)
 
         적용 순서:

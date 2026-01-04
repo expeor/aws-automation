@@ -5,8 +5,6 @@
 단일 리전, 복수 리전, 전체 리전 중 선택.
 """
 
-from typing import List
-
 from rich.console import Console
 
 from cli.ui.console import print_box_end, print_box_line, print_box_start
@@ -156,7 +154,7 @@ class RegionStep:
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
-    def _select_multiple_regions(self) -> List[str]:
+    def _select_multiple_regions(self) -> list[str]:
         """복수 리전 선택 UI (2개 이상)"""
         console.print()
 
@@ -211,7 +209,7 @@ class RegionStep:
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
-    def _print_summary(self, regions: List[str]) -> None:
+    def _print_summary(self, regions: list[str]) -> None:
         """선택 결과 출력"""
         console.print()
 

@@ -8,7 +8,7 @@ TaskError, TaskResult, ParallelExecutionResult 등
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -52,7 +52,7 @@ class TaskError:
     message: str
     timestamp: datetime = field(default_factory=datetime.now)
     retries: int = 0
-    original_exception: Optional[Exception] = None
+    original_exception: Exception | None = None
 
     def is_retryable(self) -> bool:
         """재시도 가능한 에러인지 확인"""
@@ -62,7 +62,7 @@ class TaskError:
             ErrorCategory.TIMEOUT,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환 (로깅/직렬화용)"""
         return {
             "identifier": self.identifier,
@@ -96,8 +96,8 @@ class TaskResult(Generic[T]):
     identifier: str
     region: str
     success: bool
-    data: Optional[T] = None
-    error: Optional[TaskError] = None
+    data: T | None = None
+    error: TaskError | None = None
     duration_ms: float = 0.0
 
     def __str__(self) -> str:
@@ -125,15 +125,15 @@ class ParallelExecutionResult(Generic[T]):
             print(result.get_error_summary())
     """
 
-    results: List[TaskResult[T]] = field(default_factory=list)
+    results: list[TaskResult[T]] = field(default_factory=list)
 
     @property
-    def successful(self) -> List[TaskResult[T]]:
+    def successful(self) -> list[TaskResult[T]]:
         """성공한 결과만 반환"""
         return [r for r in self.results if r.success]
 
     @property
-    def failed(self) -> List[TaskResult[T]]:
+    def failed(self) -> list[TaskResult[T]]:
         """실패한 결과만 반환"""
         return [r for r in self.results if not r.success]
 
@@ -169,7 +169,7 @@ class ParallelExecutionResult(Generic[T]):
         """모든 작업이 실패했는지"""
         return self.total_count > 0 and self.success_count == 0
 
-    def get_data(self) -> List[T]:
+    def get_data(self) -> list[T]:
         """성공한 결과의 데이터만 추출
 
         Returns:
@@ -177,7 +177,7 @@ class ParallelExecutionResult(Generic[T]):
         """
         return [r.data for r in self.successful if r.data is not None]
 
-    def get_flat_data(self) -> List[Any]:
+    def get_flat_data(self) -> list[Any]:
         """성공한 결과의 데이터를 평탄화하여 추출
 
         각 결과가 리스트인 경우 하나의 리스트로 병합합니다.
@@ -185,7 +185,7 @@ class ParallelExecutionResult(Generic[T]):
         Returns:
             모든 성공 데이터를 평탄화한 리스트
         """
-        flat: List[Any] = []
+        flat: list[Any] = []
         for r in self.successful:
             if r.data is None:
                 continue
@@ -195,17 +195,17 @@ class ParallelExecutionResult(Generic[T]):
                 flat.append(r.data)
         return flat
 
-    def get_errors(self) -> List[TaskError]:
+    def get_errors(self) -> list[TaskError]:
         """모든 에러 정보 반환"""
         return [r.error for r in self.failed if r.error is not None]
 
-    def get_errors_by_category(self) -> Dict[ErrorCategory, List[TaskError]]:
+    def get_errors_by_category(self) -> dict[ErrorCategory, list[TaskError]]:
         """카테고리별로 에러를 그룹화
 
         Returns:
             {ErrorCategory: [TaskError, ...]} 딕셔너리
         """
-        grouped: Dict[ErrorCategory, List[TaskError]] = {}
+        grouped: dict[ErrorCategory, list[TaskError]] = {}
         for r in self.failed:
             if r.error:
                 cat = r.error.category
@@ -238,7 +238,7 @@ class ParallelExecutionResult(Generic[T]):
 
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환 (로깅/직렬화용)"""
         return {
             "total": self.total_count,

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from openpyxl.styles import Alignment, Border, Font, PatternFill
@@ -13,16 +12,16 @@ if TYPE_CHECKING:
 class StyleCache:
     """Singleton cache for openpyxl styles."""
 
-    _instance: Optional["StyleCache"] = None
+    _instance: StyleCache | None = None
     _initialized: bool = False
 
-    def __new__(cls) -> "StyleCache":
+    def __new__(cls) -> StyleCache:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     @classmethod
-    def get(cls) -> "StyleCache":
+    def get(cls) -> StyleCache:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -38,26 +37,14 @@ class StyleCache:
 
         self._align_center = Alignment(horizontal="center", vertical="center")
         self._align_left = Alignment(horizontal="left", vertical="center")
-        self._align_left_wrap = Alignment(
-            horizontal="left", vertical="center", wrap_text=True
-        )
+        self._align_left_wrap = Alignment(horizontal="left", vertical="center", wrap_text=True)
         self._align_right = Alignment(horizontal="right", vertical="center")
 
-        self._fill_abuse = PatternFill(
-            start_color="FFCDD2", end_color="FFCDD2", fill_type="solid"
-        )
-        self._fill_danger = PatternFill(
-            start_color="FFCCCC", end_color="FFCCCC", fill_type="solid"
-        )
-        self._fill_warning = PatternFill(
-            start_color="FFE6CC", end_color="FFE6CC", fill_type="solid"
-        )
-        self._fill_title = PatternFill(
-            start_color="D6EAF8", end_color="D6EAF8", fill_type="solid"
-        )
-        self._fill_header = PatternFill(
-            start_color="EBF1FA", end_color="EBF1FA", fill_type="solid"
-        )
+        self._fill_abuse = PatternFill(start_color="FFCDD2", end_color="FFCDD2", fill_type="solid")
+        self._fill_danger = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+        self._fill_warning = PatternFill(start_color="FFE6CC", end_color="FFE6CC", fill_type="solid")
+        self._fill_title = PatternFill(start_color="D6EAF8", end_color="D6EAF8", fill_type="solid")
+        self._fill_header = PatternFill(start_color="EBF1FA", end_color="EBF1FA", fill_type="solid")
 
         self._font_bold = Font(name="Consolas", bold=True)
         self._font_italic_gray = Font(name="Consolas", italic=True, color="808080")
@@ -70,102 +57,100 @@ class StyleCache:
         self._initialized = True
 
     @property
-    def thin_border(self) -> "Border":
+    def thin_border(self) -> Border:
         self._ensure_init()
-        return self._border  # type: ignore
+        return self._border
 
     @property
-    def align_center(self) -> "Alignment":
+    def align_center(self) -> Alignment:
         self._ensure_init()
-        return self._align_center  # type: ignore
+        return self._align_center
 
     @property
-    def align_left(self) -> "Alignment":
+    def align_left(self) -> Alignment:
         self._ensure_init()
-        return self._align_left  # type: ignore
+        return self._align_left
 
     @property
-    def align_left_wrap(self) -> "Alignment":
+    def align_left_wrap(self) -> Alignment:
         self._ensure_init()
-        return self._align_left_wrap  # type: ignore
+        return self._align_left_wrap
 
     @property
-    def align_right(self) -> "Alignment":
+    def align_right(self) -> Alignment:
         self._ensure_init()
-        return self._align_right  # type: ignore
+        return self._align_right
 
     @property
-    def fill_abuse(self) -> "PatternFill":
+    def fill_abuse(self) -> PatternFill:
         self._ensure_init()
-        return self._fill_abuse  # type: ignore
+        return self._fill_abuse
 
     @property
-    def danger_fill(self) -> "PatternFill":
+    def danger_fill(self) -> PatternFill:
         self._ensure_init()
-        return self._fill_danger  # type: ignore
+        return self._fill_danger
 
     @property
-    def warning_fill(self) -> "PatternFill":
+    def warning_fill(self) -> PatternFill:
         self._ensure_init()
-        return self._fill_warning  # type: ignore
+        return self._fill_warning
 
     @property
-    def title_fill(self) -> "PatternFill":
+    def title_fill(self) -> PatternFill:
         self._ensure_init()
-        return self._fill_title  # type: ignore
+        return self._fill_title
 
     @property
-    def header_fill(self) -> "PatternFill":
+    def header_fill(self) -> PatternFill:
         self._ensure_init()
-        return self._fill_header  # type: ignore
+        return self._fill_header
 
     @property
-    def font_bold(self) -> "Font":
+    def font_bold(self) -> Font:
         self._ensure_init()
-        return self._font_bold  # type: ignore
+        return self._font_bold
 
     @property
-    def font_italic_gray(self) -> "Font":
+    def font_italic_gray(self) -> Font:
         self._ensure_init()
-        return self._font_italic_gray  # type: ignore
+        return self._font_italic_gray
 
     @property
-    def title_font(self) -> "Font":
+    def title_font(self) -> Font:
         self._ensure_init()
-        return self._font_title  # type: ignore
+        return self._font_title
 
     @property
-    def header_font(self) -> "Font":
+    def header_font(self) -> Font:
         self._ensure_init()
-        return self._font_section  # type: ignore
+        return self._font_section
 
     @property
-    def label_font(self) -> "Font":
+    def label_font(self) -> Font:
         self._ensure_init()
-        return self._font_label  # type: ignore
+        return self._font_label
 
     @property
-    def value_font(self) -> "Font":
+    def value_font(self) -> Font:
         self._ensure_init()
-        return self._font_value  # type: ignore
+        return self._font_value
 
-    def get_header_style(self) -> Dict[str, Any]:
+    def get_header_style(self) -> dict[str, Any]:
         """Get header style dict."""
         self._ensure_init()
         from openpyxl.styles import PatternFill
 
         return {
             "font": self._font_header,
-            "fill": PatternFill(
-                start_color="4472C4", end_color="4472C4", fill_type="solid"
-            ),
+            "fill": PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid"),
             "alignment": self._align_center,
             "border": self._border,
         }
 
-    def register_named_styles(self, wb: "Workbook") -> None:
+    def register_named_styles(self, wb: Workbook) -> None:
         """Register named styles with workbook."""
-        from openpyxl.styles import NamedStyle, PatternFill
+        from openpyxl.styles import NamedStyle
 
         self._ensure_init()
 
@@ -188,7 +173,7 @@ class StyleCache:
                 pass  # Already exists
 
 
-_cache: Optional[StyleCache] = None
+_cache: StyleCache | None = None
 
 
 def get_style_cache() -> StyleCache:

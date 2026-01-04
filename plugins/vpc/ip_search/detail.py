@@ -7,7 +7,7 @@ AWS API를 호출하여 ENI에 연결된 리소스의 상세 정보를 조회합
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 import botocore.config
 import botocore.exceptions
@@ -22,7 +22,7 @@ _API_CONFIG = botocore.config.Config(
 )
 
 
-def get_detailed_resource_info(session, eni: Dict[str, Any]) -> Optional[str]:
+def get_detailed_resource_info(session, eni: dict[str, Any]) -> str | None:
     """
     ENI에 연결된 리소스의 상세 정보를 API 호출로 조회
 
@@ -39,8 +39,8 @@ def get_detailed_resource_info(session, eni: Dict[str, Any]) -> Optional[str]:
     interface_type = eni.get("InterfaceType", "")
     description = eni.get("Description", "")
     attachment = eni.get("Attachment", {})
-    eni_id = eni.get("NetworkInterfaceId")
-    region = eni.get("Region")
+    eni_id = eni.get("NetworkInterfaceId", "")
+    region = eni.get("Region", "")
 
     # FAST PATH: Description에서 빠르게 추출 가능한 경우
     fast_result = _fast_extract_from_description(description, interface_type)
@@ -131,7 +131,7 @@ def get_detailed_resource_info(session, eni: Dict[str, Any]) -> Optional[str]:
         return None
 
 
-def _fast_extract_from_description(description: str, interface_type: str) -> Optional[str]:
+def _fast_extract_from_description(description: str, interface_type: str) -> str | None:
     """Description에서 빠르게 정보 추출 (API 호출 없음)"""
     if not description:
         return None
@@ -193,7 +193,7 @@ def _fast_extract_from_description(description: str, interface_type: str) -> Opt
     return None
 
 
-def _get_ec2_info(session, instance_id: str, region: str) -> Optional[str]:
+def _get_ec2_info(session, instance_id: str, region: str) -> str | None:
     """EC2 인스턴스 상세 정보"""
     try:
         ec2 = session.client("ec2", region_name=region, config=_API_CONFIG)
@@ -213,7 +213,7 @@ def _get_ec2_info(session, instance_id: str, region: str) -> Optional[str]:
         return f"EC2: {instance_id}"
 
 
-def _get_ecs_info(session, eni_id: str, region: str) -> Optional[str]:
+def _get_ecs_info(session, eni_id: str, region: str) -> str | None:
     """ECS 서비스 정보"""
     try:
         ec2 = session.client("ec2", region_name=region, config=_API_CONFIG)
@@ -225,7 +225,9 @@ def _get_ecs_info(session, eni_id: str, region: str) -> Optional[str]:
         if "attachment" not in description:
             return "ECS Task"
 
-        attachment_id = description.split("attachment/")[-1] if "attachment/" in description else description.split("/")[-1]
+        attachment_id = (
+            description.split("attachment/")[-1] if "attachment/" in description else description.split("/")[-1]
+        )
         if not attachment_id:
             return "ECS Task"
 
@@ -254,7 +256,7 @@ def _get_ecs_info(session, eni_id: str, region: str) -> Optional[str]:
         return "ECS Task"
 
 
-def _get_eks_fargate_info(session, eni: Dict[str, Any], region: str) -> Optional[str]:
+def _get_eks_fargate_info(session, eni: dict[str, Any], region: str) -> str | None:
     """EKS Fargate Pod 정보"""
     try:
         eks = session.client("eks", region_name=region, config=_API_CONFIG)
@@ -280,7 +282,7 @@ def _get_eks_fargate_info(session, eni: Dict[str, Any], region: str) -> Optional
         return "EKS Fargate Pod"
 
 
-def _get_lambda_info(session, eni: Dict[str, Any], region: str, eni_id: str) -> Optional[str]:
+def _get_lambda_info(session, eni: dict[str, Any], region: str, eni_id: str) -> str | None:
     """Lambda 함수 정보"""
     try:
         lambda_client = session.client("lambda", region_name=region, config=_API_CONFIG)
@@ -316,7 +318,7 @@ def _get_lambda_info(session, eni: Dict[str, Any], region: str, eni_id: str) -> 
         return "Lambda Function"
 
 
-def _get_vpc_endpoint_info(session, eni_id: str, region: str) -> Optional[str]:
+def _get_vpc_endpoint_info(session, eni_id: str, region: str) -> str | None:
     """VPC Endpoint 정보"""
     try:
         ec2 = session.client("ec2", region_name=region, config=_API_CONFIG)
@@ -340,7 +342,7 @@ def _get_vpc_endpoint_info(session, eni_id: str, region: str) -> Optional[str]:
         return "VPC Endpoint"
 
 
-def _get_opensearch_info(session, eni: Dict[str, Any], region: str) -> Optional[str]:
+def _get_opensearch_info(session, eni: dict[str, Any], region: str) -> str | None:
     """OpenSearch 도메인 정보"""
     try:
         opensearch = session.client("opensearch", region_name=region, config=_API_CONFIG)
@@ -376,7 +378,7 @@ def _get_opensearch_info(session, eni: Dict[str, Any], region: str) -> Optional[
         return "OpenSearch Domain"
 
 
-def _get_elasticache_info(session, eni: Dict[str, Any], region: str) -> Optional[str]:
+def _get_elasticache_info(session, eni: dict[str, Any], region: str) -> str | None:
     """ElastiCache 클러스터 정보"""
     try:
         elasticache = session.client("elasticache", region_name=region, config=_API_CONFIG)
@@ -395,9 +397,9 @@ def _get_elasticache_info(session, eni: Dict[str, Any], region: str) -> Optional
                 continue
 
             try:
-                subnet_group = elasticache.describe_cache_subnet_groups(
-                    CacheSubnetGroupName=cache_subnet_group
-                ).get("CacheSubnetGroups", [{}])[0]
+                subnet_group = elasticache.describe_cache_subnet_groups(CacheSubnetGroupName=cache_subnet_group).get(
+                    "CacheSubnetGroups", [{}]
+                )[0]
 
                 if subnet_group.get("VpcId") != eni_vpc_id:
                     continue
@@ -416,7 +418,7 @@ def _get_elasticache_info(session, eni: Dict[str, Any], region: str) -> Optional
         return "ElastiCache Cluster"
 
 
-def _get_nat_gateway_info(session, description: str, region: str) -> Optional[str]:
+def _get_nat_gateway_info(session, description: str, region: str) -> str | None:
     """NAT Gateway 정보"""
     try:
         nat_match = re.search(r"nat-[a-zA-Z0-9]+", description)
@@ -443,7 +445,7 @@ def _get_nat_gateway_info(session, description: str, region: str) -> Optional[st
         return "NAT Gateway"
 
 
-def _get_transit_gateway_info(session, description: str, region: str) -> Optional[str]:
+def _get_transit_gateway_info(session, description: str, region: str) -> str | None:
     """Transit Gateway 정보"""
     try:
         tgw_match = re.search(r"tgw-attach-[a-zA-Z0-9]+", description)
@@ -452,9 +454,7 @@ def _get_transit_gateway_info(session, description: str, region: str) -> Optiona
 
         attachment_id = tgw_match.group(0)
         ec2 = session.client("ec2", region_name=region, config=_API_CONFIG)
-        response = ec2.describe_transit_gateway_attachments(
-            TransitGatewayAttachmentIds=[attachment_id]
-        )
+        response = ec2.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[attachment_id])
 
         if response.get("TransitGatewayAttachments"):
             att = response["TransitGatewayAttachments"][0]
@@ -471,7 +471,7 @@ def _get_transit_gateway_info(session, description: str, region: str) -> Optiona
         return "Transit Gateway"
 
 
-def _get_api_gateway_info(session, eni_id: str, description: str, region: str) -> Optional[str]:
+def _get_api_gateway_info(session, eni_id: str, description: str, region: str) -> str | None:
     """API Gateway 정보"""
     try:
         if "VPC Link" in description:
@@ -489,7 +489,7 @@ def _get_api_gateway_info(session, eni_id: str, description: str, region: str) -
         return "API Gateway"
 
 
-def _get_route53_resolver_info(session, eni: Dict[str, Any], region: str) -> Optional[str]:
+def _get_route53_resolver_info(session, eni: dict[str, Any], region: str) -> str | None:
     """Route 53 Resolver 정보"""
     try:
         resolver = session.client("route53resolver", region_name=region, config=_API_CONFIG)
@@ -518,7 +518,7 @@ def _get_route53_resolver_info(session, eni: Dict[str, Any], region: str) -> Opt
         return "Route53 Resolver"
 
 
-def _get_efs_info(session, eni_id: str, description: str, region: str) -> Optional[str]:
+def _get_efs_info(session, eni_id: str, description: str, region: str) -> str | None:
     """EFS 정보"""
     try:
         fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
@@ -532,7 +532,7 @@ def _get_efs_info(session, eni_id: str, description: str, region: str) -> Option
                     (tag["Value"] for tag in fs_info.get("Tags", []) if tag["Key"] == "Name"),
                     None,
                 )
-                size = fs_info.get("SizeInBytes", {}).get("Value", 0) / (1024 ** 3)
+                size = fs_info.get("SizeInBytes", {}).get("Value", 0) / (1024**3)
                 display = name or fs_id
                 return f"EFS: {display} ({size:.1f} GB)"
             except Exception:
@@ -544,7 +544,7 @@ def _get_efs_info(session, eni_id: str, description: str, region: str) -> Option
         return "EFS"
 
 
-def _get_fsx_info(session, eni_id: str, description: str, region: str) -> Optional[str]:
+def _get_fsx_info(session, eni_id: str, description: str, region: str) -> str | None:
     """FSx 정보"""
     try:
         fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)

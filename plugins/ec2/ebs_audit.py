@@ -14,7 +14,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -70,8 +70,8 @@ class EBSInfo:
     availability_zone: str
     create_time: datetime
     snapshot_id: str
-    attachments: List[Dict[str, Any]]
-    tags: Dict[str, str]
+    attachments: list[dict[str, Any]]
+    tags: dict[str, str]
 
     # 메타
     account_id: str
@@ -90,7 +90,7 @@ class EBSInfo:
     def attached_instance_id(self) -> str:
         """연결된 인스턴스 ID"""
         if self.attachments:
-            return self.attachments[0].get("InstanceId", "")
+            return str(self.attachments[0].get("InstanceId", ""))
         return ""
 
 
@@ -112,7 +112,7 @@ class EBSAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[EBSFinding] = field(default_factory=list)
+    findings: list[EBSFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -131,9 +131,7 @@ class EBSAnalysisResult:
 # =============================================================================
 
 
-def collect_ebs(
-    session, account_id: str, account_name: str, region: str
-) -> List[EBSInfo]:
+def collect_ebs(session, account_id: str, account_name: str, region: str) -> list[EBSInfo]:
     """EBS 볼륨 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -182,9 +180,7 @@ def collect_ebs(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} EBS 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} EBS 수집 오류: {error_code}[/yellow]")
 
     return volumes
 
@@ -194,9 +190,7 @@ def collect_ebs(
 # =============================================================================
 
 
-def analyze_ebs(
-    volumes: List[EBSInfo], account_id: str, account_name: str, region: str
-) -> EBSAnalysisResult:
+def analyze_ebs(volumes: list[EBSInfo], account_id: str, account_name: str, region: str) -> EBSAnalysisResult:
     """EBS 미사용 분석"""
     result = EBSAnalysisResult(
         account_id=account_id,
@@ -269,7 +263,7 @@ def _analyze_single_volume(volume: EBSInfo) -> EBSFinding:
 # =============================================================================
 
 
-def generate_report(results: List[EBSAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -279,9 +273,7 @@ def generate_report(results: List[EBSAnalysisResult], output_dir: str) -> str:
     wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -291,15 +283,9 @@ def generate_report(results: List[EBSAnalysisResult], output_dir: str) -> str:
     )
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.PENDING: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.PENDING: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -407,9 +393,7 @@ def generate_report(results: List[EBSAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 40
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 40)
 
     ws2.freeze_panes = "A2"
 
@@ -427,9 +411,7 @@ def generate_report(results: List[EBSAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> EBSAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EBSAnalysisResult:
     """단일 계정/리전의 EBS 수집 및 분석 (병렬 실행용)"""
     volumes = collect_ebs(session, account_id, account_name, region)
     return analyze_ebs(volumes, account_id, account_name, region)
@@ -448,12 +430,10 @@ def run(ctx) -> None:
     )
 
     # 결과 처리
-    all_results: List[EBSAnalysisResult] = result.get_data()
+    all_results: list[EBSAnalysisResult] = result.get_data()
 
     # 진행 상황 출력
-    console.print(
-        f"  [dim]수집 완료: 성공 {result.success_count}, 실패 {result.error_count}[/dim]"
-    )
+    console.print(f"  [dim]수집 완료: 성공 {result.success_count}, 실패 {result.error_count}[/dim]")
 
     # 에러 요약
     if result.error_count > 0:
@@ -466,22 +446,14 @@ def run(ctx) -> None:
     # 개별 결과 요약
     for r in all_results:
         if r.unused_count > 0:
-            cost_str = (
-                f" (${r.unused_monthly_cost:.2f}/월)"
-                if r.unused_monthly_cost > 0
-                else ""
-            )
+            cost_str = f" (${r.unused_monthly_cost:.2f}/월)" if r.unused_monthly_cost > 0 else ""
             console.print(
                 f"  {r.account_name}/{r.region}: [red]미사용 {r.unused_count}개 ({r.unused_size_gb}GB){cost_str}[/red]"
             )
         elif r.pending_count > 0:
-            console.print(
-                f"  {r.account_name}/{r.region}: [yellow]확인 필요 {r.pending_count}개[/yellow]"
-            )
+            console.print(f"  {r.account_name}/{r.region}: [yellow]확인 필요 {r.pending_count}개[/yellow]")
         elif r.total_count > 0:
-            console.print(
-                f"  {r.account_name}/{r.region}: [green]정상 {r.normal_count}개[/green]"
-            )
+            console.print(f"  {r.account_name}/{r.region}: [green]정상 {r.normal_count}개[/green]")
 
     # 전체 통계
     totals = {
@@ -494,9 +466,7 @@ def run(ctx) -> None:
         "unused_cost": sum(r.unused_monthly_cost for r in all_results),
     }
 
-    console.print(
-        f"\n[bold]전체 EBS: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
-    )
+    console.print(f"\n[bold]전체 EBS: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
     if totals["unused"] > 0:
         console.print(
             f"  [red bold]미사용: {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]"

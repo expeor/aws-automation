@@ -22,9 +22,9 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
-from ..types import AccountInfo, TokenExpiredError
+from ..types import AccountInfo
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ class TokenEncryption:
 
     _instance: Optional["TokenEncryption"] = None
     _lock = threading.Lock()
+    _initialized: bool
 
     def __new__(cls) -> "TokenEncryption":
         if cls._instance is None:
@@ -55,7 +56,7 @@ class TokenEncryption:
         if self._initialized:
             return
         self._initialized = True
-        self._fernet: Optional[Any] = None
+        self._fernet: Any | None = None
         self._encryption_available = False
         self._init_encryption()
 
@@ -125,7 +126,7 @@ class TokenEncryption:
             return data
         try:
             decoded = base64.urlsafe_b64decode(data.encode())
-            decrypted = self._fernet.decrypt(decoded)
+            decrypted: bytes = self._fernet.decrypt(decoded)
             return decrypted.decode()
         except Exception:
             # 복호화 실패 시 평문으로 간주
@@ -156,7 +157,7 @@ class CacheEntry(Generic[T]):
 
     value: T
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
     def is_expired(self, buffer_seconds: int = 60) -> bool:
         """캐시 항목이 만료되었는지 확인
@@ -173,7 +174,7 @@ class CacheEntry(Generic[T]):
         buffer = timedelta(seconds=buffer_seconds)
         return datetime.now(timezone.utc) >= (self.expires_at - buffer)
 
-    def remaining_seconds(self) -> Optional[int]:
+    def remaining_seconds(self) -> int | None:
         """남은 시간을 초 단위로 반환
 
         Returns:
@@ -212,9 +213,9 @@ class TokenCache:
     expires_at: str  # ISO 8601 format: "2024-01-01T00:00:00Z"
     client_id: str = ""
     client_secret: str = ""
-    refresh_token: Optional[str] = None
-    region: Optional[str] = None
-    start_url: Optional[str] = None
+    refresh_token: str | None = None
+    region: str | None = None
+    start_url: str | None = None
 
     def is_expired(self, buffer_seconds: int = 60) -> bool:
         """토큰이 만료되었는지 확인
@@ -227,9 +228,7 @@ class TokenCache:
         """
         try:
             # ISO 8601 형식 파싱
-            expires_at = datetime.strptime(
-                self.expires_at, "%Y-%m-%dT%H:%M:%SZ"
-            ).replace(tzinfo=timezone.utc)
+            expires_at = datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
             buffer = timedelta(seconds=buffer_seconds)
             return datetime.now(timezone.utc) >= (expires_at - buffer)
@@ -237,16 +236,14 @@ class TokenCache:
             # 날짜 파싱 실패 시 만료된 것으로 처리
             return True
 
-    def get_expires_at_datetime(self) -> Optional[datetime]:
+    def get_expires_at_datetime(self) -> datetime | None:
         """만료 시간을 datetime 객체로 반환"""
         try:
-            return datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
             return None
 
-    def to_dict(self, encrypt: bool = True) -> Dict[str, Any]:
+    def to_dict(self, encrypt: bool = True) -> dict[str, Any]:
         """딕셔너리로 변환 (JSON 저장용)
 
         Args:
@@ -286,7 +283,7 @@ class TokenCache:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TokenCache":
+    def from_dict(cls, data: dict[str, Any]) -> "TokenCache":
         """딕셔너리에서 생성 (JSON 로드용)
 
         암호화된 필드는 자동으로 복호화됩니다.
@@ -329,7 +326,7 @@ class TokenCacheManager:
         self,
         session_name: str,
         start_url: str,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
     ):
         """TokenCacheManager 초기화
 
@@ -356,14 +353,14 @@ class TokenCacheManager:
         """
         # session_name이 있으면 session_name 사용, 없으면 start_url 사용
         input_str = self.session_name if self.session_name else self.start_url
-        return hashlib.sha1(input_str.encode("utf-8")).hexdigest()
+        return hashlib.sha1(input_str.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     @property
     def cache_path(self) -> Path:
         """캐시 파일 전체 경로"""
         return self.cache_dir / f"{self._cache_key}.json"
 
-    def load(self) -> Optional[TokenCache]:
+    def load(self) -> TokenCache | None:
         """토큰 캐시를 파일에서 로드
 
         Returns:
@@ -373,7 +370,7 @@ class TokenCacheManager:
             if not self.cache_path.exists():
                 return None
 
-            with open(self.cache_path, "r", encoding="utf-8") as f:
+            with open(self.cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             return TokenCache.from_dict(data)
@@ -438,11 +435,11 @@ class AccountCache:
         Args:
             default_ttl_seconds: 기본 TTL (초) - 기본 1시간
         """
-        self._cache: Dict[str, CacheEntry[AccountInfo]] = {}
+        self._cache: dict[str, CacheEntry[AccountInfo]] = {}
         self._lock = threading.RLock()
         self._default_ttl = timedelta(seconds=default_ttl_seconds)
 
-    def get(self, account_id: str) -> Optional[AccountInfo]:
+    def get(self, account_id: str) -> AccountInfo | None:
         """계정 정보 조회
 
         Args:
@@ -460,7 +457,7 @@ class AccountCache:
                 return None
             return entry.value
 
-    def get_all(self) -> Dict[str, AccountInfo]:
+    def get_all(self) -> dict[str, AccountInfo]:
         """모든 유효한 계정 정보 조회
 
         Returns:
@@ -486,7 +483,7 @@ class AccountCache:
         self,
         account_id: str,
         account_info: AccountInfo,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
     ) -> None:
         """계정 정보 저장
 
@@ -506,8 +503,8 @@ class AccountCache:
 
     def set_all(
         self,
-        accounts: Dict[str, AccountInfo],
-        ttl_seconds: Optional[int] = None,
+        accounts: dict[str, AccountInfo],
+        ttl_seconds: int | None = None,
     ) -> None:
         """여러 계정 정보 일괄 저장
 
@@ -561,7 +558,7 @@ class CredentialsCache:
         Args:
             default_ttl_seconds: 기본 TTL (초) - 기본 30분
         """
-        self._cache: Dict[str, CacheEntry[Dict[str, str]]] = {}
+        self._cache: dict[str, CacheEntry[dict[str, str]]] = {}
         self._lock = threading.RLock()
         self._default_ttl = timedelta(seconds=default_ttl_seconds)
 
@@ -569,7 +566,7 @@ class CredentialsCache:
         """캐시 키 생성"""
         return f"{account_id}{self.KEY_SEPARATOR}{role_name}"
 
-    def get(self, account_id: str, role_name: str) -> Optional[Dict[str, str]]:
+    def get(self, account_id: str, role_name: str) -> dict[str, str] | None:
         """자격증명 조회
 
         Args:
@@ -594,8 +591,8 @@ class CredentialsCache:
         self,
         account_id: str,
         role_name: str,
-        credentials: Dict[str, str],
-        expires_at: Optional[datetime] = None,
+        credentials: dict[str, str],
+        expires_at: datetime | None = None,
     ) -> None:
         """자격증명 저장
 
@@ -639,9 +636,7 @@ class CredentialsCache:
         count = 0
 
         with self._lock:
-            keys_to_delete = [
-                key for key in self._cache.keys() if key.startswith(prefix)
-            ]
+            keys_to_delete = [key for key in self._cache if key.startswith(prefix)]
             for key in keys_to_delete:
                 del self._cache[key]
                 count += 1

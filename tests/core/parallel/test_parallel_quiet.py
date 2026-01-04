@@ -7,8 +7,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 from core.parallel.quiet import (
     inherit_quiet_state,
     is_quiet,
@@ -197,14 +195,6 @@ class TestQuietModeLoggingIntegration:
             logger.info("info message")
             logger.warning("warning message")
             logger.error("error message")
-
-        # ERROR만 기록되어야 함
-        error_messages = [
-            r.message for r in caplog.records if r.levelno >= logging.ERROR
-        ]
-        lower_messages = [
-            r.message for r in caplog.records if r.levelno < logging.ERROR
-        ]
 
         # quiet 모드에서는 낮은 레벨 로그가 필터링됨
         # (실제 필터링은 quiet_mode의 필터 추가/제거 로직에 의존)

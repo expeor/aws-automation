@@ -8,20 +8,21 @@ internal/flow/runner.py에서 동적으로 로드하여 실행합니다.
 Usage:
     # internal/tools/{service}/runner.py
     from core.tools.base import BaseToolRunner
-    
+
     class ToolRunner(BaseToolRunner):
         def get_tools(self) -> dict:
             return {
                 "도구이름": self._run_some_tool,
             }
-        
+
         def _run_some_tool(self) -> None:
             ...
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -59,12 +60,12 @@ class BaseToolRunner(ABC):
     ctx: Optional["ExecutionContext"] = None
 
     # 하위 호환성을 위한 필드 (deprecated)
-    profiles: List[str] = field(default_factory=list)
-    regions: List[str] = field(default_factory=list)
+    profiles: list[str] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
 
     # SSO 전용 필드 (Optional)
-    start_url: Optional[str] = None
-    session_name: Optional[str] = None
+    start_url: str | None = None
+    session_name: str | None = None
 
     def __post_init__(self):
         """ctx에서 값 추출하여 하위 호환 필드 설정"""
@@ -83,7 +84,7 @@ class BaseToolRunner(ABC):
                 self.session_name = self.ctx.profile_name
 
     @abstractmethod
-    def get_tools(self) -> Dict[str, Callable[[], Any]]:
+    def get_tools(self) -> dict[str, Callable[[], Any]]:
         """도구 이름 → 실행 함수 매핑 반환
 
         Returns:
@@ -103,14 +104,12 @@ class BaseToolRunner(ABC):
         tools = self.get_tools()
 
         if tool_name not in tools:
-            _get_console().print(
-                f"[yellow]⚠️ '{tool_name}' 기능은 아직 구현되지 않았습니다.[/yellow]"
-            )
+            _get_console().print(f"[yellow]⚠️ '{tool_name}' 기능은 아직 구현되지 않았습니다.[/yellow]")
             return None
 
         return tools[tool_name]()
 
-    def get_session(self, region: str, account_id: Optional[str] = None):
+    def get_session(self, region: str, account_id: str | None = None):
         """boto3 세션 획득
 
         Args:

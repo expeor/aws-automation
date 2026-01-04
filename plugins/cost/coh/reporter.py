@@ -15,7 +15,7 @@ plugins/cost/coh/reporter.py - Cost Optimization Hub 리포트 생성기
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.tools.io.excel import ColumnDef, Styles, Workbook
 
@@ -57,7 +57,7 @@ class CostOptimizationReporter:
     def __init__(
         self,
         result: CollectionResult,
-        account_names: Optional[Dict[str, str]] = None,
+        account_names: dict[str, str] | None = None,
     ):
         """초기화
 
@@ -150,9 +150,7 @@ class CostOptimizationReporter:
         )
 
         for action_type, data in sorted_actions:
-            action_name, difficulty = action_info.get(
-                action_type, (action_type, "중간")
-            )
+            action_name, difficulty = action_info.get(action_type, (action_type, "중간"))
             summary.add_item(
                 f"{action_name} [{difficulty}]",
                 f"{data['count']:,}건, 월 ${data['savings']:,.0f}",
@@ -163,7 +161,7 @@ class CostOptimizationReporter:
         # ===== 구현 난이도별 =====
         summary.add_section("구현 난이도별 절약액")
 
-        effort_groups = {"쉬움": [], "중간": [], "어려움": []}
+        effort_groups: dict[str, list[Recommendation]] = {"쉬움": [], "중간": [], "어려움": []}
         effort_map = {
             "VeryLow": "쉬움",
             "Low": "쉬움",
@@ -257,29 +255,29 @@ class CostOptimizationReporter:
             # 요약 행
             total_cost = sum(r.estimated_monthly_cost for r in recommendations)
             total_savings = sum(r.estimated_monthly_savings for r in recommendations)
-            avg_savings_pct = (
-                (total_savings / total_cost * 100) if total_cost > 0 else 0
-            )
+            avg_savings_pct = (total_savings / total_cost * 100) if total_cost > 0 else 0
 
-            sheet.add_summary_row([
-                "합계",
-                "",
-                "",
-                f"{len(recommendations)}개",
-                "",
-                "",
-                "",
-                "",
-                "",
-                total_cost,
-                total_savings,
-                avg_savings_pct / 100,
-                "",
-                "",
-                "",
-                "",
-                "",
-            ])
+            sheet.add_summary_row(
+                [
+                    "합계",
+                    "",
+                    "",
+                    f"{len(recommendations)}개",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    total_cost,
+                    total_savings,
+                    avg_savings_pct / 100,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
 
         # 전체 권장사항 시트 (모든 타입 포함)
         if len(grouped) > 1:
@@ -294,29 +292,29 @@ class CostOptimizationReporter:
                 style = self._get_row_style(rec)
                 all_sheet.add_row(row, style=style)
 
-            all_sheet.add_summary_row([
-                "합계",
-                "",
-                "",
-                f"{self.result.filtered_count}개",
-                "",
-                "",
-                "",
-                "",
-                "",
-                self.result.total_cost,
-                self.result.total_savings,
-                (self.result.total_savings / self.result.total_cost)
-                if self.result.total_cost > 0
-                else 0,
-                "",
-                "",
-                "",
-                "",
-                "",
-            ])
+            all_sheet.add_summary_row(
+                [
+                    "합계",
+                    "",
+                    "",
+                    f"{self.result.filtered_count}개",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    self.result.total_cost,
+                    self.result.total_savings,
+                    (self.result.total_savings / self.result.total_cost) if self.result.total_cost > 0 else 0,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
 
-    def _recommendation_to_row(self, rec: Recommendation) -> List[Any]:
+    def _recommendation_to_row(self, rec: Recommendation) -> list[Any]:
         """Recommendation을 행 데이터로 변환"""
         resource_name = rec.tags.get("Name", rec.resource_id)
         account_name = self.account_names.get(rec.account_id, "")
@@ -341,7 +339,7 @@ class CostOptimizationReporter:
             rec.tags.get("Environment", ""),
         ]
 
-    def _get_row_style(self, rec: Recommendation) -> Optional[dict]:
+    def _get_row_style(self, rec: Recommendation) -> dict | None:
         """권장사항에 따른 행 스타일 결정"""
         # 높은 절약액 강조
         if rec.estimated_monthly_savings >= 100:
@@ -369,7 +367,6 @@ class CostOptimizationReporter:
         """콘솔에 요약 정보 출력"""
         try:
             from rich.console import Console
-            from rich.table import Table
 
             console = Console()
             self._print_rich_summary(console)
@@ -380,14 +377,9 @@ class CostOptimizationReporter:
         """Rich 라이브러리를 사용한 요약 출력"""
         from rich.table import Table
 
-        console.print(
-            "\n[bold cyan]Cost Optimization Hub 권장사항 요약[/bold cyan]"
-        )
+        console.print("\n[bold cyan]Cost Optimization Hub 권장사항 요약[/bold cyan]")
         console.print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        console.print(
-            f"전체 권장사항: {self.result.total_count:,}개 → "
-            f"필터링 후: {self.result.filtered_count:,}개"
-        )
+        console.print(f"전체 권장사항: {self.result.total_count:,}개 → 필터링 후: {self.result.filtered_count:,}개")
         console.print(f"제외된 계정: {len(self.result.excluded_accounts):,}개")
         console.print()
 
@@ -443,10 +435,7 @@ class CostOptimizationReporter:
         """일반 텍스트 요약 출력"""
         print("\n=== Cost Optimization Hub 권장사항 요약 ===")
         print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(
-            f"전체 권장사항: {self.result.total_count:,}개 → "
-            f"필터링 후: {self.result.filtered_count:,}개"
-        )
+        print(f"전체 권장사항: {self.result.total_count:,}개 → 필터링 후: {self.result.filtered_count:,}개")
         print(f"제외된 계정: {len(self.result.excluded_accounts):,}개")
         print()
 
@@ -457,22 +446,16 @@ class CostOptimizationReporter:
             key=lambda x: x[1]["savings"],
             reverse=True,
         ):
-            print(
-                f"  {action_type}: {data['count']:,}개, "
-                f"절약액 ${data['savings']:,.2f}"
-            )
+            print(f"  {action_type}: {data['count']:,}개, 절약액 ${data['savings']:,.2f}")
         print("-" * 60)
-        print(
-            f"  합계: {self.result.filtered_count:,}개, "
-            f"총 절약액 ${self.result.total_savings:,.2f}"
-        )
+        print(f"  합계: {self.result.filtered_count:,}개, 총 절약액 ${self.result.total_savings:,.2f}")
 
 
 def generate_report(
     result: CollectionResult,
     output_dir: str,
     file_prefix: str = "cost_optimization_hub",
-    account_names: Optional[Dict[str, str]] = None,
+    account_names: dict[str, str] | None = None,
 ) -> Path:
     """리포트 파일 생성 (편의 함수)
 

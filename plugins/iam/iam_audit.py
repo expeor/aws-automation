@@ -12,10 +12,9 @@ IAM 보안 감사 및 모범 사례 점검:
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from rich.console import Console
-from rich.table import Table
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
@@ -43,9 +42,7 @@ REQUIRED_PERMISSIONS = {
 }
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[Tuple[Any, Dict[str, Any]]]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> tuple[Any, dict[str, Any]] | None:
     """단일 계정의 IAM 수집 및 분석 (병렬 실행용)"""
     collector = IAMCollector()
     iam_data = collector.collect(session, account_id, account_name)
@@ -96,14 +93,14 @@ def run(ctx) -> None:
     reporter = IAMExcelReporter(all_results, all_stats)
     filepath = reporter.generate(output_path)
 
-    console.print(f"[bold green]보고서 생성 완료![/bold green]")
+    console.print("[bold green]보고서 생성 완료![/bold green]")
     console.print(f"  경로: {filepath}")
 
     # 폴더 열기
     open_in_explorer(output_path)
 
 
-def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
+def _print_summary(stats_list: list[dict[str, Any]]) -> None:
     """분석 결과 요약 출력"""
     # 전체 통계 계산
     totals = {
@@ -125,13 +122,9 @@ def _print_summary(stats_list: List[Dict[str, Any]]) -> None:
 
     # Critical Issues
     if totals["critical_issues"] > 0 or totals["root_access_key_count"] > 0:
-        console.print(
-            f"  [red bold]CRITICAL 이슈: {totals['critical_issues']}건[/red bold]"
-        )
+        console.print(f"  [red bold]CRITICAL 이슈: {totals['critical_issues']}건[/red bold]")
         if totals["root_access_key_count"] > 0:
-            console.print(
-                f"    - Root Access Key 존재: {totals['root_access_key_count']}개 계정"
-            )
+            console.print(f"    - Root Access Key 존재: {totals['root_access_key_count']}개 계정")
         if totals["root_no_mfa_count"] > 0:
             console.print(f"    - Root MFA 미설정: {totals['root_no_mfa_count']}개 계정")
 

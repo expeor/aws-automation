@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from .base import BaseSheetWriter
 from .config import HEADERS, SHEET_NAMES, SheetConfig
@@ -26,8 +26,8 @@ class URLSheetWriter(BaseSheetWriter):
 
     def _write_detailed_url_sheet(self) -> None:
         """Write detailed URL statistics with client info."""
-        url_details: Dict[str, Any] = self.data["request_url_details"]
-        url_data: List[Dict[str, Any]] = []
+        url_details: dict[str, Any] = self.data["request_url_details"]
+        url_data: list[dict[str, Any]] = []
 
         for url, details in url_details.items():
             methods = details.get("methods", {})
@@ -36,17 +36,11 @@ class URLSheetWriter(BaseSheetWriter):
                 top_method = top_method.replace("-", "")
 
             # Unique IPs
-            if "unique_ips" in details and isinstance(
-                details.get("unique_ips"), (int, float)
-            ):
+            if "unique_ips" in details and isinstance(details.get("unique_ips"), (int, float)):
                 unique_ips = int(details.get("unique_ips") or 0)
             else:
                 client_ips_val = details.get("client_ips", set())
-                unique_ips = (
-                    len(client_ips_val)
-                    if isinstance(client_ips_val, (set, list, tuple))
-                    else 0
-                )
+                unique_ips = len(client_ips_val) if isinstance(client_ips_val, (set, list, tuple)) else 0
 
             # Average response time
             avg_response_time = self._parse_avg_response_time(details)
@@ -89,9 +83,7 @@ class URLSheetWriter(BaseSheetWriter):
             )
 
         # Sort and limit
-        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[
-            : SheetConfig.TOP_URL_LIMIT
-        ]
+        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[: SheetConfig.TOP_URL_LIMIT]
 
         if not url_data_sorted:
             return
@@ -111,12 +103,8 @@ class URLSheetWriter(BaseSheetWriter):
         """Write simple URL count statistics."""
         url_counts = self.data["request_url_counts"]
 
-        url_data = [
-            {"Count": count, "Request": url} for url, count in url_counts.items()
-        ]
-        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[
-            : SheetConfig.TOP_URL_LIMIT
-        ]
+        url_data = [{"Count": count, "Request": url} for url, count in url_counts.items()]
+        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[: SheetConfig.TOP_URL_LIMIT]
 
         if not url_data_sorted:
             return
@@ -132,7 +120,7 @@ class URLSheetWriter(BaseSheetWriter):
 
         self.finalize_sheet(ws, headers, rows_written)
 
-    def _parse_avg_response_time(self, details: Dict[str, Any]) -> float:
+    def _parse_avg_response_time(self, details: dict[str, Any]) -> float:
         """Parse average response time from details."""
         if "avg_response_time" not in details:
             return 0.0
@@ -149,17 +137,13 @@ class URLSheetWriter(BaseSheetWriter):
 
         return 0.0
 
-    def _get_top_status(self, status_counts: Dict[str, int]) -> str:
+    def _get_top_status(self, status_counts: dict[str, int]) -> str:
         """Get most common status code."""
         if not status_counts:
             return ""
 
         # Filter valid status codes
-        valid_counts = {
-            k: v
-            for k, v in status_counts.items()
-            if k and str(k).strip() not in ("", "-", "N/A")
-        }
+        valid_counts = {k: v for k, v in status_counts.items() if k and str(k).strip() not in ("", "-", "N/A")}
 
         if not valid_counts:
             return ""
@@ -167,7 +151,7 @@ class URLSheetWriter(BaseSheetWriter):
         top_status = max(valid_counts.items(), key=lambda x: x[1])[0]
         return str(top_status)
 
-    def _calculate_error_rate(self, status_counts: Dict[str, int]) -> float:
+    def _calculate_error_rate(self, status_counts: dict[str, int]) -> float:
         """Calculate error rate from status counts."""
         if not status_counts:
             return 0.0
@@ -176,19 +160,15 @@ class URLSheetWriter(BaseSheetWriter):
         if total == 0:
             return 0.0
 
-        error_count = sum(
-            count
-            for status, count in status_counts.items()
-            if str(status).startswith(("4", "5"))
-        )
+        error_count = sum(count for status, count in status_counts.items() if str(status).startswith(("4", "5")))
 
         return round((error_count / total) * 100, 2)
 
     def _add_summary_row(
         self,
         ws,
-        data: List[Dict[str, Any]],
-        headers: List[str],
+        data: list[dict[str, Any]],
+        headers: list[str],
     ) -> None:
         """Add summary/total row at the end."""
         total_row = len(data) + 2

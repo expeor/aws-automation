@@ -4,10 +4,7 @@ tests/test_plugins_s3.py - S3 플러그인 테스트
 
 from datetime import datetime, timezone
 
-import pytest
-
 from plugins.s3.empty_bucket import (
-    BucketFinding,
     BucketInfo,
     BucketStatus,
     S3AnalysisResult,

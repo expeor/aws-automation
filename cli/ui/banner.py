@@ -5,10 +5,8 @@ cli/ui/banner.py - ASCII 아트 배너 및 컨텍스트 표시
 """
 
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
-from rich.table import Table
 
 
 def get_version() -> str:
@@ -21,7 +19,7 @@ def get_version() -> str:
         for base in candidate_dirs:
             version_file = base / "version.txt"
             if version_file.exists():
-                with open(version_file, "r", encoding="utf-8") as f:
+                with open(version_file, encoding="utf-8") as f:
                     return f.read().strip()
     except Exception:
         pass

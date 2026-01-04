@@ -12,7 +12,7 @@ from .discovery import (
     load_tool,
 )
 
-__all__ = [
+__all__: list[str] = [
     "BaseToolRunner",
     # Discovery
     "discover_categories",

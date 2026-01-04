@@ -3,18 +3,14 @@ tests/test_plugins_cost_pricing.py - Cost Pricing 플러그인 테스트
 """
 
 import json
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from plugins.cost.pricing.cache import (
     DEFAULT_TTL_DAYS,
     PriceCache,
-    clear_cache,
-    get_cache_info,
 )
 
 

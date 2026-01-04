@@ -19,7 +19,6 @@ NAT Gateway 비용 계산:
 """
 
 import logging
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 # 가격 변동이 드물어 하드코딩 (AWS Price List API 응답 파싱이 복잡함)
 # https://aws.amazon.com/vpc/pricing/
 
-NAT_GATEWAY_PRICES: Dict[str, Dict[str, float]] = {
+NAT_GATEWAY_PRICES: dict[str, dict[str, float]] = {
     # Asia Pacific
     "ap-northeast-2": {"hourly": 0.045, "per_gb": 0.045},  # 서울
     "ap-northeast-1": {"hourly": 0.045, "per_gb": 0.045},  # 도쿄
@@ -61,7 +60,7 @@ DEFAULT_PRICES = {"hourly": 0.045, "per_gb": 0.045}
 HOURS_PER_MONTH = 730
 
 
-def get_nat_prices(region: str = "ap-northeast-2") -> Dict[str, float]:
+def get_nat_prices(region: str = "ap-northeast-2") -> dict[str, float]:
     """NAT Gateway 가격 조회
 
     Args:
@@ -141,7 +140,7 @@ def estimate_savings(
     nat_count: int,
     region: str = "ap-northeast-2",
     months: int = 12,
-) -> Dict[str, float]:
+) -> dict[str, float | int | str]:
     """NAT Gateway 제거 시 예상 절감액 계산
 
     Args:

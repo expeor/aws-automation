@@ -14,10 +14,9 @@ import json
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
-
 
 # =============================================================================
 # 데이터 구조
@@ -33,7 +32,7 @@ class PublicIPResult:
     service: str
     ip_prefix: str
     region: str
-    extra: Dict[str, str] = field(default_factory=dict)
+    extra: dict[str, str] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -44,15 +43,13 @@ class PublicIPResult:
 def _get_cache_dir() -> str:
     """캐시 디렉토리 경로 (프로젝트 루트의 temp 폴더)"""
     # plugins/vpc/ip_search -> vpc -> plugins -> project_root
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    )
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     cache_dir = os.path.join(project_root, "temp", "ip_ranges")
     os.makedirs(cache_dir, exist_ok=True)
     return cache_dir
 
 
-def _load_from_cache(name: str, max_age_hours: int = 24) -> Optional[dict]:
+def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:
     """캐시에서 데이터 로드"""
     cache_file = os.path.join(_get_cache_dir(), f"{name}.json")
     if not os.path.exists(cache_file):
@@ -63,8 +60,9 @@ def _load_from_cache(name: str, max_age_hours: int = 24) -> Optional[dict]:
         return None
 
     try:
-        with open(cache_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(cache_file, encoding="utf-8") as f:
+            data: dict[Any, Any] = json.load(f)
+            return data
     except Exception:
         return None
 
@@ -94,7 +92,7 @@ def clear_public_cache() -> int:
     return count
 
 
-def refresh_public_cache(callback=None) -> Dict[str, Any]:
+def refresh_public_cache(callback=None) -> dict[str, Any]:
     """
     Public IP 캐시 새로고침 (삭제 후 재다운로드)
 
@@ -105,7 +103,7 @@ def refresh_public_cache(callback=None) -> Dict[str, Any]:
         {"success": [...], "failed": [...], "counts": {...}}
     """
     providers = ["aws", "gcp", "azure", "oracle"]
-    result = {"success": [], "failed": [], "counts": {}}
+    result: dict[str, Any] = {"success": [], "failed": [], "counts": {}}
 
     # 먼저 캐시 삭제
     clear_public_cache()
@@ -126,9 +124,7 @@ def refresh_public_cache(callback=None) -> Dict[str, Any]:
             data = loaders[provider]()
             if data:
                 # 카운트 계산
-                if provider == "aws":
-                    count = len(data.get("prefixes", []))
-                elif provider == "gcp":
+                if provider == "aws" or provider == "gcp":
                     count = len(data.get("prefixes", []))
                 elif provider == "azure":
                     count = len(data.get("values", []))
@@ -147,12 +143,12 @@ def refresh_public_cache(callback=None) -> Dict[str, Any]:
     return result
 
 
-def _fetch_and_cache(name: str, url: str) -> Optional[dict]:
+def _fetch_and_cache(name: str, url: str) -> dict[Any, Any] | None:
     """URL에서 데이터 다운로드 후 캐시 저장"""
     try:
         response = requests.get(url, timeout=15)
         if response.status_code == 200:
-            data = response.json()
+            data: dict[Any, Any] = response.json()
             _save_to_cache(name, data)
             return data
     except Exception:
@@ -160,11 +156,13 @@ def _fetch_and_cache(name: str, url: str) -> Optional[dict]:
     return None
 
 
-def _fetch_azure_fresh() -> Optional[dict]:
+def _fetch_azure_fresh() -> dict[Any, Any] | None:
     """Azure 데이터 새로 다운로드 (주간 업데이트 URL 탐색)"""
     from datetime import datetime, timedelta
 
-    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    base_url = (
+        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    )
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -174,7 +172,7 @@ def _fetch_azure_fresh() -> Optional[dict]:
             try:
                 response = requests.get(url, timeout=15)
                 if response.status_code == 200:
-                    data = response.json()
+                    data: dict[Any, Any] = response.json()
                     if data.get("values"):
                         _save_to_cache("azure", data)
                         return data
@@ -184,13 +182,13 @@ def _fetch_azure_fresh() -> Optional[dict]:
     return None
 
 
-def get_public_cache_status() -> Dict[str, Any]:
+def get_public_cache_status() -> dict[str, Any]:
     """Public IP 캐시 상태 반환"""
     from datetime import datetime
 
     cache_dir = _get_cache_dir()
     providers = ["aws", "gcp", "azure", "oracle"]
-    status = {"providers": {}, "total_files": 0}
+    status: dict[str, Any] = {"providers": {}, "total_files": 0}
 
     for name in providers:
         cache_file = os.path.join(cache_dir, f"{name}.json")
@@ -201,12 +199,10 @@ def get_public_cache_status() -> Dict[str, Any]:
                 age_hours = (time.time() - mtime) / 3600
                 is_valid = age_hours < 24
 
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     data = json.load(f)
-                    # 각 provider별 prefix 수 계산
-                    if name == "aws":
-                        count = len(data.get("prefixes", []))
-                    elif name == "gcp":
+                    # Calculate prefix count for each provider
+                    if name == "aws" or name == "gcp":
                         count = len(data.get("prefixes", []))
                     elif name == "azure":
                         count = len(data.get("values", []))
@@ -235,41 +231,37 @@ def get_public_cache_status() -> Dict[str, Any]:
 # =============================================================================
 
 
-def get_aws_ip_ranges() -> dict:
+def get_aws_ip_ranges() -> dict[str, Any]:
     """AWS IP 범위 가져오기"""
     cached = _load_from_cache("aws")
     if cached:
         return cached
 
     try:
-        response = requests.get(
-            "https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5
-        )
-        data = response.json()
+        response = requests.get("https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5)
+        data: dict[str, Any] = response.json()
         _save_to_cache("aws", data)
         return data
     except Exception:
         return {"prefixes": [], "ipv6_prefixes": []}
 
 
-def get_gcp_ip_ranges() -> dict:
+def get_gcp_ip_ranges() -> dict[str, Any]:
     """GCP IP 범위 가져오기"""
     cached = _load_from_cache("gcp")
     if cached:
         return cached
 
     try:
-        response = requests.get(
-            "https://www.gstatic.com/ipranges/cloud.json", timeout=10
-        )
-        data = response.json()
+        response = requests.get("https://www.gstatic.com/ipranges/cloud.json", timeout=10)
+        data: dict[str, Any] = response.json()
         _save_to_cache("gcp", data)
         return data
     except Exception:
         return {"prefixes": []}
 
 
-def get_azure_ip_ranges() -> dict:
+def get_azure_ip_ranges() -> dict[str, Any]:
     """Azure IP 범위 가져오기 (주간 업데이트)"""
     cached = _load_from_cache("azure")
     if cached and cached.get("values"):
@@ -277,7 +269,9 @@ def get_azure_ip_ranges() -> dict:
 
     from datetime import datetime, timedelta
 
-    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    base_url = (
+        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    )
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -287,7 +281,7 @@ def get_azure_ip_ranges() -> dict:
             try:
                 response = requests.get(url, timeout=10)
                 if response.status_code == 200:
-                    data = response.json()
+                    data: dict[str, Any] = response.json()
                     if data.get("values"):
                         _save_to_cache("azure", data)
                         return data
@@ -297,17 +291,15 @@ def get_azure_ip_ranges() -> dict:
     return {"values": []}
 
 
-def get_oracle_ip_ranges() -> dict:
+def get_oracle_ip_ranges() -> dict[str, Any]:
     """Oracle Cloud IP 범위 가져오기"""
     cached = _load_from_cache("oracle")
     if cached:
         return cached
 
     try:
-        response = requests.get(
-            "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10
-        )
-        data = response.json()
+        response = requests.get("https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10)
+        data: dict[str, Any] = response.json()
         _save_to_cache("oracle", data)
         return data
     except Exception:
@@ -319,19 +311,15 @@ def get_oracle_ip_ranges() -> dict:
 # =============================================================================
 
 
-def search_in_aws(ip: str, data: dict) -> List[PublicIPResult]:
+def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
     """AWS IP 범위에서 검색"""
-    results = []
+    results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
     except ValueError:
         return results
 
-    prefixes = (
-        data.get("prefixes", [])
-        if ip_obj.version == 4
-        else data.get("ipv6_prefixes", [])
-    )
+    prefixes = data.get("prefixes", []) if ip_obj.version == 4 else data.get("ipv6_prefixes", [])
     prefix_key = "ip_prefix" if ip_obj.version == 4 else "ipv6_prefix"
 
     for prefix in prefixes:
@@ -354,9 +342,9 @@ def search_in_aws(ip: str, data: dict) -> List[PublicIPResult]:
     return results
 
 
-def search_in_gcp(ip: str, data: dict) -> List[PublicIPResult]:
+def search_in_gcp(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
     """GCP IP 범위에서 검색"""
-    results = []
+    results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
     except ValueError:
@@ -385,9 +373,9 @@ def search_in_gcp(ip: str, data: dict) -> List[PublicIPResult]:
     return results
 
 
-def search_in_azure(ip: str, data: dict) -> List[PublicIPResult]:
+def search_in_azure(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
     """Azure IP 범위에서 검색"""
-    results = []
+    results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
     except ValueError:
@@ -416,9 +404,9 @@ def search_in_azure(ip: str, data: dict) -> List[PublicIPResult]:
     return results
 
 
-def search_in_oracle(ip: str, data: dict) -> List[PublicIPResult]:
+def search_in_oracle(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
     """Oracle Cloud IP 범위에서 검색"""
-    results = []
+    results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
     except ValueError:
@@ -455,7 +443,7 @@ def search_in_oracle(ip: str, data: dict) -> List[PublicIPResult]:
 # =============================================================================
 
 
-def load_ip_ranges_parallel(target_providers: set) -> Dict[str, dict]:
+def load_ip_ranges_parallel(target_providers: set[str]) -> dict[str, dict[str, Any]]:
     """병렬로 IP 범위 데이터 로드"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -466,12 +454,10 @@ def load_ip_ranges_parallel(target_providers: set) -> Dict[str, dict]:
         "oracle": get_oracle_ip_ranges,
     }
 
-    data_sources = {}
+    data_sources: dict[str, dict[str, Any]] = {}
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(loaders[p]): p for p in target_providers if p in loaders
-        }
+        futures = {executor.submit(loaders[p]): p for p in target_providers if p in loaders}
 
         for future in as_completed(futures):
             provider = futures[future]
@@ -484,9 +470,9 @@ def load_ip_ranges_parallel(target_providers: set) -> Dict[str, dict]:
 
 
 def search_public_ip(
-    ip_list: List[str],
-    providers: Optional[List[str]] = None,
-) -> List[PublicIPResult]:
+    ip_list: list[str],
+    providers: list[str] | None = None,
+) -> list[PublicIPResult]:
     """
     공인 IP 범위에서 검색
 
@@ -498,10 +484,7 @@ def search_public_ip(
         검색 결과 목록
     """
     all_providers = {"aws", "gcp", "azure", "oracle"}
-    if providers:
-        target_providers = {p.lower() for p in providers} & all_providers
-    else:
-        target_providers = all_providers
+    target_providers = {p.lower() for p in providers} & all_providers if providers else all_providers
 
     data_sources = load_ip_ranges_parallel(target_providers)
 
@@ -552,7 +535,7 @@ def search_public_ip(
     return all_results
 
 
-def list_aws_regions(data: dict) -> List[str]:
+def list_aws_regions(data: dict) -> list[str]:
     """AWS IP 범위에서 고유 리전 목록 반환"""
     regions = set()
     for prefix in data.get("prefixes", []):
@@ -562,7 +545,7 @@ def list_aws_regions(data: dict) -> List[str]:
     return sorted(regions)
 
 
-def list_aws_services(data: dict) -> List[str]:
+def list_aws_services(data: dict) -> list[str]:
     """AWS IP 범위에서 고유 서비스 목록 반환"""
     services = set()
     for prefix in data.get("prefixes", []):
@@ -574,9 +557,9 @@ def list_aws_services(data: dict) -> List[str]:
 
 def search_by_filter(
     provider: str = "aws",
-    region: Optional[str] = None,
-    service: Optional[str] = None,
-) -> List[PublicIPResult]:
+    region: str | None = None,
+    service: str | None = None,
+) -> list[PublicIPResult]:
     """
     리전 또는 서비스로 IP 범위 검색
 
@@ -602,7 +585,7 @@ def search_by_filter(
         return []
 
     data = loaders[provider]()
-    results = []
+    results: list[PublicIPResult] = []
 
     if provider == "aws":
         for prefix in data.get("prefixes", []):
@@ -616,14 +599,16 @@ def search_by_filter(
             if service and service.lower() not in p_service.lower():
                 continue
 
-            results.append(PublicIPResult(
-                ip_address="",
-                provider="AWS",
-                service=p_service,
-                ip_prefix=ip_prefix,
-                region=p_region,
-                extra={"network_border_group": prefix.get("network_border_group", "")},
-            ))
+            results.append(
+                PublicIPResult(
+                    ip_address="",
+                    provider="AWS",
+                    service=p_service,
+                    ip_prefix=ip_prefix,
+                    region=p_region,
+                    extra={"network_border_group": prefix.get("network_border_group", "")},
+                )
+            )
 
     elif provider == "gcp":
         for prefix in data.get("prefixes", []):
@@ -636,13 +621,15 @@ def search_by_filter(
             if service and service.lower() not in p_service.lower():
                 continue
 
-            results.append(PublicIPResult(
-                ip_address="",
-                provider="GCP",
-                service=p_service,
-                ip_prefix=ip_prefix,
-                region=p_scope,
-            ))
+            results.append(
+                PublicIPResult(
+                    ip_address="",
+                    provider="GCP",
+                    service=p_service,
+                    ip_prefix=ip_prefix,
+                    region=p_scope,
+                )
+            )
 
     elif provider == "azure":
         for svc in data.get("values", []):
@@ -655,13 +642,15 @@ def search_by_filter(
                 continue
 
             for ip_prefix in svc.get("properties", {}).get("addressPrefixes", []):
-                results.append(PublicIPResult(
-                    ip_address="",
-                    provider="Azure",
-                    service=svc_name,
-                    ip_prefix=ip_prefix,
-                    region=svc_region,
-                ))
+                results.append(
+                    PublicIPResult(
+                        ip_address="",
+                        provider="Azure",
+                        service=svc_name,
+                        ip_prefix=ip_prefix,
+                        region=svc_region,
+                    )
+                )
 
     elif provider == "oracle":
         for reg in data.get("regions", []):
@@ -678,18 +667,20 @@ def search_by_filter(
                 if service and service.lower() not in svc_name.lower():
                     continue
 
-                results.append(PublicIPResult(
-                    ip_address="",
-                    provider="Oracle",
-                    service=svc_name,
-                    ip_prefix=cidr,
-                    region=reg_name,
-                ))
+                results.append(
+                    PublicIPResult(
+                        ip_address="",
+                        provider="Oracle",
+                        service=svc_name,
+                        ip_prefix=cidr,
+                        region=reg_name,
+                    )
+                )
 
     return results
 
 
-def get_available_filters(provider: str = "aws") -> Dict[str, List[str]]:
+def get_available_filters(provider: str = "aws") -> dict[str, list[str]]:
     """사용 가능한 리전/서비스 목록 반환"""
     provider = provider.lower()
 

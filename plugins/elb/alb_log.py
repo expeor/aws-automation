@@ -8,9 +8,9 @@ core/tools/analysis/log/alb_analyzer.py - ALB 로그 분석 도구 진입점
 
 import os
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-import pytz
+import pytz  # type: ignore[import-untyped]
 import questionary
 from rich.console import Console
 from rich.panel import Panel
@@ -131,10 +131,7 @@ def run(ctx) -> None:
 
         # 압축 해제
         if isinstance(downloaded_files, list) and downloaded_files:
-            if isinstance(downloaded_files[0], str):
-                gz_directory = os.path.dirname(downloaded_files[0])
-            else:
-                gz_directory = gz_dir
+            gz_directory = os.path.dirname(downloaded_files[0]) if isinstance(downloaded_files[0], str) else gz_dir
         else:
             gz_directory = gz_dir
 
@@ -146,9 +143,7 @@ def run(ctx) -> None:
 
         # abuse_ips 처리
         if isinstance(analysis_results.get("abuse_ips"), (dict, set)):
-            analysis_results["abuse_ips_list"] = list(
-                analysis_results.get("abuse_ips", set())
-            )
+            analysis_results["abuse_ips_list"] = list(analysis_results.get("abuse_ips", set()))
             analysis_results["abuse_ips"] = "AbuseIPDB IPs processed"
 
         # Step 4: Excel 보고서 생성
@@ -165,9 +160,7 @@ def run(ctx) -> None:
 
         final_report_path = reporter.generate_report(report_path)
 
-        console.print(
-            f"[bold green]✅ 보고서 생성 완료![/bold green]\n" f"   경로: {final_report_path}"
-        )
+        console.print(f"[bold green]✅ 보고서 생성 완료![/bold green]\n   경로: {final_report_path}")
 
         # Step 5: 임시 파일 정리
         _cleanup_temp_files(analyzer, gz_directory, log_directory)
@@ -186,9 +179,9 @@ def run(ctx) -> None:
 
 
 def _select_alb_with_pagination(
-    alb_list: List[Dict[str, Any]],
+    alb_list: list[dict[str, Any]],
     page_size: int = 20,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """페이지네이션으로 ALB 선택
 
     Args:
@@ -205,7 +198,7 @@ def _select_alb_with_pagination(
         return None
 
     total = len(alb_list)
-    total_pages = (total + page_size - 1) // page_size
+    (total + page_size - 1) // page_size
     current_page = 0
     filtered_list = alb_list  # 검색 필터링된 리스트
 
@@ -254,10 +247,10 @@ def _select_alb_with_pagination(
                 "번호 입력 또는 명령:",
             ).ask()
         except KeyboardInterrupt:
-            raise KeyboardInterrupt("사용자가 취소했습니다.")
+            raise KeyboardInterrupt("사용자가 취소했습니다.") from None
 
         if user_input is None:
-            raise KeyboardInterrupt("사용자가 취소했습니다.")
+            raise KeyboardInterrupt("사용자가 취소했습니다.") from None
 
         user_input = user_input.strip()
 
@@ -267,7 +260,7 @@ def _select_alb_with_pagination(
 
         # 명령어 처리
         if user_input.lower() == "q":
-            raise KeyboardInterrupt("사용자가 취소했습니다.")
+            raise KeyboardInterrupt("사용자가 취소했습니다.") from None
 
         if user_input.lower() == "n":
             if end_idx < len(filtered_list):
@@ -287,19 +280,13 @@ def _select_alb_with_pagination(
         if user_input.startswith("/"):
             search_term = user_input[1:].strip().lower()
             if search_term:
-                filtered_list = [
-                    item for item in alb_list if search_term in item["name"].lower()
-                ]
+                filtered_list = [item for item in alb_list if search_term in item["name"].lower()]
                 current_page = 0
                 if not filtered_list:
-                    console.print(
-                        f"[yellow]'{search_term}' 검색 결과가 없습니다. 전체 목록으로 복원합니다.[/yellow]"
-                    )
+                    console.print(f"[yellow]'{search_term}' 검색 결과가 없습니다. 전체 목록으로 복원합니다.[/yellow]")
                     filtered_list = alb_list
                 else:
-                    console.print(
-                        f"[green]'{search_term}' 검색 결과: {len(filtered_list)}개[/green]"
-                    )
+                    console.print(f"[green]'{search_term}' 검색 결과: {len(filtered_list)}개[/green]")
             else:
                 # 빈 검색어는 전체 목록 복원
                 filtered_list = alb_list
@@ -313,14 +300,14 @@ def _select_alb_with_pagination(
             if 1 <= selected_num <= len(filtered_list):
                 selected_item = filtered_list[selected_num - 1]
                 console.print(f"[green]✓ 선택됨: {selected_item['name']}[/green]")
-                return selected_item["lb"]
+                return dict(selected_item["lb"])
             else:
                 console.print(f"[red]1~{len(filtered_list)} 범위의 번호를 입력하세요.[/red]")
         except ValueError:
             console.print("[yellow]번호, 명령어(n/p/q), 또는 /검색어를 입력하세요.[/yellow]")
 
 
-def _get_bucket_input_with_options(session, ctx) -> Optional[str]:
+def _get_bucket_input_with_options(session, ctx) -> str | None:
     """S3 버킷 경로 입력 방식 선택
 
     Returns:
@@ -348,7 +335,7 @@ def _get_bucket_input_with_options(session, ctx) -> Optional[str]:
         return _get_bucket_input_manual()
 
 
-def _get_lb_and_build_path(session, ctx) -> str:
+def _get_lb_and_build_path(session, ctx) -> str | None:
     """자동 탐색으로 S3 경로 생성"""
     from botocore.exceptions import ClientError
 
@@ -375,17 +362,14 @@ def _get_lb_and_build_path(session, ctx) -> str:
         return _get_bucket_input_manual()
 
     # ALB 선택 - 목록 생성
-    alb_list: List[Dict[str, Any]] = []
+    alb_list: list[dict[str, Any]] = []
 
     for lb in sorted(albs, key=lambda x: x["LoadBalancerName"]):
         # 로그 설정 확인
         try:
-            attrs = elbv2_client.describe_load_balancer_attributes(
-                LoadBalancerArn=lb["LoadBalancerArn"]
-            )
+            attrs = elbv2_client.describe_load_balancer_attributes(LoadBalancerArn=lb["LoadBalancerArn"])
             log_enabled = any(
-                attr["Key"] == "access_logs.s3.enabled" and attr["Value"] == "true"
-                for attr in attrs["Attributes"]
+                attr["Key"] == "access_logs.s3.enabled" and attr["Value"] == "true" for attr in attrs["Attributes"]
             )
             status = "✅" if log_enabled else "❌"
         except Exception:
@@ -408,9 +392,7 @@ def _get_lb_and_build_path(session, ctx) -> str:
 
     # 로그 설정 확인
     try:
-        attrs = elbv2_client.describe_load_balancer_attributes(
-            LoadBalancerArn=selected_lb["LoadBalancerArn"]
-        )
+        attrs = elbv2_client.describe_load_balancer_attributes(LoadBalancerArn=selected_lb["LoadBalancerArn"])
 
         log_config = {}
         for attr in attrs["Attributes"]:
@@ -428,9 +410,7 @@ def _get_lb_and_build_path(session, ctx) -> str:
             return _get_bucket_input_manual()
 
         if not log_config.get("bucket"):
-            console.print(
-                f"[yellow]⚠️ '{selected_lb['LoadBalancerName']}'의 로그 버킷 정보가 없습니다.[/yellow]"
-            )
+            console.print(f"[yellow]⚠️ '{selected_lb['LoadBalancerName']}'의 로그 버킷 정보가 없습니다.[/yellow]")
             return _get_bucket_input_manual()
 
         # S3 경로 생성
@@ -461,7 +441,7 @@ def _get_lb_and_build_path(session, ctx) -> str:
         return _get_bucket_input_manual()
 
 
-def _get_bucket_input_manual() -> Optional[str]:
+def _get_bucket_input_manual() -> str | None:
     """수동으로 S3 버킷 경로 입력
 
     Returns:
@@ -510,10 +490,10 @@ def _get_bucket_input_manual() -> Optional[str]:
             if not confirm:
                 continue
 
-        return bucket
+        return str(bucket)
 
 
-def _get_time_range_input() -> Tuple[datetime, datetime]:
+def _get_time_range_input() -> tuple[datetime, datetime]:
     """시간 범위 입력
 
     Raises:
@@ -523,10 +503,7 @@ def _get_time_range_input() -> Tuple[datetime, datetime]:
     yesterday = now - timedelta(days=1)
 
     console.print("\n[bold cyan]⏰ 분석 시간 범위 설정[/bold cyan]")
-    console.print(
-        f"[dim]기본값: {yesterday.strftime('%Y-%m-%d %H:%M')} ~ "
-        f"{now.strftime('%Y-%m-%d %H:%M')}[/dim]"
-    )
+    console.print(f"[dim]기본값: {yesterday.strftime('%Y-%m-%d %H:%M')} ~ {now.strftime('%Y-%m-%d %H:%M')}[/dim]")
 
     # 빠른 선택 (기본값인 24시간을 첫 번째에 배치)
     quick_choices = [
@@ -579,8 +556,7 @@ def _get_time_range_input() -> Tuple[datetime, datetime]:
         end_time = now
 
     console.print(
-        f"[green]✓ 분석 기간: {start_time.strftime('%Y-%m-%d %H:%M')} ~ "
-        f"{end_time.strftime('%Y-%m-%d %H:%M')}[/green]"
+        f"[green]✓ 분석 기간: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}[/green]"
     )
     return start_time, end_time
 
@@ -613,12 +589,12 @@ def _get_timezone_input() -> str:
             raise KeyboardInterrupt("사용자가 취소했습니다.")
         try:
             pytz.timezone(tz)
-            return tz
+            return str(tz)
         except pytz.exceptions.UnknownTimeZoneError:
             console.print("[yellow]⚠️ 잘못된 타임존. Asia/Seoul을 사용합니다.[/yellow]")
             return "Asia/Seoul"
 
-    return choice
+    return str(choice)
 
 
 def _create_output_directory(ctx) -> str:
@@ -638,7 +614,7 @@ def _create_output_directory(ctx) -> str:
     return output_path
 
 
-def _generate_report_filename(analyzer, analysis_results: Dict[str, Any]) -> str:
+def _generate_report_filename(analyzer, analysis_results: dict[str, Any]) -> str:
     """보고서 파일명 생성"""
     import secrets
 
@@ -650,14 +626,10 @@ def _generate_report_filename(analyzer, analysis_results: Dict[str, Any]) -> str
         hours = int(time_diff.total_seconds() / 3600)
 
         if hours < 24:
-            period_info = f"{hours}hrs"
+            pass
         else:
-            days = hours // 24
-            remaining_hours = hours % 24
-            if remaining_hours == 0:
-                period_info = f"{days}days"
-            else:
-                period_info = f"{days}d{remaining_hours}h"
+            hours // 24
+            hours % 24
 
         # 계정/리전 정보
         account_id = "unknown"

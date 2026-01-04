@@ -4,13 +4,15 @@ core/parallel/executor.py - 병렬 세션 실행기
 Map-Reduce 패턴으로 멀티 계정/리전 작업을 병렬 처리합니다.
 ThreadPoolExecutor 기반이며, Rate limiting과 재시도를 지원합니다.
 """
+
 from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeVar
 
 from .decorators import RetryConfig, categorize_error, get_error_code, is_retryable
 from .quiet import is_quiet, set_quiet
@@ -38,8 +40,8 @@ class ParallelConfig:
     """
 
     max_workers: int = 20
-    retry_config: Optional[RetryConfig] = None
-    rate_limiter_config: Optional[RateLimiterConfig] = None
+    retry_config: RetryConfig | None = None
+    rate_limiter_config: RateLimiterConfig | None = None
 
 
 @dataclass
@@ -49,7 +51,7 @@ class _TaskSpec:
     account_id: str
     account_name: str
     region: str
-    session_getter: Callable[[], "boto3.Session"]
+    session_getter: Callable[[], boto3.Session]
 
 
 class ParallelSessionExecutor:
@@ -79,8 +81,8 @@ class ParallelSessionExecutor:
 
     def __init__(
         self,
-        ctx: "ExecutionContext",
-        config: Optional[ParallelConfig] = None,
+        ctx: ExecutionContext,
+        config: ParallelConfig | None = None,
     ):
         """초기화
 
@@ -100,7 +102,7 @@ class ParallelSessionExecutor:
 
     def execute(
         self,
-        func: Callable[["boto3.Session", str, str, str], T],
+        func: Callable[[boto3.Session, str, str, str], T],
         service: str = "default",
     ) -> ParallelExecutionResult[T]:
         """작업 함수를 모든 세션에 병렬 실행
@@ -119,12 +121,9 @@ class ParallelSessionExecutor:
             logger.warning("실행할 작업이 없습니다")
             return ParallelExecutionResult()
 
-        logger.info(
-            f"병렬 실행 시작: {len(tasks)}개 작업, "
-            f"max_workers={self.config.max_workers}, service={service}"
-        )
+        logger.info(f"병렬 실행 시작: {len(tasks)}개 작업, max_workers={self.config.max_workers}, service={service}")
 
-        results: List[TaskResult[T]] = []
+        results: list[TaskResult[T]] = []
         start_time = time.monotonic()
 
         # 부모 스레드의 quiet 상태를 저장하여 워커 스레드에 전파
@@ -172,16 +171,14 @@ class ParallelSessionExecutor:
         exec_result = ParallelExecutionResult(results=results)
 
         logger.info(
-            f"병렬 실행 완료: 성공 {exec_result.success_count}, "
-            f"실패 {exec_result.error_count}, "
-            f"총 {total_time:.0f}ms"
+            f"병렬 실행 완료: 성공 {exec_result.success_count}, 실패 {exec_result.error_count}, 총 {total_time:.0f}ms"
         )
 
         return exec_result
 
-    def _build_task_list(self) -> List[_TaskSpec]:
+    def _build_task_list(self) -> list[_TaskSpec]:
         """실행할 작업 목록 생성"""
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
 
         if self.ctx.is_sso_session():
             tasks = self._build_sso_tasks()
@@ -192,9 +189,9 @@ class ParallelSessionExecutor:
 
         return tasks
 
-    def _build_sso_tasks(self) -> List[_TaskSpec]:
+    def _build_sso_tasks(self) -> list[_TaskSpec]:
         """SSO Session 기반 작업 목록"""
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
         target_accounts = self.ctx.get_target_accounts()
 
         for account in target_accounts:
@@ -223,11 +220,11 @@ class ParallelSessionExecutor:
 
         return tasks
 
-    def _build_multi_profile_tasks(self) -> List[_TaskSpec]:
+    def _build_multi_profile_tasks(self) -> list[_TaskSpec]:
         """다중 프로파일 기반 작업 목록"""
         from core.auth.session import get_session
 
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
 
         for profile in self.ctx.profiles:
             for region in self.ctx.regions:
@@ -246,11 +243,11 @@ class ParallelSessionExecutor:
 
         return tasks
 
-    def _build_single_profile_tasks(self) -> List[_TaskSpec]:
+    def _build_single_profile_tasks(self) -> list[_TaskSpec]:
         """단일 프로파일 기반 작업 목록"""
         from core.auth.session import get_session
 
-        tasks: List[_TaskSpec] = []
+        tasks: list[_TaskSpec] = []
         profile = self.ctx.profile_name or "default"
 
         for region in self.ctx.regions:
@@ -271,7 +268,7 @@ class ParallelSessionExecutor:
 
     def _execute_single(
         self,
-        func: Callable[["boto3.Session", str, str, str], T],
+        func: Callable[[boto3.Session, str, str, str], T],
         task: _TaskSpec,
         service: str,
         quiet: bool = False,
@@ -323,14 +320,14 @@ class ParallelSessionExecutor:
 
     def _execute_with_retry(
         self,
-        func: Callable[["boto3.Session", str, str, str], T],
-        session: "boto3.Session",
+        func: Callable[[boto3.Session, str, str, str], T],
+        session: boto3.Session,
         task: _TaskSpec,
         service: str,
         start_time: float,
     ) -> TaskResult[T]:
         """재시도 로직을 포함한 작업 실행"""
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
 
         for attempt in range(self._retry_config.max_retries + 1):
             try:
@@ -366,10 +363,7 @@ class ParallelSessionExecutor:
 
                 # 재시도 대기
                 delay = self._retry_config.get_delay(attempt)
-                logger.debug(
-                    f"[{task.account_id}/{task.region}] 시도 {attempt + 1} 실패, "
-                    f"{delay:.2f}초 후 재시도..."
-                )
+                logger.debug(f"[{task.account_id}/{task.region}] 시도 {attempt + 1} 실패, {delay:.2f}초 후 재시도...")
                 time.sleep(delay)
 
         # 재시도 소진 (도달하면 안 됨)
@@ -380,11 +374,7 @@ class ParallelSessionExecutor:
             error=TaskError(
                 identifier=task.account_id,
                 region=task.region,
-                category=(
-                    categorize_error(last_error)
-                    if last_error
-                    else ErrorCategory.UNKNOWN
-                ),
+                category=(categorize_error(last_error) if last_error else ErrorCategory.UNKNOWN),
                 error_code=get_error_code(last_error) if last_error else "Unknown",
                 message="최대 재시도 횟수 초과",
                 retries=self._retry_config.max_retries,
@@ -395,8 +385,8 @@ class ParallelSessionExecutor:
 
 
 def parallel_collect(
-    ctx: "ExecutionContext",
-    collector_func: Callable[["boto3.Session", str, str, str], T],
+    ctx: ExecutionContext,
+    collector_func: Callable[[boto3.Session, str, str, str], T],
     max_workers: int = 20,
     service: str = "default",
 ) -> ParallelExecutionResult[T]:

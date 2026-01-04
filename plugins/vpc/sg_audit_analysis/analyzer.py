@@ -10,7 +10,7 @@ Security Group 분석기
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from .collector import SecurityGroup, SGRule
 from .critical_ports import (
@@ -46,7 +46,7 @@ class SGAnalysisResult:
 
     sg: SecurityGroup
     status: SGStatus
-    unused_reasons: List[str]
+    unused_reasons: list[str]
     action_recommendation: str
 
 
@@ -69,7 +69,7 @@ class RuleAnalysisResult:
     is_all_ports: bool  # ALL ports
     is_all_protocols: bool  # ALL protocols
     # Risk Level (AWS Trusted Advisor 복합 조건 기반)
-    exposed_critical_ports: List[CriticalPort] = field(default_factory=list)
+    exposed_critical_ports: list[CriticalPort] = field(default_factory=list)
     risk_level: str = ""  # HIGH / MEDIUM / LOW / ""
     # 추가 위험 요소
     is_egress_all_open: bool = False  # Egress ALL + 0.0.0.0/0 (데이터 유출 위험)
@@ -77,21 +77,19 @@ class RuleAnalysisResult:
     is_cross_account: bool = False  # Cross-account SG 참조
     cross_account_id: str = ""  # 참조된 계정 ID
     has_no_description: bool = False  # Description 없음
-    hidden_risky_ports: List[CriticalPort] = field(
-        default_factory=list
-    )  # 넓은 범위에 숨은 위험 포트
+    hidden_risky_ports: list[CriticalPort] = field(default_factory=list)  # 넓은 범위에 숨은 위험 포트
     # 추가 경고 메시지
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 class SGAnalyzer:
     """Security Group 분석기"""
 
-    def __init__(self, security_groups: List[SecurityGroup]):
+    def __init__(self, security_groups: list[SecurityGroup]):
         self.security_groups = security_groups
-        self.sg_map: Dict[str, SecurityGroup] = {sg.sg_id: sg for sg in security_groups}
+        self.sg_map: dict[str, SecurityGroup] = {sg.sg_id: sg for sg in security_groups}
 
-    def analyze(self) -> tuple[List[SGAnalysisResult], List[RuleAnalysisResult]]:
+    def analyze(self) -> tuple[list[SGAnalysisResult], list[RuleAnalysisResult]]:
         """전체 분석 실행"""
         sg_results = []
         rule_results = []
@@ -138,10 +136,7 @@ class SGAnalyzer:
         if sg.eni_count == 0 and not sg.referenced_by_sgs:
             status = SGStatus.UNUSED
 
-            if sg.is_default_vpc:
-                action = "미사용 - Default VPC 삭제 검토 (SG도 같이 정리됨)"
-            else:
-                action = "미사용 - 삭제 검토"
+            action = "미사용 - Default VPC 삭제 검토 (SG도 같이 정리됨)" if sg.is_default_vpc else "미사용 - 삭제 검토"
         else:
             if sg.eni_count > 0:
                 action = f"사용 중 (ENI {sg.eni_count}개 연결)"
@@ -160,7 +155,7 @@ class SGAnalyzer:
         """단일 Rule 분석"""
         status = RuleStatus.ACTIVE
         stale_reason = ""
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         # SG 참조 규칙인 경우 Stale 체크
         if rule.source_dest_type == "sg" and rule.referenced_sg_id:
@@ -187,30 +182,22 @@ class SGAnalyzer:
         is_wide_cidr = cidr_prefix != -1 and cidr_prefix < 24
 
         # Risk Level 분석 (인바운드 + 넓은 범위인 경우만)
-        exposed_critical_ports: List[CriticalPort] = []
+        exposed_critical_ports: list[CriticalPort] = []
         risk_level = ""
 
         # 인바운드 + (0.0.0.0/0 또는 넓은 CIDR)인 경우 위험도 평가
         if rule.direction == "inbound" and (is_open_to_world or is_wide_cidr):
-            risk_level, exposed_critical_ports = self._evaluate_risk_level(
-                rule, is_open_to_world, is_wide_cidr
-            )
+            risk_level, exposed_critical_ports = self._evaluate_risk_level(rule, is_open_to_world, is_wide_cidr)
 
         # === 추가 위험 요소 분석 ===
 
         # 1. Egress ALL + 0.0.0.0/0 → 데이터 유출 위험
-        is_egress_all_open = (
-            rule.direction == "outbound"
-            and is_open_to_world
-            and (is_all_ports or is_all_protocols)
-        )
+        is_egress_all_open = rule.direction == "outbound" and is_open_to_world and (is_all_ports or is_all_protocols)
         if is_egress_all_open:
             warnings.append("Egress ALL 허용 - 데이터 유출 통제 불가")
 
         # 2. Self 참조 + ALL 포트 → 횡이동 위험
-        is_self_all_ports = rule.is_self_reference and (
-            is_all_ports or is_all_protocols
-        )
+        is_self_all_ports = rule.is_self_reference and (is_all_ports or is_all_protocols)
         if is_self_all_ports:
             warnings.append("Self 참조 ALL 포트 - 같은 SG 내 횡이동 가능")
 
@@ -260,7 +247,7 @@ class SGAnalyzer:
 
     def _evaluate_risk_level(
         self, rule: SGRule, is_open_to_world: bool, is_wide_cidr: bool
-    ) -> tuple[str, List[CriticalPort]]:
+    ) -> tuple[str, list[CriticalPort]]:
         """
         AWS Trusted Advisor 복합 조건 기반 Risk Level 평가
 
@@ -293,7 +280,7 @@ class SGAnalyzer:
 
         return "", []
 
-    def _get_exposed_risky_ports(self, rule: SGRule) -> List[CriticalPort]:
+    def _get_exposed_risky_ports(self, rule: SGRule) -> list[CriticalPort]:
         """규칙에서 노출된 위험 포트 조회 (Trusted Advisor RED + 추가 위험 포트)"""
         # ALL 포트인 경우 모든 위험 포트 노출
         if rule.port_range == "ALL":
@@ -318,7 +305,7 @@ class SGAnalyzer:
         except (ValueError, IndexError):
             return []
 
-    def _get_exposed_web_ports(self, rule: SGRule) -> List[CriticalPort]:
+    def _get_exposed_web_ports(self, rule: SGRule) -> list[CriticalPort]:
         """규칙에서 노출된 웹 포트 조회"""
         result = []
 
@@ -375,7 +362,7 @@ class SGAnalyzer:
         except (ValueError, IndexError):
             return False
 
-    def _get_hidden_risky_ports(self, rule: SGRule) -> List[CriticalPort]:
+    def _get_hidden_risky_ports(self, rule: SGRule) -> list[CriticalPort]:
         """
         넓은 포트 범위 내 숨겨진 위험 포트 탐지
 
@@ -415,11 +402,9 @@ class SGAnalyzer:
         except (ValueError, IndexError):
             return -1
 
-    def get_summary(
-        self, sg_results: List[SGAnalysisResult]
-    ) -> Dict[str, Dict[str, Any]]:
+    def get_summary(self, sg_results: list[SGAnalysisResult]) -> dict[str, dict[str, Any]]:
         """계정/리전별 요약 통계"""
-        summary: Dict[str, Dict[str, Any]] = {}
+        summary: dict[str, dict[str, Any]] = {}
 
         for result in sg_results:
             sg = result.sg

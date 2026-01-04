@@ -2,24 +2,19 @@
 tests/test_plugins_dynamodb.py - DynamoDB 플러그인 테스트
 """
 
-from datetime import datetime, timezone
 from unittest.mock import patch
 
-import pytest
-
-from plugins.dynamodb.unused import (
-    DynamoDBAnalysisResult,
-    TableFinding,
-    TableInfo,
-    TableStatus,
-    analyze_tables,
-)
 from plugins.dynamodb.capacity_mode import (
     CapacityAnalysisResult,
     CapacityRecommendation,
-    TableCapacityFinding,
     TableCapacityInfo,
     analyze_capacity,
+)
+from plugins.dynamodb.unused import (
+    DynamoDBAnalysisResult,
+    TableInfo,
+    TableStatus,
+    analyze_tables,
 )
 
 
@@ -377,7 +372,10 @@ class TestCapacityRecommendation:
         """권장 사항 값 확인"""
         assert CapacityRecommendation.KEEP_PROVISIONED.value == "keep_provisioned"
         assert CapacityRecommendation.SWITCH_TO_ONDEMAND.value == "switch_to_ondemand"
-        assert CapacityRecommendation.SWITCH_TO_PROVISIONED.value == "switch_to_provisioned"
+        assert (
+            CapacityRecommendation.SWITCH_TO_PROVISIONED.value
+            == "switch_to_provisioned"
+        )
         assert CapacityRecommendation.REDUCE_CAPACITY.value == "reduce_capacity"
         assert CapacityRecommendation.INCREASE_CAPACITY.value == "increase_capacity"
         assert CapacityRecommendation.OPTIMAL.value == "optimal"
@@ -388,7 +386,9 @@ class TestAnalyzeCapacity:
 
     @patch("plugins.dynamodb.capacity_mode.get_dynamodb_monthly_cost")
     @patch("plugins.dynamodb.capacity_mode.estimate_ondemand_cost")
-    def test_provisioned_low_usage_switch_to_ondemand(self, mock_ondemand, mock_provisioned):
+    def test_provisioned_low_usage_switch_to_ondemand(
+        self, mock_ondemand, mock_provisioned
+    ):
         """Provisioned 저사용 → On-Demand 전환 권장"""
         mock_provisioned.return_value = 50.0
         mock_ondemand.return_value = 10.0  # On-Demand가 더 저렴
@@ -414,7 +414,10 @@ class TestAnalyzeCapacity:
 
         assert result.optimization_candidates == 1
         assert result.potential_savings == 40.0  # 50 - 10
-        assert result.findings[0].recommendation == CapacityRecommendation.SWITCH_TO_ONDEMAND
+        assert (
+            result.findings[0].recommendation
+            == CapacityRecommendation.SWITCH_TO_ONDEMAND
+        )
 
     @patch("plugins.dynamodb.capacity_mode.get_dynamodb_monthly_cost")
     @patch("plugins.dynamodb.capacity_mode.estimate_ondemand_cost")
@@ -444,7 +447,10 @@ class TestAnalyzeCapacity:
 
         result = analyze_capacity(tables, "123456789012", "test", "ap-northeast-2")
 
-        assert result.findings[0].recommendation == CapacityRecommendation.INCREASE_CAPACITY
+        assert (
+            result.findings[0].recommendation
+            == CapacityRecommendation.INCREASE_CAPACITY
+        )
 
     @patch("plugins.dynamodb.capacity_mode.get_dynamodb_monthly_cost")
     @patch("plugins.dynamodb.capacity_mode.estimate_ondemand_cost")
@@ -501,7 +507,10 @@ class TestAnalyzeCapacity:
         assert result.ondemand_tables == 1
         assert result.optimization_candidates == 1
         assert result.potential_savings == 30.0  # 50 - 20
-        assert result.findings[0].recommendation == CapacityRecommendation.SWITCH_TO_PROVISIONED
+        assert (
+            result.findings[0].recommendation
+            == CapacityRecommendation.SWITCH_TO_PROVISIONED
+        )
 
     @patch("plugins.dynamodb.capacity_mode.get_dynamodb_monthly_cost")
     @patch("plugins.dynamodb.capacity_mode.estimate_ondemand_cost")

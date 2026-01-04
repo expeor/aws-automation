@@ -18,4 +18,4 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-__all__ = ["run", "REQUIRED_PERMISSIONS"]
+__all__: list[str] = ["run", "REQUIRED_PERMISSIONS"]

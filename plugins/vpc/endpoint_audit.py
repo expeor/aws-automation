@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -50,7 +49,7 @@ class VPCEndpointInfo:
     service_name: str
     vpc_id: str
     state: str
-    creation_time: Optional[datetime]
+    creation_time: datetime | None
     name: str = ""
 
     @property
@@ -87,7 +86,7 @@ class EndpointAnalysisResult:
     unused_count: int = 0
     normal_count: int = 0
     unused_monthly_cost: float = 0.0
-    findings: List[EndpointFinding] = field(default_factory=list)
+    findings: list[EndpointFinding] = field(default_factory=list)
 
 
 # =============================================================================
@@ -95,9 +94,7 @@ class EndpointAnalysisResult:
 # =============================================================================
 
 
-def collect_endpoints(
-    session, account_id: str, account_name: str, region: str
-) -> List[VPCEndpointInfo]:
+def collect_endpoints(session, account_id: str, account_name: str, region: str) -> list[VPCEndpointInfo]:
     """VPC Endpoints 수집"""
     ec2 = get_client(session, "ec2", region_name=region)
     endpoints = []
@@ -164,7 +161,7 @@ def check_endpoint_usage(session, region: str, endpoint_id: str, days: int = 7) 
         datapoints = response.get("Datapoints", [])
         if datapoints:
             total_bytes = sum(dp.get("Sum", 0) for dp in datapoints)
-            return total_bytes > 0
+            return bool(total_bytes > 0)
 
     except ClientError:
         pass
@@ -179,7 +176,7 @@ def check_endpoint_usage(session, region: str, endpoint_id: str, days: int = 7) 
 
 
 def analyze_endpoints(
-    endpoints: List[VPCEndpointInfo],
+    endpoints: list[VPCEndpointInfo],
     session,
     account_id: str,
     account_name: str,
@@ -252,7 +249,7 @@ def analyze_endpoints(
 # =============================================================================
 
 
-def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[EndpointAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -262,9 +259,7 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     # Summary
@@ -317,9 +312,7 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
             ws_detail.cell(row=detail_row, column=3, value=ep.endpoint_id)
             ws_detail.cell(row=detail_row, column=4, value=ep.name or "-")
             ws_detail.cell(row=detail_row, column=5, value=ep.endpoint_type)
-            ws_detail.cell(
-                row=detail_row, column=6, value=ep.service_name.split(".")[-1]
-            )
+            ws_detail.cell(row=detail_row, column=6, value=ep.service_name.split(".")[-1])
             ws_detail.cell(row=detail_row, column=7, value=ep.vpc_id)
             ws_detail.cell(row=detail_row, column=8, value=ep.state)
             ws_detail.cell(row=detail_row, column=9, value=f"${ep.monthly_cost:,.2f}")
@@ -328,12 +321,10 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
     # 열 너비
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -349,9 +340,7 @@ def generate_report(results: List[EndpointAnalysisResult], output_dir: str) -> s
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[EndpointAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EndpointAnalysisResult | None:
     """단일 계정/리전의 VPC Endpoint 수집 및 분석 (병렬 실행용)"""
     endpoints = collect_endpoints(session, account_id, account_name, region)
     if not endpoints:
@@ -368,9 +357,7 @@ def run(ctx) -> None:
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
     # None 필터링
-    results: List[EndpointAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    results: list[EndpointAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     # 에러 출력
     if result.error_count > 0:
@@ -384,11 +371,9 @@ def run(ctx) -> None:
     # 요약
     total_interface = sum(r.interface_count for r in results)
     total_gateway = sum(r.gateway_count for r in results)
-    total_cost = sum(
-        r.interface_count * get_endpoint_monthly_cost(r.region) for r in results
-    )
+    total_cost = sum(r.interface_count * get_endpoint_monthly_cost(r.region) for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"Interface Endpoint: {total_interface}개 (${total_cost:,.2f}/월)")
     console.print(f"Gateway Endpoint: {total_gateway}개 (무료)")
 

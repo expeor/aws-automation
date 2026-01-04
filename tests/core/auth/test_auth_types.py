@@ -7,8 +7,6 @@ internal/auth/types/types.py 단위 테스트
 
 from datetime import datetime
 
-import pytest
-
 from core.auth.types import (
     AccountInfo,
     AccountNotFoundError,

@@ -15,7 +15,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -72,8 +71,8 @@ class ENIInfo:
     owner_id: str
     instance_id: str
     attachment_status: str
-    security_groups: List[str]
-    tags: Dict[str, str]
+    security_groups: list[str]
+    tags: dict[str, str]
     name: str
 
     # 메타
@@ -122,7 +121,7 @@ class ENIAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[ENIFinding] = field(default_factory=list)
+    findings: list[ENIFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -137,9 +136,7 @@ class ENIAnalysisResult:
 # =============================================================================
 
 
-def collect_enis(
-    session, account_id: str, account_name: str, region: str
-) -> List[ENIInfo]:
+def collect_enis(session, account_id: str, account_name: str, region: str) -> list[ENIInfo]:
     """ENI 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -168,19 +165,13 @@ def collect_enis(
                     subnet_id=data.get("SubnetId", ""),
                     availability_zone=data.get("AvailabilityZone", ""),
                     private_ip=data.get("PrivateIpAddress", ""),
-                    public_ip=data.get("Association", {}).get("PublicIp", "")
-                    if data.get("Association")
-                    else "",
+                    public_ip=data.get("Association", {}).get("PublicIp", "") if data.get("Association") else "",
                     interface_type=data.get("InterfaceType", ""),
                     requester_id=data.get("RequesterId", ""),
                     owner_id=data.get("OwnerId", ""),
                     instance_id=attachment.get("InstanceId", "") if attachment else "",
-                    attachment_status=attachment.get("Status", "")
-                    if attachment
-                    else "",
-                    security_groups=[
-                        g.get("GroupId", "") for g in data.get("Groups", [])
-                    ],
+                    attachment_status=attachment.get("Status", "") if attachment else "",
+                    security_groups=[g.get("GroupId", "") for g in data.get("Groups", [])],
                     tags=tags,
                     name=tags.get("Name", ""),
                     account_id=account_id,
@@ -192,9 +183,7 @@ def collect_enis(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} ENI 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} ENI 수집 오류: {error_code}[/yellow]")
 
     return enis
 
@@ -204,9 +193,7 @@ def collect_enis(
 # =============================================================================
 
 
-def analyze_enis(
-    enis: List[ENIInfo], account_id: str, account_name: str, region: str
-) -> ENIAnalysisResult:
+def analyze_enis(enis: list[ENIInfo], account_id: str, account_name: str, region: str) -> ENIAnalysisResult:
     """ENI 미사용 분석"""
     result = ENIAnalysisResult(
         account_id=account_id,
@@ -301,7 +288,7 @@ def _analyze_single_eni(eni: ENIInfo) -> ENIFinding:
 # =============================================================================
 
 
-def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -311,9 +298,7 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
     wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -323,18 +308,10 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
     )
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.PENDING: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
-        UsageStatus.AWS_MANAGED: PatternFill(
-            start_color="95A5A6", end_color="95A5A6", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.PENDING: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
+        UsageStatus.AWS_MANAGED: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
     }
 
     # Summary
@@ -438,9 +415,7 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 40
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 40)
 
     ws2.freeze_panes = "A2"
 
@@ -458,9 +433,7 @@ def generate_report(results: List[ENIAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> ENIAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ENIAnalysisResult:
     """단일 계정/리전의 ENI 수집 및 분석 (병렬 실행용)"""
     enis = collect_enis(session, account_id, account_name, region)
     return analyze_enis(enis, account_id, account_name, region)
@@ -473,7 +446,7 @@ def run(ctx) -> None:
     # 병렬 수집 및 분석
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
-    all_results: List[ENIAnalysisResult] = result.get_data()
+    all_results: list[ENIAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:

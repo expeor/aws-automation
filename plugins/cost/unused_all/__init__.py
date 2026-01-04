@@ -24,6 +24,9 @@ plugins/cost/unused_all - 미사용 리소스 종합 분석 (병렬 처리)
 # 메인 진입점
 from .orchestrator import collect_options, run
 
+# 리포트 생성 (외부 호출 가능)
+from .report import generate_report
+
 # 타입 (외부 사용 가능)
 from .types import (
     RESOURCE_FIELD_MAP,
@@ -33,10 +36,7 @@ from .types import (
     UnusedResourceSummary,
 )
 
-# 리포트 생성 (외부 호출 가능)
-from .report import generate_report
-
-__all__ = [
+__all__: list[str] = [
     # 메인 진입점
     "run",
     "collect_options",

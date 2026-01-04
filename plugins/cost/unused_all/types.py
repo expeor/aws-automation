@@ -7,7 +7,7 @@ plugins/cost/unused_all/types.py - 미사용 리소스 분석 데이터 타입
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # 각 도구의 결과 타입 import
 from plugins.acm.unused import ACMAnalysisResult
@@ -37,7 +37,6 @@ from plugins.sqs.unused import SQSAnalysisResult
 from plugins.vpc.endpoint_audit import EndpointAnalysisResult
 from plugins.vpc.eni_audit import ENIAnalysisResult
 
-
 # =============================================================================
 # 리소스 설정 (카테고리별 그룹화)
 # =============================================================================
@@ -48,7 +47,7 @@ from plugins.vpc.eni_audit import ENIAnalysisResult
 # - data_unused: collector 반환 데이터의 unused 키 (unused, old, issue, orphan 등)
 # - session/final: 세션/최종 결과의 필드명
 # - data_key: collector 반환 데이터의 결과 키 (result, findings)
-RESOURCE_FIELD_MAP: Dict[str, Dict[str, Any]] = {
+RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     # =========================================================================
     # Compute (EC2)
     # =========================================================================
@@ -487,105 +486,105 @@ class SessionCollectionResult:
     summary: UnusedResourceSummary
 
     # Compute (EC2)
-    ami_result: Optional[AMIAnalysisResult] = None
-    ebs_result: Optional[EBSAnalysisResult] = None
-    snap_result: Optional[SnapshotAnalysisResult] = None
-    eip_result: Optional[EIPAnalysisResult] = None
-    eni_result: Optional[ENIAnalysisResult] = None
+    ami_result: AMIAnalysisResult | None = None
+    ebs_result: EBSAnalysisResult | None = None
+    snap_result: SnapshotAnalysisResult | None = None
+    eip_result: EIPAnalysisResult | None = None
+    eni_result: ENIAnalysisResult | None = None
 
     # Networking (VPC)
-    nat_findings: List[Any] = field(default_factory=list)
-    endpoint_result: Optional[EndpointAnalysisResult] = None
+    nat_findings: list[Any] = field(default_factory=list)
+    endpoint_result: EndpointAnalysisResult | None = None
 
     # Load Balancing
-    elb_result: Optional[LBAnalysisResult] = None
-    tg_result: Optional[TargetGroupAnalysisResult] = None
+    elb_result: LBAnalysisResult | None = None
+    tg_result: TargetGroupAnalysisResult | None = None
 
     # Database
-    dynamodb_result: Optional[DynamoDBAnalysisResult] = None
-    elasticache_result: Optional[ElastiCacheAnalysisResult] = None
-    rds_instance_result: Optional[RDSInstanceAnalysisResult] = None
-    rds_snap_result: Optional[RDSSnapshotAnalysisResult] = None
+    dynamodb_result: DynamoDBAnalysisResult | None = None
+    elasticache_result: ElastiCacheAnalysisResult | None = None
+    rds_instance_result: RDSInstanceAnalysisResult | None = None
+    rds_snap_result: RDSSnapshotAnalysisResult | None = None
 
     # Storage
-    ecr_result: Optional[ECRAnalysisResult] = None
-    efs_result: Optional[EFSAnalysisResult] = None
-    s3_result: Optional[S3AnalysisResult] = None
+    ecr_result: ECRAnalysisResult | None = None
+    efs_result: EFSAnalysisResult | None = None
+    s3_result: S3AnalysisResult | None = None
 
     # Serverless
-    apigateway_result: Optional[APIGatewayAnalysisResult] = None
-    eventbridge_result: Optional[EventBridgeAnalysisResult] = None
-    lambda_result: Optional[LambdaAnalysisResult] = None
+    apigateway_result: APIGatewayAnalysisResult | None = None
+    eventbridge_result: EventBridgeAnalysisResult | None = None
+    lambda_result: LambdaAnalysisResult | None = None
 
     # Messaging
-    sns_result: Optional[SNSAnalysisResult] = None
-    sqs_result: Optional[SQSAnalysisResult] = None
+    sns_result: SNSAnalysisResult | None = None
+    sqs_result: SQSAnalysisResult | None = None
 
     # Security
-    acm_result: Optional[ACMAnalysisResult] = None
-    kms_result: Optional[KMSKeyAnalysisResult] = None
-    secret_result: Optional[SecretAnalysisResult] = None
+    acm_result: ACMAnalysisResult | None = None
+    kms_result: KMSKeyAnalysisResult | None = None
+    secret_result: SecretAnalysisResult | None = None
 
     # Monitoring
-    cw_alarm_result: Optional[AlarmAnalysisResult] = None
-    loggroup_result: Optional[LogGroupAnalysisResult] = None
+    cw_alarm_result: AlarmAnalysisResult | None = None
+    loggroup_result: LogGroupAnalysisResult | None = None
 
     # DNS (Global)
-    route53_result: Optional[Route53AnalysisResult] = None
+    route53_result: Route53AnalysisResult | None = None
 
     # 에러 목록
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
 class UnusedAllResult:
     """종합 분석 결과"""
 
-    summaries: List[UnusedResourceSummary] = field(default_factory=list)
+    summaries: list[UnusedResourceSummary] = field(default_factory=list)
 
     # Compute (EC2)
-    ami_results: List[AMIAnalysisResult] = field(default_factory=list)
-    ebs_results: List[EBSAnalysisResult] = field(default_factory=list)
-    snap_results: List[SnapshotAnalysisResult] = field(default_factory=list)
-    eip_results: List[EIPAnalysisResult] = field(default_factory=list)
-    eni_results: List[ENIAnalysisResult] = field(default_factory=list)
+    ami_results: list[AMIAnalysisResult] = field(default_factory=list)
+    ebs_results: list[EBSAnalysisResult] = field(default_factory=list)
+    snap_results: list[SnapshotAnalysisResult] = field(default_factory=list)
+    eip_results: list[EIPAnalysisResult] = field(default_factory=list)
+    eni_results: list[ENIAnalysisResult] = field(default_factory=list)
 
     # Networking (VPC)
-    nat_findings: List[Any] = field(default_factory=list)
-    endpoint_results: List[EndpointAnalysisResult] = field(default_factory=list)
+    nat_findings: list[Any] = field(default_factory=list)
+    endpoint_results: list[EndpointAnalysisResult] = field(default_factory=list)
 
     # Load Balancing
-    elb_results: List[LBAnalysisResult] = field(default_factory=list)
-    tg_results: List[TargetGroupAnalysisResult] = field(default_factory=list)
+    elb_results: list[LBAnalysisResult] = field(default_factory=list)
+    tg_results: list[TargetGroupAnalysisResult] = field(default_factory=list)
 
     # Database
-    dynamodb_results: List[DynamoDBAnalysisResult] = field(default_factory=list)
-    elasticache_results: List[ElastiCacheAnalysisResult] = field(default_factory=list)
-    rds_instance_results: List[RDSInstanceAnalysisResult] = field(default_factory=list)
-    rds_snap_results: List[RDSSnapshotAnalysisResult] = field(default_factory=list)
+    dynamodb_results: list[DynamoDBAnalysisResult] = field(default_factory=list)
+    elasticache_results: list[ElastiCacheAnalysisResult] = field(default_factory=list)
+    rds_instance_results: list[RDSInstanceAnalysisResult] = field(default_factory=list)
+    rds_snap_results: list[RDSSnapshotAnalysisResult] = field(default_factory=list)
 
     # Storage
-    ecr_results: List[ECRAnalysisResult] = field(default_factory=list)
-    efs_results: List[EFSAnalysisResult] = field(default_factory=list)
-    s3_results: List[S3AnalysisResult] = field(default_factory=list)
+    ecr_results: list[ECRAnalysisResult] = field(default_factory=list)
+    efs_results: list[EFSAnalysisResult] = field(default_factory=list)
+    s3_results: list[S3AnalysisResult] = field(default_factory=list)
 
     # Serverless
-    apigateway_results: List[APIGatewayAnalysisResult] = field(default_factory=list)
-    eventbridge_results: List[EventBridgeAnalysisResult] = field(default_factory=list)
-    lambda_results: List[LambdaAnalysisResult] = field(default_factory=list)
+    apigateway_results: list[APIGatewayAnalysisResult] = field(default_factory=list)
+    eventbridge_results: list[EventBridgeAnalysisResult] = field(default_factory=list)
+    lambda_results: list[LambdaAnalysisResult] = field(default_factory=list)
 
     # Messaging
-    sns_results: List[SNSAnalysisResult] = field(default_factory=list)
-    sqs_results: List[SQSAnalysisResult] = field(default_factory=list)
+    sns_results: list[SNSAnalysisResult] = field(default_factory=list)
+    sqs_results: list[SQSAnalysisResult] = field(default_factory=list)
 
     # Security
-    acm_results: List[ACMAnalysisResult] = field(default_factory=list)
-    kms_results: List[KMSKeyAnalysisResult] = field(default_factory=list)
-    secret_results: List[SecretAnalysisResult] = field(default_factory=list)
+    acm_results: list[ACMAnalysisResult] = field(default_factory=list)
+    kms_results: list[KMSKeyAnalysisResult] = field(default_factory=list)
+    secret_results: list[SecretAnalysisResult] = field(default_factory=list)
 
     # Monitoring
-    cw_alarm_results: List[AlarmAnalysisResult] = field(default_factory=list)
-    loggroup_results: List[LogGroupAnalysisResult] = field(default_factory=list)
+    cw_alarm_results: list[AlarmAnalysisResult] = field(default_factory=list)
+    loggroup_results: list[LogGroupAnalysisResult] = field(default_factory=list)
 
     # DNS (Global)
-    route53_results: List[Route53AnalysisResult] = field(default_factory=list)
+    route53_results: list[Route53AnalysisResult] = field(default_factory=list)

@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -50,18 +49,18 @@ class SecretInfo:
     arn: str
     name: str
     description: str
-    created_date: Optional[datetime]
-    last_accessed_date: Optional[datetime]
-    last_changed_date: Optional[datetime]
+    created_date: datetime | None
+    last_accessed_date: datetime | None
+    last_changed_date: datetime | None
     rotation_enabled: bool
-    deleted_date: Optional[datetime] = None
+    deleted_date: datetime | None = None
 
     @property
     def monthly_cost(self) -> float:
         return get_secret_price(self.region)
 
     @property
-    def days_since_access(self) -> Optional[int]:
+    def days_since_access(self) -> int | None:
         if self.last_accessed_date:
             return (datetime.now(timezone.utc) - self.last_accessed_date).days
         return None
@@ -89,12 +88,10 @@ class SecretAnalysisResult:
     normal_count: int = 0
     total_monthly_cost: float = 0.0
     unused_monthly_cost: float = 0.0
-    findings: List[SecretFinding] = field(default_factory=list)
+    findings: list[SecretFinding] = field(default_factory=list)
 
 
-def collect_secrets(
-    session, account_id: str, account_name: str, region: str
-) -> List[SecretInfo]:
+def collect_secrets(session, account_id: str, account_name: str, region: str) -> list[SecretInfo]:
     """Secrets Manager 시크릿 수집"""
     sm = get_client(session, "secretsmanager", region_name=region)
     secrets = []
@@ -121,9 +118,7 @@ def collect_secrets(
     return secrets
 
 
-def analyze_secrets(
-    secrets: List[SecretInfo], account_id: str, account_name: str, region: str
-) -> SecretAnalysisResult:
+def analyze_secrets(secrets: list[SecretInfo], account_id: str, account_name: str, region: str) -> SecretAnalysisResult:
     """시크릿 분석"""
     result = SecretAnalysisResult(
         account_id=account_id,
@@ -146,10 +141,7 @@ def analyze_secrets(
             )
             continue
 
-        if (
-            secret.days_since_access
-            and secret.days_since_access > UNUSED_DAYS_THRESHOLD
-        ):
+        if secret.days_since_access and secret.days_since_access > UNUSED_DAYS_THRESHOLD:
             result.unused_count += 1
             result.unused_monthly_cost += secret.monthly_cost
             result.findings.append(
@@ -187,7 +179,7 @@ def analyze_secrets(
     return result
 
 
-def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[SecretAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -197,9 +189,7 @@ def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
 
@@ -253,26 +243,18 @@ def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str
                 ws_detail.cell(
                     row=detail_row,
                     column=5,
-                    value=s.last_accessed_date.strftime("%Y-%m-%d")
-                    if s.last_accessed_date
-                    else "없음",
+                    value=s.last_accessed_date.strftime("%Y-%m-%d") if s.last_accessed_date else "없음",
                 )
-                ws_detail.cell(
-                    row=detail_row, column=6, value="예" if s.rotation_enabled else "아니오"
-                )
-                ws_detail.cell(
-                    row=detail_row, column=7, value=f"${s.monthly_cost:,.2f}"
-                )
+                ws_detail.cell(row=detail_row, column=6, value="예" if s.rotation_enabled else "아니오")
+                ws_detail.cell(row=detail_row, column=7, value=f"${s.monthly_cost:,.2f}")
                 ws_detail.cell(row=detail_row, column=8, value=f.recommendation)
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -282,9 +264,7 @@ def generate_report(results: List[SecretAnalysisResult], output_dir: str) -> str
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[SecretAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SecretAnalysisResult | None:
     """단일 계정/리전의 시크릿 수집 및 분석 (병렬 실행용)"""
     secrets = collect_secrets(session, account_id, account_name, region)
     if not secrets:
@@ -296,12 +276,8 @@ def run(ctx) -> None:
     """Secrets Manager 미사용 분석"""
     console.print("[bold]Secrets Manager 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="secretsmanager"
-    )
-    results: List[SecretAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="secretsmanager")
+    results: list[SecretAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -314,10 +290,8 @@ def run(ctx) -> None:
     unused = sum(r.unused_count for r in results)
     unused_cost = sum(r.unused_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
-    console.print(
-        f"전체: {total}개 / 미사용: [yellow]{unused}개[/yellow] (${unused_cost:,.2f}/월)"
-    )
+    console.print("\n[bold]종합 결과[/bold]")
+    console.print(f"전체: {total}개 / 미사용: [yellow]{unused}개[/yellow] (${unused_cost:,.2f}/월)")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

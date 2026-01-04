@@ -10,7 +10,7 @@ NAT Gateway 분석기
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .collector import NATAuditData, NATGateway
 
@@ -59,7 +59,7 @@ class NATFinding:
     annual_savings: float = 0.0  # 연간 절감 가능액
 
     # 세부 정보
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -67,7 +67,7 @@ class NATAnalysisResult:
     """전체 분석 결과"""
 
     audit_data: NATAuditData
-    findings: List[NATFinding] = field(default_factory=list)
+    findings: list[NATFinding] = field(default_factory=list)
 
     # 요약 통계
     total_nat_count: int = 0
@@ -114,9 +114,7 @@ class NATAnalyzer:
 
         # 전체 통계
         result.total_nat_count = len(self.audit_data.nat_gateways)
-        result.total_monthly_cost = sum(
-            f.nat.total_monthly_cost for f in result.findings
-        )
+        result.total_monthly_cost = sum(f.nat.total_monthly_cost for f in result.findings)
         result.total_monthly_waste = sum(f.monthly_waste for f in result.findings)
         result.total_annual_savings = sum(f.annual_savings for f in result.findings)
 
@@ -226,7 +224,7 @@ class NATAnalyzer:
             },
         )
 
-    def get_summary_stats(self) -> Dict[str, Any]:
+    def get_summary_stats(self) -> dict[str, Any]:
         """요약 통계 반환"""
         result = self.analyze()
 

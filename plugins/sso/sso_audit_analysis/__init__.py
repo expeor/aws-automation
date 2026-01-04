@@ -11,7 +11,7 @@ from .analyzer import SSOAnalysisResult, SSOAnalyzer
 from .collector import SSOCollector, SSOData
 from .reporter import SSOExcelReporter
 
-__all__ = [
+__all__: list[str] = [
     "SSOCollector",
     "SSOData",
     "SSOAnalyzer",

@@ -12,9 +12,10 @@ Usage:
     # 커스텀 설정
     ec2 = get_client(session, "ec2", max_attempts=10, connect_timeout=10)
 """
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import boto3
@@ -27,9 +28,9 @@ DEFAULT_READ_TIMEOUT = 30  # 초
 
 
 def get_client(
-    session: "boto3.Session",
+    session: boto3.Session,
     service_name: str,
-    region_name: Optional[str] = None,
+    region_name: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     retry_mode: str = DEFAULT_RETRY_MODE,
     connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
@@ -82,9 +83,9 @@ def get_client(
 
 
 def get_resource(
-    session: "boto3.Session",
+    session: boto3.Session,
     service_name: str,
-    region_name: Optional[str] = None,
+    region_name: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     retry_mode: str = DEFAULT_RETRY_MODE,
     **kwargs: Any,

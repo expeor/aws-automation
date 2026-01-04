@@ -48,8 +48,8 @@ _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-import click
-from click import Context, HelpFormatter
+import click  # noqa: E402
+from click import Context, HelpFormatter  # noqa: E402
 
 # Keep lightweight, centralized logging config
 # WARNING 레벨로 설정하여 INFO 로그가 도구 출력에 섞이지 않도록 함
@@ -212,9 +212,7 @@ cli.help = _build_help_text()
     is_flag=True,
     help="최소 출력 모드",
 )
-def run_command(
-    tool_path, profile, profile_group, region, format, output, quiet
-):
+def run_command(tool_path, profile, profile_group, region, format, output, quiet):
     """비대화형 도구 실행 (CI/CD용)
 
     SSO Profile 또는 Access Key 프로파일만 지원합니다.
@@ -350,9 +348,7 @@ def list_tools_command(category, as_json):
                     path = f"{cat['name']}/{tool.get('module', '')}"
                     name = tool.get("name", "")
                     perm = tool.get("permission", "read")
-                    perm_str = {"read": "R", "write": "W", "delete": "D"}.get(
-                        perm, perm
-                    )
+                    perm_str = {"read": "R", "write": "W", "delete": "D"}.get(perm, perm)
                     table.add_row(path, name, perm_str)
 
         console.print(table)
@@ -524,11 +520,9 @@ def group_create():
     # 5. 저장
     manager = ProfileGroupsManager()
     if manager.add(name, kind, selected_profiles):
-        console.print(
-            f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]"
-        )
+        console.print(f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]")
     else:
-        console.print(f"\n[red]그룹 저장 실패 (이미 존재하거나 최대 개수 초과)[/red]")
+        console.print("\n[red]그룹 저장 실패 (이미 존재하거나 최대 개수 초과)[/red]")
         raise SystemExit(1)
 
 
@@ -544,9 +538,9 @@ def _parse_selection(selection: str, max_count: int) -> list:
         if "-" in part and not part.startswith("-"):
             # 범위 (1-3)
             try:
-                start, end = part.split("-", 1)
-                start, end = int(start), int(end)
-                for i in range(start, end + 1):
+                start_str, end_str = part.split("-", 1)
+                start_int, end_int = int(start_str), int(end_str)
+                for i in range(start_int, end_int + 1):
                     if 1 <= i <= max_count:
                         result.add(i - 1)  # 0-indexed
             except ValueError:
@@ -586,9 +580,9 @@ def _get_profiles_by_kind(kind: str) -> list:
 
             provider_type = detect_provider_type(profile_config)
 
-            if kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE:
-                result.append(profile_name)
-            elif kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS:
+            if (kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE) or (
+                kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS
+            ):
                 result.append(profile_name)
     except Exception:
         pass
@@ -763,7 +757,6 @@ def ip_command(query, profile, save_csv, detail_mode, no_public):
       aa ip 10.0.1.50 -p my-profile  # 특정 프로파일 사용
     """
     from cli.flow import create_flow_runner
-    from cli.flow.context import ExecutionContext
 
     # 쿼리가 없으면 기존 대화형 모드
     if not query:
@@ -809,22 +802,26 @@ def _run_ip_search_direct(
     try:
         # 세션 생성
         session = get_session(profile)
-        ctx.session = session
+        ctx.session = session  # type: ignore[attr-defined]
 
         # 캐시 확인
         from plugins.vpc.ip_search.private import ENICache
 
-        cache = ENICache(session_name=profile)
-        if not cache.is_valid():
-            console.print(f"[yellow]ENI 캐시가 없습니다. Private 검색이 제한됩니다.[/yellow]")
+        eni_cache = ENICache(session_name=profile)
+        cache: ENICache | None = eni_cache if eni_cache.is_valid() else None
+        if cache is None:
+            console.print("[yellow]ENI 캐시가 없습니다. Private 검색이 제한됩니다.[/yellow]")
             console.print("[dim]전체 검색을 원하면 'aa ip'로 대화형 모드 진입 후 'cache' 명령 사용[/dim]\n")
-            cache = None
 
         # 검색 실행
-        from plugins.vpc.ip_search.private import parse_query, QueryType, search_by_query
+        from plugins.vpc.ip_search.private import (
+            QueryType,
+            parse_query,
+            search_by_query,
+        )
         from plugins.vpc.ip_search.public import search_public_ip
 
-        results = {"public": [], "private": []}
+        results: dict[str, list] = {"public": [], "private": []}
 
         # Public 검색 (public_mode가 True일 때만)
         if public_mode:
@@ -861,7 +858,7 @@ def _run_ip_search_direct(
             import traceback
 
             traceback.print_exc()
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

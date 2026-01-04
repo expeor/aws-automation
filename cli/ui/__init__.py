@@ -37,7 +37,7 @@ from .search import (
     init_search_engine,
 )
 
-__all__ = [
+__all__: list[str] = [
     "MainMenu",
     "show_main_menu",
     "print_banner",

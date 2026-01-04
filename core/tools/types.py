@@ -5,7 +5,7 @@ Area(영역) 분류의 단일 소스.
 UI 레이어(main_menu, category step)는 이 모듈을 import해서 사용.
 """
 
-from typing import Dict, List, TypedDict
+from typing import TypedDict
 
 
 class AreaInfo(TypedDict):
@@ -24,7 +24,7 @@ class AreaInfo(TypedDict):
 # - 새로운 영역을 추가하지 마세요
 # - 참조: https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor.html
 # ============================================================================
-AREA_REGISTRY: List[AreaInfo] = [
+AREA_REGISTRY: list[AreaInfo] = [
     {
         "key": "security",
         "command": "/security",
@@ -68,7 +68,7 @@ AREA_REGISTRY: List[AreaInfo] = [
 ]
 
 # /command → internal key 매핑 (자동 생성)
-AREA_COMMANDS: Dict[str, str] = {}
+AREA_COMMANDS: dict[str, str] = {}
 for _area in AREA_REGISTRY:
     AREA_COMMANDS[_area["command"]] = _area["key"]
 # 추가 별칭
@@ -76,7 +76,7 @@ AREA_COMMANDS["/sec"] = "security"
 AREA_COMMANDS["/op"] = "operational"
 
 # 한글 키워드 → internal key 매핑
-AREA_KEYWORDS: Dict[str, str] = {
+AREA_KEYWORDS: dict[str, str] = {
     # security
     "보안": "security",
     "취약": "security",
@@ -102,9 +102,8 @@ AREA_KEYWORDS: Dict[str, str] = {
 }
 
 # 문자열 키 기반 AREA_DISPLAY (category.py 호환)
-AREA_DISPLAY_BY_KEY: Dict[str, Dict[str, str]] = {
-    a["key"]: {"label": a["label"], "color": a["color"], "icon": a["icon"]}
-    for a in AREA_REGISTRY
+AREA_DISPLAY_BY_KEY: dict[str, dict[str, str]] = {
+    a["key"]: {"label": a["label"], "color": a["color"], "icon": a["icon"]} for a in AREA_REGISTRY
 }
 
 
@@ -144,14 +143,14 @@ class CategoryMeta(TypedDict, total=False):
 
     # 선택 필드
     display_name: str  # UI 표시 이름 (없으면 name 사용)
-    aliases: List[str]  # 별칭 (예: ["gov"])
+    aliases: list[str]  # 별칭 (예: ["gov"])
     group: str  # 그룹 ("aws" | "special" | "collection")
     icon: str  # 아이콘 (메뉴 표시용)
 
     # 하위 서비스 (예: elb→["alb", "nlb", "gwlb", "clb"])
     # sub_services에 정의된 이름으로 CLI 명령어 자동 등록
     # 각 도구의 sub_service 필드와 매칭되어 필터링됨
-    sub_services: List[str]
+    sub_services: list[str]
 
     # 컬렉션 전용
     collection: bool  # 컬렉션 여부 (True면 다른 도구 참조)

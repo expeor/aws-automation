@@ -4,9 +4,7 @@ tests/test_parallel_errors.py - core/parallel/errors.py 테스트
 
 import threading
 from datetime import datetime
-from unittest.mock import MagicMock
 
-import pytest
 from botocore.exceptions import ClientError
 
 from core.parallel.errors import (

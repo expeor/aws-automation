@@ -4,8 +4,6 @@ tests/plugins/vpc/test_plugins_sg_audit.py - Security Group Audit 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestCollectSGs:
     """_collect_sgs 함수 테스트"""
@@ -82,7 +80,7 @@ class TestCreateOutputDirectory:
         )
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("123456789012")
         mock_path_instance.sub.assert_called_once_with("sg-audit")
@@ -102,7 +100,7 @@ class TestCreateOutputDirectory:
         mock_path_instance.build.return_value = "/output/my-profile/sg-audit/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("my-profile")
 
@@ -121,7 +119,7 @@ class TestCreateOutputDirectory:
         mock_path_instance.build.return_value = "/output/default/sg-audit/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
-        result = _create_output_directory(mock_ctx)
+        _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("default")
 

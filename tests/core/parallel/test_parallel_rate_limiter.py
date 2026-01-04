@@ -4,9 +4,6 @@ tests/test_parallel_rate_limiter.py - core/parallel/rate_limiter.py 테스트
 
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-
-import pytest
 
 from core.parallel.rate_limiter import (
     SERVICE_RATE_LIMITS,

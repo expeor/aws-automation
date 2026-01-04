@@ -3,12 +3,12 @@ pkg/output/builder.py - 출력 경로 빌더 구현
 """
 
 import os
-import platform
 import subprocess
+import sys
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 
 class DatePattern(str, Enum):
@@ -59,8 +59,8 @@ class OutputPath:
             identifier: 프로파일명 또는 계정 ID
         """
         self._identifier = self._sanitize(identifier)
-        self._parts: List[str] = []
-        self._date_pattern: Optional[DatePattern] = None
+        self._parts: list[str] = []
+        self._date_pattern: DatePattern | None = None
         self._root = self._get_project_root()
 
     def sub(self, *parts: str) -> "OutputPath":
@@ -164,7 +164,7 @@ class OutputPath:
         return str(cwd)
 
     @staticmethod
-    def _get_date_parts(pattern: DatePattern) -> List[str]:
+    def _get_date_parts(pattern: DatePattern) -> list[str]:
         """날짜 패턴에 따른 경로 세그먼트 반환"""
         now = datetime.now()
 
@@ -200,12 +200,11 @@ def open_in_explorer(path: str) -> bool:
         os.makedirs(path, exist_ok=True)
 
     try:
-        system = platform.system()
-        if system == "Windows":
-            os.startfile(path)  # type: ignore
-        elif system == "Darwin":  # macOS
+        if sys.platform == "win32":
+            os.startfile(path)  # noqa: S606
+        elif sys.platform == "darwin":
             subprocess.run(["open", path], check=False)
-        else:  # Linux
+        else:
             subprocess.run(["xdg-open", path], check=False)
         return True
     except Exception:
@@ -225,12 +224,11 @@ def open_file(filepath: str) -> bool:
         return False
 
     try:
-        system = platform.system()
-        if system == "Windows":
-            os.startfile(filepath)  # type: ignore
-        elif system == "Darwin":  # macOS
+        if sys.platform == "win32":
+            os.startfile(filepath)  # noqa: S606
+        elif sys.platform == "darwin":
             subprocess.run(["open", filepath], check=False)
-        else:  # Linux
+        else:
             subprocess.run(["xdg-open", filepath], check=False)
         return True
     except Exception:
@@ -277,6 +275,4 @@ def create_report_directory(
         output_dir = create_report_directory("alb_log", "my-profile")
         # → output/my-profile/tools/alb_log/2025/12/
     """
-    return (
-        OutputPath(identifier).sub("tools", tool_name).with_date(date_pattern).build()
-    )
+    return OutputPath(identifier).sub("tools", tool_name).with_date(date_pattern).build()

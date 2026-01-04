@@ -9,9 +9,8 @@ plugins/acm/unused.py - ACM 미사용 인증서 분석
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -54,9 +53,9 @@ class CertInfo:
     status: str
     cert_type: str  # AMAZON_ISSUED, IMPORTED
     key_algorithm: str
-    in_use_by: List[str]
-    not_before: Optional[datetime]
-    not_after: Optional[datetime]
+    in_use_by: list[str]
+    not_before: datetime | None
+    not_after: datetime | None
     renewal_eligibility: str
 
     @property
@@ -64,7 +63,7 @@ class CertInfo:
         return len(self.in_use_by) > 0
 
     @property
-    def days_until_expiry(self) -> Optional[int]:
+    def days_until_expiry(self) -> int | None:
         if self.not_after:
             now = datetime.now(timezone.utc)
             delta = self.not_after - now
@@ -94,12 +93,10 @@ class ACMAnalysisResult:
     expired_certs: int = 0
     pending_certs: int = 0
     normal_certs: int = 0
-    findings: List[CertFinding] = field(default_factory=list)
+    findings: list[CertFinding] = field(default_factory=list)
 
 
-def collect_certificates(
-    session, account_id: str, account_name: str, region: str
-) -> List[CertInfo]:
+def collect_certificates(session, account_id: str, account_name: str, region: str) -> list[CertInfo]:
     """ACM 인증서 수집"""
     from botocore.exceptions import ClientError
 
@@ -125,9 +122,7 @@ def collect_certificates(
                 cert_arn = cert_summary.get("CertificateArn", "")
 
                 try:
-                    cert_detail = acm.describe_certificate(CertificateArn=cert_arn).get(
-                        "Certificate", {}
-                    )
+                    cert_detail = acm.describe_certificate(CertificateArn=cert_arn).get("Certificate", {})
 
                     info = CertInfo(
                         account_id=account_id,
@@ -154,9 +149,7 @@ def collect_certificates(
     return certs
 
 
-def analyze_certificates(
-    certs: List[CertInfo], account_id: str, account_name: str, region: str
-) -> ACMAnalysisResult:
+def analyze_certificates(certs: list[CertInfo], account_id: str, account_name: str, region: str) -> ACMAnalysisResult:
     """ACM 인증서 분석"""
     result = ACMAnalysisResult(
         account_id=account_id,
@@ -229,7 +222,7 @@ def analyze_certificates(
     return result
 
 
-def generate_report(results: List[ACMAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[ACMAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -239,17 +232,11 @@ def generate_report(results: List[ACMAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
-    orange_fill = PatternFill(
-        start_color="FFA500", end_color="FFA500", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
+    orange_fill = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -324,12 +311,10 @@ def generate_report(results: List[ACMAnalysisResult], output_dir: str) -> str:
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -339,9 +324,7 @@ def generate_report(results: List[ACMAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[ACMAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ACMAnalysisResult | None:
     """단일 계정/리전의 ACM 인증서 수집 및 분석 (병렬 실행용)"""
     certs = collect_certificates(session, account_id, account_name, region)
     if not certs:
@@ -354,7 +337,7 @@ def run(ctx) -> None:
     console.print("[bold]ACM 인증서 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="acm")
-    results: List[ACMAnalysisResult] = [r for r in result.get_data() if r is not None]
+    results: list[ACMAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -367,7 +350,7 @@ def run(ctx) -> None:
     total_expiring = sum(r.expiring_certs for r in results)
     total_expired = sum(r.expired_certs for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용: [yellow]{total_unused}개[/yellow] / "
         f"만료임박: [orange1]{total_expiring}개[/orange1] / "

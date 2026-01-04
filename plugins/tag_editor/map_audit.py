@@ -16,12 +16,23 @@ AWS 리소스의 map-migrated 태그 현황을 분석하고 리포트 생성
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.table import Table
 
-from core.parallel import parallel_collect, get_client
+from core.parallel import get_client, parallel_collect
+
+from .report import generate_audit_report
+from .types import (
+    MAP_TAG_KEY,
+    MapTagAnalysisResult,
+    ResourceTagInfo,
+    ResourceTypeStats,
+)
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -29,19 +40,6 @@ REQUIRED_PERMISSIONS = {
         "tag:GetResources",
     ],
 }
-
-from .types import (
-    MAP_TAG_KEY,
-    RESOURCE_TYPE_GROUPS,
-    SUPPORTED_RESOURCE_TYPES,
-    MapTagAnalysisResult,
-    ResourceTagInfo,
-    ResourceTypeStats,
-)
-from .report import generate_audit_report
-
-if TYPE_CHECKING:
-    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -51,14 +49,20 @@ console = Console()
 # =============================================================================
 
 
-def _parse_arn(arn: str) -> Dict[str, str]:
+def _parse_arn(arn: str) -> dict[str, str]:
     """ARN 파싱하여 리소스 정보 추출
 
     ARN format: arn:partition:service:region:account-id:resource-type/resource-id
     """
     parts = arn.split(":")
     if len(parts) < 6:
-        return {"service": "", "region": "", "account_id": "", "resource_type": "", "resource_id": ""}
+        return {
+            "service": "",
+            "region": "",
+            "account_id": "",
+            "resource_type": "",
+            "resource_id": "",
+        }
 
     service = parts[2]
     region = parts[3]
@@ -83,7 +87,7 @@ def _parse_arn(arn: str) -> Dict[str, str]:
     }
 
 
-def _get_resource_name(tags: Dict[str, str]) -> str:
+def _get_resource_name(tags: dict[str, str]) -> str:
     """태그에서 Name 추출"""
     return tags.get("Name", tags.get("name", ""))
 
@@ -93,7 +97,7 @@ def collect_resources_with_tags(
     account_id: str,
     account_name: str,
     region: str,
-    resource_types: Optional[List[str]] = None,
+    resource_types: list[str] | None = None,
 ) -> MapTagAnalysisResult:
     """ResourceGroupsTaggingAPI로 리소스 수집 및 태그 분석"""
     result = MapTagAnalysisResult(
@@ -109,7 +113,7 @@ def collect_resources_with_tags(
         return result
 
     # 리소스 타입별 통계
-    type_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
+    type_counts: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
 
     # 페이지네이션으로 모든 리소스 조회
     paginator = client.get_paginator("get_resources")
@@ -192,14 +196,12 @@ def collect_resources_with_tags(
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> MapTagAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> MapTagAnalysisResult:
     """단일 계정/리전의 MAP 태그 분석 (병렬 실행용)"""
     return collect_resources_with_tags(session, account_id, account_name, region)
 
 
-def _print_summary_table(results: List[MapTagAnalysisResult]) -> None:
+def _print_summary_table(results: list[MapTagAnalysisResult]) -> None:
     """콘솔에 요약 테이블 출력"""
     # 전체 통계
     total_resources = sum(r.total_resources for r in results)
@@ -207,13 +209,13 @@ def _print_summary_table(results: List[MapTagAnalysisResult]) -> None:
     total_untagged = sum(r.untagged_resources for r in results)
     overall_rate = (total_tagged / total_resources * 100) if total_resources > 0 else 0
 
-    console.print(f"\n[bold]전체 MAP 태그 현황[/bold]")
+    console.print("\n[bold]전체 MAP 태그 현황[/bold]")
     console.print(f"총 리소스: {total_resources:,}개")
     console.print(f"태그됨: [green]{total_tagged:,}개[/green] ({overall_rate:.1f}%)")
     console.print(f"미태그: [red]{total_untagged:,}개[/red]")
 
     # 리소스 타입별 통계 집계
-    type_totals: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
+    type_totals: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
     for r in results:
         for ts in r.type_stats:
             type_totals[ts.resource_type]["total"] += ts.total
@@ -221,7 +223,7 @@ def _print_summary_table(results: List[MapTagAnalysisResult]) -> None:
 
     # 테이블 출력
     if type_totals:
-        console.print(f"\n[bold]리소스 타입별 현황[/bold]")
+        console.print("\n[bold]리소스 타입별 현황[/bold]")
         table = Table(show_header=True)
         table.add_column("리소스 타입", style="cyan")
         table.add_column("전체", justify="right")
@@ -261,7 +263,7 @@ def _print_summary_table(results: List[MapTagAnalysisResult]) -> None:
 # =============================================================================
 
 
-def collect_options(ctx: "ExecutionContext") -> None:
+def collect_options(ctx: ExecutionContext) -> None:
     """MAP 태그 분석 옵션 수집"""
     from rich.prompt import Confirm
 
@@ -279,17 +281,15 @@ def collect_options(ctx: "ExecutionContext") -> None:
     ctx.options["untagged_only"] = show_untagged_only
 
 
-def run(ctx: "ExecutionContext") -> None:
+def run(ctx: ExecutionContext) -> None:
     """MAP 태그 분석 실행"""
     console.print("[bold]MAP 태그 분석 시작...[/bold]\n")
     console.print(f"[dim]분석 태그: {MAP_TAG_KEY}[/dim]\n")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="resourcegroupstaggingapi"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="resourcegroupstaggingapi")
 
-    results: List[MapTagAnalysisResult] = result.get_data()
+    results: list[MapTagAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:

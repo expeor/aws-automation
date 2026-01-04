@@ -19,7 +19,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
 
 from rich.console import Console
 
@@ -78,13 +77,13 @@ class SnapshotInfo:
     state: str
     volume_id: str
     volume_size_gb: int
-    start_time: Optional[datetime]
+    start_time: datetime | None
     encrypted: bool
     owner_id: str
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
     # AMI 연결
-    ami_ids: List[str] = field(default_factory=list)
+    ami_ids: list[str] = field(default_factory=list)
 
     # 메타
     account_id: str = ""
@@ -132,7 +131,7 @@ class SnapshotAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[SnapshotFinding] = field(default_factory=list)
+    findings: list[SnapshotFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -153,9 +152,7 @@ class SnapshotAnalysisResult:
 # =============================================================================
 
 
-def collect_snapshots(
-    session, account_id: str, account_name: str, region: str
-) -> List[SnapshotInfo]:
+def collect_snapshots(session, account_id: str, account_name: str, region: str) -> list[SnapshotInfo]:
     """EBS Snapshot 목록 수집 (자체 소유만)"""
     from botocore.exceptions import ClientError
 
@@ -199,14 +196,12 @@ def collect_snapshots(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} Snapshot 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} Snapshot 수집 오류: {error_code}[/yellow]")
 
     return snapshots
 
 
-def get_ami_snapshot_mapping(session, region: str) -> Dict[str, List[str]]:
+def get_ami_snapshot_mapping(session, region: str) -> dict[str, list[str]]:
     """AMI가 사용하는 스냅샷 ID 매핑 조회
 
     Returns:
@@ -214,7 +209,7 @@ def get_ami_snapshot_mapping(session, region: str) -> Dict[str, List[str]]:
     """
     from botocore.exceptions import ClientError
 
-    mapping: Dict[str, List[str]] = {}
+    mapping: dict[str, list[str]] = {}
 
     try:
         ec2 = get_client(session, "ec2", region_name=region)
@@ -246,8 +241,8 @@ def get_ami_snapshot_mapping(session, region: str) -> Dict[str, List[str]]:
 
 
 def analyze_snapshots(
-    snapshots: List[SnapshotInfo],
-    ami_mapping: Dict[str, List[str]],
+    snapshots: list[SnapshotInfo],
+    ami_mapping: dict[str, list[str]],
     account_id: str,
     account_name: str,
     region: str,
@@ -348,7 +343,7 @@ def _analyze_single_snapshot(snapshot: SnapshotInfo) -> SnapshotFinding:
 # =============================================================================
 
 
-def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[SnapshotAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -358,9 +353,7 @@ def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> s
     wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -370,15 +363,9 @@ def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> s
     )
 
     status_fills = {
-        UsageStatus.ORPHAN: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.OLD: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.ORPHAN: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.OLD: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -488,9 +475,7 @@ def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> s
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 50
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
 
     ws2.freeze_panes = "A2"
 
@@ -508,9 +493,7 @@ def generate_report(results: List[SnapshotAnalysisResult], output_dir: str) -> s
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[SnapshotAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SnapshotAnalysisResult | None:
     """단일 계정/리전의 스냅샷 수집 및 분석 (병렬 실행용)"""
     snapshots = collect_snapshots(session, account_id, account_name, region)
     if not snapshots:
@@ -534,14 +517,10 @@ def run(ctx) -> None:
     )
 
     # 결과 처리 (None 제외)
-    all_results: List[SnapshotAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    all_results: list[SnapshotAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     # 진행 상황 출력
-    console.print(
-        f"  [dim]수집 완료: 성공 {result.success_count}, 실패 {result.error_count}[/dim]"
-    )
+    console.print(f"  [dim]수집 완료: 성공 {result.success_count}, 실패 {result.error_count}[/dim]")
 
     # 에러 요약
     if result.error_count > 0:
@@ -561,9 +540,7 @@ def run(ctx) -> None:
                 parts.append(f"오래됨 {r.old_count}개 ({r.old_size_gb}GB)")
             total_waste = r.orphan_monthly_cost + r.old_monthly_cost
             cost_str = f" (${total_waste:.2f}/월)" if total_waste > 0 else ""
-            console.print(
-                f"  {r.account_name}/{r.region}: [red]{', '.join(parts)}{cost_str}[/red]"
-            )
+            console.print(f"  {r.account_name}/{r.region}: [red]{', '.join(parts)}{cost_str}[/red]")
         elif r.total_count > 0:
             console.print(
                 f"  {r.account_name}/{r.region}: [green]정상 {r.normal_count}개 ({r.total_size_gb}GB)[/green]"
@@ -582,9 +559,7 @@ def run(ctx) -> None:
         "old_cost": sum(r.old_monthly_cost for r in all_results),
     }
 
-    console.print(
-        f"\n[bold]전체 스냅샷: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
-    )
+    console.print(f"\n[bold]전체 스냅샷: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
     if totals["orphan"] > 0:
         console.print(
             f"  [red bold]고아: {totals['orphan']}개 ({totals['orphan_size']}GB, ${totals['orphan_cost']:.2f}/월)[/red bold]"

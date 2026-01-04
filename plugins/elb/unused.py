@@ -20,7 +20,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -86,12 +85,12 @@ class LoadBalancerInfo:
     scheme: str  # internet-facing, internal
     state: str
     vpc_id: str
-    availability_zones: List[str]
-    created_time: Optional[datetime]
-    tags: Dict[str, str]
+    availability_zones: list[str]
+    created_time: datetime | None
+    tags: dict[str, str]
 
     # 타겟 그룹 (ALB/NLB/GWLB)
-    target_groups: List[TargetGroupInfo] = field(default_factory=list)
+    target_groups: list[TargetGroupInfo] = field(default_factory=list)
 
     # CLB 전용
     registered_instances: int = 0
@@ -138,7 +137,7 @@ class LBAnalysisResult:
     account_id: str
     account_name: str
     region: str
-    findings: List[LBFinding] = field(default_factory=list)
+    findings: list[LBFinding] = field(default_factory=list)
 
     # 통계
     total_count: int = 0
@@ -155,9 +154,7 @@ class LBAnalysisResult:
 # =============================================================================
 
 
-def collect_v2_load_balancers(
-    session, account_id: str, account_name: str, region: str
-) -> List[LoadBalancerInfo]:
+def collect_v2_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
     """ALB/NLB/GWLB 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -193,10 +190,7 @@ def collect_v2_load_balancers(
                     scheme=data.get("Scheme", ""),
                     state=data.get("State", {}).get("Code", ""),
                     vpc_id=data.get("VpcId", ""),
-                    availability_zones=[
-                        az.get("ZoneName", "")
-                        for az in data.get("AvailabilityZones", [])
-                    ],
+                    availability_zones=[az.get("ZoneName", "") for az in data.get("AvailabilityZones", [])],
                     created_time=data.get("CreatedTime"),
                     tags=tags,
                     account_id=account_id,
@@ -212,14 +206,12 @@ def collect_v2_load_balancers(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
 
 
-def _get_target_groups(elbv2, lb_arn: str) -> List[TargetGroupInfo]:
+def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
     """LB에 연결된 타겟 그룹 조회"""
     from botocore.exceptions import ClientError
 
@@ -270,9 +262,7 @@ def _get_target_groups(elbv2, lb_arn: str) -> List[TargetGroupInfo]:
 # =============================================================================
 
 
-def collect_classic_load_balancers(
-    session, account_id: str, account_name: str, region: str
-) -> List[LoadBalancerInfo]:
+def collect_classic_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
     """Classic Load Balancer 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -303,9 +293,7 @@ def collect_classic_load_balancers(
             healthy = 0
             try:
                 if instances:
-                    health_response = elb.describe_instance_health(
-                        LoadBalancerName=lb_name
-                    )
+                    health_response = elb.describe_instance_health(LoadBalancerName=lb_name)
                     for state in health_response.get("InstanceStates", []):
                         if state.get("State") == "InService":
                             healthy += 1
@@ -337,9 +325,7 @@ def collect_classic_load_balancers(
         if "not available" not in str(e).lower():
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             if not is_quiet():
-                console.print(
-                    f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]"
-                )
+                console.print(f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
 
@@ -350,7 +336,7 @@ def collect_classic_load_balancers(
 
 
 def analyze_load_balancers(
-    load_balancers: List[LoadBalancerInfo],
+    load_balancers: list[LoadBalancerInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -451,7 +437,7 @@ def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
 # =============================================================================
 
 
-def generate_report(results: List[LBAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
@@ -463,9 +449,7 @@ def generate_report(results: List[LBAnalysisResult], output_dir: str) -> str:
         wb.remove(active_sheet)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -475,15 +459,9 @@ def generate_report(results: List[LBAnalysisResult], output_dir: str) -> str:
     )
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.UNHEALTHY: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.UNHEALTHY: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -581,9 +559,7 @@ def generate_report(results: List[LBAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 50
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
 
     ws2.freeze_panes = "A2"
 
@@ -601,14 +577,10 @@ def generate_report(results: List[LBAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> LBAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LBAnalysisResult:
     """단일 계정/리전의 ELB 수집 및 분석 (병렬 실행용)"""
     v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
-    classic_lbs = collect_classic_load_balancers(
-        session, account_id, account_name, region
-    )
+    classic_lbs = collect_classic_load_balancers(session, account_id, account_name, region)
     all_lbs = v2_lbs + classic_lbs
     return analyze_load_balancers(all_lbs, account_id, account_name, region)
 
@@ -618,11 +590,9 @@ def run(ctx) -> None:
     console.print("[bold]미사용 ELB 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="elasticloadbalancing"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elasticloadbalancing")
 
-    all_results: List[LBAnalysisResult] = result.get_data()
+    all_results: list[LBAnalysisResult] = result.get_data()
 
     # 에러 출력
     if result.error_count > 0:

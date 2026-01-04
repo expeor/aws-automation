@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.tools.io.excel import ColumnDef, Workbook
 
@@ -42,10 +42,10 @@ class Repository:
     clone_url_http: str = ""
     clone_url_ssh: str = ""
     arn: str = ""
-    creation_date: Optional[datetime] = None
-    last_modified_date: Optional[datetime] = None
+    creation_date: datetime | None = None
+    last_modified_date: datetime | None = None
     default_branch: str = ""
-    branches: List[str] = field(default_factory=list)
+    branches: list[str] = field(default_factory=list)
 
     @property
     def branch_count(self) -> int:
@@ -56,7 +56,7 @@ class Repository:
         """브랜치가 없는 빈 리포지토리인지"""
         return self.branch_count == 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -74,8 +74,8 @@ class Repository:
 class AuditResult:
     """리포지토리 감사 결과"""
 
-    repositories: List[Repository] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    repositories: list[Repository] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     @property
     def total_repos(self) -> int:
@@ -86,27 +86,31 @@ class AuditResult:
         return sum(r.branch_count for r in self.repositories)
 
     @property
-    def empty_repos(self) -> List[Repository]:
+    def empty_repos(self) -> list[Repository]:
         """빈 리포지토리 목록"""
         return [r for r in self.repositories if r.is_empty]
 
-    def get_repo_branch_pairs(self) -> List[Dict[str, str]]:
+    def get_repo_branch_pairs(self) -> list[dict[str, str]]:
         """리포지토리-브랜치 쌍 목록"""
         pairs = []
         for repo in self.repositories:
             if repo.branches:
                 for branch in repo.branches:
-                    pairs.append({
-                        "repository": repo.name,
-                        "branch": branch,
-                        "account_id": repo.account_id,
-                    })
+                    pairs.append(
+                        {
+                            "repository": repo.name,
+                            "branch": branch,
+                            "account_id": repo.account_id,
+                        }
+                    )
             else:
-                pairs.append({
-                    "repository": repo.name,
-                    "branch": "(empty)",
-                    "account_id": repo.account_id,
-                })
+                pairs.append(
+                    {
+                        "repository": repo.name,
+                        "branch": "(empty)",
+                        "account_id": repo.account_id,
+                    }
+                )
         return pairs
 
 
@@ -116,7 +120,7 @@ class RepoAuditor:
     모든 리포지토리와 브랜치 정보를 수집합니다.
     """
 
-    def __init__(self, session, region: str = None):
+    def __init__(self, session, region: str | None = None):
         """초기화
 
         Args:
@@ -162,7 +166,7 @@ class RepoAuditor:
 
         return AuditResult(repositories=repositories, errors=errors)
 
-    def _list_repositories(self, client) -> List[str]:
+    def _list_repositories(self, client) -> list[str]:
         """리포지토리 이름 목록 조회"""
         repo_names = []
 
@@ -198,7 +202,7 @@ class RepoAuditor:
             branches=branches,
         )
 
-    def _list_branches(self, client, repo_name: str) -> List[str]:
+    def _list_branches(self, client, repo_name: str) -> list[str]:
         """브랜치 목록 조회"""
         branches = []
 
@@ -303,14 +307,16 @@ class RepoAuditReporter:
             ]
             sheet.add_row(row)
 
-        sheet.add_summary_row([
-            "합계",
-            f"{self.result.total_repos}개",
-            "",
-            self.result.total_branches,
-            "",
-            "",
-        ])
+        sheet.add_summary_row(
+            [
+                "합계",
+                f"{self.result.total_repos}개",
+                "",
+                self.result.total_branches,
+                "",
+                "",
+            ]
+        )
 
     def _create_branches_sheet(self, wb: Workbook) -> None:
         """브랜치 시트"""
@@ -333,15 +339,17 @@ class RepoAuditReporter:
         sheet = wb.new_sheet(name="Empty Repos", columns=columns)
 
         for repo in self.result.empty_repos:
-            sheet.add_row([
-                repo.name,
-                repo.creation_date,
-                repo.last_modified_date,
-            ])
+            sheet.add_row(
+                [
+                    repo.name,
+                    repo.creation_date,
+                    repo.last_modified_date,
+                ]
+            )
 
     def print_summary(self) -> None:
         """콘솔에 요약 출력"""
-        print(f"\n=== CodeCommit 리포지토리 분석 결과 ===")
+        print("\n=== CodeCommit 리포지토리 분석 결과 ===")
         print(f"총 리포지토리: {self.result.total_repos}개")
         print(f"총 브랜치: {self.result.total_branches}개")
         print(f"빈 리포지토리: {len(self.result.empty_repos)}개")
@@ -380,8 +388,8 @@ class CodeCommitAnalysisResult:
     total_repos: int = 0
     empty_repos: int = 0
     total_branches: int = 0
-    repos: List[Repository] = field(default_factory=list)
-    empty_repo_list: List[Repository] = field(default_factory=list)
+    repos: list[Repository] = field(default_factory=list)
+    empty_repo_list: list[Repository] = field(default_factory=list)
 
     # 비용 없음 (CodeCommit은 저장량 기반 과금, 빈 리포지토리는 무료)
     unused_monthly_cost: float = 0.0
@@ -392,7 +400,7 @@ def collect_repos(
     account_id: str,
     account_name: str,
     region: str,
-) -> List[Repository]:
+) -> list[Repository]:
     """CodeCommit 리포지토리 수집
 
     Args:
@@ -448,7 +456,7 @@ def collect_repos(
     return repos
 
 
-def _list_branches(client, repo_name: str) -> List[str]:
+def _list_branches(client, repo_name: str) -> list[str]:
     """브랜치 목록 조회"""
     branches = []
 
@@ -463,7 +471,7 @@ def _list_branches(client, repo_name: str) -> List[str]:
 
 
 def analyze_repos(
-    repos: List[Repository],
+    repos: list[Repository],
     account_id: str,
     account_name: str,
     region: str,
@@ -500,7 +508,7 @@ def analyze_repos(
 # =============================================================================
 
 
-def run_audit(ctx) -> None:
+def run_audit(ctx) -> dict[str, Any]:
     """CodeCommit 리포지토리 분석"""
     from core.auth.session import get_context_session
     from core.tools.output import OutputPath
@@ -535,7 +543,7 @@ def run_audit(ctx) -> None:
     }
 
 
-def run_empty_repos(ctx) -> None:
+def run_empty_repos(ctx) -> dict[str, Any]:
     """빈 리포지토리 조회"""
     from core.auth.session import get_context_session
 

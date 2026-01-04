@@ -7,7 +7,7 @@ discovery 기반으로 도구를 자동 발견하고 실행합니다.
 
 import sys
 import traceback
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -20,7 +20,7 @@ console = Console()
 class FlowRunner:
     """통합 CLI Flow Runner (discovery 기반)"""
 
-    def run(self, entry_point: Optional[str] = None) -> None:
+    def run(self, entry_point: str | None = None) -> None:
         """Flow 실행"""
         while True:
             try:
@@ -70,9 +70,7 @@ class FlowRunner:
             # 도구 정보 조회
             tool_meta = self._find_tool_meta(category, tool_module)
             if not tool_meta:
-                console.print(
-                    f"[red]! '{category}/{tool_module}' " f"도구를 찾을 수 없습니다.[/red]"
-                )
+                console.print(f"[red]! '{category}/{tool_module}' 도구를 찾을 수 없습니다.[/red]")
                 return
 
             # Context 구성
@@ -83,12 +81,8 @@ class FlowRunner:
                 description=tool_meta.get("description", ""),
                 category=category,
                 permission=tool_meta.get("permission", "read"),
-                supports_single_region_only=tool_meta.get(
-                    "supports_single_region_only", False
-                ),
-                supports_single_account_only=tool_meta.get(
-                    "supports_single_account_only", False
-                ),
+                supports_single_region_only=tool_meta.get("supports_single_region_only", False),
+                supports_single_account_only=tool_meta.get("supports_single_account_only", False),
                 is_global=tool_meta.get("is_global", False),
             )
 
@@ -129,7 +123,7 @@ class FlowRunner:
         self,
         category: str,
         tool_module: str,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """도구 메타데이터 조회"""
         from core.tools.discovery import discover_categories
 
@@ -179,7 +173,7 @@ class FlowRunner:
             if "--debug" in sys.argv:
                 console.print(f"[dim]이력 저장 실패: {e}[/dim]")
 
-    def _run_once(self, entry_point: Optional[str] = None) -> FlowResult:
+    def _run_once(self, entry_point: str | None = None) -> FlowResult:
         """한 번의 Flow 실행"""
         ctx = ExecutionContext()
 
@@ -238,7 +232,7 @@ class FlowRunner:
                             continue
                         if tool_meta.get("name") == ctx.tool.name:
                             # require_session 옵션 확인 (기본값: True)
-                            return tool_meta.get("require_session", True)
+                            return bool(tool_meta.get("require_session", True))
 
             # 찾지 못하면 기본값 True
             return True
@@ -264,9 +258,7 @@ class FlowRunner:
 
         if tool is None:
             console.print()
-            console.print(
-                f"[yellow]{ctx.category}/{ctx.tool.name} " f"도구를 찾을 수 없습니다.[/yellow]"
-            )
+            console.print(f"[yellow]{ctx.category}/{ctx.tool.name} 도구를 찾을 수 없습니다.[/yellow]")
             return
 
         # 필요 권한 정보 추출
@@ -299,9 +291,7 @@ class FlowRunner:
             self._handle_permission_error(e, required_permissions)
             raise
 
-    def _print_execution_summary(
-        self, ctx: ExecutionContext, required_permissions: Any = None
-    ) -> None:
+    def _print_execution_summary(self, ctx: ExecutionContext, required_permissions: Any = None) -> None:
         """실행 전 요약 출력"""
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
@@ -359,9 +349,7 @@ class FlowRunner:
                 count += len(perm_list)
         return count
 
-    def _handle_permission_error(
-        self, error: Exception, required_permissions: Any
-    ) -> None:
+    def _handle_permission_error(self, error: Exception, required_permissions: Any) -> None:
         """권한 오류 시 안내 메시지 출력"""
         # botocore ClientError에서 AccessDenied 확인
         error_code = None
@@ -406,9 +394,7 @@ class FlowRunner:
                     console.print(f"    - {perm}")
 
             console.print()
-            console.print(
-                "[dim]IAM 정책에 위 권한을 추가하거나 관리자에게 문의하세요.[/dim]"
-            )
+            console.print("[dim]IAM 정책에 위 권한을 추가하거나 관리자에게 문의하세요.[/dim]")
         console.print("[yellow]━━━━━━━━━━━━━━━━━[/yellow]")
 
 

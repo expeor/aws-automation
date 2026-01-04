@@ -8,7 +8,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 
 @dataclass
@@ -64,7 +64,7 @@ class RecentHistory:
         if self._initialized:
             return
         self._path = self._get_history_path()
-        self._items: List[RecentItem] = []
+        self._items: list[RecentItem] = []
         self._load()
         self._initialized = True
 
@@ -120,7 +120,7 @@ class RecentHistory:
 
         self._save()
 
-    def get_recent(self, limit: int = 5) -> List[RecentItem]:
+    def get_recent(self, limit: int = 5) -> list[RecentItem]:
         """최근 사용 목록 (시간순)
 
         Args:
@@ -131,7 +131,7 @@ class RecentHistory:
         """
         return self._items[:limit]
 
-    def get_frequent(self, limit: int = 5) -> List[RecentItem]:
+    def get_frequent(self, limit: int = 5) -> list[RecentItem]:
         """자주 사용 목록 (사용 횟수순)
 
         Args:
@@ -147,7 +147,7 @@ class RecentHistory:
         )
         return sorted_items[:limit]
 
-    def get_all(self) -> List[RecentItem]:
+    def get_all(self) -> list[RecentItem]:
         """전체 이력"""
         return self._items.copy()
 

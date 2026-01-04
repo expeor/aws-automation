@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -19,7 +18,6 @@ from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing.dynamodb import (
     estimate_ondemand_cost,
-    estimate_provisioned_cost,
     get_dynamodb_monthly_cost,
 )
 
@@ -64,8 +62,8 @@ class TableCapacityInfo:
     # Provisioned 설정
     provisioned_read: int = 0
     provisioned_write: int = 0
-    last_increase_dt: Optional[datetime] = None
-    last_decrease_dt: Optional[datetime] = None
+    last_increase_dt: datetime | None = None
+    last_decrease_dt: datetime | None = None
     decreases_today: int = 0
     # CloudWatch 지표 (평균)
     avg_consumed_read: float = 0.0
@@ -74,7 +72,7 @@ class TableCapacityInfo:
     max_consumed_write: float = 0.0
     throttled_read: float = 0.0
     throttled_write: float = 0.0
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     @property
     def size_mb(self) -> float:
@@ -141,12 +139,10 @@ class CapacityAnalysisResult:
     ondemand_tables: int = 0
     optimization_candidates: int = 0
     potential_savings: float = 0.0
-    findings: List[TableCapacityFinding] = field(default_factory=list)
+    findings: list[TableCapacityFinding] = field(default_factory=list)
 
 
-def collect_capacity_info(
-    session, account_id: str, account_name: str, region: str
-) -> List[TableCapacityInfo]:
+def collect_capacity_info(session, account_id: str, account_name: str, region: str) -> list[TableCapacityInfo]:
     """DynamoDB 테이블 용량 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -200,12 +196,10 @@ def collect_capacity_info(
                             Statistics=["Average", "Maximum"],
                         )
                         if read_resp.get("Datapoints"):
-                            table.avg_consumed_read = sum(
-                                d["Average"] for d in read_resp["Datapoints"]
-                            ) / len(read_resp["Datapoints"])
-                            table.max_consumed_read = max(
-                                d["Maximum"] for d in read_resp["Datapoints"]
+                            table.avg_consumed_read = sum(d["Average"] for d in read_resp["Datapoints"]) / len(
+                                read_resp["Datapoints"]
                             )
+                            table.max_consumed_read = max(d["Maximum"] for d in read_resp["Datapoints"])
 
                         # ConsumedWriteCapacityUnits
                         write_resp = cloudwatch.get_metric_statistics(
@@ -218,12 +212,10 @@ def collect_capacity_info(
                             Statistics=["Average", "Maximum"],
                         )
                         if write_resp.get("Datapoints"):
-                            table.avg_consumed_write = sum(
-                                d["Average"] for d in write_resp["Datapoints"]
-                            ) / len(write_resp["Datapoints"])
-                            table.max_consumed_write = max(
-                                d["Maximum"] for d in write_resp["Datapoints"]
+                            table.avg_consumed_write = sum(d["Average"] for d in write_resp["Datapoints"]) / len(
+                                write_resp["Datapoints"]
                             )
+                            table.max_consumed_write = max(d["Maximum"] for d in write_resp["Datapoints"])
 
                         # ThrottledRequests (Read)
                         read_throttle = cloudwatch.get_metric_statistics(
@@ -236,9 +228,7 @@ def collect_capacity_info(
                             Statistics=["Sum"],
                         )
                         if read_throttle.get("Datapoints"):
-                            table.throttled_read = sum(
-                                d["Sum"] for d in read_throttle["Datapoints"]
-                            )
+                            table.throttled_read = sum(d["Sum"] for d in read_throttle["Datapoints"])
 
                         # ThrottledRequests (Write)
                         write_throttle = cloudwatch.get_metric_statistics(
@@ -251,9 +241,7 @@ def collect_capacity_info(
                             Statistics=["Sum"],
                         )
                         if write_throttle.get("Datapoints"):
-                            table.throttled_write = sum(
-                                d["Sum"] for d in write_throttle["Datapoints"]
-                            )
+                            table.throttled_write = sum(d["Sum"] for d in write_throttle["Datapoints"])
 
                     except ClientError:
                         pass
@@ -270,7 +258,7 @@ def collect_capacity_info(
 
 
 def analyze_capacity(
-    tables: List[TableCapacityInfo], account_id: str, account_name: str, region: str
+    tables: list[TableCapacityInfo], account_id: str, account_name: str, region: str
 ) -> CapacityAnalysisResult:
     """DynamoDB 용량 모드 분석"""
     result = CapacityAnalysisResult(
@@ -287,9 +275,7 @@ def analyze_capacity(
             # On-Demand → Provisioned 전환 검토
             # 사용량이 일정하고 예측 가능한 경우
             if table.avg_consumed_read > 0 or table.avg_consumed_write > 0:
-                savings = (
-                    table.estimated_ondemand_cost - table.estimated_provisioned_cost
-                )
+                savings = table.estimated_ondemand_cost - table.estimated_provisioned_cost
                 if savings > 0:
                     result.optimization_candidates += 1
                     result.potential_savings += savings
@@ -338,9 +324,7 @@ def analyze_capacity(
 
             # 매우 낮은 사용률 → On-Demand 전환 검토
             if read_util < 10 and write_util < 10:
-                savings = (
-                    table.estimated_provisioned_cost - table.estimated_ondemand_cost
-                )
+                savings = table.estimated_provisioned_cost - table.estimated_ondemand_cost
                 if savings > 0:
                     result.optimization_candidates += 1
                     result.potential_savings += savings
@@ -382,7 +366,7 @@ def analyze_capacity(
     return result
 
 
-def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[CapacityAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -392,16 +376,10 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    green_fill = PatternFill(
-        start_color="70AD47", end_color="70AD47", fill_type="solid"
-    )
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    green_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
 
     # Summary 시트
@@ -476,12 +454,8 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
             ws_detail.cell(row=detail_row, column=4, value=t.billing_mode)
             ws_detail.cell(row=detail_row, column=5, value=t.provisioned_read)
             ws_detail.cell(row=detail_row, column=6, value=t.provisioned_write)
-            ws_detail.cell(
-                row=detail_row, column=7, value=f"{t.avg_consumed_read:.1f}"
-            )
-            ws_detail.cell(
-                row=detail_row, column=8, value=f"{t.avg_consumed_write:.1f}"
-            )
+            ws_detail.cell(row=detail_row, column=7, value=f"{t.avg_consumed_read:.1f}")
+            ws_detail.cell(row=detail_row, column=8, value=f"{t.avg_consumed_write:.1f}")
             ws_detail.cell(row=detail_row, column=9, value=f"{t.read_utilization:.1f}")
             ws_detail.cell(row=detail_row, column=10, value=f"{t.write_utilization:.1f}")
             ws_detail.cell(
@@ -489,18 +463,14 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
                 column=11,
                 value=f"${t.estimated_provisioned_cost:.2f}",
             )
-            ws_detail.cell(
-                row=detail_row, column=12, value=f"${t.estimated_ondemand_cost:.2f}"
-            )
+            ws_detail.cell(row=detail_row, column=12, value=f"${t.estimated_ondemand_cost:.2f}")
             ws_detail.cell(
                 row=detail_row,
                 column=13,
                 value=rec_labels.get(f.recommendation, f.recommendation.value),
             )
             ws_detail.cell(row=detail_row, column=14, value=f.reason)
-            ws_detail.cell(
-                row=detail_row, column=15, value=f"${f.potential_savings:.2f}"
-            )
+            ws_detail.cell(row=detail_row, column=15, value=f"${f.potential_savings:.2f}")
 
             # 색상 적용
             if f.recommendation in (
@@ -515,12 +485,10 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -530,9 +498,7 @@ def generate_report(results: List[CapacityAnalysisResult], output_dir: str) -> s
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[CapacityAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> CapacityAnalysisResult | None:
     """단일 계정/리전의 DynamoDB 용량 분석 (병렬 실행용)"""
     tables = collect_capacity_info(session, account_id, account_name, region)
     if not tables:
@@ -544,12 +510,8 @@ def run(ctx) -> None:
     """DynamoDB 용량 모드 분석"""
     console.print("[bold]DynamoDB 용량 모드 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="dynamodb"
-    )
-    results: List[CapacityAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="dynamodb")
+    results: list[CapacityAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -564,12 +526,11 @@ def run(ctx) -> None:
     total_candidates = sum(r.optimization_candidates for r in results)
     total_savings = sum(r.potential_savings for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"전체 테이블: {total_tables}개")
     console.print(f"  Provisioned: {total_provisioned}개 / On-Demand: {total_ondemand}개")
     console.print(
-        f"최적화 대상: [cyan]{total_candidates}개[/cyan] "
-        f"(예상 절감: [green]${total_savings:,.2f}/월[/green])"
+        f"최적화 대상: [cyan]{total_candidates}개[/cyan] (예상 절감: [green]${total_savings:,.2f}/월[/green])"
     )
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:

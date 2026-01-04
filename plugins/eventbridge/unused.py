@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -84,12 +83,10 @@ class EventBridgeAnalysisResult:
     no_targets: int = 0
     unused_rules: int = 0
     normal_rules: int = 0
-    findings: List[RuleFinding] = field(default_factory=list)
+    findings: list[RuleFinding] = field(default_factory=list)
 
 
-def collect_rules(
-    session, account_id: str, account_name: str, region: str
-) -> List[RuleInfo]:
+def collect_rules(session, account_id: str, account_name: str, region: str) -> list[RuleInfo]:
     """EventBridge 규칙 수집"""
     from botocore.exceptions import ClientError
 
@@ -143,9 +140,7 @@ def collect_rules(
                         event_bus_name=bus_name,
                         state=rule.get("State", ""),
                         schedule_expression=rule.get("ScheduleExpression", ""),
-                        event_pattern=rule.get("EventPattern", "")[:100]
-                        if rule.get("EventPattern")
-                        else "",
+                        event_pattern=rule.get("EventPattern", "")[:100] if rule.get("EventPattern") else "",
                         target_count=target_count,
                     )
 
@@ -163,9 +158,7 @@ def collect_rules(
                                 Statistics=["Sum"],
                             )
                             if trig_resp.get("Datapoints"):
-                                info.triggered_rules = sum(
-                                    d["Sum"] for d in trig_resp["Datapoints"]
-                                )
+                                info.triggered_rules = sum(d["Sum"] for d in trig_resp["Datapoints"])
 
                             # Invocations
                             inv_resp = cloudwatch.get_metric_statistics(
@@ -178,9 +171,7 @@ def collect_rules(
                                 Statistics=["Sum"],
                             )
                             if inv_resp.get("Datapoints"):
-                                info.invocations = sum(
-                                    d["Sum"] for d in inv_resp["Datapoints"]
-                                )
+                                info.invocations = sum(d["Sum"] for d in inv_resp["Datapoints"])
 
                             # FailedInvocations
                             fail_resp = cloudwatch.get_metric_statistics(
@@ -193,9 +184,7 @@ def collect_rules(
                                 Statistics=["Sum"],
                             )
                             if fail_resp.get("Datapoints"):
-                                info.failed_invocations = sum(
-                                    d["Sum"] for d in fail_resp["Datapoints"]
-                                )
+                                info.failed_invocations = sum(d["Sum"] for d in fail_resp["Datapoints"])
 
                         except ClientError:
                             pass
@@ -208,9 +197,7 @@ def collect_rules(
     return rules
 
 
-def analyze_rules(
-    rules: List[RuleInfo], account_id: str, account_name: str, region: str
-) -> EventBridgeAnalysisResult:
+def analyze_rules(rules: list[RuleInfo], account_id: str, account_name: str, region: str) -> EventBridgeAnalysisResult:
     """EventBridge 규칙 분석"""
     result = EventBridgeAnalysisResult(
         account_id=account_id,
@@ -268,7 +255,7 @@ def analyze_rules(
     return result
 
 
-def generate_report(results: List[EventBridgeAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[EventBridgeAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -278,14 +265,10 @@ def generate_report(results: List[EventBridgeAnalysisResult], output_dir: str) -
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     gray_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
     # Summary 시트
@@ -350,20 +333,16 @@ def generate_report(results: List[EventBridgeAnalysisResult], output_dir: str) -
                     value=rule.schedule_expression or "-",
                 )
                 ws_detail.cell(row=detail_row, column=7, value=rule.target_count)
-                ws_detail.cell(
-                    row=detail_row, column=8, value=int(rule.triggered_rules)
-                )
+                ws_detail.cell(row=detail_row, column=8, value=int(rule.triggered_rules))
                 ws_detail.cell(row=detail_row, column=9, value=f.status.value)
                 ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -373,9 +352,7 @@ def generate_report(results: List[EventBridgeAnalysisResult], output_dir: str) -
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[EventBridgeAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EventBridgeAnalysisResult | None:
     """단일 계정/리전의 EventBridge 규칙 수집 및 분석 (병렬 실행용)"""
     rules = collect_rules(session, account_id, account_name, region)
     if not rules:
@@ -387,12 +364,8 @@ def run(ctx) -> None:
     """EventBridge 미사용 규칙 분석"""
     console.print("[bold]EventBridge 규칙 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="events"
-    )
-    results: List[EventBridgeAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="events")
+    results: list[EventBridgeAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -405,7 +378,7 @@ def run(ctx) -> None:
     total_no_targets = sum(r.no_targets for r in results)
     total_unused = sum(r.unused_rules for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"비활성화: {total_disabled}개 / "
         f"타겟없음: [red]{total_no_targets}개[/red] / "

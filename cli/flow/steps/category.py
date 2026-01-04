@@ -6,7 +6,7 @@ discovery 기반으로 자동 발견된 카테고리/도구 표시.
 menu.py 의존성 제거됨.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.table import Table
@@ -28,7 +28,7 @@ PERMISSION_COLORS = {
 }
 
 
-def _load_categories() -> List[Dict[str, Any]]:
+def _load_categories() -> list[dict[str, Any]]:
     """discovery 기반 카테고리 로드 (AWS 서비스 포함)"""
     try:
         from core.tools.discovery import discover_categories
@@ -69,17 +69,14 @@ class CategoryStep:
     def execute(
         self,
         ctx: ExecutionContext,
-        entry_point: Optional[str] = None,
+        entry_point: str | None = None,
     ) -> ExecutionContext:
         """카테고리/도구 선택 실행"""
         categories = _load_categories()
 
         if not categories:
             console.print("[red]! 등록된 도구가 없습니다.[/red]")
-            console.print(
-                "[yellow]* internal/tools/ 하위에 "
-                "CATEGORY, TOOLS가 정의된 폴더를 추가하세요.[/yellow]"
-            )
+            console.print("[yellow]* internal/tools/ 하위에 CATEGORY, TOOLS가 정의된 폴더를 추가하세요.[/yellow]")
             raise RuntimeError("도구 없음")
 
         if entry_point:
@@ -121,7 +118,7 @@ class CategoryStep:
         ctx.tool = _convert_to_tool_info(tool, category["name"])
         return ctx
 
-    def _apply_sub_service_menu(self, category: Dict) -> Optional[Dict]:
+    def _apply_sub_service_menu(self, category: dict) -> dict | None:
         """sub_services가 있으면 서브메뉴 표시, 없으면 원본 반환
 
         Returns:
@@ -147,7 +144,7 @@ class CategoryStep:
 
         return self._select_sub_service(category, sub_svc_with_tools)
 
-    def _find_category(self, categories: List[Dict], name: str) -> Optional[Dict]:
+    def _find_category(self, categories: list[dict], name: str) -> dict | None:
         """이름, 별칭, 또는 하위 서비스명으로 카테고리 검색
 
         하위 서비스명으로 검색 시 해당 sub_service 도구만 필터링됨.
@@ -157,9 +154,7 @@ class CategoryStep:
 
         return resolve_category(name)
 
-    def _select_sub_service(
-        self, category: Dict, sub_svc_with_tools: List[tuple]
-    ) -> Optional[Dict]:
+    def _select_sub_service(self, category: dict, sub_svc_with_tools: list[tuple]) -> dict | None:
         """하위 서비스 선택 UI
 
         Args:
@@ -225,9 +220,7 @@ class CategoryStep:
                 if 0 <= sub_idx < len(sub_svc_with_tools):
                     selected_sub_svc = sub_svc_with_tools[sub_idx][0]
                     filtered = category.copy()
-                    filtered["tools"] = [
-                        t for t in tools if t.get("sub_service") == selected_sub_svc
-                    ]
+                    filtered["tools"] = [t for t in tools if t.get("sub_service") == selected_sub_svc]
                     filtered["_sub_service_filter"] = selected_sub_svc
                     return filtered
 
@@ -235,10 +228,9 @@ class CategoryStep:
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
-    def _select_category(self, categories: List[Dict]) -> Dict:
+    def _select_category(self, categories: list[dict]) -> dict:
         """카테고리 선택 UI (페이지네이션, 3열 지원)"""
         PAGE_SIZE = 40  # 페이지당 40개
-        MAX_COLS = 3  # 최대 3열
 
         # 카테고리 항목 준비
         menu_items = []
@@ -300,9 +292,7 @@ class CategoryStep:
                     if item_idx < page_count:
                         global_idx = start_idx + item_idx + 1
                         item = page_items[item_idx]
-                        row_data.extend(
-                            [str(global_idx), item["name"], str(item["count"])]
-                        )
+                        row_data.extend([str(global_idx), item["name"], str(item["count"])])
                     else:
                         row_data.extend(["", "", ""])
                 table.add_row(*row_data)
@@ -341,19 +331,17 @@ class CategoryStep:
                 if num == 0:
                     raise KeyboardInterrupt()
                 if 1 <= num <= total_count:
-                    return menu_items[num - 1]["cat"]
+                    return dict(menu_items[num - 1]["cat"])
                 console.print(f"[dim]1-{total_count} 범위[/dim]")
             except ValueError:
                 # 키워드 검색 (다른 페이지 항목도 검색 가능)
                 matched = self._search_category_by_keyword(menu_items, choice)
                 if matched:
-                    return matched["cat"]
+                    return dict(matched["cat"])
                 # 검색 결과 없으면 전체 검색으로 이동
                 return self._quick_search_and_select(categories, choice)
 
-    def _search_category_by_keyword(
-        self, menu_items: List[Dict], keyword: str
-    ) -> Optional[Dict]:
+    def _search_category_by_keyword(self, menu_items: list[dict], keyword: str) -> dict | None:
         """카테고리 이름으로 빠른 검색 (모든 페이지 대상)
 
         정확히 일치하거나 부분 일치하는 카테고리를 찾음.
@@ -395,9 +383,7 @@ class CategoryStep:
                 pass
             console.print(f"[dim]0-{len(partial_matches)} 범위[/dim]")
 
-    def _quick_search_and_select(
-        self, categories: List[Dict], keyword: str = ""
-    ) -> Dict:
+    def _quick_search_and_select(self, categories: list[dict], keyword: str = "") -> dict:
         """빠른 검색으로 카테고리/도구 찾기"""
         from cli.ui.search import get_search_engine, init_search_engine
 
@@ -434,9 +420,7 @@ class CategoryStep:
         table.add_column("설명", style="dim")
 
         for i, r in enumerate(results, 1):
-            table.add_row(
-                str(i), r.category_display.upper(), r.tool_name, r.description[:30]
-            )
+            table.add_row(str(i), r.category_display.upper(), r.tool_name, r.description[:30])
 
         console.print(table)
         console.print()
@@ -466,14 +450,12 @@ class CategoryStep:
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
-    def _select_tool(self, category: Dict) -> Optional[Dict]:
+    def _select_tool(self, category: dict) -> dict | None:
         """도구 선택 UI (필터 지원)"""
         tools = category.get("tools", [])
         return self._display_tool_table_with_filter(category, tools)
 
-    def _display_tool_table_with_filter(
-        self, category: Dict, tools: List[Dict]
-    ) -> Optional[Dict]:
+    def _display_tool_table_with_filter(self, category: dict, tools: list[dict]) -> dict | None:
         """필터 지원 도구 선택 UI
 
         p: 권한 필터, a: 영역 필터, r: 필터 초기화
@@ -481,8 +463,8 @@ class CategoryStep:
         Returns:
             선택된 도구 dict, 또는 None (이전 메뉴)
         """
-        perm_filter: Optional[str] = None
-        area_filter: Optional[str] = None
+        perm_filter: str | None = None
+        area_filter: str | None = None
 
         while True:
             # 필터 적용
@@ -496,9 +478,7 @@ class CategoryStep:
             print_box_start(f"{display_name} ({len(filtered)}개)")
 
             # 범례 출력
-            self._print_filter_header(
-                perm_filter, area_filter, len(filtered), len(tools), tools
-            )
+            self._print_filter_header(perm_filter, area_filter, len(filtered), len(tools), tools)
             print_box_line()
 
             # 영역별로 도구 출력
@@ -506,16 +486,12 @@ class CategoryStep:
             index_map = {}  # 번호 → 도구 매핑
 
             for area_key, area_tools in grouped.items():
-                area_info = AREA_DISPLAY.get(
-                    area_key, {"label": area_key or "기타", "color": "dim"}
-                )
+                area_info = AREA_DISPLAY.get(area_key, {"label": area_key or "기타", "color": "dim"})
                 area_label = area_info["label"]
                 area_color = area_info["color"]
 
                 # 영역 헤더
-                print_box_line(
-                    f" [{area_color}]▸ {area_label}[/{area_color}] [dim]({len(area_tools)})[/dim]"
-                )
+                print_box_line(f" [{area_color}]▸ {area_label}[/{area_color}] [dim]({len(area_tools)})[/dim]")
 
                 # 도구 목록 (2열) - 직접 포맷팅
                 sorted_tools = self._sort_tools(area_tools)
@@ -539,31 +515,25 @@ class CategoryStep:
                         index_map[tool_index] = right
                         tool_index += 1
                         # 2열 출력 (Rich Table 사용)
-                        row_table = Table(
-                            show_header=False, box=None, padding=(0, 1), pad_edge=False
-                        )
+                        row_table = Table(show_header=False, box=None, padding=(0, 1), pad_edge=False)
                         row_table.add_column(width=3, justify="right")
                         row_table.add_column(width=20)
                         row_table.add_column(width=3, justify="right")
                         row_table.add_column(width=20)
                         row_table.add_row(left_num, left_name, right_num, right_name)
-                        console.print(f"[bold #FF9900]│[/]   ", end="")
+                        console.print("[bold #FF9900]│[/]   ", end="")
                         console.print(row_table)
                     else:
                         # 1열만 출력
-                        row_table = Table(
-                            show_header=False, box=None, padding=(0, 1), pad_edge=False
-                        )
+                        row_table = Table(show_header=False, box=None, padding=(0, 1), pad_edge=False)
                         row_table.add_column(width=3, justify="right")
                         row_table.add_column(width=20)
                         row_table.add_row(left_num, left_name)
-                        console.print(f"[bold #FF9900]│[/]   ", end="")
+                        console.print("[bold #FF9900]│[/]   ", end="")
                         console.print(row_table)
 
             print_box_line()
-            print_box_line(
-                " [dim]p[/dim] 권한필터  [dim]a[/dim] 영역필터  [dim]r[/dim] 초기화  [dim]0[/dim] 돌아가기"
-            )
+            print_box_line(" [dim]p[/dim] 권한필터  [dim]a[/dim] 영역필터  [dim]r[/dim] 초기화  [dim]0[/dim] 돌아가기")
 
             print_box_end()
 
@@ -596,7 +566,7 @@ class CategoryStep:
             except ValueError:
                 console.print("[dim]숫자 또는 p/a/r[/dim]")
 
-    def _group_tools_by_area(self, tools: List[Dict]) -> Dict[str, List[Dict]]:
+    def _group_tools_by_area(self, tools: list[dict]) -> dict[str, list[dict]]:
         """영역별로 도구 그룹화 (순서 유지)"""
         from collections import OrderedDict
 
@@ -610,7 +580,7 @@ class CategoryStep:
             "",
         ]
 
-        grouped: Dict[str, List[Dict]] = OrderedDict()
+        grouped: dict[str, list[dict]] = OrderedDict()
 
         # 우선순위 순서대로 빈 리스트 초기화
         for area in area_order:
@@ -626,9 +596,7 @@ class CategoryStep:
         # 빈 영역 제거
         return OrderedDict((k, v) for k, v in grouped.items() if v)
 
-    def _apply_filters(
-        self, tools: List[Dict], perm_filter: Optional[str], area_filter: Optional[str]
-    ) -> List[Dict]:
+    def _apply_filters(self, tools: list[dict], perm_filter: str | None, area_filter: str | None) -> list[dict]:
         """필터 적용"""
         result = tools
         if perm_filter:
@@ -639,11 +607,11 @@ class CategoryStep:
 
     def _print_filter_header(
         self,
-        perm_filter: Optional[str],
-        area_filter: Optional[str],
+        perm_filter: str | None,
+        area_filter: str | None,
         filtered_count: int,
         total_count: int,
-        tools: List[Dict] = None,
+        tools: list[dict] | None = None,
     ) -> None:
         """필터 헤더 출력"""
         # 권한 범례 (간결)
@@ -656,44 +624,29 @@ class CategoryStep:
             if used_areas:
                 area_parts = []
                 for area_key in used_areas:
-                    info = AREA_DISPLAY.get(
-                        area_key, {"label": area_key, "color": "dim"}
-                    )
-                    area_parts.append(
-                        f"[{info['color']}]■[/{info['color']}]{info['label']}"
-                    )
+                    info = AREA_DISPLAY.get(area_key, {"label": area_key, "color": "dim"})
+                    area_parts.append(f"[{info['color']}]■[/{info['color']}]{info['label']}")
                 print_box_line(f" {' '.join(area_parts)}")
 
         # 필터 상태
         if perm_filter or area_filter:
             filters = []
             if perm_filter:
-                perm_label = {"read": "읽기", "write": "쓰기", "delete": "삭제"}.get(
-                    perm_filter, perm_filter
-                )
+                perm_label = {"read": "읽기", "write": "쓰기", "delete": "삭제"}.get(perm_filter, perm_filter)
                 filters.append(perm_label)
             if area_filter:
                 area_label = AREA_DISPLAY.get(area_filter, {}).get("label", area_filter)
                 filters.append(area_label)
-            print_box_line(
-                f" [dim]필터: {', '.join(filters)} ({filtered_count}/{total_count})[/dim]"
-            )
+            print_box_line(f" [dim]필터: {', '.join(filters)} ({filtered_count}/{total_count})[/dim]")
 
-    def _select_permission_filter(self, current: Optional[str]) -> Optional[str]:
+    def _select_permission_filter(self, current: str | None) -> str | None:
         """권한 필터 선택"""
         console.print("[dim]1)읽기 2)쓰기 3)삭제 0)취소[/dim]")
         choice = console.input("> ").strip()
-        if choice == "1":
-            return "read"
-        elif choice == "2":
-            return "write"
-        elif choice == "3":
-            return "delete"
-        return current
+        mapping = {"1": "read", "2": "write", "3": "delete"}
+        return mapping.get(choice, current)
 
-    def _select_area_filter(
-        self, current: Optional[str], tools: List[Dict] = None
-    ) -> Optional[str]:
+    def _select_area_filter(self, current: str | None, tools: list[dict] | None = None) -> str | None:
         """영역 필터 선택 (해당 카테고리에 있는 영역만 표시)"""
         # 사용 중인 영역만 필터링
         if tools:
@@ -706,9 +659,7 @@ class CategoryStep:
             console.print("[dim]필터 가능한 영역이 없습니다.[/dim]")
             return current
 
-        labels = " ".join(
-            [f"{i+1}){info['label']}" for i, (_, info) in enumerate(areas)]
-        )
+        labels = " ".join([f"{i + 1}){info['label']}" for i, (_, info) in enumerate(areas)])
         console.print(f"[dim]{labels} 0)취소[/dim]")
         choice = console.input("> ").strip()
         try:
@@ -721,7 +672,7 @@ class CategoryStep:
             pass
         return current
 
-    def _sort_tools(self, tools: List[Dict]) -> List[Dict]:
+    def _sort_tools(self, tools: list[dict]) -> list[dict]:
         """권한순 → 이름순 정렬"""
         perm_order = {"read": 1, "write": 2, "delete": 3}
         return sorted(

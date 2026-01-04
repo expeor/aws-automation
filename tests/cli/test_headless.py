@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cli.headless import HeadlessConfig, HeadlessRunner, run_headless
-from core.auth.types import AccountInfo
 
 
 class TestHeadlessConfig:

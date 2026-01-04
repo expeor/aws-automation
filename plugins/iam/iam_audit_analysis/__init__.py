@@ -23,7 +23,7 @@ from .collector import (
 )
 from .reporter import IAMExcelReporter
 
-__all__ = [
+__all__: list[str] = [
     # Collector
     "IAMCollector",
     "IAMUser",

@@ -9,10 +9,9 @@ plugins/cost/pricing/cache.py - 가격 정보 로컬 캐시
 
 import json
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from core.tools.cache.path import get_cache_dir
 
@@ -42,7 +41,7 @@ class PriceCache:
         """캐시 파일 경로 반환"""
         return self.cache_dir / f"{service}_{region}.json"
 
-    def get(self, service: str, region: str) -> Optional[Dict[str, Any]]:
+    def get(self, service: str, region: str) -> dict[str, Any] | None:
         """캐시된 가격 데이터 조회
 
         Args:
@@ -58,7 +57,7 @@ class PriceCache:
             return None
 
         try:
-            with open(cache_path, "r", encoding="utf-8") as f:
+            with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             # 만료 확인
@@ -67,13 +66,14 @@ class PriceCache:
                 logger.debug(f"캐시 만료: {service}/{region}")
                 return None
 
-            return data.get("prices", {})
+            prices = data.get("prices", {})
+            return dict(prices) if prices else {}
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.warning(f"캐시 읽기 오류: {e}")
             return None
 
-    def set(self, service: str, region: str, prices: Dict[str, Any]) -> None:
+    def set(self, service: str, region: str, prices: dict[str, Any]) -> None:
         """가격 데이터 캐싱
 
         Args:
@@ -114,26 +114,27 @@ class PriceCache:
             return True
         return False
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """캐시 상태 정보
 
         Returns:
             캐시 파일 목록 및 상태
         """
-        info = {
+        files: list[dict[str, Any]] = []
+        info: dict[str, Any] = {
             "cache_dir": str(self.cache_dir),
             "ttl_days": self.ttl_days,
-            "files": [],
+            "files": files,
         }
 
         if self.cache_dir.exists():
             for f in self.cache_dir.glob("*.json"):
                 try:
-                    with open(f, "r", encoding="utf-8") as fp:
+                    with open(f, encoding="utf-8") as fp:
                         data = json.load(fp)
                     cached_at = datetime.fromisoformat(data.get("cached_at", ""))
                     age_days = (datetime.now() - cached_at).days
-                    info["files"].append(
+                    files.append(
                         {
                             "name": f.name,
                             "service": data.get("service"),
@@ -145,7 +146,7 @@ class PriceCache:
                         }
                     )
                 except Exception:
-                    info["files"].append({"name": f.name, "error": True})
+                    files.append({"name": f.name, "error": True})
 
         return info
 
@@ -154,7 +155,7 @@ class PriceCache:
 _cache = PriceCache()
 
 
-def clear_cache(service: Optional[str] = None, region: Optional[str] = None) -> int:
+def clear_cache(service: str | None = None, region: str | None = None) -> int:
     """캐시 삭제
 
     Args:
@@ -183,6 +184,6 @@ def clear_cache(service: Optional[str] = None, region: Optional[str] = None) -> 
     return count
 
 
-def get_cache_info() -> Dict[str, Any]:
+def get_cache_info() -> dict[str, Any]:
     """캐시 상태 정보 조회"""
     return _cache.get_info()

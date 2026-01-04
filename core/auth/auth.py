@@ -10,16 +10,15 @@ AWS 통합 인증 Manager
 
 import concurrent.futures
 import logging
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import boto3
-from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .config import AWSProfile, AWSSession, Loader, ParsedConfig
 from .types import (
     AccountInfo,
-    AccountNotFoundError,
     AuthError,
     NotAuthenticatedError,
     Provider,
@@ -64,8 +63,8 @@ class Manager:
 
     def __init__(self):
         """Manager 초기화"""
-        self._providers: Dict[str, Provider] = {}
-        self._active_provider: Optional[Provider] = None
+        self._providers: dict[str, Provider] = {}
+        self._active_provider: Provider | None = None
         self._config_loader = Loader()
 
     # =========================================================================
@@ -108,15 +107,15 @@ class Manager:
         self._active_provider = provider
         logger.debug(f"활성 Provider 설정: {provider.type().value}:{provider.name()}")
 
-    def get_active_provider(self) -> Optional[Provider]:
+    def get_active_provider(self) -> Provider | None:
         """현재 활성 Provider 반환"""
         return self._active_provider
 
     def find_provider(
         self,
-        provider_type: Optional[ProviderType] = None,
-        name: Optional[str] = None,
-    ) -> Optional[Provider]:
+        provider_type: ProviderType | None = None,
+        name: str | None = None,
+    ) -> Provider | None:
         """Provider 검색
 
         Args:
@@ -126,7 +125,7 @@ class Manager:
         Returns:
             매칭되는 첫 번째 Provider 또는 None
         """
-        for key, provider in self._providers.items():
+        for _key, provider in self._providers.items():
             if provider_type and provider.type() != provider_type:
                 continue
             if name and provider.name() != name:
@@ -134,7 +133,7 @@ class Manager:
             return provider
         return None
 
-    def list_providers(self) -> List[Provider]:
+    def list_providers(self) -> list[Provider]:
         """등록된 모든 Provider 목록"""
         return list(self._providers.values())
 
@@ -161,9 +160,9 @@ class Manager:
 
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
     ) -> boto3.Session:
         """boto3 Session 획득
 
@@ -180,10 +179,10 @@ class Manager:
 
     def get_aws_config(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
+    ) -> dict[str, Any]:
         """AWS Config 획득
 
         Args:
@@ -195,7 +194,8 @@ class Manager:
             AWS 설정 딕셔너리
         """
         provider = self._ensure_active_provider()
-        return provider.get_aws_config(account_id, role_name, region)
+        result: dict[str, Any] = provider.get_aws_config(account_id, role_name, region)
+        return result
 
     def get_default_region(self) -> str:
         """기본 리전 반환"""
@@ -206,12 +206,12 @@ class Manager:
     # 계정 관리
     # =========================================================================
 
-    def list_accounts(self) -> Dict[str, AccountInfo]:
+    def list_accounts(self) -> dict[str, AccountInfo]:
         """활성 Provider의 계정 목록"""
         provider = self._ensure_active_provider()
         return provider.list_accounts()
 
-    def list_all_accounts(self) -> Dict[str, AccountInfo]:
+    def list_all_accounts(self) -> dict[str, AccountInfo]:
         """모든 Provider의 계정 목록 통합"""
         all_accounts = {}
 
@@ -227,7 +227,7 @@ class Manager:
 
         return all_accounts
 
-    def get_account(self, account_id: str) -> Optional[AccountInfo]:
+    def get_account(self, account_id: str) -> AccountInfo | None:
         """특정 계정 정보 조회
 
         Args:
@@ -246,10 +246,10 @@ class Manager:
     def for_each_account(
         self,
         func: Callable[[AccountInfo, boto3.Session], T],
-        accounts: Optional[Dict[str, AccountInfo]] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
-    ) -> Dict[str, T]:
+        accounts: dict[str, AccountInfo] | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
+    ) -> dict[str, T | None]:
         """모든 계정에 대해 순차적으로 작업 수행
 
         Args:
@@ -266,7 +266,7 @@ class Manager:
         if accounts is None:
             accounts = provider.list_accounts()
 
-        results = {}
+        results: dict[str, T | None] = {}
         for account_id, account_info in accounts.items():
             try:
                 # 역할 이름 결정
@@ -294,11 +294,11 @@ class Manager:
     def for_each_account_parallel(
         self,
         func: Callable[[AccountInfo, boto3.Session], T],
-        accounts: Optional[Dict[str, AccountInfo]] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        accounts: dict[str, AccountInfo] | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
         max_workers: int = 10,
-    ) -> Dict[str, T]:
+    ) -> dict[str, T | None]:
         """모든 계정에 대해 병렬로 작업 수행
 
         Args:
@@ -316,12 +316,12 @@ class Manager:
         if accounts is None:
             accounts = provider.list_accounts()
 
-        results = {}
+        results: dict[str, T | None] = {}
 
         def process_account(
             account_id: str,
             account_info: AccountInfo,
-        ) -> tuple:
+        ) -> tuple[str, T | None]:
             try:
                 role = role_name or account_info.get_role()
                 if not role:
@@ -339,8 +339,7 @@ class Manager:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
-                executor.submit(process_account, acc_id, acc_info): acc_id
-                for acc_id, acc_info in accounts.items()
+                executor.submit(process_account, acc_id, acc_info): acc_id for acc_id, acc_info in accounts.items()
             }
 
             for future in concurrent.futures.as_completed(futures):
@@ -364,24 +363,25 @@ class Manager:
 
     def load_config(self) -> ParsedConfig:
         """AWS 설정 파일 로드"""
-        return self._config_loader.load()
+        config: ParsedConfig = self._config_loader.load()
+        return config
 
-    def list_profiles(self) -> List[str]:
+    def list_profiles(self) -> list[str]:
         """프로파일 목록"""
         config = self.load_config()
         return list(config.profiles.keys())
 
-    def list_sso_sessions(self) -> List[str]:
+    def list_sso_sessions(self) -> list[str]:
         """SSO 세션 목록"""
         config = self.load_config()
         return list(config.sessions.keys())
 
-    def get_profile(self, name: str) -> Optional[AWSProfile]:
+    def get_profile(self, name: str) -> AWSProfile | None:
         """프로파일 정보 조회"""
         config = self.load_config()
         return config.profiles.get(name)
 
-    def get_sso_session(self, name: str) -> Optional[AWSSession]:
+    def get_sso_session(self, name: str) -> AWSSession | None:
         """SSO 세션 정보 조회"""
         config = self.load_config()
         return config.sessions.get(name)

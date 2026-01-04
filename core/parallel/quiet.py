@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 # 스레드-로컬 저장소로 quiet 상태 관리
 _quiet_state = threading.local()

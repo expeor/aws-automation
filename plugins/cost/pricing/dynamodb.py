@@ -33,7 +33,6 @@ DynamoDB 비용 구성:
 """
 
 import logging
-from typing import Dict
 
 from .cache import PriceCache
 from .fetcher import PricingFetcher
@@ -50,7 +49,7 @@ HOURS_PER_MONTH = 730
 def get_dynamodb_prices(
     region: str = "ap-northeast-2",
     refresh: bool = False,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """DynamoDB 가격 조회
 
     Args:
@@ -150,9 +149,7 @@ def get_dynamodb_monthly_cost(
     if billing_mode == "PAY_PER_REQUEST":
         # On-Demand
         read_cost = (read_requests / 1_000_000) * prices.get("read_per_million", 0.25)
-        write_cost = (write_requests / 1_000_000) * prices.get(
-            "write_per_million", 1.25
-        )
+        write_cost = (write_requests / 1_000_000) * prices.get("write_per_million", 1.25)
         total += read_cost + write_cost
     else:
         # Provisioned
@@ -230,7 +227,7 @@ def estimate_ondemand_cost(
     )
 
 
-def _get_cached_prices(region: str, refresh: bool = False) -> Dict[str, float]:
+def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
     """캐시된 가격 조회 (없으면 API 호출)"""
     if not refresh:
         cached = _cache.get("dynamodb", region)

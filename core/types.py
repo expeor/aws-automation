@@ -56,16 +56,12 @@ Usage:
         return f"{instance['InstanceId']} ({instance['InstanceType']})"
 """
 
+from collections.abc import Callable
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Literal,
-    Optional,
     Protocol,
     TypedDict,
-    Union,
     runtime_checkable,
 )
 
@@ -97,10 +93,10 @@ class ToolMetadata(TypedDict, total=False):
         "operational",
         "inventory",
     ]
-    tags: List[str]
+    tags: list[str]
     service: str
     ref: str  # 참조 도구용
-    requires: List[str]  # 필요한 패키지
+    requires: list[str]  # 필요한 패키지
 
 
 class CategoryMetadata(TypedDict, total=False):
@@ -111,7 +107,7 @@ class CategoryMetadata(TypedDict, total=False):
     description: str
 
     # 선택적 필드
-    aliases: List[str]
+    aliases: list[str]
     icon: str
 
 
@@ -120,7 +116,7 @@ class DiscoveredCategory(TypedDict):
 
     name: str
     description: str
-    tools: List[ToolMetadata]
+    tools: list[ToolMetadata]
     module_path: str
     _source: str
 
@@ -151,7 +147,7 @@ class AWSResource(TypedDict, total=False):
     _status: str
 
     # AWS 공통 필드
-    Tags: List[AWSTag]
+    Tags: list[AWSTag]
     Arn: str
 
 
@@ -160,7 +156,7 @@ class EC2Instance(AWSResource):
 
     InstanceId: str
     InstanceType: str
-    State: Dict[str, str]
+    State: dict[str, str]
     LaunchTime: str
     PrivateIpAddress: str
     PublicIpAddress: str
@@ -224,7 +220,7 @@ class PluginRunner(Protocol):
 class OptionsCollector(Protocol):
     """옵션 수집 함수 프로토콜"""
 
-    def __call__(self, ctx: Any) -> Dict[str, Any]:
+    def __call__(self, ctx: Any) -> dict[str, Any]:
         """옵션 수집
 
         Args:
@@ -240,8 +236,7 @@ class OptionsCollector(Protocol):
 class AWSClient(Protocol):
     """boto3 클라이언트 프로토콜"""
 
-    def __getattr__(self, name: str) -> Callable[..., Dict[str, Any]]:
-        ...
+    def __getattr__(self, name: str) -> Callable[..., dict[str, Any]]: ...
 
 
 @runtime_checkable
@@ -258,14 +253,14 @@ class SessionProvider(Protocol):
 
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
     ) -> Any:  # boto3.Session
         """세션 반환"""
         ...
 
-    def list_accounts(self) -> Dict[str, Any]:
+    def list_accounts(self) -> dict[str, Any]:
         """계정 목록 반환"""
         ...
 
@@ -287,10 +282,10 @@ class AnalysisResult(TypedDict, total=False):
     """분석 결과 타입"""
 
     success: bool
-    data: List[Dict[str, Any]]
-    errors: List[str]
+    data: list[dict[str, Any]]
+    errors: list[str]
     output_path: str
-    summary: Dict[str, Any]
+    summary: dict[str, Any]
 
 
 class ErrorInfo(TypedDict):
@@ -317,20 +312,20 @@ class PaginatedResponse(TypedDict, total=False):
 class DescribeInstancesResponse(PaginatedResponse):
     """EC2 describe_instances 응답"""
 
-    Reservations: List[Dict[str, Any]]
+    Reservations: list[dict[str, Any]]
 
 
 class DescribeVolumesResponse(PaginatedResponse):
     """EC2 describe_volumes 응답"""
 
-    Volumes: List[EBSVolume]
+    Volumes: list[EBSVolume]
 
 
 class ListBucketsResponse(TypedDict):
     """S3 list_buckets 응답"""
 
-    Buckets: List[S3Bucket]
-    Owner: Dict[str, str]
+    Buckets: list[S3Bucket]
+    Owner: dict[str, str]
 
 
 # =============================================================================

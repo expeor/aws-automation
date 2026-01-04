@@ -8,12 +8,12 @@ Static Credentials Provider 구현
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
 
-from ..types import AccountInfo, NotAuthenticatedError, ProviderError, ProviderType
+from ..types import AccountInfo, ProviderError, ProviderType
 from .base import BaseProvider
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,10 @@ class StaticCredentialsConfig:
         region: 기본 리전
     """
 
-    profile_name: Optional[str] = None
-    access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
-    session_token: Optional[str] = None
+    profile_name: str | None = None
+    access_key_id: str | None = None
+    secret_access_key: str | None = None
+    session_token: str | None = None
     region: str = "ap-northeast-2"
 
     @property
@@ -82,8 +82,8 @@ class StaticCredentialsProvider(BaseProvider):
         super().__init__(name=config.name, region=config.region)
 
         self._config = config
-        self._session: Optional[boto3.Session] = None
-        self._account_info: Optional[AccountInfo] = None
+        self._session: boto3.Session | None = None
+        self._account_info: AccountInfo | None = None
 
     @property
     def _provider_type(self) -> ProviderType:
@@ -139,20 +139,20 @@ class StaticCredentialsProvider(BaseProvider):
                     operation="authenticate",
                     message="유효하지 않은 AWS 자격증명입니다",
                     cause=e,
-                )
+                ) from e
             elif error_code == "ExpiredToken":
                 raise ProviderError(
                     provider=self._name,
                     operation="authenticate",
                     message="임시 자격증명이 만료되었습니다",
                     cause=e,
-                )
+                ) from e
             raise ProviderError(
                 provider=self._name,
                 operation="authenticate",
                 message=f"자격증명 검증 실패: {error_code}",
                 cause=e,
-            )
+            ) from e
 
     def _extract_name_from_arn(self, arn: str) -> str:
         """ARN에서 사용자/역할 이름 추출"""
@@ -167,9 +167,9 @@ class StaticCredentialsProvider(BaseProvider):
 
     def get_session(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
     ) -> boto3.Session:
         """boto3 Session 반환
 
@@ -201,10 +201,10 @@ class StaticCredentialsProvider(BaseProvider):
 
     def get_aws_config(
         self,
-        account_id: Optional[str] = None,
-        role_name: Optional[str] = None,
-        region: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        account_id: str | None = None,
+        role_name: str | None = None,
+        region: str | None = None,
+    ) -> dict[str, Any]:
         """AWS 설정 정보 반환"""
         session = self.get_session(region=region)
         return {
@@ -216,7 +216,7 @@ class StaticCredentialsProvider(BaseProvider):
             },
         }
 
-    def list_accounts(self) -> Dict[str, AccountInfo]:
+    def list_accounts(self) -> dict[str, AccountInfo]:
         """계정 목록 반환
 
         정적 자격증명은 단일 계정만 지원합니다.
@@ -232,6 +232,6 @@ class StaticCredentialsProvider(BaseProvider):
         """멀티 계정 지원 여부"""
         return False
 
-    def get_account_info(self) -> Optional[AccountInfo]:
+    def get_account_info(self) -> AccountInfo | None:
         """현재 계정 정보 반환"""
         return self._account_info

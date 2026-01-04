@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from .base import BaseSheetWriter, get_column_letter
 from .config import HEADERS, SHEET_NAMES, SheetConfig
@@ -18,9 +17,7 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
     def write(self) -> None:
         """Create response time sheet."""
         try:
-            if not (
-                self.data.get("response_time") or self.data.get("long_response_times")
-            ):
+            if not (self.data.get("response_time") or self.data.get("long_response_times")):
                 return
 
             # Get and filter logs
@@ -31,14 +28,12 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
             # Sort by response time (descending), filter nulls
             sorted_logs = sorted(
                 long_response_logs,
-                key=lambda x: x.get("response_time")
-                if x.get("response_time") is not None
-                else -1,
+                key=lambda x: x.get("response_time") if x.get("response_time") is not None else -1,
                 reverse=True,
             )
-            filtered_logs = [
-                log for log in sorted_logs if log.get("response_time") is not None
-            ][: SheetConfig.TOP_RESPONSE_TIME_LIMIT]
+            filtered_logs = [log for log in sorted_logs if log.get("response_time") is not None][
+                : SheetConfig.TOP_RESPONSE_TIME_LIMIT
+            ]
 
             if not filtered_logs:
                 return
@@ -72,9 +67,9 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
     def _write_response_time_rows(
         self,
         ws,
-        logs: List[Dict[str, Any]],
-        headers: List[str],
-        abuse_ips: Set[str],
+        logs: list[dict[str, Any]],
+        headers: list[str],
+        abuse_ips: set[str],
     ) -> None:
         """Write response time rows."""
         border = self.styles.thin_border

@@ -18,7 +18,7 @@ from .builder import (
 # 레거시 호환 별칭
 open_file_explorer = open_in_explorer
 
-__all__ = [
+__all__: list[str] = [
     # Path builder
     "OutputPath",
     "OutputResult",

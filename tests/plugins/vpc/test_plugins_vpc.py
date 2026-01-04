@@ -2,14 +2,12 @@
 tests/test_plugins_vpc.py - VPC 플러그인 테스트
 """
 
-import pytest
 
 from plugins.vpc.sg_audit_analysis.critical_ports import (
     ALL_RISKY_PORTS,
     PORT_INFO,
     TRUSTED_ADVISOR_RED_PORTS,
     WEB_PORTS,
-    CriticalPort,
     check_port_range,
     check_port_range_all,
     get_port_info,
@@ -25,12 +23,12 @@ class TestCriticalPortSets:
     def test_trusted_advisor_red_ports(self):
         """Trusted Advisor RED 포트"""
         expected = {20, 21, 1433, 1434, 3306, 3389, 4333, 5432, 5500}
-        assert TRUSTED_ADVISOR_RED_PORTS == expected
+        assert expected == TRUSTED_ADVISOR_RED_PORTS
 
     def test_web_ports(self):
         """웹 포트"""
         expected = {25, 80, 443, 465}
-        assert WEB_PORTS == expected
+        assert expected == WEB_PORTS
 
     def test_all_risky_ports_includes_red(self):
         """위험 포트에 RED 포함"""
@@ -167,7 +165,7 @@ class TestPortInfo:
 
     def test_critical_port_fields(self):
         """CriticalPort 필드 확인"""
-        for port, info in PORT_INFO.items():
+        for _port, info in PORT_INFO.items():
             assert isinstance(info.port, int)
             assert isinstance(info.name, str)
             assert info.protocol in ["tcp", "udp", "both"]

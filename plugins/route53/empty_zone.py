@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -50,7 +49,7 @@ class HostedZoneInfo:
     is_private: bool
     record_count: int
     comment: str
-    vpcs: List[str] = field(default_factory=list)
+    vpcs: list[str] = field(default_factory=list)
     has_real_records: bool = False
 
     @property
@@ -80,12 +79,10 @@ class Route53AnalysisResult:
     private_zones: int = 0
     public_zones: int = 0
     wasted_monthly_cost: float = 0.0
-    findings: List[ZoneFinding] = field(default_factory=list)
+    findings: list[ZoneFinding] = field(default_factory=list)
 
 
-def collect_hosted_zones(
-    session, account_id: str, account_name: str
-) -> List[HostedZoneInfo]:
+def collect_hosted_zones(session, account_id: str, account_name: str) -> list[HostedZoneInfo]:
     """Hosted Zone 수집 (글로벌 서비스)"""
     from botocore.exceptions import ClientError
 
@@ -112,17 +109,13 @@ def collect_hosted_zones(
                 try:
                     hz_detail = route53.get_hosted_zone(Id=zone_id)
                     vpcs = hz_detail.get("VPCs", [])
-                    zone_info.vpcs = [
-                        f"{v.get('VPCRegion')}:{v.get('VPCId')}" for v in vpcs
-                    ]
+                    zone_info.vpcs = [f"{v.get('VPCRegion')}:{v.get('VPCId')}" for v in vpcs]
                 except ClientError:
                     pass
 
             # 실제 레코드 존재 여부 확인 (NS, SOA 제외)
             try:
-                records = route53.list_resource_record_sets(
-                    HostedZoneId=zone_id, MaxItems="100"
-                )
+                records = route53.list_resource_record_sets(HostedZoneId=zone_id, MaxItems="100")
                 for record in records.get("ResourceRecordSets", []):
                     record_type = record.get("Type", "")
                     if record_type not in ("NS", "SOA"):
@@ -136,9 +129,7 @@ def collect_hosted_zones(
     return zones
 
 
-def analyze_hosted_zones(
-    zones: List[HostedZoneInfo], account_id: str, account_name: str
-) -> Route53AnalysisResult:
+def analyze_hosted_zones(zones: list[HostedZoneInfo], account_id: str, account_name: str) -> Route53AnalysisResult:
     """Hosted Zone 분석"""
     result = Route53AnalysisResult(
         account_id=account_id,
@@ -189,7 +180,7 @@ def analyze_hosted_zones(
     return result
 
 
-def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[Route53AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -199,14 +190,10 @@ def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> st
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -271,12 +258,10 @@ def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> st
     # 컬럼 너비 자동 조정
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -286,9 +271,7 @@ def generate_report(results: List[Route53AnalysisResult], output_dir: str) -> st
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[Route53AnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> Route53AnalysisResult | None:
     """단일 계정의 Hosted Zone 수집 및 분석 (병렬 실행용)
 
     Route53는 글로벌 서비스이므로 region은 무시됩니다.
@@ -304,12 +287,8 @@ def run(ctx) -> None:
     """빈 Hosted Zone 분석"""
     console.print("[bold]Route53 빈 Hosted Zone 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="route53"
-    )
-    results: List[Route53AnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="route53")
+    results: list[Route53AnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -321,10 +300,8 @@ def run(ctx) -> None:
     total_unused = sum(r.empty_zones + r.ns_soa_only_zones for r in results)
     total_cost = sum(r.wasted_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
-    console.print(
-        f"미사용 Hosted Zone: [yellow]{total_unused}개[/yellow] (${total_cost:,.2f}/월)"
-    )
+    console.print("\n[bold]종합 결과[/bold]")
+    console.print(f"미사용 Hosted Zone: [yellow]{total_unused}개[/yellow] (${total_cost:,.2f}/월)")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

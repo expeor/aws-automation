@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, FrozenSet, Tuple
 
 
 @dataclass(frozen=True)
@@ -32,7 +31,7 @@ STYLE_STATUS = "status"
 STYLE_CENTER = "center"
 STYLE_DATA = "data"
 
-COLUMN_STYLE_MAP: Dict[str, str] = {
+COLUMN_STYLE_MAP: dict[str, str] = {
     "Count": STYLE_NUMBER,
     "Unique IPs": STYLE_NUMBER,
     "IP Count": STYLE_NUMBER,
@@ -55,7 +54,7 @@ COLUMN_STYLE_MAP: Dict[str, str] = {
     "User Agent": STYLE_DATA,
 }
 
-COLUMN_WIDTH_MAP: Dict[str, int] = {
+COLUMN_WIDTH_MAP: dict[str, int] = {
     "Count": 11,
     "Client": 20,
     "Country": 10,
@@ -86,7 +85,7 @@ COLUMN_WIDTH_MAP: Dict[str, int] = {
     "총 데이터 (변환)": 25,
 }
 
-WRAP_TEXT_COLUMNS: Dict[str, str] = {
+WRAP_TEXT_COLUMNS: dict[str, str] = {
     "Request": "left",
     "Redirect URL": "left",
     "User Agent": "left",
@@ -129,9 +128,9 @@ SHEET_NAMES = SheetNames()
 class Headers:
     """Header configurations."""
 
-    ABUSE_IP: Tuple[str, ...] = ("Count", "IP", "Country", "ASN", "ISP")
+    ABUSE_IP: tuple[str, ...] = ("Count", "IP", "Country", "ASN", "ISP")
 
-    ABUSE_REQUESTS: Tuple[str, ...] = (
+    ABUSE_REQUESTS: tuple[str, ...] = (
         "Timestamp",
         "Client",
         "Country",
@@ -144,7 +143,7 @@ class Headers:
         "Backend Status Code",
     )
 
-    RESPONSE_TIME: Tuple[str, ...] = (
+    RESPONSE_TIME: tuple[str, ...] = (
         "Response time",
         "Timestamp",
         "Client",
@@ -158,7 +157,7 @@ class Headers:
         "Backend Status Code",
     )
 
-    BYTES_ANALYSIS: Tuple[str, ...] = (
+    BYTES_ANALYSIS: tuple[str, ...] = (
         "Request",
         "수신 데이터 (Bytes)",
         "송신 데이터 (Bytes)",
@@ -166,7 +165,7 @@ class Headers:
         "총 데이터 (변환)",
     )
 
-    STATUS_COUNT_BASE: Tuple[str, ...] = (
+    STATUS_COUNT_BASE: tuple[str, ...] = (
         "Count",
         "Client",
         "Country",
@@ -178,7 +177,7 @@ class Headers:
         "Backend Status Code",
     )
 
-    STATUS_COUNT_3XX: Tuple[str, ...] = (
+    STATUS_COUNT_3XX: tuple[str, ...] = (
         "Count",
         "Client",
         "Country",
@@ -191,7 +190,7 @@ class Headers:
         "Backend Status Code",
     )
 
-    STATUS_TIMESTAMP: Tuple[str, ...] = (
+    STATUS_TIMESTAMP: tuple[str, ...] = (
         "Timestamp",
         "Client",
         "Country",
@@ -205,9 +204,9 @@ class Headers:
         "Error Reason",
     )
 
-    COUNTRY_STATS: Tuple[str, ...] = ("Count", "Country", "IP Count", "Percentage")
+    COUNTRY_STATS: tuple[str, ...] = ("Count", "Country", "IP Count", "Percentage")
 
-    URL_DETAILED: Tuple[str, ...] = (
+    URL_DETAILED: tuple[str, ...] = (
         "Count",
         "Client",
         "Country",
@@ -219,12 +218,12 @@ class Headers:
         "Error Rate (%)",
     )
 
-    URL_SIMPLE: Tuple[str, ...] = ("Count", "Request")
+    URL_SIMPLE: tuple[str, ...] = ("Count", "Request")
 
 
 HEADERS = Headers()
 
-STATUS_CODE_TYPES: Tuple[str, ...] = (
+STATUS_CODE_TYPES: tuple[str, ...] = (
     "ELB 2xx Count",
     "ELB 3xx Count",
     "ELB 4xx Count",
@@ -233,6 +232,4 @@ STATUS_CODE_TYPES: Tuple[str, ...] = (
     "Backend 5xx Count",
 )
 
-SPECIAL_COUNTRY_CODES: FrozenSet[str] = frozenset(
-    {"UNKNOWN", "PRIVATE", "LOOPBACK", "LINK_LOCAL", "MULTICAST"}
-)
+SPECIAL_COUNTRY_CODES: frozenset[str] = frozenset({"UNKNOWN", "PRIVATE", "LOOPBACK", "LINK_LOCAL", "MULTICAST"})

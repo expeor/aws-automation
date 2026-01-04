@@ -24,10 +24,8 @@ Usage:
     -q, --quiet: 최소 출력 모드
 """
 
-import json
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -49,11 +47,11 @@ class HeadlessConfig:
     profile: str
 
     # 대상
-    regions: List[str] = field(default_factory=list)
+    regions: list[str] = field(default_factory=list)
 
     # 출력
     format: str = "console"  # console, json, csv
-    output: Optional[str] = None
+    output: str | None = None
     quiet: bool = False
 
 
@@ -66,7 +64,7 @@ class HeadlessRunner:
 
     def __init__(self, config: HeadlessConfig):
         self.config = config
-        self._ctx: Optional[ExecutionContext] = None
+        self._ctx: ExecutionContext | None = None
 
     def run(self) -> int:
         """Headless 실행
@@ -107,7 +105,7 @@ class HeadlessRunner:
                 traceback.print_exc()
             return 1
 
-    def _load_tool(self) -> Optional[dict]:
+    def _load_tool(self) -> dict | None:
         """도구 메타데이터 로드"""
         from core.tools.discovery import discover_categories
 
@@ -121,10 +119,7 @@ class HeadlessRunner:
                     if tool_meta.get("module") == self.config.tool_module:
                         return tool_meta
 
-        console.print(
-            f"[red]도구를 찾을 수 없습니다: "
-            f"{self.config.category}/{self.config.tool_module}[/red]"
-        )
+        console.print(f"[red]도구를 찾을 수 없습니다: {self.config.category}/{self.config.tool_module}[/red]")
         return None
 
     def _build_context(self, tool_meta: dict) -> ExecutionContext:
@@ -136,12 +131,8 @@ class HeadlessRunner:
             description=tool_meta.get("description", ""),
             category=self.config.category,
             permission=tool_meta.get("permission", "read"),
-            supports_single_region_only=tool_meta.get(
-                "supports_single_region_only", False
-            ),
-            supports_single_account_only=tool_meta.get(
-                "supports_single_account_only", False
-            ),
+            supports_single_region_only=tool_meta.get("supports_single_region_only", False),
+            supports_single_account_only=tool_meta.get("supports_single_account_only", False),
             is_global=tool_meta.get("is_global", False),
         )
 
@@ -183,6 +174,7 @@ class HeadlessRunner:
 
     def _setup_sso_profile(self) -> bool:
         """SSO Profile 인증 설정"""
+        assert self._ctx is not None
         self._ctx.provider_kind = ProviderKind.SSO_PROFILE
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -194,6 +186,7 @@ class HeadlessRunner:
 
     def _setup_static(self) -> bool:
         """Static Credentials 인증 설정"""
+        assert self._ctx is not None
         self._ctx.provider_kind = ProviderKind.STATIC_CREDENTIALS
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -205,7 +198,8 @@ class HeadlessRunner:
 
     def _setup_regions(self) -> bool:
         """리전 설정"""
-        regions = []
+        assert self._ctx is not None
+        regions: list[str] = []
 
         for r in self.config.regions:
             if r.lower() == "all":
@@ -219,8 +213,8 @@ class HeadlessRunner:
                 regions.append(r)
 
         # 중복 제거
-        seen = set()
-        unique_regions = []
+        seen: set[str] = set()
+        unique_regions: list[str] = []
         for r in regions:
             if r not in seen:
                 seen.add(r)
@@ -238,13 +232,14 @@ class HeadlessRunner:
 
     def _execute(self) -> int:
         """도구 실행"""
+        assert self._ctx is not None
+        assert self._ctx.tool is not None
+        assert self._ctx.category is not None
         from core.tools.discovery import load_tool
 
         tool = load_tool(self._ctx.category, self._ctx.tool.name)
         if tool is None:
-            console.print(
-                f"[red]도구 로드 실패: {self._ctx.category}/{self._ctx.tool.name}[/red]"
-            )
+            console.print(f"[red]도구 로드 실패: {self._ctx.category}/{self._ctx.tool.name}[/red]")
             return 1
 
         if not self.config.quiet:
@@ -263,6 +258,8 @@ class HeadlessRunner:
 
     def _print_summary(self) -> None:
         """실행 요약 출력"""
+        assert self._ctx is not None
+        assert self._ctx.tool is not None
         console.print(f"[bold]{self._ctx.tool.name}[/bold]")
         console.print(f"  프로파일: {self._ctx.profile_name}")
 
@@ -275,9 +272,9 @@ class HeadlessRunner:
 def run_headless(
     tool_path: str,
     profile: str,
-    regions: List[str],
+    regions: list[str],
     format: str = "console",
-    output: Optional[str] = None,
+    output: str | None = None,
     quiet: bool = False,
 ) -> int:
     """Headless 실행 편의 함수
@@ -299,8 +296,7 @@ def run_headless(
     parts = tool_path.split("/")
     if len(parts) != 2:
         console.print(
-            f"[red]잘못된 도구 경로: {tool_path}[/red]\n"
-            f"[dim]형식: category/tool_module (예: ec2/ebs_audit)[/dim]"
+            f"[red]잘못된 도구 경로: {tool_path}[/red]\n[dim]형식: category/tool_module (예: ec2/ebs_audit)[/dim]"
         )
         return 1
 

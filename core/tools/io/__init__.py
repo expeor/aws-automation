@@ -16,7 +16,7 @@
 
 from core.tools.io import csv, excel, file
 
-__all__ = [
+__all__: list[str] = [
     "csv",
     "excel",
     "file",

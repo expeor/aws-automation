@@ -6,8 +6,6 @@ AWS 인증 프로파일을 선택하고 Provider를 생성.
 2단계 선택: 인증 타입 → 프로파일
 """
 
-from typing import Dict, List
-
 from rich.console import Console
 
 from ..context import ExecutionContext, ProviderKind
@@ -56,9 +54,7 @@ class ProfileStep:
 
         if not profiles:
             console.print("[red]! 사용 가능한 AWS 프로파일이 없습니다.[/red]")
-            console.print(
-                "[yellow]* 'aws configure' 또는 " "'aws configure sso'를 실행해주세요.[/yellow]"
-            )
+            console.print("[yellow]* 'aws configure' 또는 'aws configure sso'를 실행해주세요.[/yellow]")
             raise RuntimeError("프로파일 없음")
 
         # 프로파일이 1개면 자동 선택
@@ -78,6 +74,7 @@ class ProfileStep:
         saved_groups = group_manager.get_all()
 
         available_types = [k for k, v in profiles_by_type.items() if v]
+        selected_type: ProviderKind | str
         if len(available_types) == 1 and not saved_groups:
             selected_type = available_types[0]
             type_info = AUTH_TYPE_INFO.get(selected_type, {})
@@ -94,6 +91,8 @@ class ProfileStep:
             return self._handle_group_selection(ctx, group_name, profiles)
 
         # 2단계: 프로파일 선택
+        # At this point selected_type is guaranteed to be ProviderKind (not "group:*" string)
+        assert isinstance(selected_type, ProviderKind)
         type_profiles = profiles_by_type[selected_type]
         selected = self._select_profile_in_type(type_profiles, selected_type)
 
@@ -103,9 +102,9 @@ class ProfileStep:
 
         return self._handle_selected_profile(ctx, selected)
 
-    def _group_by_type(self, profiles: list) -> Dict[ProviderKind, List[dict]]:
+    def _group_by_type(self, profiles: list) -> dict[ProviderKind, list[dict]]:
         """프로파일을 타입별로 그룹핑"""
-        grouped: Dict[ProviderKind, List[dict]] = {
+        grouped: dict[ProviderKind, list[dict]] = {
             ProviderKind.SSO_SESSION: [],
             ProviderKind.SSO_PROFILE: [],
             ProviderKind.STATIC_CREDENTIALS: [],
@@ -116,9 +115,7 @@ class ProfileStep:
                 grouped[kind].append(p)
         return grouped
 
-    def _select_auth_type(
-        self, profiles_by_type: Dict[ProviderKind, List[dict]]
-    ) -> ProviderKind | str:
+    def _select_auth_type(self, profiles_by_type: dict[ProviderKind, list[dict]]) -> ProviderKind | str:
         """인증 타입 선택 (1단계)
 
         Returns:
@@ -126,7 +123,6 @@ class ProfileStep:
             str: 프로파일 그룹 이름 (그룹 선택 시 "group:그룹명" 형태)
         """
         from cli.ui.console import print_box_end, print_box_line, print_box_start
-
         from core.tools.history import ProfileGroupsManager
 
         # 저장된 프로파일 그룹 확인
@@ -148,9 +144,7 @@ class ProfileStep:
 
         # 저장된 그룹이 있으면 맨 위에 표시
         if saved_groups:
-            print_box_line(
-                f" {menu_idx}) [cyan]★ 저장된 프로파일 그룹[/cyan] [dim]({len(saved_groups)}개)[/dim]"
-            )
+            print_box_line(f" {menu_idx}) [cyan]★ 저장된 프로파일 그룹[/cyan] [dim]({len(saved_groups)}개)[/dim]")
             menu_idx += 1
             print_box_line(" ────────────────────────")
 
@@ -158,9 +152,7 @@ class ProfileStep:
         for kind, type_profiles in available_types:
             info = AUTH_TYPE_INFO[kind]
             count = len(type_profiles)
-            print_box_line(
-                f" {menu_idx}) {info['name']}{info['badge']} [dim]({count}개)[/dim]"
-            )
+            print_box_line(f" {menu_idx}) {info['name']}{info['badge']} [dim]({count}개)[/dim]")
             menu_idx += 1
 
         print_box_end()
@@ -211,9 +203,7 @@ class ProfileStep:
             profiles_preview = ", ".join(g.profiles[:2])
             if len(g.profiles) > 2:
                 profiles_preview += f" 외 {len(g.profiles) - 2}개"
-            print_box_line(
-                f" {idx}) [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]"
-            )
+            print_box_line(f" {idx}) [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]")
 
         print_box_line("")
         print_box_line(" [dim]0) 뒤로[/dim]")
@@ -238,9 +228,7 @@ class ProfileStep:
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
-    def _select_profile_in_type(
-        self, profiles: List[dict], kind: ProviderKind
-    ) -> dict | List[dict]:
+    def _select_profile_in_type(self, profiles: list[dict], kind: ProviderKind) -> dict | list[dict]:
         """특정 타입 내에서 프로파일 선택 (2단계)
 
         Returns:
@@ -315,12 +303,12 @@ class ProfileStep:
                 if 1 <= idx <= len(sorted_profiles):
                     selected = sorted_profiles[idx - 1]
                     console.print(f"[dim]프로파일:[/dim] {selected['name']}")
-                    return selected
+                    return dict(selected)
                 console.print(f"[dim]1-{len(sorted_profiles)} 범위[/dim]")
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
-    def _select_single_profile_large(self, profiles: List[dict]) -> dict:
+    def _select_single_profile_large(self, profiles: list[dict]) -> dict:
         """대규모 프로파일에서 단일 선택 (검색/페이지네이션 지원)"""
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
@@ -328,14 +316,10 @@ class ProfileStep:
         search_filter = ""
         current_page = 0
 
-        def get_filtered() -> List[tuple]:
+        def get_filtered() -> list[tuple]:
             if not search_filter:
                 return list(enumerate(profiles))
-            return [
-                (i, p)
-                for i, p in enumerate(profiles)
-                if search_filter.lower() in p["name"].lower()
-            ]
+            return [(i, p) for i, p in enumerate(profiles) if search_filter.lower() in p["name"].lower()]
 
         def display():
             nonlocal current_page
@@ -420,30 +404,26 @@ class ProfileStep:
                     orig_idx, _ = filtered[idx - 1]
                     selected = profiles[orig_idx]
                     console.print(f"[dim]프로파일:[/dim] {selected['name']}")
-                    return selected
+                    return dict(selected)
                 console.print(f"[dim]1-{len(filtered)} 범위[/dim]")
             except ValueError:
                 console.print("[dim]숫자 또는 /검색어[/dim]")
 
-    def _select_multi_profiles(self, profiles: List[dict]) -> List[dict]:
+    def _select_multi_profiles(self, profiles: list[dict]) -> list[dict]:
         """다중 프로파일 선택 (STATIC_CREDENTIALS용)"""
         import fnmatch
 
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
         PAGE_SIZE = 20
-        selected_indices = set()
+        selected_indices: set[int] = set()
         search_filter = ""
         current_page = 0
 
-        def get_filtered_profiles() -> List[tuple]:
+        def get_filtered_profiles() -> list[tuple]:
             if not search_filter:
                 return list(enumerate(profiles))
-            return [
-                (i, p)
-                for i, p in enumerate(profiles)
-                if search_filter.lower() in p["name"].lower()
-            ]
+            return [(i, p) for i, p in enumerate(profiles) if search_filter.lower() in p["name"].lower()]
 
         def display_profiles():
             nonlocal current_page
@@ -473,9 +453,7 @@ class ProfileStep:
                     right_display_idx = start_idx + i + half + 1
                     orig_idx_r, right = page_items[i + half]
                     right_check = "v" if orig_idx_r in selected_indices else " "
-                    right_str = (
-                        f"{right_display_idx:>2}){right_check}{right['name'][:20]}"
-                    )
+                    right_str = f"{right_display_idx:>2}){right_check}{right['name'][:20]}"
                     print_box_line(f" {left_str}  {right_str}")
                 else:
                     print_box_line(f" {left_str}")
@@ -593,9 +571,7 @@ class ProfileStep:
             return "IAM Access Key"
         return ""
 
-    def _handle_selected_profile(
-        self, ctx: ExecutionContext, selected: dict
-    ) -> ExecutionContext:
+    def _handle_selected_profile(self, ctx: ExecutionContext, selected: dict) -> ExecutionContext:
         """선택된 프로파일에 따라 적절한 Flow 처리"""
         kind = selected["kind"]
 
@@ -606,18 +582,14 @@ class ProfileStep:
         else:  # STATIC_CREDENTIALS
             return self._handle_static_single_flow(ctx, selected)
 
-    def _handle_static_single_flow(
-        self, ctx: ExecutionContext, selected: dict
-    ) -> ExecutionContext:
+    def _handle_static_single_flow(self, ctx: ExecutionContext, selected: dict) -> ExecutionContext:
         """Static 단일 프로파일 처리"""
         ctx.provider_kind = selected["kind"]
         ctx.profile_name = selected["name"]
         ctx.profiles = [selected["name"]]
         return ctx
 
-    def _handle_group_selection(
-        self, ctx: ExecutionContext, group_name: str, all_profiles: list
-    ) -> ExecutionContext:
+    def _handle_group_selection(self, ctx: ExecutionContext, group_name: str, all_profiles: list) -> ExecutionContext:
         """프로파일 그룹 선택 처리
 
         그룹에 저장된 프로파일 이름으로 실제 프로파일 정보를 찾아서
@@ -656,9 +628,7 @@ class ProfileStep:
         # 멀티 프로파일 플로우로 진입
         return self._handle_multi_profile_flow(ctx, matched_profiles)
 
-    def _handle_multi_profile_flow(
-        self, ctx: ExecutionContext, selected_profiles: List[dict]
-    ) -> ExecutionContext:
+    def _handle_multi_profile_flow(self, ctx: ExecutionContext, selected_profiles: list[dict]) -> ExecutionContext:
         """다중 프로파일 처리 (Static, SSO Profile)"""
         ctx.provider_kind = selected_profiles[0]["kind"]
         ctx.profile_name = selected_profiles[0]["name"]
@@ -667,9 +637,7 @@ class ProfileStep:
         console.print(f"[dim]{len(ctx.profiles)}개 프로파일 순차 실행[/dim]")
         return ctx
 
-    def _handle_sso_session_flow(
-        self, ctx: ExecutionContext, profiles: list
-    ) -> ExecutionContext:
+    def _handle_sso_session_flow(self, ctx: ExecutionContext, profiles: list) -> ExecutionContext:
         """SSO Session 인증 Flow 처리 (멀티 계정)
 
         SSO Session은 동적으로 계정/역할을 선택할 수 있음.
@@ -689,9 +657,7 @@ class ProfileStep:
 
         return ctx
 
-    def _handle_sso_profile_flow(
-        self, ctx: ExecutionContext, profiles: list
-    ) -> ExecutionContext:
+    def _handle_sso_profile_flow(self, ctx: ExecutionContext, profiles: list) -> ExecutionContext:
         """SSO Profile 인증 Flow 처리 (단일 계정)
 
         SSO Profile은 계정/역할이 고정되어 있음 (sso_account_id, sso_role_name).
@@ -819,20 +785,20 @@ class ProfileStep:
                     start_url = session_config.start_url
                     sso_region = session_config.region
                 else:
-                    start_url = profile_config.sso_start_url
-                    sso_region = profile_config.sso_region
+                    start_url = profile_config.sso_start_url or ""
+                    sso_region = profile_config.sso_region or "ap-northeast-2"
             else:
                 # Legacy SSO: 프로파일에 직접 설정된 경우
                 sso_session_name = profile_name  # 세션 이름 대신 프로파일 이름 사용
-                start_url = profile_config.sso_start_url
-                sso_region = profile_config.sso_region
+                start_url = profile_config.sso_start_url or ""
+                sso_region = profile_config.sso_region or "ap-northeast-2"
 
             return SSOProfileProvider(
                 SSOProfileConfig(
                     profile_name=profile_name,
                     sso_session=sso_session_name,
-                    account_id=profile_config.sso_account_id,
-                    role_name=profile_config.sso_role_name,
+                    account_id=profile_config.sso_account_id or "",
+                    role_name=profile_config.sso_role_name or "",
                     region=profile_config.region or "ap-northeast-2",
                     start_url=start_url,
                     sso_region=sso_region or "ap-northeast-2",
@@ -841,9 +807,7 @@ class ProfileStep:
 
         elif kind == ProviderKind.STATIC_CREDENTIALS:
             profile_name = profile["name"]
-            return StaticCredentialsProvider(
-                StaticCredentialsConfig(profile_name=profile_name)
-            )
+            return StaticCredentialsProvider(StaticCredentialsConfig(profile_name=profile_name))
 
         else:
             raise ValueError(f"지원하지 않는 Provider 종류: {kind}")
@@ -871,10 +835,7 @@ class ProfileStep:
 
         try:
             accounts_data = ctx.provider.list_accounts()
-            if isinstance(accounts_data, dict):
-                accounts = list(accounts_data.values())
-            else:
-                accounts = accounts_data
+            accounts = list(accounts_data.values()) if isinstance(accounts_data, dict) else accounts_data
             console.print(f"[dim]{len(accounts)}개 계정[/dim]")
             return accounts
         except Exception as e:

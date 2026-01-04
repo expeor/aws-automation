@@ -13,7 +13,7 @@ from .alb_log_analyzer import ALBLogAnalyzer
 from .alb_log_downloader import ALBLogDownloader
 from .ip_intelligence import AbuseIPDBProvider, IPDenyProvider, IPIntelligence
 
-__all__ = [
+__all__: list[str] = [
     "ALBLogAnalyzer",
     "ALBExcelReporter",
     "ALBLogDownloader",

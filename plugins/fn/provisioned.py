@@ -14,7 +14,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Dict, List, Optional
 
 from rich.console import Console
 
@@ -65,9 +64,9 @@ class LambdaPCInfo:
     memory_mb: int
 
     # PC 설정
-    pc_configs: List[PCConfig] = field(default_factory=list)
+    pc_configs: list[PCConfig] = field(default_factory=list)
     total_provisioned: int = 0
-    reserved_concurrency: Optional[int] = None
+    reserved_concurrency: int | None = None
 
     # 메트릭
     invocations_30d: int = 0
@@ -102,7 +101,7 @@ class PCFinding:
     function: LambdaPCInfo
     status: PCStatus
     recommendation: str
-    recommended_pc: Optional[int] = None
+    recommended_pc: int | None = None
     monthly_waste: float = 0.0
     monthly_savings: float = 0.0
 
@@ -121,7 +120,7 @@ class PCAnalysisResult:
     undersized_pc_count: int = 0
     total_pc_cost: float = 0.0
     potential_savings: float = 0.0
-    findings: List[PCFinding] = field(default_factory=list)
+    findings: list[PCFinding] = field(default_factory=list)
 
 
 # =============================================================================
@@ -134,7 +133,7 @@ def collect_pc_info(
     account_id: str,
     account_name: str,
     region: str,
-) -> List[LambdaPCInfo]:
+) -> list[LambdaPCInfo]:
     """Lambda PC 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -164,23 +163,15 @@ def collect_pc_info(
 
                 # PC 설정 조회
                 try:
-                    pc_response = lambda_client.list_provisioned_concurrency_configs(
-                        FunctionName=function_name
-                    )
+                    pc_response = lambda_client.list_provisioned_concurrency_configs(FunctionName=function_name)
                     for pc in pc_response.get("ProvisionedConcurrencyConfigs", []):
                         qualifier = (
-                            pc.get("FunctionArn", "").split(":")[-1]
-                            if ":" in pc.get("FunctionArn", "")
-                            else "$LATEST"
+                            pc.get("FunctionArn", "").split(":")[-1] if ":" in pc.get("FunctionArn", "") else "$LATEST"
                         )
                         config = PCConfig(
                             qualifier=qualifier,
-                            allocated=pc.get(
-                                "AllocatedProvisionedConcurrentExecutions", 0
-                            ),
-                            available=pc.get(
-                                "AvailableProvisionedConcurrentExecutions", 0
-                            ),
+                            allocated=pc.get("AllocatedProvisionedConcurrentExecutions", 0),
+                            available=pc.get("AvailableProvisionedConcurrentExecutions", 0),
                             status=pc.get("Status", ""),
                         )
                         info.pc_configs.append(config)
@@ -190,12 +181,8 @@ def collect_pc_info(
 
                 # Reserved Concurrency 조회
                 try:
-                    concurrency = lambda_client.get_function_concurrency(
-                        FunctionName=function_name
-                    )
-                    info.reserved_concurrency = concurrency.get(
-                        "ReservedConcurrentExecutions"
-                    )
+                    concurrency = lambda_client.get_function_concurrency(FunctionName=function_name)
+                    info.reserved_concurrency = concurrency.get("ReservedConcurrentExecutions")
                 except ClientError:
                     pass
 
@@ -233,9 +220,7 @@ def collect_pc_info(
                         max_val = int(dp.get("Maximum", 0))
                         if max_val > info.max_concurrent:
                             info.max_concurrent = max_val
-                        info.avg_concurrent = max(
-                            info.avg_concurrent, dp.get("Average", 0)
-                        )
+                        info.avg_concurrent = max(info.avg_concurrent, dp.get("Average", 0))
                 except ClientError:
                     pass
 
@@ -268,9 +253,7 @@ def collect_pc_info(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]")
 
     return functions
 
@@ -281,7 +264,7 @@ def collect_pc_info(
 
 
 def analyze_pc(
-    functions: List[LambdaPCInfo],
+    functions: list[LambdaPCInfo],
     account_id: str,
     account_name: str,
     region: str,
@@ -388,7 +371,7 @@ def _analyze_single_pc(func: LambdaPCInfo, region: str) -> PCFinding:
 # =============================================================================
 
 
-def generate_report(results: List[PCAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[PCAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -398,24 +381,14 @@ def generate_report(results: List[PCAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     status_fills = {
-        PCStatus.UNUSED: PatternFill(
-            start_color="FF0000", end_color="FF0000", fill_type="solid"
-        ),
-        PCStatus.OVERSIZED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        PCStatus.UNDERSIZED: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        PCStatus.OPTIMAL: PatternFill(
-            start_color="90EE90", end_color="90EE90", fill_type="solid"
-        ),
+        PCStatus.UNUSED: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
+        PCStatus.OVERSIZED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        PCStatus.UNDERSIZED: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        PCStatus.OPTIMAL: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
     }
 
     # Summary
@@ -511,12 +484,10 @@ def generate_report(results: List[PCAnalysisResult], output_dir: str) -> str:
     # 열 너비
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -533,9 +504,7 @@ def generate_report(results: List[PCAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[PCAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> PCAnalysisResult | None:
     """단일 계정/리전의 PC 정보 수집 및 분석 (병렬 실행용)"""
     functions = collect_pc_info(session, account_id, account_name, region)
     if not functions:
@@ -547,10 +516,8 @@ def run(ctx) -> None:
     """PC 분석 실행"""
     console.print("[bold]Lambda Provisioned Concurrency 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="lambda"
-    )
-    results: List[PCAnalysisResult] = [r for r in result.get_data() if r is not None]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="lambda")
+    results: list[PCAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -567,7 +534,7 @@ def run(ctx) -> None:
     total_cost = sum(r.total_pc_cost for r in results)
     total_savings = sum(r.potential_savings for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(f"PC 설정된 함수: {total_with_pc}개")
     console.print(f"총 PC 비용: ${total_cost:,.2f}/월")
 

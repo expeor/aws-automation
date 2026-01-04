@@ -11,7 +11,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -55,7 +54,7 @@ class ClusterInfo:
     node_type: str
     num_nodes: int
     status: str
-    created_at: Optional[datetime]
+    created_at: datetime | None
     # CloudWatch 지표
     avg_connections: float = 0.0
     avg_cpu: float = 0.0
@@ -103,12 +102,10 @@ class ElastiCacheAnalysisResult:
     normal_clusters: int = 0
     unused_monthly_cost: float = 0.0
     low_usage_monthly_cost: float = 0.0
-    findings: List[ClusterFinding] = field(default_factory=list)
+    findings: list[ClusterFinding] = field(default_factory=list)
 
 
-def collect_elasticache_clusters(
-    session, account_id: str, account_name: str, region: str
-) -> List[ClusterInfo]:
+def collect_elasticache_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
     """ElastiCache 클러스터 수집"""
     from botocore.exceptions import ClientError
 
@@ -146,35 +143,31 @@ def collect_elasticache_clusters(
                     conn_resp = cloudwatch.get_metric_statistics(
                         Namespace="AWS/ElastiCache",
                         MetricName="CurrConnections",
-                        Dimensions=[
-                            {"Name": "ReplicationGroupId", "Value": cluster_id}
-                        ],
+                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
                         StartTime=start_time,
                         EndTime=now,
                         Period=86400,
                         Statistics=["Average"],
                     )
                     if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(
-                            d["Average"] for d in conn_resp["Datapoints"]
-                        ) / len(conn_resp["Datapoints"])
+                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
+                            conn_resp["Datapoints"]
+                        )
 
                     # CPUUtilization
                     cpu_resp = cloudwatch.get_metric_statistics(
                         Namespace="AWS/ElastiCache",
                         MetricName="CPUUtilization",
-                        Dimensions=[
-                            {"Name": "ReplicationGroupId", "Value": cluster_id}
-                        ],
+                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
                         StartTime=start_time,
                         EndTime=now,
                         Period=86400,
                         Statistics=["Average"],
                     )
                     if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(
-                            d["Average"] for d in cpu_resp["Datapoints"]
-                        ) / len(cpu_resp["Datapoints"])
+                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
+                            cpu_resp["Datapoints"]
+                        )
 
                 except ClientError:
                     pass
@@ -217,9 +210,9 @@ def collect_elasticache_clusters(
                         Statistics=["Average"],
                     )
                     if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(
-                            d["Average"] for d in conn_resp["Datapoints"]
-                        ) / len(conn_resp["Datapoints"])
+                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
+                            conn_resp["Datapoints"]
+                        )
 
                     cpu_resp = cloudwatch.get_metric_statistics(
                         Namespace="AWS/ElastiCache",
@@ -231,9 +224,9 @@ def collect_elasticache_clusters(
                         Statistics=["Average"],
                     )
                     if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(
-                            d["Average"] for d in cpu_resp["Datapoints"]
-                        ) / len(cpu_resp["Datapoints"])
+                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
+                            cpu_resp["Datapoints"]
+                        )
 
                 except ClientError:
                     pass
@@ -246,7 +239,7 @@ def collect_elasticache_clusters(
 
 
 def analyze_clusters(
-    clusters: List[ClusterInfo], account_id: str, account_name: str, region: str
+    clusters: list[ClusterInfo], account_id: str, account_name: str, region: str
 ) -> ElastiCacheAnalysisResult:
     """ElastiCache 클러스터 분석"""
     result = ElastiCacheAnalysisResult(
@@ -295,7 +288,7 @@ def analyze_clusters(
     return result
 
 
-def generate_report(results: List[ElastiCacheAnalysisResult], output_dir: str) -> str:
+def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -305,14 +298,10 @@ def generate_report(results: List[ElastiCacheAnalysisResult], output_dir: str) -
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -381,23 +370,17 @@ def generate_report(results: List[ElastiCacheAnalysisResult], output_dir: str) -
                 ws_detail.cell(row=detail_row, column=5, value=c.node_type)
                 ws_detail.cell(row=detail_row, column=6, value=c.num_nodes)
                 ws_detail.cell(row=detail_row, column=7, value=f.status.value)
-                ws_detail.cell(
-                    row=detail_row, column=8, value=f"{c.avg_connections:.1f}"
-                )
+                ws_detail.cell(row=detail_row, column=8, value=f"{c.avg_connections:.1f}")
                 ws_detail.cell(row=detail_row, column=9, value=f"{c.avg_cpu:.1f}%")
-                ws_detail.cell(
-                    row=detail_row, column=10, value=f"${c.estimated_monthly_cost:.2f}"
-                )
+                ws_detail.cell(row=detail_row, column=10, value=f"${c.estimated_monthly_cost:.2f}")
                 ws_detail.cell(row=detail_row, column=11, value=f.recommendation)
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
+            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
+            col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -407,9 +390,7 @@ def generate_report(results: List[ElastiCacheAnalysisResult], output_dir: str) -
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> Optional[ElastiCacheAnalysisResult]:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ElastiCacheAnalysisResult | None:
     """단일 계정/리전의 ElastiCache 클러스터 수집 및 분석 (병렬 실행용)"""
     clusters = collect_elasticache_clusters(session, account_id, account_name, region)
     if not clusters:
@@ -421,12 +402,8 @@ def run(ctx) -> None:
     """ElastiCache 미사용 클러스터 분석"""
     console.print("[bold]ElastiCache 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="elasticache"
-    )
-    results: List[ElastiCacheAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elasticache")
+    results: list[ElastiCacheAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -440,7 +417,7 @@ def run(ctx) -> None:
     unused_cost = sum(r.unused_monthly_cost for r in results)
     low_cost = sum(r.low_usage_monthly_cost for r in results)
 
-    console.print(f"\n[bold]종합 결과[/bold]")
+    console.print("\n[bold]종합 결과[/bold]")
     console.print(
         f"미사용: [red]{total_unused}개[/red] (${unused_cost:,.2f}/월) / "
         f"저사용: [yellow]{total_low}개[/yellow] (${low_cost:,.2f}/월)"

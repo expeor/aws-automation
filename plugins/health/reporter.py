@@ -15,9 +15,9 @@ plugins/health/reporter.py - AWS Health 패치 보고서 생성기
 
 import logging
 from calendar import monthcalendar
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.tools.io.excel import ColumnDef, Styles, Workbook
 
@@ -230,9 +230,7 @@ class PatchReporter:
 
     def _create_urgent_patches_sheet(self, wb: Workbook) -> None:
         """긴급 패치 시트 생성"""
-        urgent_patches = [
-            p for p in self.result.patches if p.urgency in ["critical", "high"]
-        ]
+        urgent_patches = [p for p in self.result.patches if p.urgency in ["critical", "high"]]
 
         if not urgent_patches:
             return
@@ -244,19 +242,21 @@ class PatchReporter:
             style = self._get_row_style(patch)
             sheet.add_row(row, style=style)
 
-        sheet.add_summary_row([
-            "합계",
-            "",
-            f"{len(urgent_patches)}건",
-            "",
-            "",
-            "",
-            "",
-            "",
-            sum(len(p.affected_resources) for p in urgent_patches),
-            "",
-            "",
-        ])
+        sheet.add_summary_row(
+            [
+                "합계",
+                "",
+                f"{len(urgent_patches)}건",
+                "",
+                "",
+                "",
+                "",
+                "",
+                sum(len(p.affected_resources) for p in urgent_patches),
+                "",
+                "",
+            ]
+        )
 
     def _create_all_patches_sheet(self, wb: Workbook) -> None:
         """전체 패치 목록 시트"""
@@ -267,26 +267,26 @@ class PatchReporter:
             style = self._get_row_style(patch)
             sheet.add_row(row, style=style)
 
-        sheet.add_summary_row([
-            "합계",
-            "",
-            f"{len(self.result.patches)}건",
-            "",
-            "",
-            "",
-            "",
-            "",
-            self.result.affected_resource_count,
-            "",
-            "",
-        ])
+        sheet.add_summary_row(
+            [
+                "합계",
+                "",
+                f"{len(self.result.patches)}건",
+                "",
+                "",
+                "",
+                "",
+                "",
+                self.result.affected_resource_count,
+                "",
+                "",
+            ]
+        )
 
     def _create_affected_resources_sheet(self, wb: Workbook) -> None:
         """영향받는 리소스 시트"""
         # 영향받는 리소스가 있는 패치만
-        patches_with_resources = [
-            p for p in self.result.patches if p.affected_resources
-        ]
+        patches_with_resources = [p for p in self.result.patches if p.affected_resources]
 
         if not patches_with_resources:
             return
@@ -313,9 +313,7 @@ class PatchReporter:
             return
 
         # 각 월별로 시트 생성 (최대 3개월)
-        months = sorted(
-            [k for k in self.result.summary_by_month.keys() if k != "미정"]
-        )[:3]
+        months = sorted([k for k in self.result.summary_by_month if k != "미정"])[:3]
 
         for month_key in months:
             patches = self.result.summary_by_month[month_key]
@@ -325,7 +323,7 @@ class PatchReporter:
         self,
         wb: Workbook,
         month_key: str,
-        patches: List[PatchItem],
+        patches: list[PatchItem],
     ) -> None:
         """개별 월 캘린더 시트 생성"""
         # 월 파싱
@@ -350,7 +348,7 @@ class PatchReporter:
         sheet = wb.new_sheet(name=sheet_name, columns=calendar_columns)
 
         # 일자별 패치 매핑
-        patches_by_day: Dict[int, List[PatchItem]] = {}
+        patches_by_day: dict[int, list[PatchItem]] = {}
         for patch in patches:
             if patch.scheduled_date:
                 day = patch.scheduled_date.day
@@ -389,7 +387,7 @@ class PatchReporter:
 
             sheet.add_row(row)
 
-    def _patch_to_row(self, patch: PatchItem) -> List[Any]:
+    def _patch_to_row(self, patch: PatchItem) -> list[Any]:
         """PatchItem을 행 데이터로 변환"""
         days_until = patch.event.days_until_start
         d_day = f"D-{days_until}" if days_until is not None else "-"
@@ -417,7 +415,7 @@ class PatchReporter:
             "low": "낮음",
         }.get(urgency, urgency)
 
-    def _get_row_style(self, patch: PatchItem) -> Optional[dict]:
+    def _get_row_style(self, patch: PatchItem) -> dict | None:
         """패치에 따른 행 스타일 결정"""
         if patch.urgency == "critical":
             return Styles.danger()
@@ -429,7 +427,6 @@ class PatchReporter:
         """콘솔에 요약 정보 출력"""
         try:
             from rich.console import Console
-            from rich.table import Table
 
             console = Console()
             self._print_rich_summary(console)
@@ -481,10 +478,7 @@ class PatchReporter:
             for p in urgent[:5]:
                 d_day = f"D-{p.event.days_until_start}" if p.event.days_until_start else ""
                 style = "red" if p.urgency == "critical" else "yellow"
-                console.print(
-                    f"  [{style}]{p.service}[/{style}] - {p.event_type} "
-                    f"({p.action_required}) [{d_day}]"
-                )
+                console.print(f"  [{style}]{p.service}[/{style}] - {p.event_type} ({p.action_required}) [{d_day}]")
 
             if len(urgent) > 5:
                 console.print(f"  ... 외 {len(urgent) - 5}건")

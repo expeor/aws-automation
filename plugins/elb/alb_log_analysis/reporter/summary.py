@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Tuple
 
 from .base import BaseSheetWriter, SummarySheetHelper
 from .config import SHEET_NAMES, SheetConfig
@@ -41,10 +40,7 @@ class SummarySheetWriter(BaseSheetWriter):
             helper.add_item("요청 종료 시간", self.data.get("end_time", "N/A"))
             helper.add_item("타임존", self.data.get("timezone", "N/A"))
 
-            if (
-                self.data.get("actual_start_time")
-                and self.data.get("actual_start_time") != "N/A"
-            ):
+            if self.data.get("actual_start_time") and self.data.get("actual_start_time") != "N/A":
                 helper.add_item("실제 로그 시작", self.data.get("actual_start_time", "N/A"))
                 helper.add_item("실제 로그 종료", self.data.get("actual_end_time", "N/A"))
 
@@ -53,9 +49,7 @@ class SummarySheetWriter(BaseSheetWriter):
             helper.add_section("데이터 통계")
             helper.add_item("총 로그 라인 수", f"{self.data.get('log_lines_count', 0):,}개")
             helper.add_item("분석된 로그 파일 수", f"{self.data.get('log_files_count', 0):,}개")
-            helper.add_item(
-                "고유 클라이언트 IP 수", f"{self.data.get('unique_client_ips', 0):,}개"
-            )
+            helper.add_item("고유 클라이언트 IP 수", f"{self.data.get('unique_client_ips', 0):,}개")
             helper.add_item(
                 "총 수신 바이트",
                 self.format_bytes(self.data.get("total_received_bytes", 0)),
@@ -118,7 +112,7 @@ class SummarySheetWriter(BaseSheetWriter):
         except Exception as e:
             logger.error(f"Summary 시트 생성 중 오류 발생: {e}")
 
-    def _parse_s3_uri(self, s3_uri: str) -> Tuple[str, str, str, str]:
+    def _parse_s3_uri(self, s3_uri: str) -> tuple[str, str, str, str]:
         """Parse S3 URI into components."""
         bucket_name = account_id = region = service_prefix = "N/A"
 
@@ -134,9 +128,7 @@ class SummarySheetWriter(BaseSheetWriter):
 
             if "/AWSLogs/" in path:
                 prefix_part = path.split("/AWSLogs/")[0]
-                service_prefix = (
-                    prefix_part.split("/", 1)[1] if "/" in prefix_part else prefix_part
-                )
+                service_prefix = prefix_part.split("/", 1)[1] if "/" in prefix_part else prefix_part
                 awslogs_part = path.split("/AWSLogs/")[1]
                 awslogs_parts = awslogs_part.split("/")
 
@@ -189,9 +181,7 @@ class SummarySheetWriter(BaseSheetWriter):
             if total_requests == 0:
                 return "0.0%"
 
-            error_requests = self.data.get("elb_4xx_count", 0) + self.data.get(
-                "elb_5xx_count", 0
-            )
+            error_requests = self.data.get("elb_4xx_count", 0) + self.data.get("elb_5xx_count", 0)
             return f"{(error_requests / total_requests) * 100:.1f}%"
 
         except Exception as e:
@@ -206,9 +196,7 @@ class SummarySheetWriter(BaseSheetWriter):
                 return 0
 
             matching_abuse_ips = self.get_matching_abuse_ips()
-            return sum(
-                int(client_ip_counts.get(ip, 0) or 0) for ip in matching_abuse_ips
-            )
+            return sum(int(client_ip_counts.get(ip, 0) or 0) for ip in matching_abuse_ips)
         except Exception:
             return 0
 
@@ -243,7 +231,7 @@ class SummarySheetWriter(BaseSheetWriter):
             highlight = highlight_type if count > 0 else None
             helper.add_item(label, display_value, highlight=highlight)
 
-    def _get_top_request_urls(self, limit: int) -> List[Tuple[str, int]]:
+    def _get_top_request_urls(self, limit: int) -> list[tuple[str, int]]:
         """Get top requested URLs."""
         try:
             url_counts = self.data.get("request_url_counts", {})
@@ -256,7 +244,7 @@ class SummarySheetWriter(BaseSheetWriter):
             logger.error(f"상위 요청 URL 계산 중 오류: {e}")
             return []
 
-    def _get_top_user_agents(self, limit: int) -> List[Tuple[str, int]]:
+    def _get_top_user_agents(self, limit: int) -> list[tuple[str, int]]:
         """Get top user agents."""
         try:
             ua_counts = self.data.get("user_agent_counts", {})
@@ -269,22 +257,20 @@ class SummarySheetWriter(BaseSheetWriter):
             logger.error(f"상위 User Agent 계산 중 오류: {e}")
             return []
 
-    def _get_top_countries(self, limit: int) -> List[Tuple[str, int]]:
+    def _get_top_countries(self, limit: int) -> list[tuple[str, int]]:
         """Get top countries."""
         try:
             country_stats = self.data.get("country_statistics", {})
             if not country_stats:
                 return []
 
-            sorted_countries = sorted(
-                country_stats.items(), key=lambda x: x[1], reverse=True
-            )
+            sorted_countries = sorted(country_stats.items(), key=lambda x: x[1], reverse=True)
             return sorted_countries[:limit]
         except Exception as e:
             logger.error(f"상위 국가 계산 중 오류: {e}")
             return []
 
-    def _calculate_response_time_stats(self) -> Dict[str, str]:
+    def _calculate_response_time_stats(self) -> dict[str, str]:
         """Calculate response time statistics."""
         try:
             long_response_times = self.data.get("long_response_times", [])
@@ -304,10 +290,7 @@ class SummarySheetWriter(BaseSheetWriter):
             response_times.sort()
             n = len(response_times)
 
-            if n % 2 == 0:
-                median = (response_times[n // 2 - 1] + response_times[n // 2]) / 2
-            else:
-                median = response_times[n // 2]
+            median = (response_times[n // 2 - 1] + response_times[n // 2]) / 2 if n % 2 == 0 else response_times[n // 2]
 
             return {
                 "max": f"{response_times[-1]:.3f}초",

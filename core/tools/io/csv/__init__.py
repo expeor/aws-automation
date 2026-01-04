@@ -9,7 +9,7 @@ from .handler import (
     validate_csv_headers,
 )
 
-__all__ = [
+__all__: list[str] = [
     "ENCODING_PRIORITIES",
     "detect_csv_encoding",
     "read_csv_robust",

@@ -7,12 +7,11 @@ Provider 기본 클래스
 
 import logging
 from abc import abstractmethod
-from typing import Any, Dict, Optional
 
 import boto3
 
 from ..cache import AccountCache, CredentialsCache
-from ..types import AccountInfo, NotAuthenticatedError, Provider, ProviderType
+from ..types import NotAuthenticatedError, Provider, ProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +75,8 @@ class BaseProvider(Provider):
         self,
         access_key_id: str,
         secret_access_key: str,
-        session_token: Optional[str] = None,
-        region: Optional[str] = None,
+        session_token: str | None = None,
+        region: str | None = None,
     ) -> boto3.Session:
         """boto3 Session 생성
 
@@ -101,7 +100,7 @@ class BaseProvider(Provider):
         self,
         account_id: str,
         role_name: str,
-    ) -> Optional[Dict[str, str]]:
+    ) -> dict[str, str] | None:
         """캐시된 자격증명 조회"""
         return self._credentials_cache.get(account_id, role_name)
 
@@ -109,7 +108,7 @@ class BaseProvider(Provider):
         self,
         account_id: str,
         role_name: str,
-        credentials: Dict[str, str],
+        credentials: dict[str, str],
     ) -> None:
         """자격증명 캐시"""
         self._credentials_cache.set(account_id, role_name, credentials)

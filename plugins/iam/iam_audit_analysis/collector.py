@@ -12,7 +12,7 @@ IAM 데이터 수집기
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from botocore.exceptions import ClientError
 
@@ -28,8 +28,8 @@ class IAMAccessKey:
     user_name: str
     access_key_id: str
     status: str  # Active / Inactive
-    create_date: Optional[datetime] = None
-    last_used_date: Optional[datetime] = None
+    create_date: datetime | None = None
+    last_used_date: datetime | None = None
     last_used_service: str = ""
     last_used_region: str = ""
     # 계산된 값
@@ -45,7 +45,7 @@ class GitCredential:
     service_user_name: str
     service_specific_credential_id: str
     status: str  # Active / Inactive
-    create_date: Optional[datetime] = None
+    create_date: datetime | None = None
     # 계산된 값
     age_days: int = 0
 
@@ -54,10 +54,10 @@ class GitCredential:
 class IAMUserChangeHistory:
     """IAM User 변경 이력 (AWS Config History)"""
 
-    capture_time: Optional[datetime] = None
+    capture_time: datetime | None = None
     status: str = ""  # OK, ResourceDeleted, ResourceDiscovered
     change_type: str = ""  # CREATE, UPDATE, DELETE
-    related_events: List[str] = field(default_factory=list)  # CloudTrail Event IDs
+    related_events: list[str] = field(default_factory=list)  # CloudTrail Event IDs
     # 변경 전후 상태 요약
     configuration_diff: str = ""
 
@@ -78,32 +78,32 @@ class IAMUser:
     user_name: str
     user_id: str
     arn: str
-    create_date: Optional[datetime] = None
-    password_last_used: Optional[datetime] = None
+    create_date: datetime | None = None
+    password_last_used: datetime | None = None
     # MFA
     has_mfa: bool = False
-    mfa_devices: List[str] = field(default_factory=list)
+    mfa_devices: list[str] = field(default_factory=list)
     # Console Access (Password)
     has_console_access: bool = False
-    password_last_changed: Optional[datetime] = None
-    password_next_rotation: Optional[datetime] = None
+    password_last_changed: datetime | None = None
+    password_next_rotation: datetime | None = None
     # Access Keys
-    access_keys: List["IAMAccessKey"] = field(default_factory=list)
+    access_keys: list["IAMAccessKey"] = field(default_factory=list)
     active_key_count: int = 0
     # Git Credentials (CodeCommit)
-    git_credentials: List["GitCredential"] = field(default_factory=list)
+    git_credentials: list["GitCredential"] = field(default_factory=list)
     active_git_credential_count: int = 0
     # Change History (AWS Config)
-    change_history: List["IAMUserChangeHistory"] = field(default_factory=list)
+    change_history: list["IAMUserChangeHistory"] = field(default_factory=list)
     # Groups & Policies
-    groups: List[str] = field(default_factory=list)
-    attached_policies: List[str] = field(default_factory=list)
-    inline_policies: List[str] = field(default_factory=list)
+    groups: list[str] = field(default_factory=list)
+    attached_policies: list[str] = field(default_factory=list)
+    inline_policies: list[str] = field(default_factory=list)
     # 위험한 권한 (iam:PassRole 등)
-    dangerous_permissions: List[str] = field(default_factory=list)
+    dangerous_permissions: list[str] = field(default_factory=list)
     has_passrole_wildcard: bool = False
     # 권한 상승 경로 (Privilege Escalation Paths)
-    privesc_paths: List[str] = field(default_factory=list)
+    privesc_paths: list[str] = field(default_factory=list)
     # 계산된 값
     days_since_last_login: int = -1  # -1 = 로그인 기록 없음
     days_since_password_change: int = -1
@@ -116,34 +116,34 @@ class IAMRole:
     role_name: str
     role_id: str
     arn: str
-    create_date: Optional[datetime] = None
+    create_date: datetime | None = None
     description: str = ""
     path: str = "/"
     # Trust Policy
-    trust_policy: Dict[str, Any] = field(default_factory=dict)
-    trusted_entities: List[str] = field(default_factory=list)
+    trust_policy: dict[str, Any] = field(default_factory=dict)
+    trusted_entities: list[str] = field(default_factory=list)
     # Last Used
-    last_used_date: Optional[datetime] = None
+    last_used_date: datetime | None = None
     last_used_region: str = ""
     # Policies
-    attached_policies: List[str] = field(default_factory=list)
-    inline_policies: List[str] = field(default_factory=list)
+    attached_policies: list[str] = field(default_factory=list)
+    inline_policies: list[str] = field(default_factory=list)
     # Connected Resources (AWS Config)
-    connected_resources: List["RoleResourceRelation"] = field(default_factory=list)
+    connected_resources: list["RoleResourceRelation"] = field(default_factory=list)
     # 분석용 플래그
     is_service_linked: bool = False
     is_aws_managed: bool = False
     has_admin_access: bool = False
     # 위험한 권한 (iam:PassRole 등)
-    dangerous_permissions: List[str] = field(default_factory=list)
+    dangerous_permissions: list[str] = field(default_factory=list)
     has_passrole_wildcard: bool = False
     # Trust Policy 위험 분석
-    trust_policy_risks: List[str] = field(default_factory=list)
+    trust_policy_risks: list[str] = field(default_factory=list)
     has_public_trust: bool = False  # Principal: * 허용
     has_external_without_condition: bool = False  # 외부 계정 ExternalId 없음
-    external_account_ids: List[str] = field(default_factory=list)  # 외부 계정 목록
+    external_account_ids: list[str] = field(default_factory=list)  # 외부 계정 목록
     # 권한 상승 경로 (Privilege Escalation Paths)
-    privesc_paths: List[str] = field(default_factory=list)
+    privesc_paths: list[str] = field(default_factory=list)
     # 계산된 값
     age_days: int = 0
     days_since_last_use: int = -1  # -1 = 사용 기록 없음
@@ -156,17 +156,17 @@ class IAMGroup:
     group_name: str
     group_id: str
     arn: str
-    create_date: Optional[datetime] = None
+    create_date: datetime | None = None
     path: str = "/"
     # 멤버
-    members: List[str] = field(default_factory=list)  # User names
+    members: list[str] = field(default_factory=list)  # User names
     member_count: int = 0
     # Policies
-    attached_policies: List[str] = field(default_factory=list)
-    inline_policies: List[str] = field(default_factory=list)
+    attached_policies: list[str] = field(default_factory=list)
+    inline_policies: list[str] = field(default_factory=list)
     # 분석 플래그
     has_admin_access: bool = False
-    dangerous_permissions: List[str] = field(default_factory=list)
+    dangerous_permissions: list[str] = field(default_factory=list)
     # 계산된 값
     age_days: int = 0
 
@@ -212,11 +212,11 @@ class IAMData:
 
     account_id: str
     account_name: str
-    users: List[IAMUser] = field(default_factory=list)
-    groups: List[IAMGroup] = field(default_factory=list)
-    roles: List[IAMRole] = field(default_factory=list)
-    password_policy: Optional[PasswordPolicy] = None
-    account_summary: Optional[AccountSummary] = None
+    users: list[IAMUser] = field(default_factory=list)
+    groups: list[IAMGroup] = field(default_factory=list)
+    roles: list[IAMRole] = field(default_factory=list)
+    password_policy: PasswordPolicy | None = None
+    account_summary: AccountSummary | None = None
     # AWS Config 상태
     config_enabled: bool = False
     config_error: str = ""
@@ -273,7 +273,7 @@ class IAMCollector:
     }
 
     def __init__(self):
-        self.errors: List[str] = []
+        self.errors: list[str] = []
 
     def collect(self, session, account_id: str, account_name: str) -> IAMData:
         """단일 계정에서 IAM 데이터 수집
@@ -292,9 +292,7 @@ class IAMCollector:
             iam = get_client(session, "iam")
 
             # 1. Account Summary
-            iam_data.account_summary = self._collect_account_summary(
-                iam, account_id, account_name
-            )
+            iam_data.account_summary = self._collect_account_summary(iam, account_id, account_name)
 
             # 2. Password Policy
             iam_data.password_policy = self._collect_password_policy(iam)
@@ -330,9 +328,7 @@ class IAMCollector:
 
         return iam_data
 
-    def _collect_account_summary(
-        self, iam, account_id: str, account_name: str
-    ) -> AccountSummary:
+    def _collect_account_summary(self, iam, account_id: str, account_name: str) -> AccountSummary:
         """Account Summary 수집"""
         summary = AccountSummary(account_id=account_id, account_name=account_name)
 
@@ -345,14 +341,10 @@ class IAMCollector:
             summary.roles = summary_map.get("Roles", 0)
             summary.policies = summary_map.get("Policies", 0)
             summary.mfa_devices = summary_map.get("MFADevices", 0)
-            summary.access_keys_per_user_quota = summary_map.get(
-                "AccessKeysPerUserQuota", 2
-            )
+            summary.access_keys_per_user_quota = summary_map.get("AccessKeysPerUserQuota", 2)
 
             # Root Account 정보
-            summary.root_access_keys_present = (
-                summary_map.get("AccountAccessKeysPresent", 0) > 0
-            )
+            summary.root_access_keys_present = summary_map.get("AccountAccessKeysPresent", 0) > 0
             summary.root_mfa_active = summary_map.get("AccountMFAEnabled", 0) > 0
 
         except ClientError as e:
@@ -372,20 +364,12 @@ class IAMCollector:
             policy.minimum_length = pw_policy.get("MinimumPasswordLength", 0)
             policy.require_symbols = pw_policy.get("RequireSymbols", False)
             policy.require_numbers = pw_policy.get("RequireNumbers", False)
-            policy.require_uppercase = pw_policy.get(
-                "RequireUppercaseCharacters", False
-            )
-            policy.require_lowercase = pw_policy.get(
-                "RequireLowercaseCharacters", False
-            )
-            policy.allow_users_to_change = pw_policy.get(
-                "AllowUsersToChangePassword", True
-            )
+            policy.require_uppercase = pw_policy.get("RequireUppercaseCharacters", False)
+            policy.require_lowercase = pw_policy.get("RequireLowercaseCharacters", False)
+            policy.allow_users_to_change = pw_policy.get("AllowUsersToChangePassword", True)
             policy.expire_passwords = pw_policy.get("ExpirePasswords", False)
             policy.max_password_age = pw_policy.get("MaxPasswordAge", 0)
-            policy.password_reuse_prevention = pw_policy.get(
-                "PasswordReusePrevention", 0
-            )
+            policy.password_reuse_prevention = pw_policy.get("PasswordReusePrevention", 0)
             policy.hard_expiry = pw_policy.get("HardExpiry", False)
 
         except ClientError as e:
@@ -397,7 +381,7 @@ class IAMCollector:
 
         return policy
 
-    def _collect_users(self, iam) -> List[IAMUser]:
+    def _collect_users(self, iam) -> list[IAMUser]:
         """IAM Users 수집"""
         users = []
         now = datetime.now(timezone.utc)
@@ -475,9 +459,7 @@ class IAMCollector:
 
                 # Last Used 정보
                 try:
-                    last_used_response = iam.get_access_key_last_used(
-                        AccessKeyId=key.access_key_id
-                    )
+                    last_used_response = iam.get_access_key_last_used(AccessKeyId=key.access_key_id)
                     last_used = last_used_response.get("AccessKeyLastUsed", {})
                     key.last_used_date = last_used.get("LastUsedDate")
                     key.last_used_service = last_used.get("ServiceName", "")
@@ -509,9 +491,7 @@ class IAMCollector:
                 cred = GitCredential(
                     user_name=user.user_name,
                     service_user_name=cred_data.get("ServiceUserName", ""),
-                    service_specific_credential_id=cred_data.get(
-                        "ServiceSpecificCredentialId", ""
-                    ),
+                    service_specific_credential_id=cred_data.get("ServiceSpecificCredentialId", ""),
                     status=cred_data.get("Status", ""),
                     create_date=cred_data.get("CreateDate"),
                 )
@@ -557,9 +537,7 @@ class IAMCollector:
         try:
             # Attached Policies
             response = iam.list_attached_user_policies(UserName=user.user_name)
-            user.attached_policies = [
-                p["PolicyName"] for p in response.get("AttachedPolicies", [])
-            ]
+            user.attached_policies = [p["PolicyName"] for p in response.get("AttachedPolicies", [])]
 
             # Inline Policies
             response = iam.list_user_policies(UserName=user.user_name)
@@ -580,7 +558,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _analyze_policy_document(self, policy_doc: Dict[str, Any], entity: Any) -> None:
+    def _analyze_policy_document(self, policy_doc: dict[str, Any], entity: Any) -> None:
         """정책 문서에서 위험한 권한 분석
 
         Args:
@@ -606,28 +584,20 @@ class IAMCollector:
             # 위험한 권한 검사
             for action in actions:
                 # iam:PassRole with * resource 검사
-                if action in ("iam:PassRole", "iam:*", "*"):
-                    if "*" in resources or any("*" in r for r in resources):
-                        entity.has_passrole_wildcard = True
-                        if (
-                            "iam:PassRole (Resource: *)"
-                            not in entity.dangerous_permissions
-                        ):
-                            entity.dangerous_permissions.append(
-                                "iam:PassRole (Resource: *)"
-                            )
+                if action in ("iam:PassRole", "iam:*", "*") and ("*" in resources or any("*" in r for r in resources)):
+                    entity.has_passrole_wildcard = True
+                    if "iam:PassRole (Resource: *)" not in entity.dangerous_permissions:
+                        entity.dangerous_permissions.append("iam:PassRole (Resource: *)")
 
                 # 단독 위험 권한 검사
-                if action in self.DANGEROUS_PERMISSIONS:
-                    if action not in entity.dangerous_permissions:
-                        entity.dangerous_permissions.append(action)
+                if action in self.DANGEROUS_PERMISSIONS and action not in entity.dangerous_permissions:
+                    entity.dangerous_permissions.append(action)
 
                 # 와일드카드 권한 검사
-                if action == "iam:*" or action == "*":
-                    if "iam:* (Full IAM Access)" not in entity.dangerous_permissions:
-                        entity.dangerous_permissions.append("iam:* (Full IAM Access)")
+                if action in ("iam:*", "*") and "iam:* (Full IAM Access)" not in entity.dangerous_permissions:
+                    entity.dangerous_permissions.append("iam:* (Full IAM Access)")
 
-    def _collect_groups(self, iam) -> List[IAMGroup]:
+    def _collect_groups(self, iam) -> list[IAMGroup]:
         """IAM Groups 수집"""
         groups = []
         now = datetime.now(timezone.utc)
@@ -710,9 +680,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _analyze_group_policy_document(
-        self, policy_doc: Dict[str, Any], group: IAMGroup
-    ) -> None:
+    def _analyze_group_policy_document(self, policy_doc: dict[str, Any], group: IAMGroup) -> None:
         """그룹 정책 문서에서 위험한 권한 분석"""
         statements = policy_doc.get("Statement", [])
         if isinstance(statements, dict):
@@ -728,15 +696,13 @@ class IAMCollector:
 
             # 위험한 권한 검사
             for action in actions:
-                if action in self.DANGEROUS_PERMISSIONS:
-                    if action not in group.dangerous_permissions:
-                        group.dangerous_permissions.append(action)
+                if action in self.DANGEROUS_PERMISSIONS and action not in group.dangerous_permissions:
+                    group.dangerous_permissions.append(action)
 
-                if action == "iam:*" or action == "*":
-                    if "iam:* (Full IAM Access)" not in group.dangerous_permissions:
-                        group.dangerous_permissions.append("iam:* (Full IAM Access)")
+                if action in ("iam:*", "*") and "iam:* (Full IAM Access)" not in group.dangerous_permissions:
+                    group.dangerous_permissions.append("iam:* (Full IAM Access)")
 
-    def _collect_roles(self, iam) -> List[IAMRole]:
+    def _collect_roles(self, iam) -> list[IAMRole]:
         """IAM Roles 수집"""
         roles = []
         now = datetime.now(timezone.utc)
@@ -823,7 +789,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _extract_trusted_entities(self, trust_policy: Dict[str, Any]) -> List[str]:
+    def _extract_trusted_entities(self, trust_policy: dict[str, Any]) -> list[str]:
         """Trust Policy에서 신뢰 엔티티 추출"""
         entities = []
 
@@ -891,9 +857,7 @@ class IAMCollector:
             # === 1. Principal: * 검사 (가장 위험) ===
             if principal == "*":
                 role.has_public_trust = True
-                role.trust_policy_risks.append(
-                    "CRITICAL: Principal '*' - 누구나 Assume 가능"
-                )
+                role.trust_policy_risks.append("CRITICAL: Principal '*' - 누구나 Assume 가능")
                 continue
 
             if isinstance(principal, dict):
@@ -905,17 +869,12 @@ class IAMCollector:
                     # === 2. AWS: "*" 검사 ===
                     if aws_arn == "*":
                         role.has_public_trust = True
-                        role.trust_policy_risks.append(
-                            "CRITICAL: Principal AWS:'*' - 모든 AWS 계정 허용"
-                        )
+                        role.trust_policy_risks.append("CRITICAL: Principal AWS:'*' - 모든 AWS 계정 허용")
                         continue
 
                     # === 3. 외부 계정 검사 ===
                     external_account_id = self._extract_account_from_arn(aws_arn)
-                    if (
-                        external_account_id
-                        and external_account_id != current_account_id
-                    ):
+                    if external_account_id and external_account_id != current_account_id:
                         role.external_account_ids.append(external_account_id)
 
                         # ExternalId 조건 있는지 확인
@@ -924,8 +883,7 @@ class IAMCollector:
                         if not has_external_id:
                             role.has_external_without_condition = True
                             role.trust_policy_risks.append(
-                                f"HIGH: 외부 계정 {external_account_id} - ExternalId 조건 없음 "
-                                "(Confused Deputy 취약)"
+                                f"HIGH: 외부 계정 {external_account_id} - ExternalId 조건 없음 (Confused Deputy 취약)"
                             )
 
                 # === 4. SAML 페더레이션 무제한 검사 ===
@@ -934,14 +892,11 @@ class IAMCollector:
                     federated = [federated]
 
                 for fed in federated:
-                    if "saml-provider" in fed.lower():
-                        # SAML 페더레이션에 조건이 없으면 위험
-                        if not condition:
-                            role.trust_policy_risks.append(
-                                f"MEDIUM: SAML 페더레이션 조건 없음 - {fed}"
-                            )
+                    # SAML 페더레이션에 조건이 없으면 위험
+                    if "saml-provider" in fed.lower() and not condition:
+                        role.trust_policy_risks.append(f"MEDIUM: SAML 페더레이션 조건 없음 - {fed}")
 
-    def _extract_account_from_arn(self, arn: str) -> Optional[str]:
+    def _extract_account_from_arn(self, arn: str) -> str | None:
         """ARN에서 계정 ID 추출
 
         Examples:
@@ -963,7 +918,7 @@ class IAMCollector:
 
         return None
 
-    def _has_external_id_condition(self, condition: Dict[str, Any]) -> bool:
+    def _has_external_id_condition(self, condition: dict[str, Any]) -> bool:
         """Condition에 ExternalId가 있는지 확인"""
         if not condition:
             return False
@@ -975,10 +930,7 @@ class IAMCollector:
 
         # StringLike도 확인
         string_like = condition.get("StringLike", {})
-        if "sts:ExternalId" in string_like:
-            return True
-
-        return False
+        return "sts:ExternalId" in string_like
 
     def _collect_config_relationships(self, session, iam_data: IAMData) -> None:
         """AWS Config에서 Role-Resource 관계 수집
@@ -1039,9 +991,7 @@ class IAMCollector:
                                         RoleResourceRelation(
                                             resource_type=resource_type,
                                             resource_name=resource_name,
-                                            resource_id=relationships.get(
-                                                "resourceId", ""
-                                            ),
+                                            resource_id=relationships.get("resourceId", ""),
                                         )
                                     )
 
@@ -1060,19 +1010,13 @@ class IAMCollector:
                     "NoSuchConfigurationAggregatorException",
                 ):
                     iam_data.config_error = "AWS Config가 활성화되지 않음"
-                    logger.info(
-                        f"AWS Config 비활성화 [{iam_data.account_name}]: {error_msg}"
-                    )
+                    logger.info(f"AWS Config 비활성화 [{iam_data.account_name}]: {error_msg}")
                 elif error_code == "AccessDeniedException":
                     iam_data.config_error = "AWS Config 접근 권한 없음"
-                    logger.info(
-                        f"AWS Config 권한 없음 [{iam_data.account_name}]: {error_msg}"
-                    )
+                    logger.info(f"AWS Config 권한 없음 [{iam_data.account_name}]: {error_msg}")
                 else:
                     iam_data.config_error = f"AWS Config 오류: {error_code}"
-                    logger.warning(
-                        f"AWS Config 오류 [{iam_data.account_name}]: {error_code}"
-                    )
+                    logger.warning(f"AWS Config 오류 [{iam_data.account_name}]: {error_code}")
 
         except Exception as e:
             iam_data.config_error = f"Config 수집 실패: {str(e)}"
@@ -1095,9 +1039,7 @@ class IAMCollector:
             for user_name, user in user_map.items():
                 try:
                     # AWS Config에서 해당 User의 변경 이력 조회
-                    paginator = config_client.get_paginator(
-                        "get_resource_config_history"
-                    )
+                    paginator = config_client.get_paginator("get_resource_config_history")
 
                     prev_config = None
                     for page in paginator.paginate(
@@ -1125,9 +1067,7 @@ class IAMCollector:
                             # 변경 내용 요약 생성
                             config_diff = ""
                             if change_type == "UPDATE" and prev_config:
-                                config_diff = self._summarize_config_diff(
-                                    prev_config, item.get("configuration")
-                                )
+                                config_diff = self._summarize_config_diff(prev_config, item.get("configuration"))
 
                             history = IAMUserChangeHistory(
                                 capture_time=item.get("configurationItemCaptureTime"),
@@ -1180,12 +1120,8 @@ class IAMCollector:
                     changes.append("MFA 변경")
 
             # Policy 변경
-            old_policies = set(
-                p.get("policyName", "") for p in old.get("attachedManagedPolicies", [])
-            )
-            new_policies = set(
-                p.get("policyName", "") for p in new.get("attachedManagedPolicies", [])
-            )
+            old_policies = set(p.get("policyName", "") for p in old.get("attachedManagedPolicies", []))
+            new_policies = set(p.get("policyName", "") for p in new.get("attachedManagedPolicies", []))
             if old_policies != new_policies:
                 added = new_policies - old_policies
                 removed = old_policies - new_policies

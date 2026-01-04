@@ -11,7 +11,7 @@ from .analyzer import NATAnalysisResult, NATAnalyzer
 from .collector import NATAuditData, NATCollector, NATGateway
 from .reporter import NATExcelReporter
 
-__all__ = [
+__all__: list[str] = [
     "NATCollector",
     "NATGateway",
     "NATAuditData",
