@@ -58,7 +58,8 @@ class RegionStep:
         else:
             modes = [
                 f"현재 리전 ({self.default_region})",
-                "여러 리전 선택",
+                "다른 리전 1개 선택",
+                "여러 리전 선택 (2개 이상)",
                 f"모든 리전 ({len(ALL_REGIONS)}개)",
             ]
 
@@ -98,11 +99,13 @@ class RegionStep:
                 ctx.regions = [self._select_single_region()]
         else:
             # 다중 리전 지원하는 경우
-            if mode == 1:  # 단일 리전
+            if mode == 1:  # 현재 리전
                 ctx.regions = [self.default_region]
-            elif mode == 3:  # 모든 리전
+            elif mode == 2:  # 다른 리전 1개
+                ctx.regions = [self._select_single_region()]
+            elif mode == 4:  # 모든 리전
                 ctx.regions = ALL_REGIONS.copy()
-            else:  # 다중 리전
+            else:  # 여러 리전 (2개 이상)
                 ctx.regions = self._select_multiple_regions()
 
         # 결과 출력
@@ -158,7 +161,7 @@ class RegionStep:
                 console.print("[dim]숫자 입력[/dim]")
 
     def _select_multiple_regions(self) -> List[str]:
-        """복수 리전 선택 UI"""
+        """복수 리전 선택 UI (2개 이상)"""
         console.print()
 
         # 자주 사용하는 리전 우선 표시
@@ -166,12 +169,8 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions = common_region_codes + other_regions
 
-        # 기본 선택 (서울)
-        selected_indices = {0} if all_regions[0] == self.default_region else set()
-        for i, r in enumerate(all_regions):
-            if r == self.default_region:
-                selected_indices.add(i)
-                break
+        # 빈 상태에서 시작 (사용자가 직접 선택)
+        selected_indices = set()
 
         def display():
             print_box_start(f"리전 선택 ({len(all_regions)}개)")
@@ -198,8 +197,9 @@ class RegionStep:
                     print_box_line(f" {left_str}")
 
             print_box_line()
+            count_display = f"{len(selected_indices)}개" if len(selected_indices) >= 2 else f"{len(selected_indices)}개 [yellow](2개 이상 필요)[/yellow]"
             print_box_line(
-                f"[dim]번호: 토글 | a: 전체 | d: 완료 ({len(selected_indices)}개)[/dim]"
+                f"[dim]번호: 토글 | a: 전체 | d: 완료 ({count_display})[/dim]"
             )
             print_box_end()
 
@@ -212,8 +212,9 @@ class RegionStep:
                 continue
 
             if choice == "d":
-                if not selected_indices:
-                    return [self.default_region]
+                if len(selected_indices) < 2:
+                    console.print("[yellow]2개 이상 선택해주세요[/yellow]")
+                    continue
                 return [all_regions[i] for i in sorted(selected_indices)]
 
             if choice == "a":
