@@ -151,9 +151,9 @@ def filter_accounts_by_pattern(
     result = []
     for account in accounts:
         # 이름으로 매칭
-        if match_any_pattern(
-            account.name, patterns, case_sensitive
-        ) or match_any_pattern(account.id, patterns, case_sensitive):
+        if match_any_pattern(account.name, patterns, case_sensitive) or match_any_pattern(
+            account.id, patterns, case_sensitive
+        ):
             result.append(account)
 
     return result

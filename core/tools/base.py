@@ -104,9 +104,7 @@ class BaseToolRunner(ABC):
         tools = self.get_tools()
 
         if tool_name not in tools:
-            _get_console().print(
-                f"[yellow]⚠️ '{tool_name}' 기능은 아직 구현되지 않았습니다.[/yellow]"
-            )
+            _get_console().print(f"[yellow]⚠️ '{tool_name}' 기능은 아직 구현되지 않았습니다.[/yellow]")
             return None
 
         return tools[tool_name]()

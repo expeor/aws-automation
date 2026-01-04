@@ -77,10 +77,7 @@ def get_detailed_resource_info(session, eni: dict[str, Any]) -> str | None:
                 return result
 
         # OpenSearch / Elasticsearch
-        if (
-            "opensearch" in description.lower()
-            or "elasticsearch" in description.lower()
-        ):
+        if "opensearch" in description.lower() or "elasticsearch" in description.lower():
             result = _get_opensearch_info(session, eni, region)
             if result:
                 return result
@@ -229,9 +226,7 @@ def _get_ecs_info(session, eni_id: str, region: str) -> str | None:
             return "ECS Task"
 
         attachment_id = (
-            description.split("attachment/")[-1]
-            if "attachment/" in description
-            else description.split("/")[-1]
+            description.split("attachment/")[-1] if "attachment/" in description else description.split("/")[-1]
         )
         if not attachment_id:
             return "ECS Task"
@@ -249,11 +244,7 @@ def _get_ecs_info(session, eni_id: str, region: str) -> str | None:
                     for att in task.get("attachments", []):
                         if att.get("id") == attachment_id:
                             group = task.get("group", "")
-                            service_name = (
-                                group.split("service:")[1]
-                                if group.startswith("service:")
-                                else "Unknown"
-                            )
+                            service_name = group.split("service:")[1] if group.startswith("service:") else "Unknown"
                             cluster_name = cluster.split("/")[-1]
                             return f"ECS: {service_name} (Cluster: {cluster_name})"
             except Exception:
@@ -273,19 +264,14 @@ def _get_eks_fargate_info(session, eni: dict[str, Any], region: str) -> str | No
 
         for cluster_name in clusters[:3]:
             try:
-                profiles = eks.list_fargate_profiles(clusterName=cluster_name).get(
-                    "fargateProfileNames", []
-                )
+                profiles = eks.list_fargate_profiles(clusterName=cluster_name).get("fargateProfileNames", [])
                 for profile in profiles:
                     profile_details = eks.describe_fargate_profile(
                         clusterName=cluster_name, fargateProfileName=profile
                     ).get("fargateProfile", {})
 
                     if eni.get("SubnetId") in profile_details.get("subnets", []):
-                        namespaces = [
-                            s.get("namespace")
-                            for s in profile_details.get("selectors", [])
-                        ]
+                        namespaces = [s.get("namespace") for s in profile_details.get("selectors", [])]
                         return f"EKS Fargate: {cluster_name}/{profile} (NS: {', '.join(namespaces)})"
             except Exception:
                 continue
@@ -296,9 +282,7 @@ def _get_eks_fargate_info(session, eni: dict[str, Any], region: str) -> str | No
         return "EKS Fargate Pod"
 
 
-def _get_lambda_info(
-    session, eni: dict[str, Any], region: str, eni_id: str
-) -> str | None:
+def _get_lambda_info(session, eni: dict[str, Any], region: str, eni_id: str) -> str | None:
     """Lambda 함수 정보"""
     try:
         lambda_client = session.client("lambda", region_name=region, config=_API_CONFIG)
@@ -346,11 +330,7 @@ def _get_vpc_endpoint_info(session, eni_id: str, region: str) -> str | None:
                 service_name = endpoint.get("ServiceName", "").split(".")[-1]
 
                 name = next(
-                    (
-                        tag["Value"]
-                        for tag in endpoint.get("Tags", [])
-                        if tag["Key"] == "Name"
-                    ),
+                    (tag["Value"] for tag in endpoint.get("Tags", []) if tag["Key"] == "Name"),
                     None,
                 )
                 display = name or endpoint_id
@@ -365,9 +345,7 @@ def _get_vpc_endpoint_info(session, eni_id: str, region: str) -> str | None:
 def _get_opensearch_info(session, eni: dict[str, Any], region: str) -> str | None:
     """OpenSearch 도메인 정보"""
     try:
-        opensearch = session.client(
-            "opensearch", region_name=region, config=_API_CONFIG
-        )
+        opensearch = session.client("opensearch", region_name=region, config=_API_CONFIG)
         domains = opensearch.list_domain_names().get("DomainNames", [])
 
         eni_vpc_id = eni.get("VpcId")
@@ -377,9 +355,7 @@ def _get_opensearch_info(session, eni: dict[str, Any], region: str) -> str | Non
         for domain_info in domains[:5]:
             domain_name = domain_info.get("DomainName")
             try:
-                detail = opensearch.describe_domain(DomainName=domain_name).get(
-                    "DomainStatus", {}
-                )
+                detail = opensearch.describe_domain(DomainName=domain_name).get("DomainStatus", {})
                 vpc_options = detail.get("VPCOptions", {})
 
                 if vpc_options.get("VPCId") != eni_vpc_id:
@@ -391,9 +367,7 @@ def _get_opensearch_info(session, eni: dict[str, Any], region: str) -> str | Non
                 if not (eni_security_groups & domain_sgs):
                     continue
 
-                engine_version = detail.get("EngineVersion", "").replace(
-                    "OpenSearch_", ""
-                )
+                engine_version = detail.get("EngineVersion", "").replace("OpenSearch_", "")
                 return f"OpenSearch: {domain_name} (v{engine_version})"
             except Exception:
                 continue
@@ -407,16 +381,12 @@ def _get_opensearch_info(session, eni: dict[str, Any], region: str) -> str | Non
 def _get_elasticache_info(session, eni: dict[str, Any], region: str) -> str | None:
     """ElastiCache 클러스터 정보"""
     try:
-        elasticache = session.client(
-            "elasticache", region_name=region, config=_API_CONFIG
-        )
+        elasticache = session.client("elasticache", region_name=region, config=_API_CONFIG)
 
         eni_vpc_id = eni.get("VpcId")
         eni_subnet_id = eni.get("SubnetId")
 
-        clusters = elasticache.describe_cache_clusters(ShowCacheNodeInfo=True).get(
-            "CacheClusters", []
-        )
+        clusters = elasticache.describe_cache_clusters(ShowCacheNodeInfo=True).get("CacheClusters", [])
 
         for cluster in clusters[:10]:
             cluster_id = cluster.get("CacheClusterId")
@@ -427,16 +397,14 @@ def _get_elasticache_info(session, eni: dict[str, Any], region: str) -> str | No
                 continue
 
             try:
-                subnet_group = elasticache.describe_cache_subnet_groups(
-                    CacheSubnetGroupName=cache_subnet_group
-                ).get("CacheSubnetGroups", [{}])[0]
+                subnet_group = elasticache.describe_cache_subnet_groups(CacheSubnetGroupName=cache_subnet_group).get(
+                    "CacheSubnetGroups", [{}]
+                )[0]
 
                 if subnet_group.get("VpcId") != eni_vpc_id:
                     continue
 
-                subnet_ids = set(
-                    s["SubnetIdentifier"] for s in subnet_group.get("Subnets", [])
-                )
+                subnet_ids = set(s["SubnetIdentifier"] for s in subnet_group.get("Subnets", []))
                 if eni_subnet_id not in subnet_ids:
                     continue
 
@@ -486,9 +454,7 @@ def _get_transit_gateway_info(session, description: str, region: str) -> str | N
 
         attachment_id = tgw_match.group(0)
         ec2 = session.client("ec2", region_name=region, config=_API_CONFIG)
-        response = ec2.describe_transit_gateway_attachments(
-            TransitGatewayAttachmentIds=[attachment_id]
-        )
+        response = ec2.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[attachment_id])
 
         if response.get("TransitGatewayAttachments"):
             att = response["TransitGatewayAttachments"][0]
@@ -505,9 +471,7 @@ def _get_transit_gateway_info(session, description: str, region: str) -> str | N
         return "Transit Gateway"
 
 
-def _get_api_gateway_info(
-    session, eni_id: str, description: str, region: str
-) -> str | None:
+def _get_api_gateway_info(session, eni_id: str, description: str, region: str) -> str | None:
     """API Gateway 정보"""
     try:
         if "VPC Link" in description:
@@ -528,9 +492,7 @@ def _get_api_gateway_info(
 def _get_route53_resolver_info(session, eni: dict[str, Any], region: str) -> str | None:
     """Route 53 Resolver 정보"""
     try:
-        resolver = session.client(
-            "route53resolver", region_name=region, config=_API_CONFIG
-        )
+        resolver = session.client("route53resolver", region_name=region, config=_API_CONFIG)
         endpoints = resolver.list_resolver_endpoints().get("ResolverEndpoints", [])
 
         eni_subnet_id = eni.get("SubnetId")
@@ -546,9 +508,7 @@ def _get_route53_resolver_info(session, eni: dict[str, Any], region: str) -> str
 
                 for ip_addr in ip_addresses:
                     if ip_addr.get("SubnetId") == eni_subnet_id:
-                        return (
-                            f"Route53 Resolver: {endpoint_name} ({direction.lower()})"
-                        )
+                        return f"Route53 Resolver: {endpoint_name} ({direction.lower()})"
             except Exception:
                 continue
 
@@ -567,15 +527,9 @@ def _get_efs_info(session, eni_id: str, description: str, region: str) -> str | 
             efs = session.client("efs", region_name=region, config=_API_CONFIG)
 
             try:
-                fs_info = efs.describe_file_systems(FileSystemId=fs_id).get(
-                    "FileSystems", [{}]
-                )[0]
+                fs_info = efs.describe_file_systems(FileSystemId=fs_id).get("FileSystems", [{}])[0]
                 name = next(
-                    (
-                        tag["Value"]
-                        for tag in fs_info.get("Tags", [])
-                        if tag["Key"] == "Name"
-                    ),
+                    (tag["Value"] for tag in fs_info.get("Tags", []) if tag["Key"] == "Name"),
                     None,
                 )
                 size = fs_info.get("SizeInBytes", {}).get("Value", 0) / (1024**3)
@@ -599,9 +553,7 @@ def _get_fsx_info(session, eni_id: str, description: str, region: str) -> str | 
             fsx = session.client("fsx", region_name=region, config=_API_CONFIG)
 
             try:
-                fs_info = fsx.describe_file_systems(FileSystemIds=[fs_id]).get(
-                    "FileSystems", [{}]
-                )[0]
+                fs_info = fsx.describe_file_systems(FileSystemIds=[fs_id]).get("FileSystems", [{}])[0]
                 fs_type = fs_info.get("FileSystemType", "Unknown")
                 storage = fs_info.get("StorageCapacity", 0)
                 return f"FSx ({fs_type}): {fs_id} ({storage} GB)"

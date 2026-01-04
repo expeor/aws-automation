@@ -85,9 +85,7 @@ class SQSAnalysisResult:
     findings: list[QueueFinding] = field(default_factory=list)
 
 
-def collect_sqs_queues(
-    session, account_id: str, account_name: str, region: str
-) -> list[SQSQueueInfo]:
+def collect_sqs_queues(session, account_id: str, account_name: str, region: str) -> list[SQSQueueInfo]:
     """SQS 큐 수집"""
     from botocore.exceptions import ClientError
 
@@ -118,9 +116,7 @@ def collect_sqs_queues(
                     created_ts = attrs.get("CreatedTimestamp")
                     created_at = None
                     if created_ts:
-                        created_at = datetime.fromtimestamp(
-                            int(created_ts), tz=timezone.utc
-                        )
+                        created_at = datetime.fromtimestamp(int(created_ts), tz=timezone.utc)
 
                     info = SQSQueueInfo(
                         account_id=account_id,
@@ -131,15 +127,9 @@ def collect_sqs_queues(
                         queue_arn=queue_arn,
                         is_fifo=queue_name.endswith(".fifo"),
                         is_dlq=is_dlq,
-                        approximate_messages=int(
-                            attrs.get("ApproximateNumberOfMessages", 0)
-                        ),
-                        approximate_messages_delayed=int(
-                            attrs.get("ApproximateNumberOfMessagesDelayed", 0)
-                        ),
-                        approximate_messages_not_visible=int(
-                            attrs.get("ApproximateNumberOfMessagesNotVisible", 0)
-                        ),
+                        approximate_messages=int(attrs.get("ApproximateNumberOfMessages", 0)),
+                        approximate_messages_delayed=int(attrs.get("ApproximateNumberOfMessagesDelayed", 0)),
+                        approximate_messages_not_visible=int(attrs.get("ApproximateNumberOfMessagesNotVisible", 0)),
                         created_timestamp=created_at,
                     )
 
@@ -156,9 +146,7 @@ def collect_sqs_queues(
                             Statistics=["Sum"],
                         )
                         if sent_resp.get("Datapoints"):
-                            info.messages_sent = sum(
-                                d["Sum"] for d in sent_resp["Datapoints"]
-                            )
+                            info.messages_sent = sum(d["Sum"] for d in sent_resp["Datapoints"])
 
                         # NumberOfMessagesReceived
                         recv_resp = cloudwatch.get_metric_statistics(
@@ -171,9 +159,7 @@ def collect_sqs_queues(
                             Statistics=["Sum"],
                         )
                         if recv_resp.get("Datapoints"):
-                            info.messages_received = sum(
-                                d["Sum"] for d in recv_resp["Datapoints"]
-                            )
+                            info.messages_received = sum(d["Sum"] for d in recv_resp["Datapoints"])
 
                         # NumberOfMessagesDeleted
                         del_resp = cloudwatch.get_metric_statistics(
@@ -186,9 +172,7 @@ def collect_sqs_queues(
                             Statistics=["Sum"],
                         )
                         if del_resp.get("Datapoints"):
-                            info.messages_deleted = sum(
-                                d["Sum"] for d in del_resp["Datapoints"]
-                            )
+                            info.messages_deleted = sum(d["Sum"] for d in del_resp["Datapoints"])
 
                     except ClientError:
                         pass
@@ -204,9 +188,7 @@ def collect_sqs_queues(
     return queues
 
 
-def analyze_queues(
-    queues: list[SQSQueueInfo], account_id: str, account_name: str, region: str
-) -> SQSAnalysisResult:
+def analyze_queues(queues: list[SQSQueueInfo], account_id: str, account_name: str, region: str) -> SQSAnalysisResult:
     """SQS 큐 분석"""
     result = SQSAnalysisResult(
         account_id=account_id,
@@ -216,9 +198,7 @@ def analyze_queues(
     )
 
     for queue in queues:
-        total_activity = (
-            queue.messages_sent + queue.messages_received + queue.messages_deleted
-        )
+        total_activity = queue.messages_sent + queue.messages_received + queue.messages_deleted
 
         # 빈 DLQ
         if queue.is_dlq and queue.approximate_messages == 0 and total_activity == 0:
@@ -266,14 +246,10 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -342,9 +318,7 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -354,9 +328,7 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> SQSAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SQSAnalysisResult | None:
     """단일 계정/리전의 SQS 큐 수집 및 분석 (병렬 실행용)"""
     queues = collect_sqs_queues(session, account_id, account_name, region)
     if not queues:
@@ -382,9 +354,7 @@ def run(ctx) -> None:
     total_empty_dlq = sum(r.empty_dlqs for r in results)
 
     console.print("\n[bold]종합 결과[/bold]")
-    console.print(
-        f"미사용 큐: [red]{total_unused}개[/red] / 빈 DLQ: [yellow]{total_empty_dlq}개[/yellow]"
-    )
+    console.print(f"미사용 큐: [red]{total_unused}개[/red] / 빈 DLQ: [yellow]{total_empty_dlq}개[/yellow]")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

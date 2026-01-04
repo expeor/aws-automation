@@ -166,9 +166,7 @@ class IPDenyProvider:
                         logger.warning(f"Unsafe tar member 감지: {member.name}")
                         continue
                     if member.isfile() and member.name.endswith(".zone"):
-                        country_code = (
-                            os.path.basename(member.name).replace(".zone", "").upper()
-                        )
+                        country_code = os.path.basename(member.name).replace(".zone", "").upper()
                         content = tar.extractfile(member)
                         if content:
                             blocks = []
@@ -356,15 +354,12 @@ class IPIntelligence:
 
             self._initialized = True
 
-            total_countries = len(
-                set(self._ipv4_networks.keys()) | set(self._ipv6_networks.keys())
-            )
+            total_countries = len(set(self._ipv4_networks.keys()) | set(self._ipv6_networks.keys()))
             total_ipv4 = sum(len(n) for n in self._ipv4_networks.values())
             total_ipv6 = sum(len(n) for n in self._ipv6_networks.values())
 
             logger.debug(
-                f"✅ IP 인텔리전스 초기화 완료: {total_countries}개 국가, "
-                f"IPv4 {total_ipv4:,}개, IPv6 {total_ipv6:,}개"
+                f"✅ IP 인텔리전스 초기화 완료: {total_countries}개 국가, IPv4 {total_ipv4:,}개, IPv6 {total_ipv6:,}개"
             )
             return True
 
@@ -396,10 +391,7 @@ class IPIntelligence:
         for bucket_v6 in self._ipv6_index.values():
             bucket_v6.sort(key=lambda x: x[0].prefixlen, reverse=True)
 
-        logger.debug(
-            f"인덱스 구축 완료: IPv4 {len(self._ipv4_index):,}개, "
-            f"IPv6 {len(self._ipv6_index):,}개 버킷"
-        )
+        logger.debug(f"인덱스 구축 완료: IPv4 {len(self._ipv4_index):,}개, IPv6 {len(self._ipv6_index):,}개 버킷")
 
     # -------------------------------------------------------------------------
     # 국가 매핑 API
@@ -438,11 +430,7 @@ class IPIntelligence:
             return special_result
 
         # 국가 매칭
-        result = (
-            self._match_ipv4(ip)
-            if isinstance(ip, ipaddress.IPv4Address)
-            else self._match_ipv6(ip)
-        )
+        result = self._match_ipv4(ip) if isinstance(ip, ipaddress.IPv4Address) else self._match_ipv6(ip)
 
         self._ip_cache[ip_str] = result
         return result

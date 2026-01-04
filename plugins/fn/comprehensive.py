@@ -490,24 +490,14 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     severity_fills = {
-        Severity.CRITICAL: PatternFill(
-            start_color="FF0000", end_color="FF0000", fill_type="solid"
-        ),
-        Severity.HIGH: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        Severity.MEDIUM: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        Severity.LOW: PatternFill(
-            start_color="90EE90", end_color="90EE90", fill_type="solid"
-        ),
+        Severity.CRITICAL: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
+        Severity.HIGH: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        Severity.MEDIUM: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        Severity.LOW: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
     }
 
     # Summary
@@ -555,9 +545,7 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
     ws.cell(row=row, column=3, value=total_functions).font = Font(bold=True)
     ws.cell(row=row, column=4, value=total_issues).font = Font(bold=True)
     ws.cell(row=row, column=8, value=f"${total_cost:,.2f}").font = Font(bold=True)
-    ws.cell(row=row, column=9, value=f"${total_savings:,.2f}").font = Font(
-        bold=True, color="FF0000"
-    )
+    ws.cell(row=row, column=9, value=f"${total_savings:,.2f}").font = Font(bold=True, color="FF0000")
 
     # Issues
     ws_issues = wb.create_sheet("Issues")
@@ -595,9 +583,7 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
                 ws_issues.cell(
                     row=issue_row,
                     column=10,
-                    value=f"${issue.potential_savings:,.2f}"
-                    if issue.potential_savings > 0
-                    else "-",
+                    value=f"${issue.potential_savings:,.2f}" if issue.potential_savings > 0 else "-",
                 )
 
                 fill = severity_fills.get(issue.severity)
@@ -637,22 +623,16 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
             ws_all.cell(row=all_row, column=4, value=fn.runtime)
             ws_all.cell(row=all_row, column=5, value=fn.memory_mb)
             ws_all.cell(row=all_row, column=6, value=fn.timeout_seconds)
-            ws_all.cell(
-                row=all_row, column=7, value=metrics.invocations if metrics else 0
-            )
+            ws_all.cell(row=all_row, column=7, value=metrics.invocations if metrics else 0)
             ws_all.cell(
                 row=all_row,
                 column=8,
                 value=f"{metrics.duration_avg_ms:.1f}ms" if metrics else "-",
             )
             ws_all.cell(row=all_row, column=9, value=metrics.errors if metrics else 0)
-            ws_all.cell(
-                row=all_row, column=10, value=metrics.throttles if metrics else 0
-            )
+            ws_all.cell(row=all_row, column=10, value=metrics.throttles if metrics else 0)
             ws_all.cell(row=all_row, column=11, value=comp.issue_count)
-            ws_all.cell(
-                row=all_row, column=12, value=f"${comp.estimated_monthly_cost:,.4f}"
-            )
+            ws_all.cell(row=all_row, column=12, value=f"${comp.estimated_monthly_cost:,.4f}")
 
     # 열 너비
     for sheet in wb.worksheets:
@@ -660,9 +640,7 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -679,13 +657,9 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> ComprehensiveAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ComprehensiveAnalysisResult:
     """단일 계정/리전의 Lambda 종합 분석 (병렬 실행용)"""
-    functions = collect_functions_with_metrics(
-        session, account_id, account_name, region
-    )
+    functions = collect_functions_with_metrics(session, account_id, account_name, region)
     return analyze_comprehensive(functions, account_id, account_name, region)
 
 
@@ -694,9 +668,7 @@ def run(ctx) -> None:
     console.print("[bold]Lambda 종합 분석 시작...[/bold]\n")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="lambda"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="lambda")
 
     results: list[ComprehensiveAnalysisResult] = result.get_data()
 

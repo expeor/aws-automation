@@ -77,9 +77,7 @@ class RuleAnalysisResult:
     is_cross_account: bool = False  # Cross-account SG 참조
     cross_account_id: str = ""  # 참조된 계정 ID
     has_no_description: bool = False  # Description 없음
-    hidden_risky_ports: list[CriticalPort] = field(
-        default_factory=list
-    )  # 넓은 범위에 숨은 위험 포트
+    hidden_risky_ports: list[CriticalPort] = field(default_factory=list)  # 넓은 범위에 숨은 위험 포트
     # 추가 경고 메시지
     warnings: list[str] = field(default_factory=list)
 
@@ -138,11 +136,7 @@ class SGAnalyzer:
         if sg.eni_count == 0 and not sg.referenced_by_sgs:
             status = SGStatus.UNUSED
 
-            action = (
-                "미사용 - Default VPC 삭제 검토 (SG도 같이 정리됨)"
-                if sg.is_default_vpc
-                else "미사용 - 삭제 검토"
-            )
+            action = "미사용 - Default VPC 삭제 검토 (SG도 같이 정리됨)" if sg.is_default_vpc else "미사용 - 삭제 검토"
         else:
             if sg.eni_count > 0:
                 action = f"사용 중 (ENI {sg.eni_count}개 연결)"
@@ -193,25 +187,17 @@ class SGAnalyzer:
 
         # 인바운드 + (0.0.0.0/0 또는 넓은 CIDR)인 경우 위험도 평가
         if rule.direction == "inbound" and (is_open_to_world or is_wide_cidr):
-            risk_level, exposed_critical_ports = self._evaluate_risk_level(
-                rule, is_open_to_world, is_wide_cidr
-            )
+            risk_level, exposed_critical_ports = self._evaluate_risk_level(rule, is_open_to_world, is_wide_cidr)
 
         # === 추가 위험 요소 분석 ===
 
         # 1. Egress ALL + 0.0.0.0/0 → 데이터 유출 위험
-        is_egress_all_open = (
-            rule.direction == "outbound"
-            and is_open_to_world
-            and (is_all_ports or is_all_protocols)
-        )
+        is_egress_all_open = rule.direction == "outbound" and is_open_to_world and (is_all_ports or is_all_protocols)
         if is_egress_all_open:
             warnings.append("Egress ALL 허용 - 데이터 유출 통제 불가")
 
         # 2. Self 참조 + ALL 포트 → 횡이동 위험
-        is_self_all_ports = rule.is_self_reference and (
-            is_all_ports or is_all_protocols
-        )
+        is_self_all_ports = rule.is_self_reference and (is_all_ports or is_all_protocols)
         if is_self_all_ports:
             warnings.append("Self 참조 ALL 포트 - 같은 SG 내 횡이동 가능")
 
@@ -416,9 +402,7 @@ class SGAnalyzer:
         except (ValueError, IndexError):
             return -1
 
-    def get_summary(
-        self, sg_results: list[SGAnalysisResult]
-    ) -> dict[str, dict[str, Any]]:
+    def get_summary(self, sg_results: list[SGAnalysisResult]) -> dict[str, dict[str, Any]]:
         """계정/리전별 요약 통계"""
         summary: dict[str, dict[str, Any]] = {}
 

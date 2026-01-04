@@ -113,9 +113,7 @@ class ALBLogDownloader:
         # datetime 객체 또는 문자열을 datetime 객체로 변환
         if isinstance(start_datetime, str):
             try:
-                self.start_datetime = datetime.strptime(
-                    start_datetime, "%Y-%m-%d %H:%M"
-                )
+                self.start_datetime = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M")
             except ValueError as e:
                 raise ValueError(f"잘못된 시작 시간 형식: {start_datetime}") from e
         else:
@@ -167,9 +165,7 @@ class ALBLogDownloader:
         self.output_dir = _create_report_directory("alb_log", self.session_name)
         self.report_filename = self._generate_report_filename()
 
-        self.console.print(
-            f"⏰ 분석 기간: {self.start_datetime} ~ {self.end_datetime} ({timezone})"
-        )
+        self.console.print(f"⏰ 분석 기간: {self.start_datetime} ~ {self.end_datetime} ({timezone})")
 
     def _generate_report_filename(self) -> str:
         """보고서 파일 이름을 생성합니다."""
@@ -193,9 +189,7 @@ class ALBLogDownloader:
             # Load Balancer ID 추출
             s3_parts = self.s3_uri.replace("s3://", "").split("/")
             bucket_name = s3_parts[0] if len(s3_parts) > 0 else ""
-            prefix_parts = (
-                s3_parts[1:-2] if len(s3_parts) > 2 else []
-            )  # AWSLogs 전까지의 prefix
+            prefix_parts = s3_parts[1:-2] if len(s3_parts) > 2 else []  # AWSLogs 전까지의 prefix
 
             load_balancer_id = ""
             if prefix_parts:
@@ -297,27 +291,21 @@ class ALBLogDownloader:
                     try:
                         # 1. YYYYMMDDTHHMMSSZ 형식 (Z 포함)
                         if "T" in timestamp_str and timestamp_str.endswith("Z"):
-                            return datetime.strptime(
-                                timestamp_str, "%Y%m%dT%H%M%SZ"
-                            ).replace(tzinfo=pytz.UTC)
+                            return datetime.strptime(timestamp_str, "%Y%m%dT%H%M%SZ").replace(tzinfo=pytz.UTC)
                     except ValueError:
                         pass
 
                     try:
                         # 2. YYYYMMDDTHHMMSS 형식 (Z 없음)
                         if "T" in timestamp_str and len(timestamp_str) >= 15:
-                            return datetime.strptime(
-                                timestamp_str, "%Y%m%dT%H%M%S"
-                            ).replace(tzinfo=pytz.UTC)
+                            return datetime.strptime(timestamp_str, "%Y%m%dT%H%M%S").replace(tzinfo=pytz.UTC)
                     except ValueError:
                         pass
 
                     try:
                         # 3. 숫자만으로 구성된 형식 (YYYYMMDDHHMMS)
                         if timestamp_str.isdigit() and len(timestamp_str) >= 14:
-                            return datetime.strptime(
-                                timestamp_str[:14], "%Y%m%d%H%M%S"
-                            ).replace(tzinfo=pytz.UTC)
+                            return datetime.strptime(timestamp_str[:14], "%Y%m%d%H%M%S").replace(tzinfo=pytz.UTC)
                     except ValueError:
                         pass
 
@@ -344,10 +332,7 @@ class ALBLogDownloader:
         if not self.smart_filtering or not log_files:
             # 스마트 필터링 비활성화시 기존 방식
             return [
-                f
-                for f in log_files
-                if f.timestamp
-                and self.start_datetime_utc <= f.timestamp <= self.end_datetime_utc
+                f for f in log_files if f.timestamp and self.start_datetime_utc <= f.timestamp <= self.end_datetime_utc
             ]
 
         # 타임스탬프가 있는 파일들만 필터링
@@ -390,25 +375,15 @@ class ALBLogDownloader:
         extended_start_datetime_utc = self.start_datetime_utc - timedelta(minutes=10)
         extended_end_datetime_utc = self.end_datetime_utc + timedelta(minutes=10)
 
-        logger.debug(
-            f"요청된 시간 범위: {self.start_datetime_utc} ~ {self.end_datetime_utc} (UTC)"
-        )
-        logger.debug(
-            f"ALB 특성 고려 확장: {extended_start_datetime_utc} ~ {extended_end_datetime_utc} (±10분)"
-        )
+        logger.debug(f"요청된 시간 범위: {self.start_datetime_utc} ~ {self.end_datetime_utc} (UTC)")
+        logger.debug(f"ALB 특성 고려 확장: {extended_start_datetime_utc} ~ {extended_end_datetime_utc} (±10분)")
 
         # 바이너리 서치로 시작/끝 인덱스 찾기 (10분 확장된 범위 사용)
-        start_idx = bisect.bisect_left(
-            files_with_timestamp, extended_start_datetime_utc, key=lambda x: x.timestamp
-        )
+        start_idx = bisect.bisect_left(files_with_timestamp, extended_start_datetime_utc, key=lambda x: x.timestamp)
 
-        end_idx = bisect.bisect_right(
-            files_with_timestamp, extended_end_datetime_utc, key=lambda x: x.timestamp
-        )
+        end_idx = bisect.bisect_right(files_with_timestamp, extended_end_datetime_utc, key=lambda x: x.timestamp)
 
-        logger.debug(
-            f"바이너리 서치 결과: {start_idx} ~ {end_idx} (선택: {end_idx - start_idx}개)"
-        )
+        logger.debug(f"바이너리 서치 결과: {start_idx} ~ {end_idx} (선택: {end_idx - start_idx}개)")
 
         filtered_files = files_with_timestamp[start_idx:end_idx]
 
@@ -420,25 +395,17 @@ class ALBLogDownloader:
         # 최종 필터링 결과가 비어있는 경우 명확한 메시지 제공
         if not filtered_files:
             logger.error("❌ 요청 범위에 해당하는 ALB 로그 파일을 찾지 못했습니다.")
-            logger.error(
-                f"   요청 범위({self.timezone.zone}): {self.start_datetime} ~ {self.end_datetime}"
-            )
+            logger.error(f"   요청 범위({self.timezone.zone}): {self.start_datetime} ~ {self.end_datetime}")
             if files_with_timestamp:
-                earliest_local = files_with_timestamp[0].timestamp.astimezone(
-                    self.timezone
-                )
-                latest_local = files_with_timestamp[-1].timestamp.astimezone(
-                    self.timezone
-                )
+                earliest_local = files_with_timestamp[0].timestamp.astimezone(self.timezone)
+                latest_local = files_with_timestamp[-1].timestamp.astimezone(self.timezone)
                 self.available_range_local = (earliest_local, latest_local)
                 # 가장 최근 파일 시각 기준 권장 구간 제안 (최근 10분)
                 try:
                     suggest_start = latest_local - timedelta(minutes=10)
                     suggest_end = latest_local
                     logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")
-                    logger.error(
-                        f"   권장: 최근 유효 시각 근처로 재시도 (예: {suggest_start} ~ {suggest_end})"
-                    )
+                    logger.error(f"   권장: 최근 유효 시각 근처로 재시도 (예: {suggest_start} ~ {suggest_end})")
                 except Exception:
                     logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")
             logger.error(
@@ -465,9 +432,7 @@ class ALBLogDownloader:
 
         return base_batch_size
 
-    def _list_objects_for_prefix(
-        self, prefix: str, progress: Progress, task_id: Any
-    ) -> list[S3LogFile]:
+    def _list_objects_for_prefix(self, prefix: str, progress: Progress, task_id: Any) -> list[S3LogFile]:
         """특정 접두사에 대한 S3 객체 목록을 최적화하여 반환합니다."""
         result = []
         paginator = self.s3_client.get_paginator("list_objects_v2")
@@ -560,18 +525,14 @@ class ALBLogDownloader:
                 ) from e
             elif error_code == "404":
                 raise LogDownloadError(
-                    f"❌ S3 버킷 '{self.bucket_name}'을(를) 찾을 수 없습니다.\n"
-                    f"   버킷 이름을 확인해주세요."
+                    f"❌ S3 버킷 '{self.bucket_name}'을(를) 찾을 수 없습니다.\n   버킷 이름을 확인해주세요."
                 ) from e
             else:
                 raise LogDownloadError(
-                    f"❌ S3 버킷 '{self.bucket_name}' 접근 오류: {error_code}\n"
-                    f"   상세: {str(e)}"
+                    f"❌ S3 버킷 '{self.bucket_name}' 접근 오류: {error_code}\n   상세: {str(e)}"
                 ) from e
         except Exception as e:
-            raise LogDownloadError(
-                f"❌ S3 버킷 '{self.bucket_name}' 접근 확인 실패: {str(e)}"
-            ) from e
+            raise LogDownloadError(f"❌ S3 버킷 '{self.bucket_name}' 접근 확인 실패: {str(e)}") from e
 
     def download_logs(self) -> list[str]:
         """최적화된 방식으로 S3에서 로그 파일을 다운로드합니다."""
@@ -660,9 +621,7 @@ class ALBLogDownloader:
                     batch = filtered_files[i : i + adaptive_batch_size]
                     batch_size_mb = sum(f.size for f in batch) / 1024 / 1024
 
-                    logger.debug(
-                        f"배치 {i // adaptive_batch_size + 1}: {len(batch)}개 파일, {batch_size_mb:.1f}MB"
-                    )
+                    logger.debug(f"배치 {i // adaptive_batch_size + 1}: {len(batch)}개 파일, {batch_size_mb:.1f}MB")
 
                     with concurrent.futures.ThreadPoolExecutor(
                         max_workers=min(self.max_workers, len(batch))
@@ -701,9 +660,7 @@ class ALBLogDownloader:
             logger.error(f"❌ 로그 다운로드 중 오류 발생: {str(e)}")
             raise LogDownloadError(f"로그 다운로드 중 오류 발생: {str(e)}") from e
 
-    def _download_single_file(
-        self, key: str, progress: Progress, task_id: Any
-    ) -> str | None:
+    def _download_single_file(self, key: str, progress: Progress, task_id: Any) -> str | None:
         """단일 파일을 다운로드합니다."""
         try:
             # 🔧 수정: 모든 파일을 한 폴더에 저장 (날짜별 디렉토리 분리 제거)
@@ -823,9 +780,7 @@ class ALBLogDownloader:
                     decompressed_files.append(log_file_path)
 
                 except Exception as e:
-                    logger.error(
-                        f"❌ 압축 해제 실패 {os.path.basename(gz_file_path)}: {str(e)}"
-                    )
+                    logger.error(f"❌ 압축 해제 실패 {os.path.basename(gz_file_path)}: {str(e)}")
                     continue
 
             # 해제된 로그 파일 검증
@@ -898,12 +853,9 @@ class ALBLogDownloader:
         all_log_files = []
 
         # 날짜별 접두사 병렬 처리 (Progress bar 제거)
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(self.max_workers, len(date_prefixes))
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(self.max_workers, len(date_prefixes))) as executor:
             future_to_prefix = {
-                executor.submit(self._list_objects_for_prefix_simple, prefix): prefix
-                for prefix in date_prefixes
+                executor.submit(self._list_objects_for_prefix_simple, prefix): prefix for prefix in date_prefixes
             }
 
             for future in concurrent.futures.as_completed(future_to_prefix):

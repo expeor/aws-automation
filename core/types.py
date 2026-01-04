@@ -236,8 +236,7 @@ class OptionsCollector(Protocol):
 class AWSClient(Protocol):
     """boto3 클라이언트 프로토콜"""
 
-    def __getattr__(self, name: str) -> Callable[..., dict[str, Any]]:
-        ...
+    def __getattr__(self, name: str) -> Callable[..., dict[str, Any]]: ...
 
 
 @runtime_checkable

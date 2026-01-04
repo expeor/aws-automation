@@ -86,9 +86,7 @@ class AlarmAnalysisResult:
     findings: list[AlarmFinding] = field(default_factory=list)
 
 
-def check_metric_has_data(
-    cloudwatch, namespace: str, metric_name: str, dimensions: list[dict]
-) -> bool:
+def check_metric_has_data(cloudwatch, namespace: str, metric_name: str, dimensions: list[dict]) -> bool:
     """지표에 데이터가 있는지 확인 (모든 namespace 지원)"""
     from botocore.exceptions import ClientError
 
@@ -112,9 +110,7 @@ def check_metric_has_data(
         return False
 
 
-def collect_alarms(
-    session, account_id: str, account_name: str, region: str
-) -> list[AlarmInfo]:
+def collect_alarms(session, account_id: str, account_name: str, region: str) -> list[AlarmInfo]:
     """CloudWatch 알람 수집 및 지표 데이터 확인"""
     from botocore.exceptions import ClientError
 
@@ -156,9 +152,7 @@ def collect_alarms(
                     info.has_metric_data = False
                 elif namespace and metric_name:
                     # 모든 namespace에 대해 지표 데이터 확인
-                    info.has_metric_data = check_metric_has_data(
-                        cloudwatch, namespace, metric_name, dimensions_list
-                    )
+                    info.has_metric_data = check_metric_has_data(cloudwatch, namespace, metric_name, dimensions_list)
 
                 alarms.append(info)
 
@@ -168,9 +162,7 @@ def collect_alarms(
     return alarms
 
 
-def analyze_alarms(
-    alarms: list[AlarmInfo], account_id: str, account_name: str, region: str
-) -> AlarmAnalysisResult:
+def analyze_alarms(alarms: list[AlarmInfo], account_id: str, account_name: str, region: str) -> AlarmAnalysisResult:
     """CloudWatch 알람 분석"""
     result = AlarmAnalysisResult(
         account_id=account_id,
@@ -183,11 +175,7 @@ def analyze_alarms(
         # 고아 알람: 지표 데이터 없음 (INSUFFICIENT_DATA 포함)
         if not alarm.has_metric_data:
             result.orphan_alarms += 1
-            reason = (
-                "INSUFFICIENT_DATA"
-                if alarm.state == "INSUFFICIENT_DATA"
-                else "지표 데이터 없음"
-            )
+            reason = "INSUFFICIENT_DATA" if alarm.state == "INSUFFICIENT_DATA" else "지표 데이터 없음"
             result.findings.append(
                 AlarmFinding(
                     alarm=alarm,
@@ -199,9 +187,7 @@ def analyze_alarms(
 
         # 액션 없는 알람
         if not alarm.actions_enabled or (
-            not alarm.alarm_actions
-            and not alarm.ok_actions
-            and not alarm.insufficient_data_actions
+            not alarm.alarm_actions and not alarm.ok_actions and not alarm.insufficient_data_actions
         ):
             result.no_actions += 1
             result.findings.append(
@@ -235,14 +221,10 @@ def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -307,9 +289,7 @@ def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -319,9 +299,7 @@ def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> AlarmAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> AlarmAnalysisResult | None:
     """단일 계정/리전의 알람 수집 및 분석 (병렬 실행용)"""
     alarms = collect_alarms(session, account_id, account_name, region)
     if not alarms:
@@ -334,9 +312,7 @@ def run(ctx) -> None:
     console.print("[bold]CloudWatch 알람 분석 시작...[/bold]\n")
     console.print(f"[dim]* 고아 알람 기준: {METRIC_CHECK_DAYS}일간 지표 데이터 없음[/dim]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="cloudwatch"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="cloudwatch")
     results: list[AlarmAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
@@ -350,10 +326,7 @@ def run(ctx) -> None:
     total_no_action = sum(r.no_actions for r in results)
 
     console.print("\n[bold]종합 결과[/bold]")
-    console.print(
-        f"고아 알람: [red]{total_orphan}개[/red] / "
-        f"액션없음: [yellow]{total_no_action}개[/yellow]"
-    )
+    console.print(f"고아 알람: [red]{total_orphan}개[/red] / 액션없음: [yellow]{total_no_action}개[/yellow]")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id
@@ -362,9 +335,7 @@ def run(ctx) -> None:
     else:
         identifier = "default"
 
-    output_path = (
-        OutputPath(identifier).sub("cloudwatch-alarm-orphan").with_date().build()
-    )
+    output_path = OutputPath(identifier).sub("cloudwatch-alarm-orphan").with_date().build()
     filepath = generate_report(results, output_path)
 
     console.print(f"\n[bold green]완료![/bold green] {filepath}")

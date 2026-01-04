@@ -73,9 +73,7 @@ class SGCollector:
         self.vpc_default_map: dict[str, bool] = {}  # vpc_id -> is_default
         self.errors: list[str] = []
 
-    def collect(
-        self, session, account_id: str, account_name: str, region: str
-    ) -> list[SecurityGroup]:
+    def collect(self, session, account_id: str, account_name: str, region: str) -> list[SecurityGroup]:
         """단일 계정/리전에서 SG 데이터 수집"""
         # 이전 수집 데이터 초기화 (중복 방지)
         self.security_groups.clear()
@@ -122,9 +120,7 @@ class SGCollector:
         except ClientError as e:
             logger.warning(f"VPC 수집 실패: {e}")
 
-    def _collect_security_groups(
-        self, ec2, account_id: str, account_name: str, region: str
-    ) -> None:
+    def _collect_security_groups(self, ec2, account_id: str, account_name: str, region: str) -> None:
         """Security Groups 수집"""
         paginator = ec2.get_paginator("describe_security_groups")
 
@@ -147,21 +143,15 @@ class SGCollector:
 
                 # 인바운드 규칙 파싱
                 for rule in sg.get("IpPermissions", []):
-                    security_group.inbound_rules.extend(
-                        self._parse_rules(rule, "inbound", sg_id, account_id)
-                    )
+                    security_group.inbound_rules.extend(self._parse_rules(rule, "inbound", sg_id, account_id))
 
                 # 아웃바운드 규칙 파싱
                 for rule in sg.get("IpPermissionsEgress", []):
-                    security_group.outbound_rules.extend(
-                        self._parse_rules(rule, "outbound", sg_id, account_id)
-                    )
+                    security_group.outbound_rules.extend(self._parse_rules(rule, "outbound", sg_id, account_id))
 
                 self.security_groups[sg_id] = security_group
 
-    def _parse_rules(
-        self, rule: dict[str, Any], direction: str, sg_id: str, account_id: str
-    ) -> list[SGRule]:
+    def _parse_rules(self, rule: dict[str, Any], direction: str, sg_id: str, account_id: str) -> list[SGRule]:
         """규칙 파싱"""
         rules = []
 
@@ -271,9 +261,7 @@ class SGCollector:
                         if sg_id in self.security_groups:
                             self.security_groups[sg_id].eni_count += 1
                             if eni_desc:
-                                self.security_groups[sg_id].eni_descriptions.append(
-                                    eni_desc
-                                )
+                                self.security_groups[sg_id].eni_descriptions.append(eni_desc)
 
         except ClientError as e:
             logger.warning(f"ENI 수집 실패: {e}")

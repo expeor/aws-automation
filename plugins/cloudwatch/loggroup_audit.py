@@ -108,9 +108,7 @@ class LogGroupAnalysisResult:
 # =============================================================================
 
 
-def collect_log_groups(
-    session, account_id: str, account_name: str, region: str
-) -> list[LogGroupInfo]:
+def collect_log_groups(session, account_id: str, account_name: str, region: str) -> list[LogGroupInfo]:
     """CloudWatch Log Groups 수집"""
     from botocore.exceptions import ClientError
 
@@ -130,9 +128,7 @@ def collect_log_groups(
             # 마지막 ingestion 시간 (lastIngestionTime이 없으면 스트림 확인)
             last_ingestion = None
             if "lastIngestionTime" in lg:
-                last_ingestion = datetime.fromtimestamp(
-                    lg["lastIngestionTime"] / 1000, tz=timezone.utc
-                )
+                last_ingestion = datetime.fromtimestamp(lg["lastIngestionTime"] / 1000, tz=timezone.utc)
 
             # 로그 스트림 개수 (메트릭 데이터에서 확인 불가시 0)
             stream_count = lg.get("metricFilterCount", 0)  # 대략적 추정
@@ -150,9 +146,7 @@ def collect_log_groups(
 
                 # 마지막 ingestion 시간 업데이트
                 if streams and not last_ingestion and "lastIngestionTime" in streams[0]:
-                    last_ingestion = datetime.fromtimestamp(
-                        streams[0]["lastIngestionTime"] / 1000, tz=timezone.utc
-                    )
+                    last_ingestion = datetime.fromtimestamp(streams[0]["lastIngestionTime"] / 1000, tz=timezone.utc)
             except ClientError:
                 pass
 
@@ -258,14 +252,10 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -347,13 +337,9 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
                 ws_detail.cell(
                     row=detail_row,
                     column=7,
-                    value=lg.last_ingestion_time.strftime("%Y-%m-%d")
-                    if lg.last_ingestion_time
-                    else "-",
+                    value=lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-",
                 )
-                ws_detail.cell(
-                    row=detail_row, column=8, value=round(lg.monthly_cost, 4)
-                )
+                ws_detail.cell(row=detail_row, column=8, value=round(lg.monthly_cost, 4))
                 ws_detail.cell(row=detail_row, column=9, value=f.recommendation)
 
     # 열 너비 조정
@@ -362,9 +348,7 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -381,9 +365,7 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> LogGroupAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LogGroupAnalysisResult | None:
     """단일 계정/리전의 Log Group 수집 및 분석 (병렬 실행용)"""
     log_groups = collect_log_groups(session, account_id, account_name, region)
     if not log_groups:
@@ -396,9 +378,7 @@ def run(ctx) -> None:
     console.print("[bold]CloudWatch Log Group 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="logs")
-    results: list[LogGroupAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    results: list[LogGroupAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")

@@ -230,9 +230,7 @@ class PatchReporter:
 
     def _create_urgent_patches_sheet(self, wb: Workbook) -> None:
         """긴급 패치 시트 생성"""
-        urgent_patches = [
-            p for p in self.result.patches if p.urgency in ["critical", "high"]
-        ]
+        urgent_patches = [p for p in self.result.patches if p.urgency in ["critical", "high"]]
 
         if not urgent_patches:
             return
@@ -288,9 +286,7 @@ class PatchReporter:
     def _create_affected_resources_sheet(self, wb: Workbook) -> None:
         """영향받는 리소스 시트"""
         # 영향받는 리소스가 있는 패치만
-        patches_with_resources = [
-            p for p in self.result.patches if p.affected_resources
-        ]
+        patches_with_resources = [p for p in self.result.patches if p.affected_resources]
 
         if not patches_with_resources:
             return
@@ -480,14 +476,9 @@ class PatchReporter:
             console.print()
             console.print("[bold red]긴급 조치 필요 항목:[/bold red]")
             for p in urgent[:5]:
-                d_day = (
-                    f"D-{p.event.days_until_start}" if p.event.days_until_start else ""
-                )
+                d_day = f"D-{p.event.days_until_start}" if p.event.days_until_start else ""
                 style = "red" if p.urgency == "critical" else "yellow"
-                console.print(
-                    f"  [{style}]{p.service}[/{style}] - {p.event_type} "
-                    f"({p.action_required}) [{d_day}]"
-                )
+                console.print(f"  [{style}]{p.service}[/{style}] - {p.event_type} ({p.action_required}) [{d_day}]")
 
             if len(urgent) > 5:
                 console.print(f"  ... 외 {len(urgent) - 5}건")

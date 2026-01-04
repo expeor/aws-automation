@@ -178,9 +178,7 @@ class SSOCollector:
 
             # 2. Permission Sets 수집
             console.print("  [dim]Permission Sets 수집 중...[/dim]")
-            sso_data.permission_sets = self._collect_permission_sets(
-                sso_admin, instance_arn
-            )
+            sso_data.permission_sets = self._collect_permission_sets(sso_admin, instance_arn)
 
             # 3. Users 수집
             console.print("  [dim]Users 수집 중...[/dim]")
@@ -221,9 +219,7 @@ class SSOCollector:
             # Organizations 접근 권한이 없을 수 있음
             pass
 
-    def _collect_permission_sets(
-        self, sso_admin, instance_arn: str
-    ) -> list[SSOPermissionSet]:
+    def _collect_permission_sets(self, sso_admin, instance_arn: str) -> list[SSOPermissionSet]:
         """Permission Sets 수집"""
         permission_sets = []
 
@@ -243,15 +239,13 @@ class SSOCollector:
 
         return permission_sets
 
-    def _get_permission_set_detail(
-        self, sso_admin, instance_arn: str, ps_arn: str
-    ) -> SSOPermissionSet | None:
+    def _get_permission_set_detail(self, sso_admin, instance_arn: str, ps_arn: str) -> SSOPermissionSet | None:
         """Permission Set 상세 정보 조회"""
         try:
             # 기본 정보
-            detail = sso_admin.describe_permission_set(
-                InstanceArn=instance_arn, PermissionSetArn=ps_arn
-            ).get("PermissionSet", {})
+            detail = sso_admin.describe_permission_set(InstanceArn=instance_arn, PermissionSetArn=ps_arn).get(
+                "PermissionSet", {}
+            )
 
             ps = SSOPermissionSet(
                 permission_set_arn=ps_arn,
@@ -266,19 +260,14 @@ class SSOCollector:
                 managed_resp = sso_admin.list_managed_policies_in_permission_set(
                     InstanceArn=instance_arn, PermissionSetArn=ps_arn
                 )
-                ps.managed_policies = [
-                    p.get("Arn", "")
-                    for p in managed_resp.get("AttachedManagedPolicies", [])
-                ]
+                ps.managed_policies = [p.get("Arn", "") for p in managed_resp.get("AttachedManagedPolicies", [])]
             except ClientError:
                 pass
 
             # Customer Managed Policies
             try:
-                customer_resp = (
-                    sso_admin.list_customer_managed_policy_references_in_permission_set(
-                        InstanceArn=instance_arn, PermissionSetArn=ps_arn
-                    )
+                customer_resp = sso_admin.list_customer_managed_policy_references_in_permission_set(
+                    InstanceArn=instance_arn, PermissionSetArn=ps_arn
                 )
                 ps.customer_managed_policies = [
                     {"Name": p.get("Name", ""), "Path": p.get("Path", "/")}
@@ -305,9 +294,7 @@ class SSOCollector:
                 if boundary:
                     ps.permissions_boundary = {
                         "ManagedPolicyArn": boundary.get("ManagedPolicyArn", ""),
-                        "CustomerManagedPolicyReference": boundary.get(
-                            "CustomerManagedPolicyReference", {}
-                        ),
+                        "CustomerManagedPolicyReference": boundary.get("CustomerManagedPolicyReference", {}),
                     }
             except ClientError:
                 pass
@@ -317,17 +304,11 @@ class SSOCollector:
 
             # Assigned Accounts
             try:
-                paginator = sso_admin.get_paginator(
-                    "list_accounts_for_provisioned_permission_set"
-                )
-                for page in paginator.paginate(
-                    InstanceArn=instance_arn, PermissionSetArn=ps_arn
-                ):
+                paginator = sso_admin.get_paginator("list_accounts_for_provisioned_permission_set")
+                for page in paginator.paginate(InstanceArn=instance_arn, PermissionSetArn=ps_arn):
                     for account_id in page.get("AccountIds", []):
                         ps.assigned_accounts.append(account_id)
-                        ps.assigned_account_names.append(
-                            self._account_name_cache.get(account_id, account_id)
-                        )
+                        ps.assigned_account_names.append(self._account_name_cache.get(account_id, account_id))
             except ClientError:
                 pass
 
@@ -401,8 +382,7 @@ class SSOCollector:
 
                     for dangerous in dangerous_actions:
                         if dangerous.lower() == action_lower or (
-                            "*" in dangerous
-                            and action_lower.startswith(dangerous.split("*")[0])
+                            "*" in dangerous and action_lower.startswith(dangerous.split("*")[0])
                         ):
                             ps.dangerous_permissions.append(action)
                             break
@@ -458,9 +438,7 @@ class SSOCollector:
                     )
 
                     # Group Members 수집
-                    group.members = self._get_group_members(
-                        identity_store, identity_store_id, group.group_id
-                    )
+                    group.members = self._get_group_members(identity_store, identity_store_id, group.group_id)
                     group.member_count = len(group.members)
 
                     # 캐시에 저장
@@ -472,16 +450,12 @@ class SSOCollector:
 
         return groups
 
-    def _get_group_members(
-        self, identity_store, identity_store_id: str, group_id: str
-    ) -> list[str]:
+    def _get_group_members(self, identity_store, identity_store_id: str, group_id: str) -> list[str]:
         """그룹 멤버 목록 조회"""
         members = []
         try:
             paginator = identity_store.get_paginator("list_group_memberships")
-            for page in paginator.paginate(
-                IdentityStoreId=identity_store_id, GroupId=group_id
-            ):
+            for page in paginator.paginate(IdentityStoreId=identity_store_id, GroupId=group_id):
                 for membership in page.get("GroupMemberships", []):
                     member_id = membership.get("MemberId", {}).get("UserId", "")
                     if member_id:
@@ -519,18 +493,10 @@ class SSOCollector:
                             principal_name = ""
                             if principal_type == "USER":
                                 cached_user = self._user_cache.get(principal_id)
-                                principal_name = (
-                                    cached_user.display_name
-                                    if cached_user
-                                    else principal_id
-                                )
+                                principal_name = cached_user.display_name if cached_user else principal_id
                             elif principal_type == "GROUP":
                                 cached_group = self._group_cache.get(principal_id)
-                                principal_name = (
-                                    cached_group.group_name
-                                    if cached_group
-                                    else principal_id
-                                )
+                                principal_name = cached_group.group_name if cached_group else principal_id
 
                             assignment = SSOAccountAssignment(
                                 account_id=account_id,
@@ -544,9 +510,7 @@ class SSOCollector:
                             assignments.append(assignment)
 
                 except ClientError as e:
-                    self.errors.append(
-                        f"Account {account_id} / PS {ps.name} 할당 조회 오류: {e}"
-                    )
+                    self.errors.append(f"Account {account_id} / PS {ps.name} 할당 조회 오류: {e}")
 
         return assignments
 
@@ -588,6 +552,4 @@ class SSOCollector:
                             if member:
                                 member.has_admin_access = True
                                 if assignment.account_name not in member.admin_accounts:
-                                    member.admin_accounts.append(
-                                        assignment.account_name
-                                    )
+                                    member.admin_accounts.append(assignment.account_name)

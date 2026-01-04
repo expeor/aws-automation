@@ -196,11 +196,7 @@ class ALBExcelReporter:
         """Save workbook."""
         if report_name:
             if os.path.isabs(report_name) or "/" in report_name or "\\" in report_name:
-                path = (
-                    report_name
-                    if report_name.endswith(".xlsx")
-                    else f"{report_name}.xlsx"
-                )
+                path = report_name if report_name.endswith(".xlsx") else f"{report_name}.xlsx"
             else:
                 path = os.path.join(self.output_dir, f"{report_name}.xlsx")
         else:
@@ -223,12 +219,7 @@ class ALBExcelReporter:
             except Exception:
                 pass
 
-        alb_name = (
-            str(data.get("alb_name") or "alb")
-            .strip()
-            .replace("/", "-")
-            .replace("\\", "-")
-        )
+        alb_name = str(data.get("alb_name") or "alb").strip().replace("/", "-").replace("\\", "-")
         return os.path.join(
             self.output_dir,
             f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx",
@@ -240,9 +231,7 @@ class ALBExcelReporter:
         abuse_list, _ = self._get_normalized_abuse_ips(data)
         return client_ips.intersection(abuse_list)
 
-    def _get_normalized_abuse_ips(
-        self, data: dict[str, Any]
-    ) -> tuple[list[str], dict[str, Any]]:
+    def _get_normalized_abuse_ips(self, data: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
         """Normalize abuse IP data."""
         excluded = {"abuse_ips", "abuse_ip_details", "timestamp"}
 

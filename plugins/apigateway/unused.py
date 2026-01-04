@@ -84,9 +84,7 @@ class APIGatewayAnalysisResult:
     findings: list[APIFinding] = field(default_factory=list)
 
 
-def collect_rest_apis(
-    session, account_id: str, account_name: str, region: str, cloudwatch
-) -> list[APIInfo]:
+def collect_rest_apis(session, account_id: str, account_name: str, region: str, cloudwatch) -> list[APIInfo]:
     """REST API 수집"""
     from botocore.exceptions import ClientError
 
@@ -142,9 +140,7 @@ def collect_rest_apis(
                             Statistics=["Sum"],
                         )
                         if count_resp.get("Datapoints"):
-                            info.total_requests = sum(
-                                d["Sum"] for d in count_resp["Datapoints"]
-                            )
+                            info.total_requests = sum(d["Sum"] for d in count_resp["Datapoints"])
 
                         err4_resp = cloudwatch.get_metric_statistics(
                             Namespace="AWS/ApiGateway",
@@ -156,9 +152,7 @@ def collect_rest_apis(
                             Statistics=["Sum"],
                         )
                         if err4_resp.get("Datapoints"):
-                            info.error_4xx = sum(
-                                d["Sum"] for d in err4_resp["Datapoints"]
-                            )
+                            info.error_4xx = sum(d["Sum"] for d in err4_resp["Datapoints"])
 
                         err5_resp = cloudwatch.get_metric_statistics(
                             Namespace="AWS/ApiGateway",
@@ -170,9 +164,7 @@ def collect_rest_apis(
                             Statistics=["Sum"],
                         )
                         if err5_resp.get("Datapoints"):
-                            info.error_5xx = sum(
-                                d["Sum"] for d in err5_resp["Datapoints"]
-                            )
+                            info.error_5xx = sum(d["Sum"] for d in err5_resp["Datapoints"])
 
                     except ClientError:
                         pass
@@ -185,9 +177,7 @@ def collect_rest_apis(
     return apis
 
 
-def collect_http_apis(
-    session, account_id: str, account_name: str, region: str, cloudwatch
-) -> list[APIInfo]:
+def collect_http_apis(session, account_id: str, account_name: str, region: str, cloudwatch) -> list[APIInfo]:
     """HTTP API (API Gateway v2) 수집"""
     from botocore.exceptions import ClientError
 
@@ -239,9 +229,7 @@ def collect_http_apis(
                             Statistics=["Sum"],
                         )
                         if count_resp.get("Datapoints"):
-                            info.total_requests = sum(
-                                d["Sum"] for d in count_resp["Datapoints"]
-                            )
+                            info.total_requests = sum(d["Sum"] for d in count_resp["Datapoints"])
 
                     except ClientError:
                         pass
@@ -254,9 +242,7 @@ def collect_http_apis(
     return apis
 
 
-def collect_apis(
-    session, account_id: str, account_name: str, region: str
-) -> list[APIInfo]:
+def collect_apis(session, account_id: str, account_name: str, region: str) -> list[APIInfo]:
     """모든 API Gateway 수집"""
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
@@ -266,9 +252,7 @@ def collect_apis(
     return rest_apis + http_apis
 
 
-def analyze_apis(
-    apis: list[APIInfo], account_id: str, account_name: str, region: str
-) -> APIGatewayAnalysisResult:
+def analyze_apis(apis: list[APIInfo], account_id: str, account_name: str, region: str) -> APIGatewayAnalysisResult:
     """API Gateway 분석"""
     result = APIGatewayAnalysisResult(
         account_id=account_id,
@@ -337,14 +321,10 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -409,9 +389,7 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -421,9 +399,7 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> APIGatewayAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> APIGatewayAnalysisResult | None:
     """단일 계정/리전의 API Gateway 수집 및 분석 (병렬 실행용)"""
     apis = collect_apis(session, account_id, account_name, region)
     if not apis:
@@ -435,12 +411,8 @@ def run(ctx) -> None:
     """API Gateway 미사용 분석"""
     console.print("[bold]API Gateway 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="apigateway"
-    )
-    results: list[APIGatewayAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="apigateway")
+    results: list[APIGatewayAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")

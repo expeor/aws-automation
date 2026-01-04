@@ -54,9 +54,7 @@ class BaseSheetWriter:
     def create_sheet(self, name: str) -> Worksheet:
         return self.workbook.create_sheet(name)
 
-    def write_header_row(
-        self, ws: Worksheet, headers: list[str] | tuple[str, ...], row: int = 1
-    ) -> None:
+    def write_header_row(self, ws: Worksheet, headers: list[str] | tuple[str, ...], row: int = 1) -> None:
         style = self.styles.get_header_style()
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=row, column=col, value=header)
@@ -65,9 +63,7 @@ class BaseSheetWriter:
             cell.alignment = style["alignment"]
             cell.border = style["border"]
 
-    def write_empty_message(
-        self, ws: Worksheet, message: str, row: int, col_count: int
-    ) -> None:
+    def write_empty_message(self, ws: Worksheet, message: str, row: int, col_count: int) -> None:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
         cell = ws.cell(row=row, column=1, value=message)
         cell.alignment = self.styles.align_center
@@ -87,9 +83,7 @@ class BaseSheetWriter:
         ws.freeze_panes = ws.cell(row=2, column=1)
         ws.sheet_view.zoomScale = self.config.ZOOM_SCALE
 
-    def _apply_column_widths(
-        self, ws: Worksheet, headers: list[str] | tuple[str, ...]
-    ) -> None:
+    def _apply_column_widths(self, ws: Worksheet, headers: list[str] | tuple[str, ...]) -> None:
         for col, header in enumerate(headers, 1):
             ws.column_dimensions[get_column_letter(col)].width = COLUMN_WIDTH_MAP.get(
                 header, self.config.DEFAULT_COLUMN_WIDTH
@@ -160,9 +154,7 @@ class BaseSheetWriter:
 
         return len(data)
 
-    def apply_wrap_text(
-        self, ws: Worksheet, headers: list[str] | tuple[str, ...]
-    ) -> None:
+    def apply_wrap_text(self, ws: Worksheet, headers: list[str] | tuple[str, ...]) -> None:
         from openpyxl.styles import Alignment
 
         for col, header in enumerate(list(headers), 1):
@@ -174,9 +166,7 @@ class BaseSheetWriter:
                 if cell.alignment:
                     cell.alignment = cell.alignment.copy(wrap_text=True)
                 else:
-                    cell.alignment = Alignment(
-                        horizontal=h_align, vertical="center", wrap_text=True
-                    )
+                    cell.alignment = Alignment(horizontal=h_align, vertical="center", wrap_text=True)
 
     def convert_status_code(self, code: Any) -> int | str:
         if code is None or code == "" or code == "-":
@@ -333,18 +323,12 @@ class SummarySheetHelper:
         else:
             for i, (name, count) in enumerate(items[:max_items], 1):
                 display = str(name)[:47] + "..." if len(str(name)) > 50 else str(name)
-                name_cell = self.ws.cell(
-                    row=self.row, column=1, value=f"{i}. {display}"
-                )
+                name_cell = self.ws.cell(row=self.row, column=1, value=f"{i}. {display}")
                 name_cell.font = self.styles.value_font
                 name_cell.alignment = self.styles.align_left
                 name_cell.border = self.styles.thin_border
 
-                val = (
-                    f"{count:,}{suffix}"
-                    if isinstance(count, (int, float))
-                    else str(count)
-                )
+                val = f"{count:,}{suffix}" if isinstance(count, (int, float)) else str(count)
                 count_cell = self.ws.cell(row=self.row, column=2, value=val)
                 count_cell.font = self.styles.value_font
                 count_cell.alignment = self.styles.align_right

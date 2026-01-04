@@ -119,10 +119,7 @@ class HeadlessRunner:
                     if tool_meta.get("module") == self.config.tool_module:
                         return tool_meta
 
-        console.print(
-            f"[red]도구를 찾을 수 없습니다: "
-            f"{self.config.category}/{self.config.tool_module}[/red]"
-        )
+        console.print(f"[red]도구를 찾을 수 없습니다: {self.config.category}/{self.config.tool_module}[/red]")
         return None
 
     def _build_context(self, tool_meta: dict) -> ExecutionContext:
@@ -134,12 +131,8 @@ class HeadlessRunner:
             description=tool_meta.get("description", ""),
             category=self.config.category,
             permission=tool_meta.get("permission", "read"),
-            supports_single_region_only=tool_meta.get(
-                "supports_single_region_only", False
-            ),
-            supports_single_account_only=tool_meta.get(
-                "supports_single_account_only", False
-            ),
+            supports_single_region_only=tool_meta.get("supports_single_region_only", False),
+            supports_single_account_only=tool_meta.get("supports_single_account_only", False),
             is_global=tool_meta.get("is_global", False),
         )
 
@@ -155,9 +148,7 @@ class HeadlessRunner:
 
         # SSO Session은 지원하지 않음
         if profile_name in config.sessions:
-            console.print(
-                f"[red]SSO Session은 headless 모드에서 지원하지 않습니다: {profile_name}[/red]"
-            )
+            console.print(f"[red]SSO Session은 headless 모드에서 지원하지 않습니다: {profile_name}[/red]")
             console.print("[dim]SSO Profile 또는 Access Key 프로파일을 사용하세요.[/dim]")
             return False
 
@@ -248,9 +239,7 @@ class HeadlessRunner:
 
         tool = load_tool(self._ctx.category, self._ctx.tool.name)
         if tool is None:
-            console.print(
-                f"[red]도구 로드 실패: {self._ctx.category}/{self._ctx.tool.name}[/red]"
-            )
+            console.print(f"[red]도구 로드 실패: {self._ctx.category}/{self._ctx.tool.name}[/red]")
             return 1
 
         if not self.config.quiet:
@@ -307,8 +296,7 @@ def run_headless(
     parts = tool_path.split("/")
     if len(parts) != 2:
         console.print(
-            f"[red]잘못된 도구 경로: {tool_path}[/red]\n"
-            f"[dim]형식: category/tool_module (예: ec2/ebs_audit)[/dim]"
+            f"[red]잘못된 도구 경로: {tool_path}[/red]\n[dim]형식: category/tool_module (예: ec2/ebs_audit)[/dim]"
         )
         return 1
 

@@ -87,9 +87,7 @@ class TrailAuditResult:
     multi_region_count: int = 0
 
 
-def collect_trails(
-    session, account_id: str, account_name: str, region: str
-) -> list[TrailInfo]:
+def collect_trails(session, account_id: str, account_name: str, region: str) -> list[TrailInfo]:
     """CloudTrail 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -129,18 +127,14 @@ def collect_trails(
                 if trail_details:
                     detail = trail_details[0]
                     trail_info.is_multi_region = detail.get("IsMultiRegionTrail", False)
-                    trail_info.include_global_events = detail.get(
-                        "IncludeGlobalServiceEvents", False
-                    )
+                    trail_info.include_global_events = detail.get("IncludeGlobalServiceEvents", False)
                     trail_info.s3_bucket = detail.get("S3BucketName", "")
                     trail_info.s3_prefix = detail.get("S3KeyPrefix", "")
                     trail_info.kms_key_id = detail.get("KMSKeyId", "")
 
                 # Event Selector 정보 조회
                 try:
-                    event_selectors_response = cloudtrail.get_event_selectors(
-                        TrailName=trail_arn
-                    )
+                    event_selectors_response = cloudtrail.get_event_selectors(TrailName=trail_arn)
                     event_selectors = event_selectors_response.get("EventSelectors", [])
 
                     for selector in event_selectors:
@@ -177,9 +171,7 @@ def collect_trails(
     return trails
 
 
-def analyze_trails(
-    trails: list[TrailInfo], account_id: str, account_name: str, region: str
-) -> TrailAuditResult:
+def analyze_trails(trails: list[TrailInfo], account_id: str, account_name: str, region: str) -> TrailAuditResult:
     """CloudTrail 분석"""
     result = TrailAuditResult(
         account_id=account_id,
@@ -295,9 +287,7 @@ class TrailAuditReporter:
                     "Yes" if trail.is_multi_region else "No",
                     "Yes" if trail.include_global_events else "No",
                     trail.s3_bucket,
-                    trail.kms_key_id[:20] + "..."
-                    if len(trail.kms_key_id) > 20
-                    else trail.kms_key_id,
+                    trail.kms_key_id[:20] + "..." if len(trail.kms_key_id) > 20 else trail.kms_key_id,
                 ]
                 sheet.add_row(row)
 
@@ -317,9 +307,7 @@ class TrailAuditReporter:
                     print(f"  {r.account_name}: {r.total_count}개 Trail")
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> TrailAuditResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> TrailAuditResult | None:
     """단일 계정/리전의 CloudTrail 수집 및 분석 (병렬 실행용)"""
     trails = collect_trails(session, account_id, account_name, region)
     if not trails:
@@ -337,9 +325,7 @@ def run(ctx) -> dict[str, Any]:
     console.print("[bold]CloudTrail 전체 계정 보고서 생성 시작...[/bold]\n")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="cloudtrail"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="cloudtrail")
     results: list[TrailAuditResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
@@ -361,9 +347,7 @@ def run(ctx) -> dict[str, Any]:
         identifier = "default"
 
     output_dir = OutputPath(identifier).sub("cloudtrail").with_date().build()
-    output_path = reporter.generate_report(
-        output_dir=output_dir, file_prefix="cloudtrail_audit"
-    )
+    output_path = reporter.generate_report(output_dir=output_dir, file_prefix="cloudtrail_audit")
 
     console.print(f"\n[bold green]완료![/bold green] {output_path}")
     open_in_explorer(output_dir)

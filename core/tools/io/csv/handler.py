@@ -76,9 +76,7 @@ def detect_csv_encoding(file_path: str) -> tuple[str | None, str | None]:
                                 )
                                 return detected_encoding, None
                     except Exception as e:
-                        logger.debug(
-                            f"chardet 감지된 인코딩 {detected_encoding} " f"검증 실패: {str(e)}"
-                        )
+                        logger.debug(f"chardet 감지된 인코딩 {detected_encoding} 검증 실패: {str(e)}")
 
         except Exception as e:
             logger.debug(f"chardet 인코딩 감지 실패: {str(e)}")
@@ -134,9 +132,7 @@ def read_csv_robust(
         # 자동 감지 시도
         detected_encoding, error = detect_csv_encoding(file_path)
         # 감지 성공 시 해당 인코딩만 사용, 실패 시 모든 인코딩 시도
-        encodings_to_try = (
-            [detected_encoding] if detected_encoding else ENCODING_PRIORITIES
-        )
+        encodings_to_try = [detected_encoding] if detected_encoding else ENCODING_PRIORITIES
 
     last_error = None
 
@@ -154,18 +150,13 @@ def read_csv_robust(
                 for row_num, row in enumerate(reader, start=1):
                     try:
                         # 빈 문자열을 None으로 변환하고 공백 제거
-                        cleaned_row = {
-                            k: v.strip() if v and v.strip() else None
-                            for k, v in row.items()
-                        }
+                        cleaned_row = {k: v.strip() if v and v.strip() else None for k, v in row.items()}
                         data.append(cleaned_row)
                     except Exception as row_error:
-                        logger.warning(
-                            f"행 {row_num} 처리 중 오류 " f"(인코딩: {enc}): {str(row_error)}"
-                        )
+                        logger.warning(f"행 {row_num} 처리 중 오류 (인코딩: {enc}): {str(row_error)}")
                         continue
 
-                logger.info(f"CSV 파일 읽기 성공: {file_path} " f"(인코딩: {enc}, {len(data)}행)")
+                logger.info(f"CSV 파일 읽기 성공: {file_path} (인코딩: {enc}, {len(data)}행)")
                 return data, enc, None
 
         except (UnicodeDecodeError, UnicodeError) as e:

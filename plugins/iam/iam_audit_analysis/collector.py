@@ -292,9 +292,7 @@ class IAMCollector:
             iam = get_client(session, "iam")
 
             # 1. Account Summary
-            iam_data.account_summary = self._collect_account_summary(
-                iam, account_id, account_name
-            )
+            iam_data.account_summary = self._collect_account_summary(iam, account_id, account_name)
 
             # 2. Password Policy
             iam_data.password_policy = self._collect_password_policy(iam)
@@ -330,9 +328,7 @@ class IAMCollector:
 
         return iam_data
 
-    def _collect_account_summary(
-        self, iam, account_id: str, account_name: str
-    ) -> AccountSummary:
+    def _collect_account_summary(self, iam, account_id: str, account_name: str) -> AccountSummary:
         """Account Summary 수집"""
         summary = AccountSummary(account_id=account_id, account_name=account_name)
 
@@ -345,14 +341,10 @@ class IAMCollector:
             summary.roles = summary_map.get("Roles", 0)
             summary.policies = summary_map.get("Policies", 0)
             summary.mfa_devices = summary_map.get("MFADevices", 0)
-            summary.access_keys_per_user_quota = summary_map.get(
-                "AccessKeysPerUserQuota", 2
-            )
+            summary.access_keys_per_user_quota = summary_map.get("AccessKeysPerUserQuota", 2)
 
             # Root Account 정보
-            summary.root_access_keys_present = (
-                summary_map.get("AccountAccessKeysPresent", 0) > 0
-            )
+            summary.root_access_keys_present = summary_map.get("AccountAccessKeysPresent", 0) > 0
             summary.root_mfa_active = summary_map.get("AccountMFAEnabled", 0) > 0
 
         except ClientError as e:
@@ -372,20 +364,12 @@ class IAMCollector:
             policy.minimum_length = pw_policy.get("MinimumPasswordLength", 0)
             policy.require_symbols = pw_policy.get("RequireSymbols", False)
             policy.require_numbers = pw_policy.get("RequireNumbers", False)
-            policy.require_uppercase = pw_policy.get(
-                "RequireUppercaseCharacters", False
-            )
-            policy.require_lowercase = pw_policy.get(
-                "RequireLowercaseCharacters", False
-            )
-            policy.allow_users_to_change = pw_policy.get(
-                "AllowUsersToChangePassword", True
-            )
+            policy.require_uppercase = pw_policy.get("RequireUppercaseCharacters", False)
+            policy.require_lowercase = pw_policy.get("RequireLowercaseCharacters", False)
+            policy.allow_users_to_change = pw_policy.get("AllowUsersToChangePassword", True)
             policy.expire_passwords = pw_policy.get("ExpirePasswords", False)
             policy.max_password_age = pw_policy.get("MaxPasswordAge", 0)
-            policy.password_reuse_prevention = pw_policy.get(
-                "PasswordReusePrevention", 0
-            )
+            policy.password_reuse_prevention = pw_policy.get("PasswordReusePrevention", 0)
             policy.hard_expiry = pw_policy.get("HardExpiry", False)
 
         except ClientError as e:
@@ -475,9 +459,7 @@ class IAMCollector:
 
                 # Last Used 정보
                 try:
-                    last_used_response = iam.get_access_key_last_used(
-                        AccessKeyId=key.access_key_id
-                    )
+                    last_used_response = iam.get_access_key_last_used(AccessKeyId=key.access_key_id)
                     last_used = last_used_response.get("AccessKeyLastUsed", {})
                     key.last_used_date = last_used.get("LastUsedDate")
                     key.last_used_service = last_used.get("ServiceName", "")
@@ -509,9 +491,7 @@ class IAMCollector:
                 cred = GitCredential(
                     user_name=user.user_name,
                     service_user_name=cred_data.get("ServiceUserName", ""),
-                    service_specific_credential_id=cred_data.get(
-                        "ServiceSpecificCredentialId", ""
-                    ),
+                    service_specific_credential_id=cred_data.get("ServiceSpecificCredentialId", ""),
                     status=cred_data.get("Status", ""),
                     create_date=cred_data.get("CreateDate"),
                 )
@@ -557,9 +537,7 @@ class IAMCollector:
         try:
             # Attached Policies
             response = iam.list_attached_user_policies(UserName=user.user_name)
-            user.attached_policies = [
-                p["PolicyName"] for p in response.get("AttachedPolicies", [])
-            ]
+            user.attached_policies = [p["PolicyName"] for p in response.get("AttachedPolicies", [])]
 
             # Inline Policies
             response = iam.list_user_policies(UserName=user.user_name)
@@ -606,27 +584,17 @@ class IAMCollector:
             # 위험한 권한 검사
             for action in actions:
                 # iam:PassRole with * resource 검사
-                if action in ("iam:PassRole", "iam:*", "*") and (
-                    "*" in resources or any("*" in r for r in resources)
-                ):
+                if action in ("iam:PassRole", "iam:*", "*") and ("*" in resources or any("*" in r for r in resources)):
                     entity.has_passrole_wildcard = True
                     if "iam:PassRole (Resource: *)" not in entity.dangerous_permissions:
-                        entity.dangerous_permissions.append(
-                            "iam:PassRole (Resource: *)"
-                        )
+                        entity.dangerous_permissions.append("iam:PassRole (Resource: *)")
 
                 # 단독 위험 권한 검사
-                if (
-                    action in self.DANGEROUS_PERMISSIONS
-                    and action not in entity.dangerous_permissions
-                ):
+                if action in self.DANGEROUS_PERMISSIONS and action not in entity.dangerous_permissions:
                     entity.dangerous_permissions.append(action)
 
                 # 와일드카드 권한 검사
-                if (
-                    action in ("iam:*", "*")
-                    and "iam:* (Full IAM Access)" not in entity.dangerous_permissions
-                ):
+                if action in ("iam:*", "*") and "iam:* (Full IAM Access)" not in entity.dangerous_permissions:
                     entity.dangerous_permissions.append("iam:* (Full IAM Access)")
 
     def _collect_groups(self, iam) -> list[IAMGroup]:
@@ -712,9 +680,7 @@ class IAMCollector:
         except ClientError:
             pass
 
-    def _analyze_group_policy_document(
-        self, policy_doc: dict[str, Any], group: IAMGroup
-    ) -> None:
+    def _analyze_group_policy_document(self, policy_doc: dict[str, Any], group: IAMGroup) -> None:
         """그룹 정책 문서에서 위험한 권한 분석"""
         statements = policy_doc.get("Statement", [])
         if isinstance(statements, dict):
@@ -730,16 +696,10 @@ class IAMCollector:
 
             # 위험한 권한 검사
             for action in actions:
-                if (
-                    action in self.DANGEROUS_PERMISSIONS
-                    and action not in group.dangerous_permissions
-                ):
+                if action in self.DANGEROUS_PERMISSIONS and action not in group.dangerous_permissions:
                     group.dangerous_permissions.append(action)
 
-                if (
-                    action in ("iam:*", "*")
-                    and "iam:* (Full IAM Access)" not in group.dangerous_permissions
-                ):
+                if action in ("iam:*", "*") and "iam:* (Full IAM Access)" not in group.dangerous_permissions:
                     group.dangerous_permissions.append("iam:* (Full IAM Access)")
 
     def _collect_roles(self, iam) -> list[IAMRole]:
@@ -897,9 +857,7 @@ class IAMCollector:
             # === 1. Principal: * 검사 (가장 위험) ===
             if principal == "*":
                 role.has_public_trust = True
-                role.trust_policy_risks.append(
-                    "CRITICAL: Principal '*' - 누구나 Assume 가능"
-                )
+                role.trust_policy_risks.append("CRITICAL: Principal '*' - 누구나 Assume 가능")
                 continue
 
             if isinstance(principal, dict):
@@ -911,17 +869,12 @@ class IAMCollector:
                     # === 2. AWS: "*" 검사 ===
                     if aws_arn == "*":
                         role.has_public_trust = True
-                        role.trust_policy_risks.append(
-                            "CRITICAL: Principal AWS:'*' - 모든 AWS 계정 허용"
-                        )
+                        role.trust_policy_risks.append("CRITICAL: Principal AWS:'*' - 모든 AWS 계정 허용")
                         continue
 
                     # === 3. 외부 계정 검사 ===
                     external_account_id = self._extract_account_from_arn(aws_arn)
-                    if (
-                        external_account_id
-                        and external_account_id != current_account_id
-                    ):
+                    if external_account_id and external_account_id != current_account_id:
                         role.external_account_ids.append(external_account_id)
 
                         # ExternalId 조건 있는지 확인
@@ -930,8 +883,7 @@ class IAMCollector:
                         if not has_external_id:
                             role.has_external_without_condition = True
                             role.trust_policy_risks.append(
-                                f"HIGH: 외부 계정 {external_account_id} - ExternalId 조건 없음 "
-                                "(Confused Deputy 취약)"
+                                f"HIGH: 외부 계정 {external_account_id} - ExternalId 조건 없음 (Confused Deputy 취약)"
                             )
 
                 # === 4. SAML 페더레이션 무제한 검사 ===
@@ -942,9 +894,7 @@ class IAMCollector:
                 for fed in federated:
                     # SAML 페더레이션에 조건이 없으면 위험
                     if "saml-provider" in fed.lower() and not condition:
-                        role.trust_policy_risks.append(
-                            f"MEDIUM: SAML 페더레이션 조건 없음 - {fed}"
-                        )
+                        role.trust_policy_risks.append(f"MEDIUM: SAML 페더레이션 조건 없음 - {fed}")
 
     def _extract_account_from_arn(self, arn: str) -> str | None:
         """ARN에서 계정 ID 추출
@@ -1041,9 +991,7 @@ class IAMCollector:
                                         RoleResourceRelation(
                                             resource_type=resource_type,
                                             resource_name=resource_name,
-                                            resource_id=relationships.get(
-                                                "resourceId", ""
-                                            ),
+                                            resource_id=relationships.get("resourceId", ""),
                                         )
                                     )
 
@@ -1062,19 +1010,13 @@ class IAMCollector:
                     "NoSuchConfigurationAggregatorException",
                 ):
                     iam_data.config_error = "AWS Config가 활성화되지 않음"
-                    logger.info(
-                        f"AWS Config 비활성화 [{iam_data.account_name}]: {error_msg}"
-                    )
+                    logger.info(f"AWS Config 비활성화 [{iam_data.account_name}]: {error_msg}")
                 elif error_code == "AccessDeniedException":
                     iam_data.config_error = "AWS Config 접근 권한 없음"
-                    logger.info(
-                        f"AWS Config 권한 없음 [{iam_data.account_name}]: {error_msg}"
-                    )
+                    logger.info(f"AWS Config 권한 없음 [{iam_data.account_name}]: {error_msg}")
                 else:
                     iam_data.config_error = f"AWS Config 오류: {error_code}"
-                    logger.warning(
-                        f"AWS Config 오류 [{iam_data.account_name}]: {error_code}"
-                    )
+                    logger.warning(f"AWS Config 오류 [{iam_data.account_name}]: {error_code}")
 
         except Exception as e:
             iam_data.config_error = f"Config 수집 실패: {str(e)}"
@@ -1097,9 +1039,7 @@ class IAMCollector:
             for user_name, user in user_map.items():
                 try:
                     # AWS Config에서 해당 User의 변경 이력 조회
-                    paginator = config_client.get_paginator(
-                        "get_resource_config_history"
-                    )
+                    paginator = config_client.get_paginator("get_resource_config_history")
 
                     prev_config = None
                     for page in paginator.paginate(
@@ -1127,9 +1067,7 @@ class IAMCollector:
                             # 변경 내용 요약 생성
                             config_diff = ""
                             if change_type == "UPDATE" and prev_config:
-                                config_diff = self._summarize_config_diff(
-                                    prev_config, item.get("configuration")
-                                )
+                                config_diff = self._summarize_config_diff(prev_config, item.get("configuration"))
 
                             history = IAMUserChangeHistory(
                                 capture_time=item.get("configurationItemCaptureTime"),
@@ -1182,12 +1120,8 @@ class IAMCollector:
                     changes.append("MFA 변경")
 
             # Policy 변경
-            old_policies = set(
-                p.get("policyName", "") for p in old.get("attachedManagedPolicies", [])
-            )
-            new_policies = set(
-                p.get("policyName", "") for p in new.get("attachedManagedPolicies", [])
-            )
+            old_policies = set(p.get("policyName", "") for p in old.get("attachedManagedPolicies", []))
+            new_policies = set(p.get("policyName", "") for p in new.get("attachedManagedPolicies", []))
             if old_policies != new_policies:
                 added = new_policies - old_policies
                 removed = old_policies - new_policies

@@ -39,9 +39,7 @@ def _adjust_column_widths(wb: Workbook) -> None:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
             col_idx = col[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -104,11 +102,7 @@ def generate_audit_report(
 
     for r in results:
         row += 1
-        rate = (
-            (r.tagged_resources / r.total_resources * 100)
-            if r.total_resources > 0
-            else 0
-        )
+        rate = (r.tagged_resources / r.total_resources * 100) if r.total_resources > 0 else 0
         ws.cell(row=row, column=1, value=r.account_name)
         ws.cell(row=row, column=2, value=r.region)
         ws.cell(row=row, column=3, value=r.total_resources)
@@ -122,9 +116,7 @@ def generate_audit_report(
     ws_type = wb.create_sheet("By Resource Type")
 
     # 타입별 통계 집계
-    type_totals: dict[str, dict[str, int]] = defaultdict(
-        lambda: {"total": 0, "tagged": 0}
-    )
+    type_totals: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
     for r in results:
         for ts in r.type_stats:
             type_totals[ts.resource_type]["total"] += ts.total
@@ -136,9 +128,7 @@ def generate_audit_report(
         ws_type.cell(row=1, column=col).font = HEADER_FONT
 
     row = 1
-    for res_type, counts in sorted(
-        type_totals.items(), key=lambda x: x[1]["total"], reverse=True
-    ):
+    for res_type, counts in sorted(type_totals.items(), key=lambda x: x[1]["total"], reverse=True):
         row += 1
         total = counts["total"]
         tagged = counts["tagged"]
@@ -241,9 +231,7 @@ def generate_audit_report(
             ws_all.cell(row=row, column=4, value=res.resource_id)
             ws_all.cell(row=row, column=5, value=res.name or "-")
 
-            tagged_cell = ws_all.cell(
-                row=row, column=6, value="Yes" if res.has_map_tag else "No"
-            )
+            tagged_cell = ws_all.cell(row=row, column=6, value="Yes" if res.has_map_tag else "No")
             if res.has_map_tag:
                 tagged_cell.fill = GREEN_FILL
             else:

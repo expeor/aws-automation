@@ -27,19 +27,13 @@ class BytesSheetWriter(BaseSheetWriter):
             self.write_header_row(ws, headers)
 
             # Combine and sort URLs by total bytes
-            all_urls = sorted(
-                set(list(received_bytes.keys()) + list(sent_bytes.keys()))
-            )
+            all_urls = sorted(set(list(received_bytes.keys()) + list(sent_bytes.keys())))
 
             total_data: dict[str, int] = {}
             for url in all_urls:
-                total_data[url] = int(received_bytes.get(url, 0)) + int(
-                    sent_bytes.get(url, 0)
-                )
+                total_data[url] = int(received_bytes.get(url, 0)) + int(sent_bytes.get(url, 0))
 
-            sorted_urls = sorted(
-                all_urls, key=lambda url: total_data[url], reverse=True
-            )[: SheetConfig.TOP_BYTES_LIMIT]
+            sorted_urls = sorted(all_urls, key=lambda url: total_data[url], reverse=True)[: SheetConfig.TOP_BYTES_LIMIT]
 
             # Write data rows
             border = self.styles.thin_border

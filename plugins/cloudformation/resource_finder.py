@@ -151,9 +151,7 @@ class ResourceFinder:
             all_resources.extend(resources)
             total_stacks += stack_count
 
-        logger.info(
-            f"검색 완료: {len(all_resources)}개 리소스 발견 " f"({total_stacks}개 Stack 검색)"
-        )
+        logger.info(f"검색 완료: {len(all_resources)}개 리소스 발견 ({total_stacks}개 Stack 검색)")
 
         return SearchResult(
             resources=all_resources,
@@ -187,17 +185,11 @@ class ResourceFinder:
 
                 for res in resources:
                     # Physical ID 필터링
-                    if (
-                        physical_id
-                        and physical_id.lower() not in res.physical_id.lower()
-                    ):
+                    if physical_id and physical_id.lower() not in res.physical_id.lower():
                         continue
 
                     # Resource Type 필터링
-                    if (
-                        resource_type
-                        and resource_type.lower() not in res.resource_type.lower()
-                    ):
+                    if resource_type and resource_type.lower() not in res.resource_type.lower():
                         continue
 
                     matched_resources.append(res)
@@ -224,10 +216,7 @@ class ResourceFinder:
                         continue
 
                     # 이름 필터
-                    if (
-                        name_filter
-                        and name_filter.lower() not in stack["StackName"].lower()
-                    ):
+                    if name_filter and name_filter.lower() not in stack["StackName"].lower():
                         continue
 
                     stacks.append(stack)

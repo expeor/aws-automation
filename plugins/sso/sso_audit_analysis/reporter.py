@@ -13,6 +13,7 @@ Note:
     이 모듈은 Lazy Import 패턴을 사용합니다.
     openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+
 from __future__ import annotations
 
 import os
@@ -45,9 +46,7 @@ class SSOExcelReporter:
 
         from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-        cls._HEADER_FILL = PatternFill(
-            start_color="4472C4", end_color="4472C4", fill_type="solid"
-        )
+        cls._HEADER_FILL = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         cls._HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
         cls._THIN_BORDER = Border(
             left=Side(style="thin"),
@@ -55,28 +54,14 @@ class SSOExcelReporter:
             top=Side(style="thin"),
             bottom=Side(style="thin"),
         )
-        cls._CENTER_ALIGN = Alignment(
-            horizontal="center", vertical="center", wrap_text=True
-        )
-        cls._LEFT_ALIGN = Alignment(
-            horizontal="left", vertical="center", wrap_text=True
-        )
+        cls._CENTER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cls._LEFT_ALIGN = Alignment(horizontal="left", vertical="center", wrap_text=True)
         cls._SEVERITY_FILLS = {
-            Severity.CRITICAL: PatternFill(
-                start_color="FF0000", end_color="FF0000", fill_type="solid"
-            ),
-            Severity.HIGH: PatternFill(
-                start_color="FFA500", end_color="FFA500", fill_type="solid"
-            ),
-            Severity.MEDIUM: PatternFill(
-                start_color="FFFF00", end_color="FFFF00", fill_type="solid"
-            ),
-            Severity.LOW: PatternFill(
-                start_color="90EE90", end_color="90EE90", fill_type="solid"
-            ),
-            Severity.INFO: PatternFill(
-                start_color="87CEEB", end_color="87CEEB", fill_type="solid"
-            ),
+            Severity.CRITICAL: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
+            Severity.HIGH: PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid"),
+            Severity.MEDIUM: PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid"),
+            Severity.LOW: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
+            Severity.INFO: PatternFill(start_color="87CEEB", end_color="87CEEB", fill_type="solid"),
         }
         cls._styles_initialized = True
 
@@ -159,9 +144,7 @@ class SSOExcelReporter:
         from openpyxl.utils import get_column_letter
 
         for column_cells in ws.columns:
-            length = max(
-                len(str(cell.value) if cell.value else "") for cell in column_cells
-            )
+            length = max(len(str(cell.value) if cell.value else "") for cell in column_cells)
             adjusted_width = min(max(length + 2, min_width), max_width)
             column_letter = get_column_letter(column_cells[0].column)
             ws.column_dimensions[column_letter].width = adjusted_width
@@ -182,25 +165,13 @@ class SSOExcelReporter:
         totals = {
             "total_users": sum(s.get("total_users", 0) for s in self.stats_list),
             "total_groups": sum(s.get("total_groups", 0) for s in self.stats_list),
-            "total_permission_sets": sum(
-                s.get("total_permission_sets", 0) for s in self.stats_list
-            ),
-            "users_with_admin": sum(
-                s.get("users_with_admin", 0) for s in self.stats_list
-            ),
-            "users_no_assignment": sum(
-                s.get("users_no_assignment", 0) for s in self.stats_list
-            ),
-            "admin_permission_sets": sum(
-                s.get("admin_permission_sets", 0) for s in self.stats_list
-            ),
-            "high_risk_permission_sets": sum(
-                s.get("high_risk_permission_sets", 0) for s in self.stats_list
-            ),
+            "total_permission_sets": sum(s.get("total_permission_sets", 0) for s in self.stats_list),
+            "users_with_admin": sum(s.get("users_with_admin", 0) for s in self.stats_list),
+            "users_no_assignment": sum(s.get("users_no_assignment", 0) for s in self.stats_list),
+            "admin_permission_sets": sum(s.get("admin_permission_sets", 0) for s in self.stats_list),
+            "high_risk_permission_sets": sum(s.get("high_risk_permission_sets", 0) for s in self.stats_list),
             "empty_groups": sum(s.get("empty_groups", 0) for s in self.stats_list),
-            "critical_issues": sum(
-                s.get("critical_issues", 0) for s in self.stats_list
-            ),
+            "critical_issues": sum(s.get("critical_issues", 0) for s in self.stats_list),
             "high_issues": sum(s.get("high_issues", 0) for s in self.stats_list),
             "medium_issues": sum(s.get("medium_issues", 0) for s in self.stats_list),
             "low_issues": sum(s.get("low_issues", 0) for s in self.stats_list),
@@ -290,12 +261,10 @@ class SSOExcelReporter:
                     ps.name,
                     "Yes" if ps.has_admin_access else "No",
                     len(ps.assigned_accounts),
-                    ", ".join(ps.assigned_account_names[:5])
-                    + ("..." if len(ps.assigned_account_names) > 5 else ""),
+                    ", ".join(ps.assigned_account_names[:5]) + ("..." if len(ps.assigned_account_names) > 5 else ""),
                     ", ".join(p.split("/")[-1] for p in ps.managed_policies),
                     ", ".join(p.split("/")[-1] for p in ps.high_risk_policies),
-                    ", ".join(ps.dangerous_permissions[:5])
-                    + ("..." if len(ps.dangerous_permissions) > 5 else ""),
+                    ", ".join(ps.dangerous_permissions[:5]) + ("..." if len(ps.dangerous_permissions) > 5 else ""),
                     ps_analysis.risk_score,
                     ps.session_duration,
                     ps.description[:100] if ps.description else "",
@@ -343,19 +312,15 @@ class SSOExcelReporter:
                 user = user_analysis.user
 
                 # 할당된 계정 목록
-                assigned_accounts = list(
-                    set(a.get("account_name", "") for a in user.assignments)
-                )
+                assigned_accounts = list(set(a.get("account_name", "") for a in user.assignments))
 
                 row = [
                     user.display_name or user.user_name,
                     user.email,
                     "Yes" if user.has_admin_access else "No",
-                    ", ".join(user.admin_accounts[:3])
-                    + ("..." if len(user.admin_accounts) > 3 else ""),
+                    ", ".join(user.admin_accounts[:3]) + ("..." if len(user.admin_accounts) > 3 else ""),
                     len(user.assignments),
-                    ", ".join(assigned_accounts[:3])
-                    + ("..." if len(assigned_accounts) > 3 else ""),
+                    ", ".join(assigned_accounts[:3]) + ("..." if len(assigned_accounts) > 3 else ""),
                     user_analysis.risk_score,
                     user.user_id,
                 ]
@@ -398,17 +363,14 @@ class SSOExcelReporter:
                 group = group_analysis.group
 
                 # 할당된 계정 목록
-                assigned_accounts = list(
-                    set(a.get("account_name", "") for a in group.assignments)
-                )
+                assigned_accounts = list(set(a.get("account_name", "") for a in group.assignments))
 
                 row = [
                     group.group_name,
                     group.member_count,
                     "Yes" if group.has_admin_access else "No",
                     len(group.assignments),
-                    ", ".join(assigned_accounts[:3])
-                    + ("..." if len(assigned_accounts) > 3 else ""),
+                    ", ".join(assigned_accounts[:3]) + ("..." if len(assigned_accounts) > 3 else ""),
                     group.description[:100] if group.description else "",
                     group.group_id,
                 ]
@@ -486,9 +448,7 @@ class SSOExcelReporter:
         for result in self.results:
             all_issues.extend(result.all_issues)
 
-        sorted_issues = sorted(
-            all_issues, key=lambda x: severity_order.get(x.severity, 5)
-        )
+        sorted_issues = sorted(all_issues, key=lambda x: severity_order.get(x.severity, 5))
 
         for issue in sorted_issues:
             row = [

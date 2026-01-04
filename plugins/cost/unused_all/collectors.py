@@ -133,9 +133,7 @@ from plugins.vpc.nat_audit_analysis import NATAnalyzer, NATCollector
 # =============================================================================
 
 
-def collect_nat(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_nat(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """NAT Gateway 수집 및 분석"""
     try:
         collector = NATCollector()
@@ -157,9 +155,7 @@ def collect_nat(
         return {"error": f"NAT Gateway: {e}"}
 
 
-def collect_eni(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_eni(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """ENI 수집 및 분석"""
     try:
         enis = collect_enis(session, account_id, account_name, region)
@@ -176,9 +172,7 @@ def collect_eni(
         return {"error": f"ENI: {e}"}
 
 
-def collect_ebs_volumes(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_ebs_volumes(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """EBS 수집 및 분석"""
     try:
         volumes = collect_ebs(session, account_id, account_name, region)
@@ -196,9 +190,7 @@ def collect_ebs_volumes(
         return {"error": f"EBS: {e}"}
 
 
-def collect_eip_addresses(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_eip_addresses(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """EIP 수집 및 분석"""
     try:
         eips = collect_eips(session, account_id, account_name, region)
@@ -216,15 +208,11 @@ def collect_eip_addresses(
         return {"error": f"EIP: {e}"}
 
 
-def collect_elb(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_elb(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """ELB 수집 및 분석"""
     try:
         v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
-        classic_lbs = collect_classic_load_balancers(
-            session, account_id, account_name, region
-        )
+        classic_lbs = collect_classic_load_balancers(session, account_id, account_name, region)
         all_lbs = v2_lbs + classic_lbs
         if not all_lbs:
             return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
@@ -240,9 +228,7 @@ def collect_elb(
         return {"error": f"ELB: {e}"}
 
 
-def collect_snapshot(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_snapshot(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """EBS Snapshot 수집 및 분석"""
     try:
         snapshots = collect_snapshots(session, account_id, account_name, region)
@@ -250,9 +236,7 @@ def collect_snapshot(
             return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
 
         ami_mapping = get_ami_snapshot_mapping(session, region)
-        result = analyze_snapshots(
-            snapshots, ami_mapping, account_id, account_name, region
-        )
+        result = analyze_snapshots(snapshots, ami_mapping, account_id, account_name, region)
         return {
             "total": result.total_count,
             "unused": result.orphan_count + result.old_count,
@@ -263,9 +247,7 @@ def collect_snapshot(
         return {"error": f"EBS Snapshot: {e}"}
 
 
-def collect_ami(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_ami(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """AMI 수집 및 분석"""
     try:
         amis = collect_amis(session, account_id, account_name, region)
@@ -284,9 +266,7 @@ def collect_ami(
         return {"error": f"AMI: {e}"}
 
 
-def collect_rds_snapshot(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_rds_snapshot(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """RDS Snapshot 수집 및 분석"""
     try:
         rds_snaps = collect_rds_snapshots(session, account_id, account_name, region)
@@ -304,9 +284,7 @@ def collect_rds_snapshot(
         return {"error": f"RDS Snapshot: {e}"}
 
 
-def collect_loggroup(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_loggroup(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """CloudWatch Log Group 수집 및 분석"""
     try:
         log_groups = collect_log_groups(session, account_id, account_name, region)
@@ -324,9 +302,7 @@ def collect_loggroup(
         return {"error": f"Log Group: {e}"}
 
 
-def collect_target_group(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_target_group(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """Target Group 수집 및 분석"""
     try:
         tgs = collect_target_groups(session, account_id, account_name, region)
@@ -343,9 +319,7 @@ def collect_target_group(
         return {"error": f"Target Group: {e}"}
 
 
-def collect_endpoint(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_endpoint(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """VPC Endpoint 수집 및 분석"""
     try:
         endpoints = collect_endpoints(session, account_id, account_name, region)
@@ -363,9 +337,7 @@ def collect_endpoint(
         return {"error": f"VPC Endpoint: {e}"}
 
 
-def collect_secret(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_secret(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """Secrets Manager 수집 및 분석"""
     try:
         secrets = collect_secrets(session, account_id, account_name, region)
@@ -383,9 +355,7 @@ def collect_secret(
         return {"error": f"Secrets Manager: {e}"}
 
 
-def collect_kms(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_kms(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """KMS 수집 및 분석"""
     try:
         kms_keys = collect_kms_keys(session, account_id, account_name, region)
@@ -403,9 +373,7 @@ def collect_kms(
         return {"error": f"KMS: {e}"}
 
 
-def collect_ecr(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_ecr(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """ECR 수집 및 분석"""
     try:
         repos = collect_ecr_repos(session, account_id, account_name, region)
@@ -423,14 +391,10 @@ def collect_ecr(
         return {"error": f"ECR: {e}"}
 
 
-def collect_lambda(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_lambda(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """Lambda 수집 및 분석"""
     try:
-        functions = collect_functions_with_metrics(
-            session, account_id, account_name, region
-        )
+        functions = collect_functions_with_metrics(session, account_id, account_name, region)
         if not functions:
             return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
 
@@ -445,20 +409,14 @@ def collect_lambda(
         return {"error": f"Lambda: {e}"}
 
 
-def collect_elasticache(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_elasticache(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """ElastiCache 수집 및 분석"""
     try:
-        clusters = collect_elasticache_clusters(
-            session, account_id, account_name, region
-        )
+        clusters = collect_elasticache_clusters(session, account_id, account_name, region)
         if not clusters:
             return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
 
-        result = analyze_elasticache_clusters(
-            clusters, account_id, account_name, region
-        )
+        result = analyze_elasticache_clusters(clusters, account_id, account_name, region)
         return {
             "total": result.total_clusters,
             "unused": result.unused_clusters + result.low_usage_clusters,
@@ -469,9 +427,7 @@ def collect_elasticache(
         return {"error": f"ElastiCache: {e}"}
 
 
-def collect_rds_instance(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_rds_instance(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """RDS Instance 수집 및 분석"""
     try:
         instances = collect_rds_instances(session, account_id, account_name, region)
@@ -481,9 +437,7 @@ def collect_rds_instance(
         result = analyze_rds_instances(instances, account_id, account_name, region)
         return {
             "total": result.total_instances,
-            "unused": result.unused_instances
-            + result.low_usage_instances
-            + result.stopped_instances,
+            "unused": result.unused_instances + result.low_usage_instances + result.stopped_instances,
             "waste": result.unused_monthly_cost + result.low_usage_monthly_cost,
             "result": result,
         }
@@ -491,9 +445,7 @@ def collect_rds_instance(
         return {"error": f"RDS Instance: {e}"}
 
 
-def collect_efs(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_efs(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """EFS 수집 및 분석"""
     try:
         filesystems = collect_efs_filesystems(session, account_id, account_name, region)
@@ -511,9 +463,7 @@ def collect_efs(
         return {"error": f"EFS: {e}"}
 
 
-def collect_sqs(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_sqs(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """SQS 수집 및 분석"""
     try:
         queues = collect_sqs_queues(session, account_id, account_name, region)
@@ -530,9 +480,7 @@ def collect_sqs(
         return {"error": f"SQS: {e}"}
 
 
-def collect_sns(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_sns(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """SNS 수집 및 분석"""
     try:
         topics = collect_sns_topics(session, account_id, account_name, region)
@@ -549,9 +497,7 @@ def collect_sns(
         return {"error": f"SNS: {e}"}
 
 
-def collect_acm(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_acm(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """ACM 수집 및 분석"""
     try:
         certs = collect_acm_certificates(session, account_id, account_name, region)
@@ -568,9 +514,7 @@ def collect_acm(
         return {"error": f"ACM: {e}"}
 
 
-def collect_apigateway(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_apigateway(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """API Gateway 수집 및 분석"""
     try:
         apis = collect_apigateway_apis(session, account_id, account_name, region)
@@ -587,9 +531,7 @@ def collect_apigateway(
         return {"error": f"API Gateway: {e}"}
 
 
-def collect_eventbridge(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_eventbridge(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """EventBridge 수집 및 분석"""
     try:
         rules = collect_eventbridge_rules(session, account_id, account_name, region)
@@ -606,9 +548,7 @@ def collect_eventbridge(
         return {"error": f"EventBridge: {e}"}
 
 
-def collect_cw_alarm(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_cw_alarm(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """CloudWatch Alarm 수집 및 분석"""
     try:
         alarms = collect_cw_alarms(session, account_id, account_name, region)
@@ -625,9 +565,7 @@ def collect_cw_alarm(
         return {"error": f"CloudWatch Alarm: {e}"}
 
 
-def collect_dynamodb(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_dynamodb(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """DynamoDB 수집 및 분석"""
     try:
         tables = collect_dynamodb_tables(session, account_id, account_name, region)
@@ -645,9 +583,7 @@ def collect_dynamodb(
         return {"error": f"DynamoDB: {e}"}
 
 
-def collect_codecommit(
-    session, account_id: str, account_name: str, region: str
-) -> dict[str, Any]:
+def collect_codecommit(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
     """CodeCommit 수집 및 분석"""
     try:
         repos = collect_codecommit_repos(session, account_id, account_name, region)

@@ -97,10 +97,7 @@ def analyze_functions(
         finding = _analyze_single_function(func, region)
         result.findings.append(finding)
 
-        if (
-            finding.status == UsageStatus.UNUSED
-            or finding.status == UsageStatus.UNUSED_PROVISIONED
-        ):
+        if finding.status == UsageStatus.UNUSED or finding.status == UsageStatus.UNUSED_PROVISIONED:
             result.unused_count += 1
             result.unused_monthly_cost += finding.monthly_waste
         elif finding.status == UsageStatus.LOW_USAGE:
@@ -196,14 +193,10 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
 
     # Summary
     ws = wb.create_sheet("Summary")
@@ -238,9 +231,7 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
     ws.cell(row=row, column=1, value="합계").font = Font(bold=True)
     ws.cell(row=row, column=3, value=total_functions).font = Font(bold=True)
     ws.cell(row=row, column=4, value=total_unused).font = Font(bold=True)
-    ws.cell(row=row, column=7, value=f"${total_waste:,.2f}").font = Font(
-        bold=True, color="FF0000"
-    )
+    ws.cell(row=row, column=7, value=f"${total_waste:,.2f}").font = Font(bold=True, color="FF0000")
 
     # Unused Functions
     ws_unused = wb.create_sheet("Unused")
@@ -278,19 +269,13 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
                 ws_unused.cell(row=unused_row, column=4, value=fn.runtime)
                 ws_unused.cell(row=unused_row, column=5, value=fn.memory_mb)
                 ws_unused.cell(row=unused_row, column=6, value=fn.timeout_seconds)
-                ws_unused.cell(
-                    row=unused_row, column=7, value=round(fn.code_size_mb, 2)
-                )
+                ws_unused.cell(row=unused_row, column=7, value=round(fn.code_size_mb, 2))
                 ws_unused.cell(
                     row=unused_row,
                     column=8,
-                    value=fn.last_modified.strftime("%Y-%m-%d")
-                    if fn.last_modified
-                    else "-",
+                    value=fn.last_modified.strftime("%Y-%m-%d") if fn.last_modified else "-",
                 )
-                ws_unused.cell(
-                    row=unused_row, column=9, value=fn.provisioned_concurrency or "-"
-                )
+                ws_unused.cell(row=unused_row, column=9, value=fn.provisioned_concurrency or "-")
                 ws_unused.cell(row=unused_row, column=10, value=f.status.value)
                 ws_unused.cell(
                     row=unused_row,
@@ -300,10 +285,7 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
                 ws_unused.cell(row=unused_row, column=12, value=f.recommendation)
 
                 # 상태별 색상
-                if (
-                    f.status == UsageStatus.UNUSED_PROVISIONED
-                    or f.status == UsageStatus.UNUSED
-                ):
+                if f.status == UsageStatus.UNUSED_PROVISIONED or f.status == UsageStatus.UNUSED:
                     ws_unused.cell(row=unused_row, column=10).fill = red_fill
                 elif f.status == UsageStatus.LOW_USAGE:
                     ws_unused.cell(row=unused_row, column=10).fill = yellow_fill
@@ -345,33 +327,25 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
             ws_all.cell(row=all_row, column=5, value=fn.memory_mb)
             ws_all.cell(row=all_row, column=6, value=fn.timeout_seconds)
             ws_all.cell(row=all_row, column=7, value=round(fn.code_size_mb, 2))
-            ws_all.cell(
-                row=all_row, column=8, value=metrics.invocations if metrics else 0
-            )
+            ws_all.cell(row=all_row, column=8, value=metrics.invocations if metrics else 0)
             ws_all.cell(
                 row=all_row,
                 column=9,
                 value=round(metrics.duration_avg_ms, 2) if metrics else 0,
             )
             ws_all.cell(row=all_row, column=10, value=metrics.errors if metrics else 0)
-            ws_all.cell(
-                row=all_row, column=11, value=metrics.throttles if metrics else 0
-            )
+            ws_all.cell(row=all_row, column=11, value=metrics.throttles if metrics else 0)
             ws_all.cell(row=all_row, column=12, value=fn.provisioned_concurrency or "-")
             ws_all.cell(
                 row=all_row,
                 column=13,
-                value=fn.reserved_concurrency
-                if fn.reserved_concurrency is not None
-                else "-",
+                value=fn.reserved_concurrency if fn.reserved_concurrency is not None else "-",
             )
             ws_all.cell(row=all_row, column=14, value=f.status.value)
             ws_all.cell(
                 row=all_row,
                 column=15,
-                value=f"${fn.estimated_monthly_cost:,.4f}"
-                if fn.estimated_monthly_cost > 0
-                else "-",
+                value=f"${fn.estimated_monthly_cost:,.4f}" if fn.estimated_monthly_cost > 0 else "-",
             )
 
     # 열 너비
@@ -380,9 +354,7 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -399,13 +371,9 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> LambdaAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LambdaAnalysisResult:
     """단일 계정/리전의 Lambda 수집 및 분석 (병렬 실행용)"""
-    functions = collect_functions_with_metrics(
-        session, account_id, account_name, region
-    )
+    functions = collect_functions_with_metrics(session, account_id, account_name, region)
     return analyze_functions(functions, account_id, account_name, region)
 
 
@@ -414,9 +382,7 @@ def run(ctx) -> None:
     console.print("[bold]Lambda 미사용 분석 시작...[/bold]\n")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="lambda"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="lambda")
 
     results: list[LambdaAnalysisResult] = result.get_data()
 

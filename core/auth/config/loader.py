@@ -214,9 +214,7 @@ class Loader:
         aws_dir = home / ".aws"
 
         self.config_path = Path(config_path) if config_path else aws_dir / "config"
-        self.credentials_path = (
-            Path(credentials_path) if credentials_path else aws_dir / "credentials"
-        )
+        self.credentials_path = Path(credentials_path) if credentials_path else aws_dir / "credentials"
 
     def load(self) -> ParsedConfig:
         """AWS 설정 파일들을 파싱
@@ -256,9 +254,7 @@ class Loader:
         try:
             config.read(str(self.config_path), encoding="utf-8")
         except Exception as e:
-            raise ConfigurationError(
-                f"config 파일 파싱 실패: {self.config_path}", cause=e
-            ) from e
+            raise ConfigurationError(f"config 파일 파싱 실패: {self.config_path}", cause=e) from e
 
         for section in config.sections():
             try:
@@ -269,18 +265,14 @@ class Loader:
                         name=session_name,
                         start_url=config.get(section, "sso_start_url", fallback=""),
                         region=config.get(section, "sso_region", fallback=""),
-                        registration_scopes=config.get(
-                            section, "sso_registration_scopes", fallback=None
-                        ),
+                        registration_scopes=config.get(section, "sso_registration_scopes", fallback=None),
                     )
                     result.sessions[session_name] = session
 
                 elif section.startswith("profile ") or section == "default":
                     # 프로파일 파싱
                     profile_name = (
-                        section.split("profile ", 1)[1].strip()
-                        if section.startswith("profile ")
-                        else "default"
+                        section.split("profile ", 1)[1].strip() if section.startswith("profile ") else "default"
                     )
                     profile = self._parse_profile_section(config, section, profile_name)
                     result.profiles[profile_name] = profile
@@ -325,9 +317,7 @@ class Loader:
         try:
             config.read(str(self.credentials_path), encoding="utf-8")
         except Exception as e:
-            raise ConfigurationError(
-                f"credentials 파일 파싱 실패: {self.credentials_path}", cause=e
-            ) from e
+            raise ConfigurationError(f"credentials 파일 파싱 실패: {self.credentials_path}", cause=e) from e
 
         for section in config.sections():
             profile_name = section

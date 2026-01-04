@@ -149,9 +149,7 @@ def get_dynamodb_monthly_cost(
     if billing_mode == "PAY_PER_REQUEST":
         # On-Demand
         read_cost = (read_requests / 1_000_000) * prices.get("read_per_million", 0.25)
-        write_cost = (write_requests / 1_000_000) * prices.get(
-            "write_per_million", 1.25
-        )
+        write_cost = (write_requests / 1_000_000) * prices.get("write_per_million", 1.25)
         total += read_cost + write_cost
     else:
         # Provisioned

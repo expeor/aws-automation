@@ -8,7 +8,6 @@ SG 현황 및 미사용 SG/규칙 분석
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-
 from rich.console import Console
 
 from core.parallel import parallel_collect
@@ -28,9 +27,7 @@ REQUIRED_PERMISSIONS = {
 }
 
 
-def _collect_sgs(
-    session, account_id: str, account_name: str, region: str
-) -> list | None:
+def _collect_sgs(session, account_id: str, account_name: str, region: str) -> list | None:
     """단일 계정/리전의 Security Group 수집 (병렬 실행용)"""
     collector = SGCollector()
     sgs = collector.collect(session, account_id, account_name, region)

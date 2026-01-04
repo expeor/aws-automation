@@ -89,9 +89,7 @@ class KMSKeyAnalysisResult:
     findings: list[KMSKeyFinding] = field(default_factory=list)
 
 
-def collect_kms_keys(
-    session, account_id: str, account_name: str, region: str
-) -> list[KMSKeyInfo]:
+def collect_kms_keys(session, account_id: str, account_name: str, region: str) -> list[KMSKeyInfo]:
     """KMS 키 수집"""
     from botocore.exceptions import ClientError
 
@@ -135,9 +133,7 @@ def collect_kms_keys(
     return keys
 
 
-def analyze_kms_keys(
-    keys: list[KMSKeyInfo], account_id: str, account_name: str, region: str
-) -> KMSKeyAnalysisResult:
+def analyze_kms_keys(keys: list[KMSKeyInfo], account_id: str, account_name: str, region: str) -> KMSKeyAnalysisResult:
     """KMS 키 분석"""
     result = KMSKeyAnalysisResult(
         account_id=account_id,
@@ -206,13 +202,9 @@ def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     ws = wb.create_sheet("Summary")
     ws["A1"] = "KMS 키 분석 보고서"
@@ -264,9 +256,7 @@ def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str
                 ws_detail.cell(row=detail_row, column=4, value=k.alias or "-")
                 ws_detail.cell(row=detail_row, column=5, value=k.key_manager)
                 ws_detail.cell(row=detail_row, column=6, value=k.key_state)
-                ws_detail.cell(
-                    row=detail_row, column=7, value=f"${k.monthly_cost:,.2f}"
-                )
+                ws_detail.cell(row=detail_row, column=7, value=f"${k.monthly_cost:,.2f}")
                 ws_detail.cell(row=detail_row, column=8, value=f.recommendation)
 
     for sheet in wb.worksheets:
@@ -274,9 +264,7 @@ def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -286,9 +274,7 @@ def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> KMSKeyAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> KMSKeyAnalysisResult | None:
     """단일 계정/리전의 KMS 키 수집 및 분석 (병렬 실행용)"""
     keys = collect_kms_keys(session, account_id, account_name, region)
     if not keys:
@@ -301,9 +287,7 @@ def run(ctx) -> None:
     console.print("[bold]KMS 키 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="kms")
-    results: list[KMSKeyAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    results: list[KMSKeyAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -317,9 +301,7 @@ def run(ctx) -> None:
     disabled_cost = sum(r.disabled_monthly_cost for r in results)
 
     console.print("\n[bold]종합 결과[/bold]")
-    console.print(
-        f"CMK: {total_cmk}개 / 비활성화: [yellow]{total_disabled}개[/yellow] (${disabled_cost:,.2f}/월)"
-    )
+    console.print(f"CMK: {total_cmk}개 / 비활성화: [yellow]{total_disabled}개[/yellow] (${disabled_cost:,.2f}/월)")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

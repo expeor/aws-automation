@@ -43,9 +43,7 @@ class PublicIPResult:
 def _get_cache_dir() -> str:
     """캐시 디렉토리 경로 (프로젝트 루트의 temp 폴더)"""
     # plugins/vpc/ip_search -> vpc -> plugins -> project_root
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    )
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     cache_dir = os.path.join(project_root, "temp", "ip_ranges")
     os.makedirs(cache_dir, exist_ok=True)
     return cache_dir
@@ -112,16 +110,10 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
 
     # 각 provider 데이터 다운로드
     loaders = {
-        "aws": lambda: _fetch_and_cache(
-            "aws", "https://ip-ranges.amazonaws.com/ip-ranges.json"
-        ),
-        "gcp": lambda: _fetch_and_cache(
-            "gcp", "https://www.gstatic.com/ipranges/cloud.json"
-        ),
+        "aws": lambda: _fetch_and_cache("aws", "https://ip-ranges.amazonaws.com/ip-ranges.json"),
+        "gcp": lambda: _fetch_and_cache("gcp", "https://www.gstatic.com/ipranges/cloud.json"),
         "azure": _fetch_azure_fresh,
-        "oracle": lambda: _fetch_and_cache(
-            "oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"
-        ),
+        "oracle": lambda: _fetch_and_cache("oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"),
     }
 
     for provider in providers:
@@ -137,9 +129,7 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
                 elif provider == "azure":
                     count = len(data.get("values", []))
                 elif provider == "oracle":
-                    count = sum(
-                        len(r.get("cidrs", [])) for r in data.get("regions", [])
-                    )
+                    count = sum(len(r.get("cidrs", [])) for r in data.get("regions", []))
                 else:
                     count = 0
 
@@ -170,7 +160,9 @@ def _fetch_azure_fresh() -> dict[Any, Any] | None:
     """Azure 데이터 새로 다운로드 (주간 업데이트 URL 탐색)"""
     from datetime import datetime, timedelta
 
-    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    base_url = (
+        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    )
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -215,9 +207,7 @@ def get_public_cache_status() -> dict[str, Any]:
                     elif name == "azure":
                         count = len(data.get("values", []))
                     elif name == "oracle":
-                        count = sum(
-                            len(r.get("cidrs", [])) for r in data.get("regions", [])
-                        )
+                        count = sum(len(r.get("cidrs", [])) for r in data.get("regions", []))
                     else:
                         count = 0
 
@@ -248,9 +238,7 @@ def get_aws_ip_ranges() -> dict[str, Any]:
         return cached
 
     try:
-        response = requests.get(
-            "https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5
-        )
+        response = requests.get("https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5)
         data: dict[str, Any] = response.json()
         _save_to_cache("aws", data)
         return data
@@ -265,9 +253,7 @@ def get_gcp_ip_ranges() -> dict[str, Any]:
         return cached
 
     try:
-        response = requests.get(
-            "https://www.gstatic.com/ipranges/cloud.json", timeout=10
-        )
+        response = requests.get("https://www.gstatic.com/ipranges/cloud.json", timeout=10)
         data: dict[str, Any] = response.json()
         _save_to_cache("gcp", data)
         return data
@@ -283,7 +269,9 @@ def get_azure_ip_ranges() -> dict[str, Any]:
 
     from datetime import datetime, timedelta
 
-    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    base_url = (
+        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    )
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -310,9 +298,7 @@ def get_oracle_ip_ranges() -> dict[str, Any]:
         return cached
 
     try:
-        response = requests.get(
-            "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10
-        )
+        response = requests.get("https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10)
         data: dict[str, Any] = response.json()
         _save_to_cache("oracle", data)
         return data
@@ -333,11 +319,7 @@ def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
     except ValueError:
         return results
 
-    prefixes = (
-        data.get("prefixes", [])
-        if ip_obj.version == 4
-        else data.get("ipv6_prefixes", [])
-    )
+    prefixes = data.get("prefixes", []) if ip_obj.version == 4 else data.get("ipv6_prefixes", [])
     prefix_key = "ip_prefix" if ip_obj.version == 4 else "ipv6_prefix"
 
     for prefix in prefixes:
@@ -351,11 +333,7 @@ def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
                         service=prefix.get("service", ""),
                         ip_prefix=prefix[prefix_key],
                         region=prefix.get("region", ""),
-                        extra={
-                            "network_border_group": prefix.get(
-                                "network_border_group", ""
-                            )
-                        },
+                        extra={"network_border_group": prefix.get("network_border_group", "")},
                     )
                 )
         except (ValueError, KeyError):
@@ -479,9 +457,7 @@ def load_ip_ranges_parallel(target_providers: set[str]) -> dict[str, dict[str, A
     data_sources: dict[str, dict[str, Any]] = {}
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(loaders[p]): p for p in target_providers if p in loaders
-        }
+        futures = {executor.submit(loaders[p]): p for p in target_providers if p in loaders}
 
         for future in as_completed(futures):
             provider = futures[future]
@@ -508,9 +484,7 @@ def search_public_ip(
         검색 결과 목록
     """
     all_providers = {"aws", "gcp", "azure", "oracle"}
-    target_providers = (
-        {p.lower() for p in providers} & all_providers if providers else all_providers
-    )
+    target_providers = {p.lower() for p in providers} & all_providers if providers else all_providers
 
     data_sources = load_ip_ranges_parallel(target_providers)
 
@@ -632,9 +606,7 @@ def search_by_filter(
                     service=p_service,
                     ip_prefix=ip_prefix,
                     region=p_region,
-                    extra={
-                        "network_border_group": prefix.get("network_border_group", "")
-                    },
+                    extra={"network_border_group": prefix.get("network_border_group", "")},
                 )
             )
 

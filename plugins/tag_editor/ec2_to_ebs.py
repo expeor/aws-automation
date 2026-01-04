@@ -139,9 +139,7 @@ class EC2ToEBSTagSync:
 
         return summary
 
-    def _get_instances(
-        self, instance_ids: list[str] | None = None
-    ) -> list[dict[str, Any]]:
+    def _get_instances(self, instance_ids: list[str] | None = None) -> list[dict[str, Any]]:
         """EC2 인스턴스 목록 조회"""
         instances = []
 
@@ -207,9 +205,7 @@ class EC2ToEBSTagSync:
                     Tags=tags_to_apply,
                 )
 
-            logger.info(
-                f"{instance_id}: {len(volume_ids)}개 볼륨에 " f"{len(tags_to_apply)}개 태그 적용"
-            )
+            logger.info(f"{instance_id}: {len(volume_ids)}개 볼륨에 {len(tags_to_apply)}개 태그 적용")
 
             return TagSyncResult(
                 instance_id=instance_id,

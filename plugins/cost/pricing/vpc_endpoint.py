@@ -126,9 +126,7 @@ def get_endpoint_monthly_fixed_cost(
     Returns:
         월간 고정 USD 비용
     """
-    return get_endpoint_monthly_cost(
-        region, endpoint_type, hours=HOURS_PER_MONTH, data_processed_gb=0
-    )
+    return get_endpoint_monthly_cost(region, endpoint_type, hours=HOURS_PER_MONTH, data_processed_gb=0)
 
 
 def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:

@@ -41,11 +41,7 @@ class PatchItem:
     def from_event(cls, event: HealthEvent) -> "PatchItem":
         """HealthEvent에서 PatchItem 생성"""
         # 설명에서 요약 추출 (첫 200자)
-        summary = (
-            event.description[:200] + "..."
-            if len(event.description) > 200
-            else event.description
-        )
+        summary = event.description[:200] + "..." if len(event.description) > 200 else event.description
         summary = summary.replace("\n", " ").strip()
 
         # 영향받는 리소스 목록
@@ -197,8 +193,7 @@ class HealthCollector:
         summary_by_month = self._group_by_month(patches)
 
         logger.info(
-            f"패치 수집 완료: 전체 {len(events)}개, "
-            f"긴급 {summary_by_urgency.get('critical', {}).get('count', 0)}개"
+            f"패치 수집 완료: 전체 {len(events)}개, 긴급 {summary_by_urgency.get('critical', {}).get('count', 0)}개"
         )
 
         return CollectionResult(
@@ -274,9 +269,7 @@ class HealthCollector:
         )
         return issues
 
-    def _summarize_by_urgency(
-        self, patches: list[PatchItem]
-    ) -> dict[str, dict[str, Any]]:
+    def _summarize_by_urgency(self, patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
         """긴급도별 요약"""
         summary: dict[str, dict[str, Any]] = {}
 
@@ -299,9 +292,7 @@ class HealthCollector:
 
         return summary
 
-    def _summarize_by_service(
-        self, patches: list[PatchItem]
-    ) -> dict[str, dict[str, Any]]:
+    def _summarize_by_service(self, patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
         """서비스별 요약"""
         summary: dict[str, dict[str, Any]] = {}
 
@@ -328,9 +319,7 @@ class HealthCollector:
         grouped: dict[str, list[PatchItem]] = {}
 
         for patch in patches:
-            month_key = (
-                patch.scheduled_date.strftime("%Y-%m") if patch.scheduled_date else "미정"
-            )
+            month_key = patch.scheduled_date.strftime("%Y-%m") if patch.scheduled_date else "미정"
 
             if month_key not in grouped:
                 grouped[month_key] = []

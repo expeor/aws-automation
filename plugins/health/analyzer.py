@@ -210,9 +210,7 @@ class HealthEvent:
         """API 응답에서 HealthEvent 객체 생성"""
         description = ""
         if detail_item:
-            desc_list = detail_item.get("eventDescription", {}).get(
-                "latestDescription", ""
-            )
+            desc_list = detail_item.get("eventDescription", {}).get("latestDescription", "")
             description = desc_list
 
         return cls(
@@ -241,9 +239,7 @@ class HealthEvent:
             "availability_zone": self.availability_zone,
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
-            "last_updated_time": (
-                self.last_updated_time.isoformat() if self.last_updated_time else None
-            ),
+            "last_updated_time": (self.last_updated_time.isoformat() if self.last_updated_time else None),
             "status_code": self.status_code,
             "event_scope_code": self.event_scope_code,
             "description": self.description,
@@ -402,9 +398,7 @@ class HealthAnalyzer:
 
         return details
 
-    def _get_affected_entities(
-        self, event_arns: list[str]
-    ) -> dict[str, list[AffectedEntity]]:
+    def _get_affected_entities(self, event_arns: list[str]) -> dict[str, list[AffectedEntity]]:
         """영향받는 리소스 조회"""
         affected = {}
 

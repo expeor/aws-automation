@@ -47,15 +47,11 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             },
             SHEET_NAMES.BACKEND_4XX_COUNT: {
                 "count": self.data.get("backend_4xx_count", 0),
-                "full_logs": self.data.get("Backend 4xx Count", {}).get(
-                    "full_logs", []
-                ),
+                "full_logs": self.data.get("Backend 4xx Count", {}).get("full_logs", []),
             },
             SHEET_NAMES.BACKEND_5XX_COUNT: {
                 "count": self.data.get("backend_5xx_count", 0),
-                "full_logs": self.data.get("Backend 5xx Count", {}).get(
-                    "full_logs", []
-                ),
+                "full_logs": self.data.get("Backend 5xx Count", {}).get("full_logs", []),
             },
         }
 
@@ -86,15 +82,11 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             },
             SHEET_NAMES.BACKEND_4XX_TS: {
                 "count": self.data.get("backend_4xx_count", 0),
-                "full_logs": self.data.get("Backend 4xx Count", {}).get(
-                    "full_logs", []
-                ),
+                "full_logs": self.data.get("Backend 4xx Count", {}).get("full_logs", []),
             },
             SHEET_NAMES.BACKEND_5XX_TS: {
                 "count": self.data.get("backend_5xx_count", 0),
-                "full_logs": self.data.get("Backend 5xx Count", {}).get(
-                    "full_logs", []
-                ),
+                "full_logs": self.data.get("Backend 5xx Count", {}).get("full_logs", []),
             },
         }
 
@@ -127,9 +119,7 @@ class StatusCodeSheetWriter(BaseSheetWriter):
 
             # Select headers based on sheet type
             is_3xx = "3xx" in sheet_name
-            headers = list(
-                HEADERS.STATUS_COUNT_3XX if is_3xx else HEADERS.STATUS_COUNT_BASE
-            )
+            headers = list(HEADERS.STATUS_COUNT_3XX if is_3xx else HEADERS.STATUS_COUNT_BASE)
 
             self.write_header_row(ws, headers)
 
@@ -162,9 +152,7 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             request = log.get("request", "N/A")
             http_method = log.get("http_method", "").replace("-", "")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
-            target_status = self.convert_status_code(
-                log.get("target_status_code", "N/A")
-            )
+            target_status = self.convert_status_code(log.get("target_status_code", "N/A"))
             target = log.get("target", "")
             target_field = "" if not target or target == "-" else target
             target_group = log.get("target_group_name", "") or ""
@@ -243,9 +231,7 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             values.extend([elb_status, target_status])
 
             # Write cells
-            for col_idx, (header, value) in enumerate(
-                zip(headers, values, strict=False), start=1
-            ):
+            for col_idx, (header, value) in enumerate(zip(headers, values, strict=False), start=1):
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = border
                 self.apply_cell_style(cell, header, value)
@@ -323,9 +309,7 @@ class StatusCodeSheetWriter(BaseSheetWriter):
             request = log.get("request", "N/A")
             user_agent = log.get("user_agent", "N/A")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
-            target_status = self.convert_status_code(
-                log.get("target_status_code", "N/A")
-            )
+            target_status = self.convert_status_code(log.get("target_status_code", "N/A"))
             error_reason = log.get("error_reason", "-")
             if error_reason in (None, "-"):
                 error_reason = ""
@@ -344,9 +328,7 @@ class StatusCodeSheetWriter(BaseSheetWriter):
                 error_reason,
             ]
 
-            for col_idx, (header, value) in enumerate(
-                zip(headers, values, strict=False), start=1
-            ):
+            for col_idx, (header, value) in enumerate(zip(headers, values, strict=False), start=1):
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = border
                 self.apply_cell_style(cell, header, value)
@@ -392,12 +374,10 @@ class ClientStatusSheetWriter(BaseSheetWriter):
             ip_country_mapping = self.data.get("ip_country_mapping", {})
 
             # Calculate totals and sort
-            client_totals = {
-                ip: sum(counts.values()) for ip, counts in client_status_stats.items()
-            }
-            sorted_clients = sorted(
-                client_totals.items(), key=lambda x: x[1], reverse=True
-            )[: SheetConfig.TOP_CLIENT_LIMIT]
+            client_totals = {ip: sum(counts.values()) for ip, counts in client_status_stats.items()}
+            sorted_clients = sorted(client_totals.items(), key=lambda x: x[1], reverse=True)[
+                : SheetConfig.TOP_CLIENT_LIMIT
+            ]
 
             # Write data
             row = 2
@@ -417,9 +397,7 @@ class ClientStatusSheetWriter(BaseSheetWriter):
 
                 # Status code columns
                 for col_idx, status_code in enumerate(sorted_codes, 3):
-                    cell = ws.cell(
-                        row=row, column=col_idx, value=status_counts.get(status_code, 0)
-                    )
+                    cell = ws.cell(row=row, column=col_idx, value=status_counts.get(status_code, 0))
                     cell.number_format = "#,##0"
                     cell.border = self.styles.thin_border
 
@@ -483,17 +461,11 @@ class TargetStatusSheetWriter(BaseSheetWriter):
             # Calculate backend totals
             target_totals = {}
             for target, status_counts in target_status_stats.items():
-                backend_total = sum(
-                    count
-                    for key, count in status_counts.items()
-                    if key.startswith("Backend:")
-                )
+                backend_total = sum(count for key, count in status_counts.items() if key.startswith("Backend:"))
                 if backend_total > 0:
                     target_totals[target] = backend_total
 
-            sorted_targets = sorted(
-                target_totals.items(), key=lambda x: x[1], reverse=True
-            )
+            sorted_targets = sorted(target_totals.items(), key=lambda x: x[1], reverse=True)
 
             # Write data
             row = 2

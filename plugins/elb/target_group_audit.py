@@ -89,9 +89,7 @@ class TargetGroupAnalysisResult:
 # =============================================================================
 
 
-def collect_target_groups(
-    session, account_id: str, account_name: str, region: str
-) -> list[TargetGroupInfo]:
+def collect_target_groups(session, account_id: str, account_name: str, region: str) -> list[TargetGroupInfo]:
     """Target Groups 수집"""
     from botocore.exceptions import ClientError
 
@@ -116,19 +114,11 @@ def collect_target_groups(
 
             # 타겟 상태 조회
             try:
-                health_resp = elbv2.describe_target_health(
-                    TargetGroupArn=tg["TargetGroupArn"]
-                )
+                health_resp = elbv2.describe_target_health(TargetGroupArn=tg["TargetGroupArn"])
                 targets = health_resp.get("TargetHealthDescriptions", [])
                 tg_info.total_targets = len(targets)
-                tg_info.healthy_targets = sum(
-                    1
-                    for t in targets
-                    if t.get("TargetHealth", {}).get("State") == "healthy"
-                )
-                tg_info.unhealthy_targets = (
-                    tg_info.total_targets - tg_info.healthy_targets
-                )
+                tg_info.healthy_targets = sum(1 for t in targets if t.get("TargetHealth", {}).get("State") == "healthy")
+                tg_info.unhealthy_targets = tg_info.total_targets - tg_info.healthy_targets
             except ClientError:
                 pass
 
@@ -220,14 +210,10 @@ def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -290,9 +276,7 @@ def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -
                 ws_detail.cell(row=detail_row, column=5, value=tg.target_type)
                 ws_detail.cell(row=detail_row, column=6, value=tg.protocol or "-")
                 ws_detail.cell(row=detail_row, column=7, value=tg.port or "-")
-                ws_detail.cell(
-                    row=detail_row, column=8, value=len(tg.load_balancer_arns)
-                )
+                ws_detail.cell(row=detail_row, column=8, value=len(tg.load_balancer_arns))
                 ws_detail.cell(row=detail_row, column=9, value=tg.total_targets)
                 ws_detail.cell(row=detail_row, column=10, value=tg.healthy_targets)
                 ws_detail.cell(row=detail_row, column=11, value=f.recommendation)
@@ -303,9 +287,7 @@ def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -322,9 +304,7 @@ def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> TargetGroupAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> TargetGroupAnalysisResult | None:
     """단일 계정/리전의 Target Group 수집 및 분석 (병렬 실행용)"""
     target_groups = collect_target_groups(session, account_id, account_name, region)
     if not target_groups:
@@ -336,12 +316,8 @@ def run(ctx) -> None:
     """Target Group 미사용 분석"""
     console.print("[bold]Target Group 분석 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="elbv2"
-    )
-    results: list[TargetGroupAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elbv2")
+    results: list[TargetGroupAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")

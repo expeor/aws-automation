@@ -12,6 +12,7 @@ Usage:
     # 커스텀 설정
     ec2 = get_client(session, "ec2", max_attempts=10, connect_timeout=10)
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

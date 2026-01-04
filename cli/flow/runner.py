@@ -70,9 +70,7 @@ class FlowRunner:
             # 도구 정보 조회
             tool_meta = self._find_tool_meta(category, tool_module)
             if not tool_meta:
-                console.print(
-                    f"[red]! '{category}/{tool_module}' " f"도구를 찾을 수 없습니다.[/red]"
-                )
+                console.print(f"[red]! '{category}/{tool_module}' 도구를 찾을 수 없습니다.[/red]")
                 return
 
             # Context 구성
@@ -83,12 +81,8 @@ class FlowRunner:
                 description=tool_meta.get("description", ""),
                 category=category,
                 permission=tool_meta.get("permission", "read"),
-                supports_single_region_only=tool_meta.get(
-                    "supports_single_region_only", False
-                ),
-                supports_single_account_only=tool_meta.get(
-                    "supports_single_account_only", False
-                ),
+                supports_single_region_only=tool_meta.get("supports_single_region_only", False),
+                supports_single_account_only=tool_meta.get("supports_single_account_only", False),
                 is_global=tool_meta.get("is_global", False),
             )
 
@@ -264,9 +258,7 @@ class FlowRunner:
 
         if tool is None:
             console.print()
-            console.print(
-                f"[yellow]{ctx.category}/{ctx.tool.name} " f"도구를 찾을 수 없습니다.[/yellow]"
-            )
+            console.print(f"[yellow]{ctx.category}/{ctx.tool.name} 도구를 찾을 수 없습니다.[/yellow]")
             return
 
         # 필요 권한 정보 추출
@@ -299,9 +291,7 @@ class FlowRunner:
             self._handle_permission_error(e, required_permissions)
             raise
 
-    def _print_execution_summary(
-        self, ctx: ExecutionContext, required_permissions: Any = None
-    ) -> None:
+    def _print_execution_summary(self, ctx: ExecutionContext, required_permissions: Any = None) -> None:
         """실행 전 요약 출력"""
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
@@ -359,9 +349,7 @@ class FlowRunner:
                 count += len(perm_list)
         return count
 
-    def _handle_permission_error(
-        self, error: Exception, required_permissions: Any
-    ) -> None:
+    def _handle_permission_error(self, error: Exception, required_permissions: Any) -> None:
         """권한 오류 시 안내 메시지 출력"""
         # botocore ClientError에서 AccessDenied 확인
         error_code = None

@@ -5,7 +5,6 @@
 단일 리전, 복수 리전, 전체 리전 중 선택.
 """
 
-
 from rich.console import Console
 
 from cli.ui.console import print_box_end, print_box_line, print_box_start

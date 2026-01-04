@@ -219,8 +219,7 @@ def safe_aws_call(
                     category = categorize_error(e)
 
                     logger.debug(
-                        f"[{service}.{op_name}] 시도 {attempt + 1}/{config.max_retries + 1} "
-                        f"실패: {error_code}"
+                        f"[{service}.{op_name}] 시도 {attempt + 1}/{config.max_retries + 1} 실패: {error_code}"
                     )
 
                     # 재시도 불가능한 에러는 즉시 반환
@@ -249,9 +248,7 @@ def safe_aws_call(
                     last_error = e
                     category = categorize_error(e)
 
-                    logger.warning(
-                        f"[{service}.{op_name}] 예상치 못한 에러: {e.__class__.__name__}: {e}"
-                    )
+                    logger.warning(f"[{service}.{op_name}] 예상치 못한 에러: {e.__class__.__name__}: {e}")
 
                     # 네트워크 에러 등은 재시도 가능
                     if is_retryable(e) and attempt < config.max_retries:
@@ -273,11 +270,7 @@ def safe_aws_call(
             return TaskError(
                 identifier=identifier,
                 region=region,
-                category=(
-                    categorize_error(last_error)
-                    if last_error
-                    else ErrorCategory.UNKNOWN
-                ),
+                category=(categorize_error(last_error) if last_error else ErrorCategory.UNKNOWN),
                 error_code=get_error_code(last_error) if last_error else "Unknown",
                 message=f"최대 재시도 횟수 초과 ({config.max_retries}회)",
                 retries=config.max_retries,
@@ -314,9 +307,7 @@ def with_retry(
         def risky_operation():
             ...
     """
-    config = RetryConfig(
-        max_retries=max_retries, base_delay=base_delay, max_delay=max_delay
-    )
+    config = RetryConfig(max_retries=max_retries, base_delay=base_delay, max_delay=max_delay)
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
@@ -334,10 +325,7 @@ def with_retry(
                         raise
 
                     delay = config.get_delay(attempt)
-                    logger.debug(
-                        f"[{func.__name__}] 시도 {attempt + 1} 실패, "
-                        f"{delay:.2f}초 후 재시도..."
-                    )
+                    logger.debug(f"[{func.__name__}] 시도 {attempt + 1} 실패, {delay:.2f}초 후 재시도...")
                     time.sleep(delay)
 
             # 여기 도달하면 안 됨

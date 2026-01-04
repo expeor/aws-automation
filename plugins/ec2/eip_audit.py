@@ -120,9 +120,7 @@ class EIPAnalysisResult:
 # =============================================================================
 
 
-def collect_eips(
-    session, account_id: str, account_name: str, region: str
-) -> list[EIPInfo]:
+def collect_eips(session, account_id: str, account_name: str, region: str) -> list[EIPInfo]:
     """EIP 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -165,9 +163,7 @@ def collect_eips(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} EIP 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} EIP 수집 오류: {error_code}[/yellow]")
 
     return eips
 
@@ -177,9 +173,7 @@ def collect_eips(
 # =============================================================================
 
 
-def analyze_eips(
-    eips: list[EIPInfo], account_id: str, account_name: str, region: str
-) -> EIPAnalysisResult:
+def analyze_eips(eips: list[EIPInfo], account_id: str, account_name: str, region: str) -> EIPAnalysisResult:
     """EIP 미사용 분석"""
     result = EIPAnalysisResult(
         account_id=account_id,
@@ -243,9 +237,7 @@ def generate_report(results: list[EIPAnalysisResult], output_dir: str) -> str:
     wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -255,15 +247,9 @@ def generate_report(results: list[EIPAnalysisResult], output_dir: str) -> str:
     )
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.PENDING: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.PENDING: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -367,9 +353,7 @@ def generate_report(results: list[EIPAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 40
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 40)
 
     ws2.freeze_panes = "A2"
 
@@ -387,9 +371,7 @@ def generate_report(results: list[EIPAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> EIPAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EIPAnalysisResult:
     """단일 계정/리전의 EIP 수집 및 분석 (병렬 실행용)"""
     eips = collect_eips(session, account_id, account_name, region)
     return analyze_eips(eips, account_id, account_name, region)
@@ -411,9 +393,7 @@ def run(ctx) -> None:
     all_results: list[EIPAnalysisResult] = result.get_data()
 
     # 진행 상황 출력
-    console.print(
-        f"  [dim]수집 완료: 성공 {result.success_count}, 실패 {result.error_count}[/dim]"
-    )
+    console.print(f"  [dim]수집 완료: 성공 {result.success_count}, 실패 {result.error_count}[/dim]")
 
     # 에러 요약
     if result.error_count > 0:
@@ -426,22 +406,12 @@ def run(ctx) -> None:
     # 개별 결과 요약
     for r in all_results:
         if r.unused_count > 0:
-            cost_str = (
-                f" (${r.unused_monthly_cost:.2f}/월)"
-                if r.unused_monthly_cost > 0
-                else ""
-            )
-            console.print(
-                f"  {r.account_name}/{r.region}: [red]미사용 {r.unused_count}개{cost_str}[/red]"
-            )
+            cost_str = f" (${r.unused_monthly_cost:.2f}/월)" if r.unused_monthly_cost > 0 else ""
+            console.print(f"  {r.account_name}/{r.region}: [red]미사용 {r.unused_count}개{cost_str}[/red]")
         elif r.pending_count > 0:
-            console.print(
-                f"  {r.account_name}/{r.region}: [yellow]확인 필요 {r.pending_count}개[/yellow]"
-            )
+            console.print(f"  {r.account_name}/{r.region}: [yellow]확인 필요 {r.pending_count}개[/yellow]")
         elif r.total_count > 0:
-            console.print(
-                f"  {r.account_name}/{r.region}: [green]정상 {r.normal_count}개[/green]"
-            )
+            console.print(f"  {r.account_name}/{r.region}: [green]정상 {r.normal_count}개[/green]")
 
     # 전체 통계
     totals = {
@@ -454,9 +424,7 @@ def run(ctx) -> None:
 
     console.print(f"\n[bold]전체 EIP: {totals['total']}개[/bold]")
     if totals["unused"] > 0:
-        console.print(
-            f"  [red bold]미사용: {totals['unused']}개 (${totals['unused_cost']:.2f}/월)[/red bold]"
-        )
+        console.print(f"  [red bold]미사용: {totals['unused']}개 (${totals['unused_cost']:.2f}/월)[/red bold]")
     if totals["pending"] > 0:
         console.print(f"  [yellow]확인 필요: {totals['pending']}개[/yellow]")
     console.print(f"  [green]정상: {totals['normal']}개[/green]")

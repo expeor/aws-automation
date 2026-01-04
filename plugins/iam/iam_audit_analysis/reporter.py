@@ -130,21 +130,15 @@ class IAMExcelReporter:
         if len(self.summary_stats) > 1:
             totals = {
                 "total_users": sum(s["total_users"] for s in self.summary_stats),
-                "users_without_mfa": sum(
-                    s["users_without_mfa"] for s in self.summary_stats
-                ),
+                "users_without_mfa": sum(s["users_without_mfa"] for s in self.summary_stats),
                 "inactive_users": sum(s["inactive_users"] for s in self.summary_stats),
-                "total_active_keys": sum(
-                    s["total_active_keys"] for s in self.summary_stats
-                ),
+                "total_active_keys": sum(s["total_active_keys"] for s in self.summary_stats),
                 "old_keys": sum(s["old_keys"] for s in self.summary_stats),
                 "unused_keys": sum(s["unused_keys"] for s in self.summary_stats),
                 "total_roles": sum(s["total_roles"] for s in self.summary_stats),
                 "unused_roles": sum(s["unused_roles"] for s in self.summary_stats),
                 "admin_roles": sum(s["admin_roles"] for s in self.summary_stats),
-                "critical_issues": sum(
-                    s["critical_issues"] for s in self.summary_stats
-                ),
+                "critical_issues": sum(s["critical_issues"] for s in self.summary_stats),
                 "high_issues": sum(s["high_issues"] for s in self.summary_stats),
                 "medium_issues": sum(s["medium_issues"] for s in self.summary_stats),
             }
@@ -261,9 +255,7 @@ class IAMExcelReporter:
             ColumnDef(header="Account Name", width=20, style="data"),
             ColumnDef(header="User Name", width=25, style="data"),
             ColumnDef(header="Created", width=12, style="data"),
-            ColumnDef(
-                header="Access Type", width=12, style="center"
-            ),  # Console/Key/Both/None
+            ColumnDef(header="Access Type", width=12, style="center"),  # Console/Key/Both/None
             ColumnDef(header="Console", width=8, style="center"),
             ColumnDef(header="MFA", width=8, style="center"),
             ColumnDef(header="Last Login", width=12, style="data"),
@@ -293,17 +285,10 @@ class IAMExcelReporter:
                     last_login_str = user.password_last_used.strftime("%Y-%m-%d")
 
                 # 이슈 목록
-                issue_details = "; ".join(
-                    [
-                        f"[{i.severity.value}] {i.issue_type.value}"
-                        for i in user_result.issues
-                    ]
-                )
+                issue_details = "; ".join([f"[{i.severity.value}] {i.issue_type.value}" for i in user_result.issues])
 
                 # Privesc Paths
-                privesc_str = (
-                    ", ".join(user.privesc_paths) if user.privesc_paths else ""
-                )
+                privesc_str = ", ".join(user.privesc_paths) if user.privesc_paths else ""
 
                 # Access Type 결정 (Console/Key/Both/None)
                 has_console = user.has_console_access
@@ -327,9 +312,7 @@ class IAMExcelReporter:
                         "Y" if user.has_console_access else "N",
                         "Y" if user.has_mfa else "N",
                         last_login_str,
-                        user.days_since_last_login
-                        if user.days_since_last_login >= 0
-                        else "",
+                        user.days_since_last_login if user.days_since_last_login >= 0 else "",
                         int(user.active_key_count),
                         int(user.active_git_credential_count),
                         ", ".join(user.groups),
@@ -377,9 +360,7 @@ class IAMExcelReporter:
                     last_used_str = "Never"
 
                 # 이슈 목록
-                issue_details = "; ".join(
-                    [i.issue_type.value for i in key_result.issues]
-                )
+                issue_details = "; ".join([i.issue_type.value for i in key_result.issues])
 
                 ws.add_row(
                     [
@@ -455,10 +436,7 @@ class IAMExcelReporter:
                 # Connected Resources (AWS Config)
                 connected_str = ""
                 if role.connected_resources:
-                    resources = [
-                        f"{r.resource_type}: {r.resource_name}"
-                        for r in role.connected_resources[:5]
-                    ]
+                    resources = [f"{r.resource_type}: {r.resource_name}" for r in role.connected_resources[:5]]
                     connected_str = "; ".join(resources)
                     if len(role.connected_resources) > 5:
                         connected_str += f" (+{len(role.connected_resources) - 5})"
@@ -469,14 +447,10 @@ class IAMExcelReporter:
                     trust_risks_str += f" (+{len(role.trust_policy_risks) - 2})"
 
                 # Privesc Paths
-                privesc_str = (
-                    ", ".join(role.privesc_paths) if role.privesc_paths else ""
-                )
+                privesc_str = ", ".join(role.privesc_paths) if role.privesc_paths else ""
 
                 # 이슈 목록
-                issue_details = "; ".join(
-                    [i.issue_type.value for i in role_result.issues]
-                )
+                issue_details = "; ".join([i.issue_type.value for i in role_result.issues])
 
                 ws.add_row(
                     [
@@ -487,9 +461,7 @@ class IAMExcelReporter:
                         created_str,
                         int(role.age_days),
                         last_used_str,
-                        role.days_since_last_use
-                        if role.days_since_last_use >= 0
-                        else "",
+                        role.days_since_last_use if role.days_since_last_use >= 0 else "",
                         role.last_used_region,
                         "Y" if role.is_service_linked else "",
                         "Y" if role.has_admin_access else "",
@@ -556,9 +528,7 @@ class IAMExcelReporter:
                     dangerous_str += f" (+{len(group.dangerous_permissions) - 3})"
 
                 # 이슈 목록
-                issue_details = "; ".join(
-                    [i.issue_type.value for i in group_result.issues]
-                )
+                issue_details = "; ".join([i.issue_type.value for i in group_result.issues])
 
                 ws.add_row(
                     [
@@ -606,9 +576,7 @@ class IAMExcelReporter:
             policy = result.policy_result.policy
 
             # 이슈 목록
-            issue_details = "; ".join(
-                [i.description for i in result.policy_result.issues]
-            )
+            issue_details = "; ".join([i.description for i in result.policy_result.issues])
 
             ws.add_row(
                 [
@@ -622,9 +590,7 @@ class IAMExcelReporter:
                     "Y" if policy.require_lowercase else "N",
                     "Y" if policy.expire_passwords else "N",
                     int(policy.max_password_age) if policy.expire_passwords else "",
-                    int(policy.password_reuse_prevention)
-                    if policy.password_reuse_prevention > 0
-                    else "",
+                    int(policy.password_reuse_prevention) if policy.password_reuse_prevention > 0 else "",
                     int(result.policy_result.score),
                     issue_details,
                 ]
@@ -664,9 +630,7 @@ class IAMExcelReporter:
                     # 변경 시간 포맷
                     change_time_str = ""
                     if change.capture_time:
-                        change_time_str = change.capture_time.strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
+                        change_time_str = change.capture_time.strftime("%Y-%m-%d %H:%M:%S")
 
                     # CloudTrail 이벤트 (최대 3개)
                     events_str = ", ".join(change.related_events[:3])

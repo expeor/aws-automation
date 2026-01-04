@@ -75,31 +75,17 @@ RUNTIME_EOL_DATA: dict[str, RuntimeInfo] = {
     "python3.11": RuntimeInfo("python3.11", "Python 3.11", None, None, None),
     "python3.10": RuntimeInfo("python3.10", "Python 3.10", None, None, None),
     "python3.9": RuntimeInfo("python3.9", "Python 3.9", None, None, None),
-    "python3.8": RuntimeInfo(
-        "python3.8", "Python 3.8", date(2024, 10, 14), date(2025, 2, 28), None
-    ),
-    "python3.7": RuntimeInfo(
-        "python3.7", "Python 3.7", date(2023, 12, 4), date(2024, 1, 9), None
-    ),
-    "python3.6": RuntimeInfo(
-        "python3.6", "Python 3.6", date(2022, 7, 18), date(2022, 8, 17), None
-    ),
-    "python2.7": RuntimeInfo(
-        "python2.7", "Python 2.7", date(2021, 7, 15), date(2022, 5, 30), None
-    ),
+    "python3.8": RuntimeInfo("python3.8", "Python 3.8", date(2024, 10, 14), date(2025, 2, 28), None),
+    "python3.7": RuntimeInfo("python3.7", "Python 3.7", date(2023, 12, 4), date(2024, 1, 9), None),
+    "python3.6": RuntimeInfo("python3.6", "Python 3.6", date(2022, 7, 18), date(2022, 8, 17), None),
+    "python2.7": RuntimeInfo("python2.7", "Python 2.7", date(2021, 7, 15), date(2022, 5, 30), None),
     # Node.js
     "nodejs22.x": RuntimeInfo("nodejs22.x", "Node.js 22", None, None, None),
     "nodejs20.x": RuntimeInfo("nodejs20.x", "Node.js 20", None, None, None),
     "nodejs18.x": RuntimeInfo("nodejs18.x", "Node.js 18", None, None, None),
-    "nodejs16.x": RuntimeInfo(
-        "nodejs16.x", "Node.js 16", date(2024, 6, 12), date(2025, 2, 28), None
-    ),
-    "nodejs14.x": RuntimeInfo(
-        "nodejs14.x", "Node.js 14", date(2023, 12, 4), date(2024, 1, 9), None
-    ),
-    "nodejs12.x": RuntimeInfo(
-        "nodejs12.x", "Node.js 12", date(2023, 3, 31), date(2023, 4, 30), None
-    ),
+    "nodejs16.x": RuntimeInfo("nodejs16.x", "Node.js 16", date(2024, 6, 12), date(2025, 2, 28), None),
+    "nodejs14.x": RuntimeInfo("nodejs14.x", "Node.js 14", date(2023, 12, 4), date(2024, 1, 9), None),
+    "nodejs12.x": RuntimeInfo("nodejs12.x", "Node.js 12", date(2023, 3, 31), date(2023, 4, 30), None),
     # Java
     "java21": RuntimeInfo("java21", "Java 21", None, None, None),
     "java17": RuntimeInfo("java17", "Java 17", None, None, None),
@@ -108,29 +94,17 @@ RUNTIME_EOL_DATA: dict[str, RuntimeInfo] = {
     "java8": RuntimeInfo("java8", "Java 8", date(2024, 1, 8), date(2024, 2, 8), None),
     # .NET
     "dotnet8": RuntimeInfo("dotnet8", ".NET 8", None, None, None),
-    "dotnet6": RuntimeInfo(
-        "dotnet6", ".NET 6", date(2024, 11, 12), date(2025, 2, 28), None
-    ),
-    "dotnetcore3.1": RuntimeInfo(
-        "dotnetcore3.1", ".NET Core 3.1", date(2023, 4, 3), date(2023, 5, 3), None
-    ),
+    "dotnet6": RuntimeInfo("dotnet6", ".NET 6", date(2024, 11, 12), date(2025, 2, 28), None),
+    "dotnetcore3.1": RuntimeInfo("dotnetcore3.1", ".NET Core 3.1", date(2023, 4, 3), date(2023, 5, 3), None),
     # Ruby
     "ruby3.3": RuntimeInfo("ruby3.3", "Ruby 3.3", None, None, None),
     "ruby3.2": RuntimeInfo("ruby3.2", "Ruby 3.2", None, None, None),
-    "ruby2.7": RuntimeInfo(
-        "ruby2.7", "Ruby 2.7", date(2023, 12, 7), date(2024, 1, 9), None
-    ),
+    "ruby2.7": RuntimeInfo("ruby2.7", "Ruby 2.7", date(2023, 12, 7), date(2024, 1, 9), None),
     # Go
-    "go1.x": RuntimeInfo(
-        "go1.x", "Go 1.x", date(2023, 12, 31), date(2024, 1, 30), None
-    ),
-    "provided.al2023": RuntimeInfo(
-        "provided.al2023", "Custom (AL2023)", None, None, None
-    ),
+    "go1.x": RuntimeInfo("go1.x", "Go 1.x", date(2023, 12, 31), date(2024, 1, 30), None),
+    "provided.al2023": RuntimeInfo("provided.al2023", "Custom (AL2023)", None, None, None),
     "provided.al2": RuntimeInfo("provided.al2", "Custom (AL2)", None, None, None),
-    "provided": RuntimeInfo(
-        "provided", "Custom", date(2023, 12, 31), date(2024, 1, 30), None
-    ),
+    "provided": RuntimeInfo("provided", "Custom", date(2023, 12, 31), date(2024, 1, 30), None),
 }
 
 

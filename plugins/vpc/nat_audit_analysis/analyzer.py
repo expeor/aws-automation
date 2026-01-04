@@ -114,9 +114,7 @@ class NATAnalyzer:
 
         # 전체 통계
         result.total_nat_count = len(self.audit_data.nat_gateways)
-        result.total_monthly_cost = sum(
-            f.nat.total_monthly_cost for f in result.findings
-        )
+        result.total_monthly_cost = sum(f.nat.total_monthly_cost for f in result.findings)
         result.total_monthly_waste = sum(f.monthly_waste for f in result.findings)
         result.total_annual_savings = sum(f.annual_savings for f in result.findings)
 

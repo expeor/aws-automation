@@ -185,11 +185,7 @@ class SSOAnalyzer:
 
             # Admin 계정 요약에 추가
             for i, account_id in enumerate(ps.assigned_accounts):
-                account_name = (
-                    ps.assigned_account_names[i]
-                    if i < len(ps.assigned_account_names)
-                    else account_id
-                )
+                account_name = ps.assigned_account_names[i] if i < len(ps.assigned_account_names) else account_id
                 self._add_admin_permission_set(account_id, account_name, ps.name)
 
         # 위험 관리형 정책 체크
@@ -213,11 +209,7 @@ class SSOAnalyzer:
         if ps.dangerous_permissions:
             for perm in ps.dangerous_permissions:
                 severity = Severity.CRITICAL if perm == "*" else Severity.HIGH
-                issue_type = (
-                    IssueType.WILDCARD_PERMISSION
-                    if perm == "*"
-                    else IssueType.DANGEROUS_INLINE_PERMISSION
-                )
+                issue_type = IssueType.WILDCARD_PERMISSION if perm == "*" else IssueType.DANGEROUS_INLINE_PERMISSION
 
                 analysis.issues.append(
                     Issue(
@@ -276,9 +268,7 @@ class SSOAnalyzer:
             for account_name in user.admin_accounts:
                 # account_name으로 account_id 찾기
                 for assign in user.assignments:
-                    if assign.get("account_name") == account_name and assign.get(
-                        "is_admin"
-                    ):
+                    if assign.get("account_name") == account_name and assign.get("is_admin"):
                         self._add_admin_user(
                             assign.get("account_id", ""),
                             account_name,
@@ -360,8 +350,7 @@ class SSOAnalyzer:
                     resource_name=assignment.principal_name,
                     resource_id=assignment.principal_id,
                     description=(
-                        f"'{assignment.principal_name}'이 '{assignment.account_name}' 계정에 "
-                        f"직접 할당되어 있습니다."
+                        f"'{assignment.principal_name}'이 '{assignment.account_name}' 계정에 직접 할당되어 있습니다."
                     ),
                     recommendation="그룹을 통한 권한 관리를 권장합니다.",
                     details={
@@ -371,36 +360,24 @@ class SSOAnalyzer:
                 )
                 result.all_issues.append(issue)
 
-    def _add_admin_permission_set(
-        self, account_id: str, account_name: str, ps_name: str
-    ) -> None:
+    def _add_admin_permission_set(self, account_id: str, account_name: str, ps_name: str) -> None:
         """Admin 계정 요약에 Permission Set 추가"""
         if account_id not in self._admin_by_account:
-            self._admin_by_account[account_id] = AdminAccountSummary(
-                account_id=account_id, account_name=account_name
-            )
+            self._admin_by_account[account_id] = AdminAccountSummary(account_id=account_id, account_name=account_name)
         if ps_name not in self._admin_by_account[account_id].permission_sets:
             self._admin_by_account[account_id].permission_sets.append(ps_name)
 
-    def _add_admin_user(
-        self, account_id: str, account_name: str, user_name: str
-    ) -> None:
+    def _add_admin_user(self, account_id: str, account_name: str, user_name: str) -> None:
         """Admin 계정 요약에 User 추가"""
         if account_id not in self._admin_by_account:
-            self._admin_by_account[account_id] = AdminAccountSummary(
-                account_id=account_id, account_name=account_name
-            )
+            self._admin_by_account[account_id] = AdminAccountSummary(account_id=account_id, account_name=account_name)
         if user_name not in self._admin_by_account[account_id].admin_users:
             self._admin_by_account[account_id].admin_users.append(user_name)
 
-    def _add_admin_group(
-        self, account_id: str, account_name: str, group_name: str
-    ) -> None:
+    def _add_admin_group(self, account_id: str, account_name: str, group_name: str) -> None:
         """Admin 계정 요약에 Group 추가"""
         if account_id not in self._admin_by_account:
-            self._admin_by_account[account_id] = AdminAccountSummary(
-                account_id=account_id, account_name=account_name
-            )
+            self._admin_by_account[account_id] = AdminAccountSummary(account_id=account_id, account_name=account_name)
         if group_name not in self._admin_by_account[account_id].admin_groups:
             self._admin_by_account[account_id].admin_groups.append(group_name)
 
@@ -411,36 +388,22 @@ class SSOAnalyzer:
         result.total_permission_sets = len(self.sso_data.permission_sets)
 
         # 사용자 통계
-        result.users_with_admin = sum(
-            1 for u in self.sso_data.users if u.has_admin_access
-        )
-        result.users_no_assignment = sum(
-            1 for u in self.sso_data.users if not u.assignments
-        )
+        result.users_with_admin = sum(1 for u in self.sso_data.users if u.has_admin_access)
+        result.users_no_assignment = sum(1 for u in self.sso_data.users if not u.assignments)
 
         # Permission Set 통계
-        result.admin_permission_sets = sum(
-            1 for ps in self.sso_data.permission_sets if ps.has_admin_access
-        )
-        result.high_risk_permission_sets = sum(
-            1 for ps in self.sso_data.permission_sets if ps.high_risk_policies
-        )
+        result.admin_permission_sets = sum(1 for ps in self.sso_data.permission_sets if ps.has_admin_access)
+        result.high_risk_permission_sets = sum(1 for ps in self.sso_data.permission_sets if ps.high_risk_policies)
 
         # Group 통계
-        result.empty_groups = sum(
-            1 for g in self.sso_data.groups if g.member_count == 0
-        )
+        result.empty_groups = sum(1 for g in self.sso_data.groups if g.member_count == 0)
 
     def get_summary_stats(self, result: SSOAnalysisResult) -> dict[str, Any]:
         """요약 통계 반환"""
         # Issue 통계
-        critical_count = sum(
-            1 for i in result.all_issues if i.severity == Severity.CRITICAL
-        )
+        critical_count = sum(1 for i in result.all_issues if i.severity == Severity.CRITICAL)
         high_count = sum(1 for i in result.all_issues if i.severity == Severity.HIGH)
-        medium_count = sum(
-            1 for i in result.all_issues if i.severity == Severity.MEDIUM
-        )
+        medium_count = sum(1 for i in result.all_issues if i.severity == Severity.MEDIUM)
         low_count = sum(1 for i in result.all_issues if i.severity == Severity.LOW)
 
         return {

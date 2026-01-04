@@ -5,7 +5,6 @@ AWS 공식 문서 기반 서비스 그룹 분류
 참조: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/
 """
 
-
 # AWS 서비스 카테고리 정의 (AWS 공식 분류 기준)
 # services 리스트는 각 서비스 폴더의 CATEGORY["name"] 값과 매칭
 # 폴더 구조: plugins/{service}/ (예: plugins/rds/, plugins/ec2/)

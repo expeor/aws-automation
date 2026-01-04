@@ -111,9 +111,7 @@ class NATCollector:
             cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
             # 1. NAT Gateway 목록 수집
-            nat_gateways = self._collect_nat_gateways(
-                ec2, account_id, account_name, region
-            )
+            nat_gateways = self._collect_nat_gateways(ec2, account_id, account_name, region)
 
             # 2. CloudWatch 메트릭 수집
             for nat in nat_gateways:
@@ -171,9 +169,7 @@ class NATCollector:
                     create_time = nat_data.get("CreateTime")
                     if create_time:
                         nat.create_time = create_time
-                        nat.age_days = (
-                            now - create_time.replace(tzinfo=timezone.utc)
-                        ).days
+                        nat.age_days = (now - create_time.replace(tzinfo=timezone.utc)).days
 
                     # IP 주소
                     addresses = nat_data.get("NatGatewayAddresses", [])
@@ -194,11 +190,7 @@ class NATCollector:
 
     def _parse_tags(self, tags: list[dict[str, str]]) -> dict[str, str]:
         """태그 파싱"""
-        return {
-            tag.get("Key", ""): tag.get("Value", "")
-            for tag in tags
-            if not tag.get("Key", "").startswith("aws:")
-        }
+        return {tag.get("Key", ""): tag.get("Value", "") for tag in tags if not tag.get("Key", "").startswith("aws:")}
 
     def _collect_metrics(self, cloudwatch, nat: NATGateway) -> None:
         """CloudWatch 메트릭 수집
@@ -249,9 +241,7 @@ class NATCollector:
                         # 날짜순 정렬
                         sorted_points = sorted(datapoints, key=lambda x: x["Timestamp"])
                         nat.daily_bytes_out = [dp.get("Sum", 0) for dp in sorted_points]
-                        nat.days_with_traffic = sum(
-                            1 for dp in datapoints if dp.get("Sum", 0) > 0
-                        )
+                        nat.days_with_traffic = sum(1 for dp in datapoints if dp.get("Sum", 0) > 0)
 
             except ClientError as e:
                 logger.debug(f"메트릭 조회 실패 [{nat.nat_gateway_id}/{metric_name}]: {e}")
@@ -273,6 +263,4 @@ class NATCollector:
             data_price = get_nat_data_price(nat.region)
             nat.monthly_data_cost = round(monthly_gb * data_price, 2)
 
-        nat.total_monthly_cost = round(
-            nat.monthly_fixed_cost + nat.monthly_data_cost, 2
-        )
+        nat.total_monthly_cost = round(nat.monthly_fixed_cost + nat.monthly_data_cost, 2)

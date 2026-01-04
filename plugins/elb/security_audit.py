@@ -342,9 +342,7 @@ class SecurityAuditResult:
 # =============================================================================
 
 
-def collect_v2_lb_security(
-    session, account_id: str, account_name: str, region: str
-) -> list[LBSecurityInfo]:
+def collect_v2_lb_security(session, account_id: str, account_name: str, region: str) -> list[LBSecurityInfo]:
     """ALB/NLB/GWLB 보안 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -375,9 +373,7 @@ def collect_v2_lb_security(
 
                 # 속성 조회 (액세스 로그, 삭제 보호)
                 try:
-                    attrs = elbv2.describe_load_balancer_attributes(
-                        LoadBalancerArn=lb_arn
-                    )
+                    attrs = elbv2.describe_load_balancer_attributes(LoadBalancerArn=lb_arn)
                     for attr in attrs.get("Attributes", []):
                         key = attr.get("Key", "")
                         value = attr.get("Value", "")
@@ -409,9 +405,7 @@ def collect_v2_lb_security(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
 
@@ -431,9 +425,7 @@ def _get_listeners(elbv2, lb_arn: str) -> list[ListenerInfo]:
                 protocol=data.get("Protocol", ""),
                 port=data.get("Port", 0),
                 ssl_policy=data.get("SslPolicy"),
-                certificates=[
-                    c.get("CertificateArn", "") for c in data.get("Certificates", [])
-                ],
+                certificates=[c.get("CertificateArn", "") for c in data.get("Certificates", [])],
                 default_actions=data.get("DefaultActions", []),
             )
             listeners.append(listener)
@@ -444,9 +436,7 @@ def _get_listeners(elbv2, lb_arn: str) -> list[ListenerInfo]:
     return listeners
 
 
-def collect_classic_lb_security(
-    session, account_id: str, account_name: str, region: str
-) -> list[LBSecurityInfo]:
+def collect_classic_lb_security(session, account_id: str, account_name: str, region: str) -> list[LBSecurityInfo]:
     """CLB 보안 정보 수집"""
     from botocore.exceptions import ClientError
 
@@ -477,9 +467,7 @@ def collect_classic_lb_security(
             # 속성 조회
             try:
                 attrs = elb.describe_load_balancer_attributes(LoadBalancerName=lb_name)
-                access_log = attrs.get("LoadBalancerAttributes", {}).get(
-                    "AccessLog", {}
-                )
+                access_log = attrs.get("LoadBalancerAttributes", {}).get("AccessLog", {})
                 lb.access_logs_enabled = access_log.get("Enabled", False)
                 lb.access_logs_bucket = access_log.get("S3BucketName", "")
             except ClientError:
@@ -502,9 +490,7 @@ def collect_classic_lb_security(
         if "not available" not in str(e).lower():
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             if not is_quiet():
-                console.print(
-                    f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]"
-                )
+                console.print(f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
 
@@ -546,9 +532,7 @@ def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
     _analyze_listener_security(lb)
 
 
-def _analyze_ssl_policy(
-    lb: LBSecurityInfo, ssl_analyzer: SSLPolicyAnalyzer | None
-) -> None:
+def _analyze_ssl_policy(lb: LBSecurityInfo, ssl_analyzer: SSLPolicyAnalyzer | None) -> None:
     """SSL/TLS 정책 분석 (AWS API 기반 동적 분석)"""
     for listener in lb.listeners:
         if listener.protocol not in ("HTTPS", "TLS"):
@@ -559,11 +543,7 @@ def _analyze_ssl_policy(
             continue
 
         # SSLPolicyAnalyzer로 동적 분석, Fallback: 정책 이름 기반 휴리스틱
-        analysis = (
-            ssl_analyzer.analyze_policy(policy)
-            if ssl_analyzer
-            else _fallback_policy_analysis(policy)
-        )
+        analysis = ssl_analyzer.analyze_policy(policy) if ssl_analyzer else _fallback_policy_analysis(policy)
 
         if not analysis["is_vulnerable"]:
             continue
@@ -777,9 +757,7 @@ def _analyze_deletion_protection(lb: LBSecurityInfo) -> None:
 
     if not lb.deletion_protection:
         # 중앙 설정의 패턴으로 프로덕션 판단
-        is_production = any(
-            keyword in lb.name.lower() for keyword in DELETION_PROTECTION_PATTERNS
-        )
+        is_production = any(keyword in lb.name.lower() for keyword in DELETION_PROTECTION_PATTERNS)
         risk = RiskLevel.HIGH if is_production else RiskLevel.LOW
 
         lb.findings.append(
@@ -822,13 +800,10 @@ def _analyze_listener_security(lb: LBSecurityInfo) -> None:
 
     # HTTP와 HTTPS 모두 있지만 리다이렉트 미설정
     if has_http and has_https and lb.lb_type == "application":
-        http_listeners = [
-            listener for listener in lb.listeners if listener.protocol == "HTTP"
-        ]
+        http_listeners = [listener for listener in lb.listeners if listener.protocol == "HTTP"]
         for http_listener in http_listeners:
             has_redirect = any(
-                action.get("Type") == "redirect"
-                and action.get("RedirectConfig", {}).get("Protocol") == "HTTPS"
+                action.get("Type") == "redirect" and action.get("RedirectConfig", {}).get("Protocol") == "HTTPS"
                 for action in http_listener.default_actions
             )
             if not has_redirect:
@@ -895,9 +870,7 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="2C3E50", end_color="2C3E50", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -907,21 +880,11 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
     )
 
     risk_fills = {
-        RiskLevel.CRITICAL: PatternFill(
-            start_color="C0392B", end_color="C0392B", fill_type="solid"
-        ),
-        RiskLevel.HIGH: PatternFill(
-            start_color="E74C3C", end_color="E74C3C", fill_type="solid"
-        ),
-        RiskLevel.MEDIUM: PatternFill(
-            start_color="F39C12", end_color="F39C12", fill_type="solid"
-        ),
-        RiskLevel.LOW: PatternFill(
-            start_color="3498DB", end_color="3498DB", fill_type="solid"
-        ),
-        RiskLevel.INFO: PatternFill(
-            start_color="95A5A6", end_color="95A5A6", fill_type="solid"
-        ),
+        RiskLevel.CRITICAL: PatternFill(start_color="C0392B", end_color="C0392B", fill_type="solid"),
+        RiskLevel.HIGH: PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid"),
+        RiskLevel.MEDIUM: PatternFill(start_color="F39C12", end_color="F39C12", fill_type="solid"),
+        RiskLevel.LOW: PatternFill(start_color="3498DB", end_color="3498DB", fill_type="solid"),
+        RiskLevel.INFO: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
     }
 
     risk_fonts = {
@@ -1061,18 +1024,10 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
             ws3.cell(row=row, column=6, value=lb.state).border = thin_border
             ws3.cell(row=row, column=7, value=lb.risk_score).border = thin_border
             ws3.cell(row=row, column=8, value=len(lb.findings)).border = thin_border
-            ws3.cell(
-                row=row, column=9, value="Yes" if lb.access_logs_enabled else "No"
-            ).border = thin_border
-            ws3.cell(
-                row=row, column=10, value="Yes" if lb.deletion_protection else "No"
-            ).border = thin_border
-            ws3.cell(
-                row=row, column=11, value="Yes" if lb.waf_web_acl_arn else "No"
-            ).border = thin_border
-            ws3.cell(
-                row=row, column=12, value="Yes" if lb.has_https_listener else "No"
-            ).border = thin_border
+            ws3.cell(row=row, column=9, value="Yes" if lb.access_logs_enabled else "No").border = thin_border
+            ws3.cell(row=row, column=10, value="Yes" if lb.deletion_protection else "No").border = thin_border
+            ws3.cell(row=row, column=11, value="Yes" if lb.waf_web_acl_arn else "No").border = thin_border
+            ws3.cell(row=row, column=12, value="Yes" if lb.has_https_listener else "No").border = thin_border
 
     # 열 너비 조정
     for sheet in wb.worksheets:
@@ -1080,9 +1035,7 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     # 저장
@@ -1099,9 +1052,7 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> SecurityAuditResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SecurityAuditResult | None:
     """단일 계정/리전의 ELB 보안 정보 수집 및 분석 (병렬 실행용)"""
     v2_lbs = collect_v2_lb_security(session, account_id, account_name, region)
     classic_lbs = collect_classic_lb_security(session, account_id, account_name, region)
@@ -1116,12 +1067,8 @@ def run(ctx) -> None:
     console.print("[bold]ELB Security Audit 시작...[/bold]")
     console.print("[dim]SSL/TLS, WAF, 액세스 로그, 삭제 보호, 인증서 만료 분석[/dim]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="elbv2"
-    )
-    all_results: list[SecurityAuditResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elbv2")
+    all_results: list[SecurityAuditResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -1141,9 +1088,7 @@ def run(ctx) -> None:
 
     console.print(f"\n[bold]전체 LB: {totals['total']}개[/bold]")
     if totals["critical"] > 0:
-        console.print(
-            f"  [red bold]CRITICAL: {totals['critical']}건[/red bold] - 즉시 조치 필요"
-        )
+        console.print(f"  [red bold]CRITICAL: {totals['critical']}건[/red bold] - 즉시 조치 필요")
     if totals["high"] > 0:
         console.print(f"  [red]HIGH: {totals['high']}건[/red]")
     if totals["medium"] > 0:

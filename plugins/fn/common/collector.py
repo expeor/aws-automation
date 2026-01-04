@@ -154,9 +154,7 @@ def collect_functions(
                 if lm_str:
                     with contextlib.suppress(ValueError):
                         # ISO 8601 형식 파싱
-                        last_modified = datetime.fromisoformat(
-                            lm_str.replace("Z", "+00:00")
-                        )
+                        last_modified = datetime.fromisoformat(lm_str.replace("Z", "+00:00"))
 
                 func_info = LambdaFunctionInfo(
                     function_name=function_name,
@@ -181,9 +179,7 @@ def collect_functions(
                 pc_configs: list[dict[str, Any]] = try_or_default(
                     lambda fname=function_name: lambda_client.list_provisioned_concurrency_configs(  # type: ignore[misc]
                         FunctionName=fname
-                    ).get(
-                        "ProvisionedConcurrencyConfigs", []
-                    ),
+                    ).get("ProvisionedConcurrencyConfigs", []),
                     default=[],
                     account_id=account_id,
                     account_name=account_name,
@@ -192,17 +188,13 @@ def collect_functions(
                     severity=ErrorSeverity.DEBUG,
                 )
                 for pc in pc_configs:
-                    func_info.provisioned_concurrency += pc.get(
-                        "AllocatedProvisionedConcurrentExecutions", 0
-                    )
+                    func_info.provisioned_concurrency += pc.get("AllocatedProvisionedConcurrentExecutions", 0)
 
                 # Reserved Concurrency 조회 (옵션)
                 reserved: int | None = try_or_default(
                     lambda fname=function_name: lambda_client.get_function_concurrency(  # type: ignore[misc]
                         FunctionName=fname
-                    ).get(
-                        "ReservedConcurrentExecutions"
-                    ),
+                    ).get("ReservedConcurrentExecutions"),
                     default=None,
                     account_id=account_id,
                     account_name=account_name,
@@ -216,9 +208,7 @@ def collect_functions(
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        logger.warning(
-            f"[{account_name}/{region}] Lambda list_functions 실패: {error_code}"
-        )
+        logger.warning(f"[{account_name}/{region}] Lambda list_functions 실패: {error_code}")
 
     return functions
 
@@ -371,8 +361,6 @@ def collect_functions_with_metrics(
     functions = collect_functions(session, account_id, account_name, region)
 
     for func in functions:
-        func.metrics = collect_function_metrics(
-            session, region, func.function_name, metric_days
-        )
+        func.metrics = collect_function_metrics(session, region, func.function_name, metric_days)
 
     return functions

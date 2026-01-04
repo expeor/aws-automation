@@ -176,9 +176,7 @@ class Recommendation:
             action_type=item.get("actionType", ""),
             estimated_monthly_cost=float(item.get("estimatedMonthlyCost", 0)),
             estimated_monthly_savings=float(item.get("estimatedMonthlySavings", 0)),
-            estimated_savings_percentage=float(
-                item.get("estimatedSavingsPercentage", 0)
-            ),
+            estimated_savings_percentage=float(item.get("estimatedSavingsPercentage", 0)),
             implementation_effort=item.get("implementationEffort", ""),
             restart_needed=item.get("restartNeeded", False),
             rollback_possible=item.get("rollbackPossible", False),
@@ -375,9 +373,7 @@ class CostOptimizationAnalyzer:
 
         return summary
 
-    def get_total_savings(
-        self, recommendations: list[Recommendation] | None = None
-    ) -> float:
+    def get_total_savings(self, recommendations: list[Recommendation] | None = None) -> float:
         """총 잠재적 월간 절약액 계산
 
         Args:
@@ -417,9 +413,7 @@ class CostOptimizationAnalyzer:
             response = self.client.get_preferences()
             return {
                 "savings_estimation_mode": response.get("savingsEstimationMode", ""),
-                "member_account_discount_visibility": response.get(
-                    "memberAccountDiscountVisibility", ""
-                ),
+                "member_account_discount_visibility": response.get("memberAccountDiscountVisibility", ""),
             }
         except Exception as e:
             logger.error(f"설정 조회 실패: {e}")

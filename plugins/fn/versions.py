@@ -104,11 +104,7 @@ class FunctionVersionInfo:
 
     @property
     def issue_count(self) -> int:
-        return (
-            len(self.old_versions)
-            + len(self.unused_versions)
-            + len(self.inactive_aliases)
-        )
+        return len(self.old_versions) + len(self.unused_versions) + len(self.inactive_aliases)
 
 
 @dataclass
@@ -162,12 +158,8 @@ def collect_versions(
 
                 # 버전 목록
                 try:
-                    versions_paginator = lambda_client.get_paginator(
-                        "list_versions_by_function"
-                    )
-                    for v_page in versions_paginator.paginate(
-                        FunctionName=function_name
-                    ):
+                    versions_paginator = lambda_client.get_paginator("list_versions_by_function")
+                    for v_page in versions_paginator.paginate(FunctionName=function_name):
                         for v in v_page.get("Versions", []):
                             version = v.get("Version", "")
                             if version == "$LATEST":
@@ -177,9 +169,7 @@ def collect_versions(
                             lm_str = v.get("LastModified")
                             if lm_str:
                                 with contextlib.suppress(ValueError):
-                                    last_modified = datetime.fromisoformat(
-                                        lm_str.replace("Z", "+00:00")
-                                    )
+                                    last_modified = datetime.fromisoformat(lm_str.replace("Z", "+00:00"))
 
                             info.versions.append(
                                 LambdaVersion(
@@ -198,9 +188,7 @@ def collect_versions(
                 # Alias 목록
                 try:
                     aliases_paginator = lambda_client.get_paginator("list_aliases")
-                    for a_page in aliases_paginator.paginate(
-                        FunctionName=function_name
-                    ):
+                    for a_page in aliases_paginator.paginate(FunctionName=function_name):
                         for a in a_page.get("Aliases", []):
                             info.aliases.append(
                                 LambdaAlias(
@@ -219,9 +207,7 @@ def collect_versions(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]")
 
     return result
 
@@ -309,13 +295,9 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    yellow_fill = PatternFill(
-        start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
 
     # Summary
     ws = wb.create_sheet("Summary")
@@ -395,8 +377,7 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
                 ws_issues.cell(
                     row=issue_row,
                     column=9,
-                    value=", ".join(cleanup_versions[:10])
-                    + ("..." if len(cleanup_versions) > 10 else ""),
+                    value=", ".join(cleanup_versions[:10]) + ("..." if len(cleanup_versions) > 10 else ""),
                 )
 
     # All Versions
@@ -450,9 +431,7 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
                 ws_all.cell(
                     row=all_row,
                     column=8,
-                    value=v.last_modified.strftime("%Y-%m-%d")
-                    if v.last_modified
-                    else "-",
+                    value=v.last_modified.strftime("%Y-%m-%d") if v.last_modified else "-",
                 )
 
                 # 상태
@@ -499,9 +478,7 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
                 if alias.routing_config:
                     weights = alias.routing_config.get("AdditionalVersionWeights", {})
                     if weights:
-                        routing = ", ".join(
-                            f"v{k}: {v*100:.0f}%" for k, v in weights.items()
-                        )
+                        routing = ", ".join(f"v{k}: {v * 100:.0f}%" for k, v in weights.items())
                 ws_alias.cell(row=alias_row, column=7, value=routing)
 
     # 열 너비
@@ -510,9 +487,7 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -529,9 +504,7 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> VersionAuditResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> VersionAuditResult | None:
     """단일 계정/리전의 Lambda 버전 수집 및 분석 (병렬 실행용)"""
     functions = collect_versions(session, account_id, account_name, region)
     if not functions:
@@ -543,9 +516,7 @@ def run(ctx) -> None:
     """Version/Alias 감사 실행"""
     console.print("[bold]Lambda Version/Alias 감사 시작...[/bold]\n")
 
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="lambda"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="lambda")
     results: list[VersionAuditResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:

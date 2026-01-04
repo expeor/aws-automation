@@ -481,9 +481,7 @@ class MainMenu:
                 idx = int(choice)
                 if 1 <= idx <= len(results):
                     _, selected = results[idx - 1]
-                    self._run_tool_directly(
-                        selected["category"], selected["tool_module"]
-                    )
+                    self._run_tool_directly(selected["category"], selected["tool_module"])
                     return
 
             self.console.print(f"[red]0-{len(results)} 범위의 번호를 입력하세요.[/]")
@@ -636,12 +634,7 @@ class MainMenu:
                 name = tool.get("name", "").lower()
                 desc = tool.get("description", "").lower()
 
-                if (
-                    query_lower in cat
-                    or query_lower in name
-                    or query_lower in desc
-                    or query_lower in tool_area
-                ):
+                if query_lower in cat or query_lower in name or query_lower in desc or query_lower in tool_area:
                     results.append((idx, tool))
 
         if not results:
@@ -701,9 +694,7 @@ class MainMenu:
         self.console.print("[bold yellow]도구 탐색[/bold yellow]")
         self.console.print("  [cyan]a[/cyan]  전체 도구      모든 도구를 한 화면에 표시")
         self.console.print("  [cyan]s[/cyan]  AWS 서비스     서비스별 목록 (EC2, ELB, VPC...)")
-        self.console.print(
-            "  [cyan]c[/cyan]  AWS 분류       카테고리별 탐색 (Compute, Storage...)"
-        )
+        self.console.print("  [cyan]c[/cyan]  AWS 분류       카테고리별 탐색 (Compute, Storage...)")
         self.console.print("  [cyan]t[/cyan]  점검 유형      TA 영역별 (보안, 비용, 성능...)")
         self.console.print("  [cyan]f[/cyan]  즐겨찾기       자주 사용하는 도구 추가/제거")
         self.console.print()
@@ -726,9 +717,7 @@ class MainMenu:
         self.console.print("[bold yellow]도메인 필터[/bold yellow]")
         for area in AREA_REGISTRY:
             cmd = area["command"].ljust(12)
-            self.console.print(
-                f"  [green]{cmd}[/green] {area['label']}, {area['desc']}"
-            )
+            self.console.print(f"  [green]{cmd}[/green] {area['label']}, {area['desc']}")
         self.console.print()
 
         # CLI 직접 실행
@@ -757,9 +746,7 @@ class MainMenu:
 
             if fav_items:
                 for i, item in enumerate(fav_items, 1):
-                    self.console.print(
-                        f"  {i:>2}. {item.tool_name} [dim]{item.category}[/dim]"
-                    )
+                    self.console.print(f"  {i:>2}. {item.tool_name} [dim]{item.category}[/dim]")
                 self.console.print()
             else:
                 self.console.print("[dim]등록된 즐겨찾기가 없습니다.[/dim]")
@@ -768,11 +755,7 @@ class MainMenu:
             # 메뉴 옵션
             self.console.print(
                 "[dim]a[/dim] 추가"
-                + (
-                    "  [dim]d[/dim] 삭제  [dim]u[/dim] 위로  [dim]n[/dim] 아래로"
-                    if fav_items
-                    else ""
-                )
+                + ("  [dim]d[/dim] 삭제  [dim]u[/dim] 위로  [dim]n[/dim] 아래로" if fav_items else "")
                 + "  [dim]0[/dim] 돌아가기"
             )
             self.console.print()
@@ -835,9 +818,7 @@ class MainMenu:
                 if self._favorites.is_favorite(selected.category, selected.tool_module):
                     self.console.print(f"[dim]'{selected.tool_name}' 이미 등록됨[/dim]")
                 else:
-                    success = self._favorites.add(
-                        selected.category, selected.tool_name, selected.tool_module
-                    )
+                    success = self._favorites.add(selected.category, selected.tool_name, selected.tool_module)
                     if success:
                         self.console.print(f"[dim]'{selected.tool_name}' 추가됨[/dim]")
                     else:
@@ -916,9 +897,7 @@ class MainMenu:
                 for session in sso_sessions:
                     session_config = config.sessions.get(session)
                     if session_config:
-                        self.console.print(
-                            f"  [cyan]●[/cyan] {session} [dim]({session_config.region})[/dim]"
-                        )
+                        self.console.print(f"  [cyan]●[/cyan] {session} [dim]({session_config.region})[/dim]")
                     else:
                         self.console.print(f"  [cyan]●[/cyan] {session}")
                 self.console.print()
@@ -949,18 +928,14 @@ class MainMenu:
                     self.console.print("[bold]SSO 프로파일[/bold] [dim](고정 계정/역할)[/dim]")
                     for name, cfg in sso_profiles:
                         if cfg and cfg.sso_account_id:
-                            self.console.print(
-                                f"  [green]●[/green] {name} [dim]({cfg.sso_account_id})[/dim]"
-                            )
+                            self.console.print(f"  [green]●[/green] {name} [dim]({cfg.sso_account_id})[/dim]")
                         else:
                             self.console.print(f"  [green]●[/green] {name}")
                     self.console.print()
 
                 # Static 프로파일
                 if static_profiles:
-                    self.console.print(
-                        "[bold]IAM Access Key[/bold] [dim](정적 자격 증명)[/dim]"
-                    )
+                    self.console.print("[bold]IAM Access Key[/bold] [dim](정적 자격 증명)[/dim]")
                     for name, cfg in static_profiles:
                         region_info = f" ({cfg.region})" if cfg and cfg.region else ""
                         self.console.print(f"  [yellow]●[/yellow] {name}{region_info}")
@@ -976,9 +951,7 @@ class MainMenu:
             if not sso_sessions and not profiles:
                 self.console.print("[dim]설정된 프로필이 없습니다.[/dim]")
                 self.console.print()
-                self.console.print(
-                    "[dim]~/.aws/config 또는 ~/.aws/credentials를 확인하세요.[/dim]"
-                )
+                self.console.print("[dim]~/.aws/config 또는 ~/.aws/credentials를 확인하세요.[/dim]")
 
         except Exception as e:
             self.console.print(f"[red]프로필 로드 실패: {e}[/red]")
@@ -1122,9 +1095,7 @@ class MainMenu:
                 idx = int(choice)
                 if 1 <= idx <= len(tools):
                     selected_tool = tools[idx - 1]
-                    self._run_tool_directly(
-                        selected_tool["category"], selected_tool["tool_module"]
-                    )
+                    self._run_tool_directly(selected_tool["category"], selected_tool["tool_module"])
                     return
                 else:
                     self.console.print(f"[red]1-{len(tools)} 범위의 번호를 입력하세요.[/]")
@@ -1184,9 +1155,7 @@ class MainMenu:
                     selected_cat = aws_categories[idx - 1]
                     self._show_services_in_category(selected_cat)
                 else:
-                    self.console.print(
-                        f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]"
-                    )
+                    self.console.print(f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]")
 
     def _show_services_in_category(self, aws_category: dict) -> None:
         """AWS 카테고리 내 서비스(플러그인) 목록 표시"""
@@ -1281,9 +1250,7 @@ class MainMenu:
                     str(i),
                     tool.get("name", ""),
                     f"[{perm_color}]{perm}[/{perm_color}]",
-                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]"
-                    if area
-                    else "",
+                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
                     (tool.get("description", "") or "")[:35],
                 )
 
@@ -1335,10 +1302,7 @@ class MainMenu:
                 if (
                     kind == "sso_profile"
                     and provider_type == ProviderType.SSO_PROFILE
-                    or (
-                        kind == "static"
-                        and provider_type == ProviderType.STATIC_CREDENTIALS
-                    )
+                    or (kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS)
                 ):
                     result.append(profile_name)
         except Exception:
@@ -1366,9 +1330,7 @@ class MainMenu:
                     profiles_preview = ", ".join(g.profiles[:2])
                     if len(g.profiles) > 2:
                         profiles_preview += f" 외 {len(g.profiles) - 2}개"
-                    self.console.print(
-                        f"  {i:>2}. [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]"
-                    )
+                    self.console.print(f"  {i:>2}. [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]")
                 self.console.print()
             else:
                 self.console.print("[dim]저장된 그룹이 없습니다.[/dim]")
@@ -1377,11 +1339,7 @@ class MainMenu:
             # 메뉴 옵션
             self.console.print(
                 "[dim]a[/dim] 추가"
-                + (
-                    "  [dim]d[/dim] 삭제  [dim]e[/dim] 수정  [dim]u[/dim] 위로  [dim]n[/dim] 아래로"
-                    if groups
-                    else ""
-                )
+                + ("  [dim]d[/dim] 삭제  [dim]e[/dim] 수정  [dim]u[/dim] 위로  [dim]n[/dim] 아래로" if groups else "")
                 + "  [dim]0[/dim] 돌아가기"
             )
             self.console.print()
@@ -1464,9 +1422,7 @@ class MainMenu:
 
         # 5. 저장
         if manager.add(name, kind, selected_profiles):
-            self.console.print(
-                f"[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]"
-            )
+            self.console.print(f"[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]")
         else:
             self.console.print("[red]저장 실패 (이름 중복 또는 최대 개수 초과)[/red]")
 
@@ -1577,9 +1533,7 @@ class MainMenu:
                 if manager.update(group.name, profiles=new_profiles):
                     self.console.print(f"[dim]프로파일 변경됨 ({len(new_profiles)}개)[/dim]")
 
-    def _reorder_profile_group_interactive(
-        self, manager, groups, direction: str
-    ) -> None:
+    def _reorder_profile_group_interactive(self, manager, groups, direction: str) -> None:
         """프로파일 그룹 순서 변경"""
         self.console.print()
         label = "위로" if direction == "up" else "아래로"
@@ -1594,11 +1548,7 @@ class MainMenu:
             idx = int(choice)
             if 1 <= idx <= len(groups):
                 group = groups[idx - 1]
-                success = (
-                    manager.move_up(group.name)
-                    if direction == "up"
-                    else manager.move_down(group.name)
-                )
+                success = manager.move_up(group.name) if direction == "up" else manager.move_down(group.name)
 
                 if success:
                     self.console.print(f"[dim]'{group.name}' 이동됨[/dim]")

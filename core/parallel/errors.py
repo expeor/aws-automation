@@ -278,9 +278,7 @@ def safe_collect(
 ) -> None:
     """안전한 에러 수집 (collector가 None이어도 동작)"""
     if collector:
-        collector.collect(
-            error, account_id, account_name, region, operation, severity, resource_id
-        )
+        collector.collect(error, account_id, account_name, region, operation, severity, resource_id)
     else:
         # collector 없으면 로깅만
         error_info = error.response.get("Error", {})

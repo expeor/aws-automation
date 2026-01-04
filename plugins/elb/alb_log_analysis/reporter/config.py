@@ -232,6 +232,4 @@ STATUS_CODE_TYPES: tuple[str, ...] = (
     "Backend 5xx Count",
 )
 
-SPECIAL_COUNTRY_CODES: frozenset[str] = frozenset(
-    {"UNKNOWN", "PRIVATE", "LOOPBACK", "LINK_LOCAL", "MULTICAST"}
-)
+SPECIAL_COUNTRY_CODES: frozenset[str] = frozenset({"UNKNOWN", "PRIVATE", "LOOPBACK", "LINK_LOCAL", "MULTICAST"})

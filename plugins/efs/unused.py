@@ -95,9 +95,7 @@ class EFSAnalysisResult:
     findings: list[EFSFinding] = field(default_factory=list)
 
 
-def collect_efs_filesystems(
-    session, account_id: str, account_name: str, region: str
-) -> list[EFSInfo]:
+def collect_efs_filesystems(session, account_id: str, account_name: str, region: str) -> list[EFSInfo]:
     """EFS 파일시스템 수집"""
     from botocore.exceptions import ClientError
 
@@ -156,9 +154,9 @@ def collect_efs_filesystems(
                         Statistics=["Average"],
                     )
                     if conn_resp.get("Datapoints"):
-                        info.avg_client_connections = sum(
-                            d["Average"] for d in conn_resp["Datapoints"]
-                        ) / len(conn_resp["Datapoints"])
+                        info.avg_client_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
+                            conn_resp["Datapoints"]
+                        )
 
                     # TotalIOBytes (읽기+쓰기)
                     io_resp = cloudwatch.get_metric_statistics(
@@ -171,9 +169,7 @@ def collect_efs_filesystems(
                         Statistics=["Sum"],
                     )
                     if io_resp.get("Datapoints"):
-                        info.total_io_bytes = sum(
-                            d["Sum"] for d in io_resp["Datapoints"]
-                        )
+                        info.total_io_bytes = sum(d["Sum"] for d in io_resp["Datapoints"])
 
                 except ClientError:
                     pass
@@ -257,14 +253,10 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -335,9 +327,7 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
                 ws_detail.cell(row=detail_row, column=6, value=fs.mount_target_count)
                 ws_detail.cell(row=detail_row, column=7, value=fs.throughput_mode)
                 ws_detail.cell(row=detail_row, column=8, value=f.status.value)
-                ws_detail.cell(
-                    row=detail_row, column=9, value=f"{fs.avg_client_connections:.1f}"
-                )
+                ws_detail.cell(row=detail_row, column=9, value=f"{fs.avg_client_connections:.1f}")
                 ws_detail.cell(
                     row=detail_row,
                     column=10,
@@ -355,9 +345,7 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -367,9 +355,7 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> EFSAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EFSAnalysisResult | None:
     """단일 계정/리전의 EFS 수집 및 분석 (병렬 실행용)"""
     filesystems = collect_efs_filesystems(session, account_id, account_name, region)
     if not filesystems:

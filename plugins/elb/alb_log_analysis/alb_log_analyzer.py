@@ -81,9 +81,7 @@ class ALBLogAnalyzer:
         # datetime 객체 또는 문자열을 datetime 객체로 변환
         if isinstance(start_datetime, str):
             try:
-                self.start_datetime = datetime.strptime(
-                    start_datetime, "%Y-%m-%d %H:%M"
-                )
+                self.start_datetime = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M")
             except ValueError as e:
                 raise ValueError(f"잘못된 시작 시간 형식: {start_datetime}") from e
         else:
@@ -126,9 +124,7 @@ class ALBLogAnalyzer:
         self.download_dir = self.temp_dir
 
         # DuckDB 임시/데이터 디렉토리
-        self.temp_work_dir = os.getenv("AA_DUCKDB_TEMP_DIR") or os.path.join(
-            self.base_dir, "duckdb"
-        )
+        self.temp_work_dir = os.getenv("AA_DUCKDB_TEMP_DIR") or os.path.join(self.base_dir, "duckdb")
         self.duckdb_dir = os.path.join(self.base_dir, "checkpoint")
         self.duckdb_db_path = os.path.join(self.duckdb_dir, "alb_logs.duckdb")
 
@@ -177,9 +173,7 @@ class ALBLogAnalyzer:
 
         # 간단한 정규식 기반 파싱 매크로들 (DuckDB MACRO)
         # 타임존 변환: ALB 로그는 UTC로 기록되므로, 사용자 타임존으로 변환
-        tz_name = (
-            self.timezone.zone if hasattr(self.timezone, "zone") else str(self.timezone)
-        )
+        tz_name = self.timezone.zone if hasattr(self.timezone, "zone") else str(self.timezone)
         functions = [
             # UTC 타임스탬프를 파싱 후 사용자 타임존으로 변환
             f"""CREATE OR REPLACE MACRO extract_timestamp(log_line) AS (
@@ -331,9 +325,7 @@ class ALBLogAnalyzer:
                 progress.advance(task)
 
                 # 2) DuckDB로 로그 분석 수행 (5단계)
-                analysis_results = self._analyze_with_duckdb(
-                    progress=progress, task_id=task
-                )
+                analysis_results = self._analyze_with_duckdb(progress=progress, task_id=task)
 
             # AbuseIPDB 데이터 추가 (IPIntelligence 통합 API 사용)
             progress.update(task, description="[cyan]AbuseIPDB 데이터 다운로드 중...")
@@ -411,21 +403,15 @@ class ALBLogAnalyzer:
                         if "-" in date_part:
                             date_str = date_part  # 이미 YYYY-MM-DD 형식
                         else:
-                            date_str = (
-                                f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
-                            )
+                            date_str = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
                         date_counts[date_str] = date_counts.get(date_str, 0) + 1
                     else:
                         # 3) 추가 패턴 시도 - 파일명 전체에서 날짜 찾기
-                        date_anywhere = re.search(
-                            r"(\d{4}[\-_]?\d{2}[\-_]?\d{2})", filename
-                        )
+                        date_anywhere = re.search(r"(\d{4}[\-_]?\d{2}[\-_]?\d{2})", filename)
                         if date_anywhere:
                             raw_date = date_anywhere.group(1).replace("_", "-")
                             if len(raw_date) == 8:  # YYYYMMDD
-                                date_str = (
-                                    f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
-                                )
+                                date_str = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
                             else:
                                 date_str = raw_date
                             date_counts[date_str] = date_counts.get(date_str, 0) + 1
@@ -452,9 +438,7 @@ class ALBLogAnalyzer:
 
             # 파일 리스트를 DuckDB가 이해할 수 있는 리스트 리터럴로 변환
             backslash = "\\"
-            file_list_sql = ", ".join(
-                [f"'{p.replace(backslash, '/')}'" for p in log_files]
-            )
+            file_list_sql = ", ".join([f"'{p.replace(backslash, '/')}'" for p in log_files])
 
             # 로그 파일들을 하나의 테이블로 로드
             create_table_query = f"""
@@ -607,11 +591,7 @@ class ALBLogAnalyzer:
             ) in target_status_results:
                 # target 표시용 키 생성 (다른 시트들과 동일한 형태)
                 if target and target != "-":
-                    target_display_key = (
-                        f"{target_group_name}({target})"
-                        if target_group_name
-                        else target
-                    )
+                    target_display_key = f"{target_group_name}({target})" if target_group_name else target
                 else:
                     continue  # target이 없으면 스킵
 
@@ -654,17 +634,13 @@ class ALBLogAnalyzer:
             user_agent_results = self.conn.execute(user_agent_query).fetchall()
             user_agent_counts = {ua: count for ua, count in user_agent_results}
             if progress is not None and task_id is not None:
-                progress.update(
-                    task_id, description="[cyan]IP/URL/User Agent 카운트 완료..."
-                )
+                progress.update(task_id, description="[cyan]IP/URL/User Agent 카운트 완료...")
                 progress.advance(task_id)
 
             # URL 별 상세 통계 (Top 100 URL 대상)
             request_url_details: dict[str, dict[str, Any]] = {}
             try:
-                top_urls = [
-                    str(url).strip() for url, _ in request_url_results[:100] if url
-                ]
+                top_urls = [str(url).strip() for url, _ in request_url_results[:100] if url]
                 if top_urls:
                     # DuckDB IN 리스트 구성 (quote escape 처리)
                     def _escape_sql(val: str) -> str:
@@ -740,11 +716,7 @@ class ALBLogAnalyzer:
                             request_url_details[url]["user_agents"][ua] = int(cnt)
 
                     for url, status, cnt in status_rows:
-                        if (
-                            url in request_url_details
-                            and status is not None
-                            and status != ""
-                        ):
+                        if url in request_url_details and status is not None and status != "":
                             request_url_details[url]["status_codes"][status] = int(cnt)
 
                     for url, uniq in unique_ip_rows:
@@ -757,9 +729,7 @@ class ALBLogAnalyzer:
                     for url, avg_rt in avg_rt_rows:
                         if url in request_url_details:
                             try:
-                                request_url_details[url]["avg_response_time"] = float(
-                                    avg_rt or 0.0
-                                )
+                                request_url_details[url]["avg_response_time"] = float(avg_rt or 0.0)
                             except Exception:
                                 request_url_details[url]["avg_response_time"] = 0.0
             except Exception:
@@ -817,9 +787,7 @@ class ALBLogAnalyzer:
                 long_resp_count_row = self.conn.execute(
                     "SELECT COUNT(*) FROM alb_logs WHERE response_time >= 1.0"
                 ).fetchone()
-                long_response_count_val = (
-                    long_resp_count_row[0] if long_resp_count_row else 0
-                )
+                long_response_count_val = long_resp_count_row[0] if long_resp_count_row else 0
             except Exception:
                 long_response_count_val = 0
 
@@ -832,9 +800,7 @@ class ALBLogAnalyzer:
             ORDER BY total_bytes DESC
             """
             received_bytes_results = self.conn.execute(received_bytes_query).fetchall()
-            received_bytes = {
-                url: bytes_count for url, bytes_count in received_bytes_results
-            }
+            received_bytes = {url: bytes_count for url, bytes_count in received_bytes_results}
 
             sent_bytes_query = """
             SELECT url, SUM(sent_bytes) as total_bytes
@@ -1023,17 +989,9 @@ class ALBLogAnalyzer:
             end_time = self.end_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
             # 실제 로그 데이터의 시간 범위 - 이미 사용자 타임존으로 변환되어 있음
-            actual_start_time = (
-                summary_result[2].strftime("%Y-%m-%d %H:%M:%S")
-                if summary_result[2]
-                else "N/A"
-            )
+            actual_start_time = summary_result[2].strftime("%Y-%m-%d %H:%M:%S") if summary_result[2] else "N/A"
 
-            actual_end_time = (
-                summary_result[3].strftime("%Y-%m-%d %H:%M:%S")
-                if summary_result[3]
-                else "N/A"
-            )
+            actual_end_time = summary_result[3].strftime("%Y-%m-%d %H:%M:%S") if summary_result[3] else "N/A"
 
             # 분석 결과 구성
             analysis_results = {
@@ -1104,9 +1062,7 @@ class ALBLogAnalyzer:
                     unique_ips = list(client_ip_counts.keys())
 
                     # 상위 10개 IP 디버깅 정보 출력
-                    top_ips = sorted(
-                        client_ip_counts.items(), key=lambda x: x[1], reverse=True
-                    )[:10]
+                    top_ips = sorted(client_ip_counts.items(), key=lambda x: x[1], reverse=True)[:10]
                     logger.debug(f"🔍 상위 10개 클라이언트 IP: {[ip for ip, count in top_ips]}")
 
                     # 국가 정보 매핑
@@ -1120,15 +1076,10 @@ class ALBLogAnalyzer:
                     analysis_results["country_statistics"] = country_stats
 
                     # 상위 10개 IP의 국가 매핑 결과 출력
-                    top_ip_countries = [
-                        (ip, country_mapping.get(ip, "UNKNOWN"))
-                        for ip, count in top_ips
-                    ]
+                    top_ip_countries = [(ip, country_mapping.get(ip, "UNKNOWN")) for ip, count in top_ips]
                     logger.debug(f"🌍 상위 10개 IP 국가 매핑: {top_ip_countries}")
 
-                    logger.debug(
-                        f"✅ 국가 정보 매핑 완료: {len(country_mapping)}개 IP, {len(country_stats)}개 국가"
-                    )
+                    logger.debug(f"✅ 국가 정보 매핑 완료: {len(country_mapping)}개 IP, {len(country_stats)}개 국가")
                 else:
                     logger.warning("⚠️ IP-Country 매퍼 초기화 실패, 국가 정보를 건너뜁니다.")
                     analysis_results["ip_country_mapping"] = {}
@@ -1290,22 +1241,16 @@ class ALBLogAnalyzer:
                     shutil.rmtree(self.download_dir, ignore_errors=True)
                     logger.debug(f"✅ 다운로드 디렉토리 정리 완료: {self.download_dir}")
                 except Exception as e:
-                    logger.error(
-                        f"❌ 다운로드 디렉토리 정리 실패: {self.download_dir}, 오류: {str(e)}"
-                    )
+                    logger.error(f"❌ 다운로드 디렉토리 정리 실패: {self.download_dir}, 오류: {str(e)}")
 
             # 압축 해제 디렉토리 명시적 정리
-            if hasattr(self, "decompressed_dir") and os.path.exists(
-                self.decompressed_dir
-            ):
+            if hasattr(self, "decompressed_dir") and os.path.exists(self.decompressed_dir):
                 try:
                     logger.debug(f"압축 해제 디렉토리 정리 중: {self.decompressed_dir}")
                     shutil.rmtree(self.decompressed_dir, ignore_errors=True)
                     logger.debug(f"✅ 압축 해제 디렉토리 정리 완료: {self.decompressed_dir}")
                 except Exception as e:
-                    logger.error(
-                        f"❌ 압축 해제 디렉토리 정리 실패: {self.decompressed_dir}, 오류: {str(e)}"
-                    )
+                    logger.error(f"❌ 압축 해제 디렉토리 정리 실패: {self.decompressed_dir}, 오류: {str(e)}")
 
             # DuckDB 작업 임시 디렉토리 정리
             if (
@@ -1331,15 +1276,9 @@ class ALBLogAnalyzer:
                     os.remove(self.duckdb_db_path)
                     logger.debug(f"✅ DuckDB 파일 삭제 완료: {self.duckdb_db_path}")
                 except Exception as e:
-                    logger.error(
-                        f"❌ DuckDB 파일 삭제 실패: {self.duckdb_db_path}, 오류: {str(e)}"
-                    )
+                    logger.error(f"❌ DuckDB 파일 삭제 실패: {self.duckdb_db_path}, 오류: {str(e)}")
 
-            if (
-                hasattr(self, "duckdb_dir")
-                and isinstance(self.duckdb_dir, str)
-                and os.path.isdir(self.duckdb_dir)
-            ):
+            if hasattr(self, "duckdb_dir") and isinstance(self.duckdb_dir, str) and os.path.isdir(self.duckdb_dir):
                 try:
                     # 비어 있으면 제거
                     if not os.listdir(self.duckdb_dir):
@@ -1361,9 +1300,7 @@ class ALBLogAnalyzer:
                     continue
 
                 if not isinstance(directory, str):
-                    logger.warning(
-                        f"스킵: 디렉토리가 문자열이 아님 - {type(directory)}: {directory}"
-                    )
+                    logger.warning(f"스킵: 디렉토리가 문자열이 아님 - {type(directory)}: {directory}")
                     continue
 
                 if os.path.exists(directory):

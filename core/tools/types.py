@@ -103,8 +103,7 @@ AREA_KEYWORDS: dict[str, str] = {
 
 # 문자열 키 기반 AREA_DISPLAY (category.py 호환)
 AREA_DISPLAY_BY_KEY: dict[str, dict[str, str]] = {
-    a["key"]: {"label": a["label"], "color": a["color"], "icon": a["icon"]}
-    for a in AREA_REGISTRY
+    a["key"]: {"label": a["label"], "color": a["color"], "icon": a["icon"]} for a in AREA_REGISTRY
 }
 
 

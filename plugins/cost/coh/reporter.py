@@ -255,9 +255,7 @@ class CostOptimizationReporter:
             # 요약 행
             total_cost = sum(r.estimated_monthly_cost for r in recommendations)
             total_savings = sum(r.estimated_monthly_savings for r in recommendations)
-            avg_savings_pct = (
-                (total_savings / total_cost * 100) if total_cost > 0 else 0
-            )
+            avg_savings_pct = (total_savings / total_cost * 100) if total_cost > 0 else 0
 
             sheet.add_summary_row(
                 [
@@ -283,9 +281,7 @@ class CostOptimizationReporter:
 
         # 전체 권장사항 시트 (모든 타입 포함)
         if len(grouped) > 1:
-            all_sheet = wb.new_sheet(
-                name="All Recommendations", columns=COLUMNS_RECOMMENDATIONS
-            )
+            all_sheet = wb.new_sheet(name="All Recommendations", columns=COLUMNS_RECOMMENDATIONS)
 
             for rec in sorted(
                 self.result.recommendations,
@@ -309,9 +305,7 @@ class CostOptimizationReporter:
                     "",
                     self.result.total_cost,
                     self.result.total_savings,
-                    (self.result.total_savings / self.result.total_cost)
-                    if self.result.total_cost > 0
-                    else 0,
+                    (self.result.total_savings / self.result.total_cost) if self.result.total_cost > 0 else 0,
                     "",
                     "",
                     "",
@@ -385,10 +379,7 @@ class CostOptimizationReporter:
 
         console.print("\n[bold cyan]Cost Optimization Hub 권장사항 요약[/bold cyan]")
         console.print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        console.print(
-            f"전체 권장사항: {self.result.total_count:,}개 → "
-            f"필터링 후: {self.result.filtered_count:,}개"
-        )
+        console.print(f"전체 권장사항: {self.result.total_count:,}개 → 필터링 후: {self.result.filtered_count:,}개")
         console.print(f"제외된 계정: {len(self.result.excluded_accounts):,}개")
         console.print()
 
@@ -431,9 +422,7 @@ class CostOptimizationReporter:
             self.result.summary_by_resource.items(),
             key=lambda x: x[1]["savings"],
             reverse=True,
-        )[
-            :10
-        ]:  # 상위 10개만
+        )[:10]:  # 상위 10개만
             res_table.add_row(
                 res_type,
                 f"{data['count']:,}",
@@ -446,10 +435,7 @@ class CostOptimizationReporter:
         """일반 텍스트 요약 출력"""
         print("\n=== Cost Optimization Hub 권장사항 요약 ===")
         print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(
-            f"전체 권장사항: {self.result.total_count:,}개 → "
-            f"필터링 후: {self.result.filtered_count:,}개"
-        )
+        print(f"전체 권장사항: {self.result.total_count:,}개 → 필터링 후: {self.result.filtered_count:,}개")
         print(f"제외된 계정: {len(self.result.excluded_accounts):,}개")
         print()
 
@@ -460,14 +446,9 @@ class CostOptimizationReporter:
             key=lambda x: x[1]["savings"],
             reverse=True,
         ):
-            print(
-                f"  {action_type}: {data['count']:,}개, " f"절약액 ${data['savings']:,.2f}"
-            )
+            print(f"  {action_type}: {data['count']:,}개, 절약액 ${data['savings']:,.2f}")
         print("-" * 60)
-        print(
-            f"  합계: {self.result.filtered_count:,}개, "
-            f"총 절약액 ${self.result.total_savings:,.2f}"
-        )
+        print(f"  합계: {self.result.filtered_count:,}개, 총 절약액 ${self.result.total_savings:,.2f}")
 
 
 def generate_report(

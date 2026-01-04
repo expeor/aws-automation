@@ -22,9 +22,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
 
@@ -94,11 +92,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         row += 1
         total = sum(getattr(s, total_attr, 0) for s in result.summaries)
         unused = sum(getattr(s, unused_attr, 0) for s in result.summaries)
-        waste = (
-            sum(getattr(s, waste_attr, 0) for s in result.summaries)
-            if waste_attr
-            else 0
-        )
+        waste = sum(getattr(s, waste_attr, 0) for s in result.summaries) if waste_attr else 0
         ws.cell(row=row, column=1, value=name)
         ws.cell(row=row, column=2, value=total)
         ws.cell(row=row, column=3, value=unused)
@@ -130,9 +124,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     )
     row += 2
     ws.cell(row=row, column=1, value="총 월간 절감 가능").font = Font(bold=True)
-    ws.cell(row=row, column=4, value=f"${total_waste:,.2f}").font = Font(
-        bold=True, color="FF0000"
-    )
+    ws.cell(row=row, column=4, value=f"${total_waste:,.2f}").font = Font(bold=True, color="FF0000")
 
     # ===== 상세 시트들 (카테고리별 정렬) =====
     # Compute (EC2)
@@ -150,9 +142,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     # Database
     _create_dynamodb_sheet(wb, result.dynamodb_results, header_fill, header_font)
     _create_elasticache_sheet(wb, result.elasticache_results, header_fill, header_font)
-    _create_rds_instance_sheet(
-        wb, result.rds_instance_results, header_fill, header_font
-    )
+    _create_rds_instance_sheet(wb, result.rds_instance_results, header_fill, header_font)
     _create_rds_snap_sheet(wb, result.rds_snap_results, header_fill, header_font)
     # Storage
     _create_ecr_sheet(wb, result.ecr_results, header_fill, header_font)
@@ -182,9 +172,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col_tuple)
             col_idx = col_tuple[0].column
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         if sheet.title != "Summary":
             sheet.freeze_panes = "A2"
 
@@ -236,9 +224,7 @@ def _create_nat_sheet(wb, findings, header_fill, header_font):
 
 def _create_eni_sheet(wb, results, header_fill, header_font):
     ws = wb.create_sheet("ENI")
-    ws.append(
-        ["Account", "Region", "ENI ID", "Name", "Usage", "Type", "Recommendation"]
-    )
+    ws.append(["Account", "Region", "ENI ID", "Name", "Usage", "Type", "Recommendation"])
     for cell in ws[1]:
         cell.fill = header_fill
         cell.font = header_font
@@ -498,9 +484,7 @@ def _create_loggroup_sheet(wb, results, header_fill, header_font):
                         f.status.value,
                         round(lg.stored_gb, 4),
                         f"{lg.retention_days}일" if lg.retention_days else "무기한",
-                        lg.last_ingestion_time.strftime("%Y-%m-%d")
-                        if lg.last_ingestion_time
-                        else "-",
+                        lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-",
                         round(lg.monthly_cost, 4),
                         f.recommendation,
                     ]
@@ -595,11 +579,7 @@ def _create_secret_sheet(wb, results, header_fill, header_font):
         for f in r.findings:
             if f.status.value != "normal":
                 sec = f.secret
-                last_access = (
-                    sec.last_accessed_date.strftime("%Y-%m-%d")
-                    if sec.last_accessed_date
-                    else "없음"
-                )
+                last_access = sec.last_accessed_date.strftime("%Y-%m-%d") if sec.last_accessed_date else "없음"
                 ws.append(
                     [
                         sec.account_name,

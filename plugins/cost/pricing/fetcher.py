@@ -3,6 +3,7 @@ plugins/cost/pricing/fetcher.py - AWS 가격 정보 가져오기
 
 AWS Pricing API (get_products)를 사용하여 리전별 가격을 조회합니다.
 """
+
 from __future__ import annotations
 
 import json
@@ -45,9 +46,7 @@ class PricingFetcher:
     def pricing_client(self):
         """Pricing API 클라이언트 (지연 생성)"""
         if self._pricing_client is None:
-            self._pricing_client = get_client(
-                self.session, "pricing", region_name=PRICING_API_REGION
-            )
+            self._pricing_client = get_client(self.session, "pricing", region_name=PRICING_API_REGION)
         return self._pricing_client
 
     def get_ec2_prices(self, region: str) -> dict[str, float]:
@@ -78,11 +77,7 @@ class PricingFetcher:
 
             prices = {}
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -129,11 +124,7 @@ class PricingFetcher:
 
             prices = {}
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -199,11 +190,7 @@ class PricingFetcher:
             }
 
             for price_item in interface_response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 terms = data.get("terms", {}).get("OnDemand", {})
                 for term in terms.values():
                     for dim in term.get("priceDimensions", {}).values():
@@ -249,11 +236,7 @@ class PricingFetcher:
             prices = {"per_secret_monthly": 0.0, "per_10k_api_calls": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -296,11 +279,7 @@ class PricingFetcher:
             prices = {"customer_key_monthly": 0.0, "per_10k_requests": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -344,11 +323,7 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -387,11 +362,7 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -404,10 +375,7 @@ class PricingFetcher:
                         desc = dim.get("description", "").lower()
                         if price > 0:
                             if "hosted zone" in desc or "zone" in group:
-                                if (
-                                    "first 25" in desc
-                                    or prices["hosted_zone_monthly"] == 0
-                                ):
+                                if "first 25" in desc or prices["hosted_zone_monthly"] == 0:
                                     prices["hosted_zone_monthly"] = price
                                 else:
                                     prices["additional_zone_monthly"] = price
@@ -451,11 +419,7 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 terms = data.get("terms", {}).get("OnDemand", {})
 
                 for term in terms.values():
@@ -498,11 +462,7 @@ class PricingFetcher:
             prices = {"unused_hourly": 0.0, "additional_hourly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -551,11 +511,7 @@ class PricingFetcher:
             )
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -616,11 +572,7 @@ class PricingFetcher:
             prices = {"rds_per_gb_monthly": 0.0, "aurora_per_gb_monthly": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -663,11 +615,7 @@ class PricingFetcher:
             prices = {"storage_per_gb_monthly": 0.0, "ingestion_per_gb": 0.0}
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -719,11 +667,7 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 
@@ -787,11 +731,7 @@ class PricingFetcher:
             }
 
             for price_item in response.get("PriceList", []):
-                data = (
-                    json.loads(price_item)
-                    if isinstance(price_item, str)
-                    else price_item
-                )
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
                 attrs = data.get("product", {}).get("attributes", {})
                 terms = data.get("terms", {}).get("OnDemand", {})
 

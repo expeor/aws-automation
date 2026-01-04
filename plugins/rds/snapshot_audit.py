@@ -148,9 +148,7 @@ class RDSSnapshotAnalysisResult:
 # =============================================================================
 
 
-def collect_rds_snapshots(
-    session, account_id: str, account_name: str, region: str
-) -> list[RDSSnapshotInfo]:
+def collect_rds_snapshots(session, account_id: str, account_name: str, region: str) -> list[RDSSnapshotInfo]:
     """RDS 수동 스냅샷 수집 (RDS + Aurora)"""
     from botocore.exceptions import ClientError
 
@@ -167,17 +165,13 @@ def collect_rds_snapshots(
                     if data.get("Status") != "available":
                         continue
 
-                    snap = _parse_rds_snapshot(
-                        data, rds, account_id, account_name, region
-                    )
+                    snap = _parse_rds_snapshot(data, rds, account_id, account_name, region)
                     if snap:
                         snapshots.append(snap)
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             if not is_quiet():
-                console.print(
-                    f"[yellow]{account_name}/{region} RDS 스냅샷 수집 오류: {error_code}[/yellow]"
-                )
+                console.print(f"[yellow]{account_name}/{region} RDS 스냅샷 수집 오류: {error_code}[/yellow]")
 
         # Aurora 클러스터 스냅샷 (수동)
         try:
@@ -187,38 +181,28 @@ def collect_rds_snapshots(
                     if data.get("Status") != "available":
                         continue
 
-                    snap = _parse_aurora_snapshot(
-                        data, rds, account_id, account_name, region
-                    )
+                    snap = _parse_aurora_snapshot(data, rds, account_id, account_name, region)
                     if snap:
                         snapshots.append(snap)
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             if not is_quiet():
-                console.print(
-                    f"[yellow]{account_name}/{region} Aurora 스냅샷 수집 오류: {error_code}[/yellow]"
-                )
+                console.print(f"[yellow]{account_name}/{region} Aurora 스냅샷 수집 오류: {error_code}[/yellow]")
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"[yellow]{account_name}/{region} 수집 오류: {error_code}[/yellow]")
 
     return snapshots
 
 
-def _parse_rds_snapshot(
-    data: dict, rds, account_id: str, account_name: str, region: str
-) -> RDSSnapshotInfo | None:
+def _parse_rds_snapshot(data: dict, rds, account_id: str, account_name: str, region: str) -> RDSSnapshotInfo | None:
     """RDS 스냅샷 파싱"""
     try:
         arn = data.get("DBSnapshotArn", "")
         allocated_storage = data.get("AllocatedStorage", 0)
-        monthly_cost = get_rds_snapshot_monthly_cost(
-            region, allocated_storage, is_aurora=False
-        )
+        monthly_cost = get_rds_snapshot_monthly_cost(region, allocated_storage, is_aurora=False)
 
         # 태그 조회
         tags = {}
@@ -226,11 +210,7 @@ def _parse_rds_snapshot(
 
         try:
             tag_response = rds.list_tags_for_resource(ResourceName=arn)
-            tags = {
-                t["Key"]: t["Value"]
-                for t in tag_response.get("TagList", [])
-                if not t["Key"].startswith("aws:")
-            }
+            tags = {t["Key"]: t["Value"] for t in tag_response.get("TagList", []) if not t["Key"].startswith("aws:")}
         except ClientError:
             pass
 
@@ -255,16 +235,12 @@ def _parse_rds_snapshot(
         return None
 
 
-def _parse_aurora_snapshot(
-    data: dict, rds, account_id: str, account_name: str, region: str
-) -> RDSSnapshotInfo | None:
+def _parse_aurora_snapshot(data: dict, rds, account_id: str, account_name: str, region: str) -> RDSSnapshotInfo | None:
     """Aurora 스냅샷 파싱"""
     try:
         arn = data.get("DBClusterSnapshotArn", "")
         allocated_storage = data.get("AllocatedStorage", 0)
-        monthly_cost = get_rds_snapshot_monthly_cost(
-            region, allocated_storage, is_aurora=True
-        )
+        monthly_cost = get_rds_snapshot_monthly_cost(region, allocated_storage, is_aurora=True)
 
         # 태그 조회
         tags = {}
@@ -272,11 +248,7 @@ def _parse_aurora_snapshot(
 
         try:
             tag_response = rds.list_tags_for_resource(ResourceName=arn)
-            tags = {
-                t["Key"]: t["Value"]
-                for t in tag_response.get("TagList", [])
-                if not t["Key"].startswith("aws:")
-            }
+            tags = {t["Key"]: t["Value"] for t in tag_response.get("TagList", []) if not t["Key"].startswith("aws:")}
         except ClientError:
             pass
 
@@ -379,18 +351,12 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     status_fills = {
-        UsageStatus.OLD: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.OLD: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -489,9 +455,7 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 50
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
 
     ws2.freeze_panes = "A2"
 
@@ -509,9 +473,7 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> RDSSnapshotAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> RDSSnapshotAnalysisResult | None:
     """단일 계정/리전의 RDS 스냅샷 수집 및 분석 (병렬 실행용)"""
     snapshots = collect_rds_snapshots(session, account_id, account_name, region)
     if not snapshots:
@@ -525,9 +487,7 @@ def run(ctx) -> None:
     console.print(f"  [dim]기준: {OLD_SNAPSHOT_DAYS}일 이상 오래된 수동 스냅샷[/dim]")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="rds")
-    all_results: list[RDSSnapshotAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    all_results: list[RDSSnapshotAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     if result.error_count > 0:
         console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
@@ -546,9 +506,7 @@ def run(ctx) -> None:
         "old_cost": sum(r.old_monthly_cost for r in all_results),
     }
 
-    console.print(
-        f"\n[bold]전체 RDS 스냅샷: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
-    )
+    console.print(f"\n[bold]전체 RDS 스냅샷: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
     if totals["old"] > 0:
         console.print(
             f"  [yellow bold]오래됨: {totals['old']}개 ({totals['old_size']}GB, ${totals['old_cost']:.2f}/월)[/yellow bold]"

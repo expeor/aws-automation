@@ -267,9 +267,7 @@ def discover_categories(
 
                     # 메타데이터 검증
                     if validate:
-                        cat_info, warnings = _validate_category_metadata(
-                            module_path, raw_category, raw_tools
-                        )
+                        cat_info, warnings = _validate_category_metadata(module_path, raw_category, raw_tools)
                         validation_warnings.extend(warnings)
                     else:
                         cat_info = raw_category.copy()
@@ -365,9 +363,7 @@ def get_category(name: str, include_aws_services: bool = True) -> dict[str, Any]
     return None
 
 
-def get_category_by_sub_service(
-    sub_service_name: str, include_aws_services: bool = True
-) -> dict[str, Any] | None:
+def get_category_by_sub_service(sub_service_name: str, include_aws_services: bool = True) -> dict[str, Any] | None:
     """하위 서비스명으로 카테고리 조회 (도구 필터링 포함)
 
     sub_services에 정의된 하위 서비스명으로 조회 시,
@@ -390,11 +386,7 @@ def get_category_by_sub_service(
         sub_services = cat.get("sub_services", [])
         if sub_service_name in sub_services:
             # 해당 sub_service에 속하는 도구만 필터링
-            filtered_tools = [
-                tool
-                for tool in cat.get("tools", [])
-                if tool.get("sub_service") == sub_service_name
-            ]
+            filtered_tools = [tool for tool in cat.get("tools", []) if tool.get("sub_service") == sub_service_name]
             # 복사본 반환 (원본 변경 방지)
             filtered_cat = cat.copy()
             filtered_cat["tools"] = filtered_tools
@@ -403,9 +395,7 @@ def get_category_by_sub_service(
     return None
 
 
-def resolve_category(
-    name: str, include_aws_services: bool = True
-) -> dict[str, Any] | None:
+def resolve_category(name: str, include_aws_services: bool = True) -> dict[str, Any] | None:
     """카테고리 또는 하위 서비스명으로 조회 (통합 함수)
 
     1. 먼저 정확한 카테고리명으로 검색

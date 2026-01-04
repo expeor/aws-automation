@@ -54,15 +54,11 @@ class AccountFilter:
 
         names_env = os.getenv("AA_COH_EXCLUDE_ACCOUNT_NAMES", "").strip()
         if names_env:
-            exclude_names = {
-                x.strip() for x in re.split(r"[,|]", names_env) if x.strip()
-            }
+            exclude_names = {x.strip() for x in re.split(r"[,|]", names_env) if x.strip()}
 
         regex_env = os.getenv("AA_COH_EXCLUDE_ACCOUNT_NAME_REGEX", "").strip()
         if regex_env:
-            exclude_patterns = [
-                x.strip() for x in re.split(r"[,|]", regex_env) if x.strip()
-            ]
+            exclude_patterns = [x.strip() for x in re.split(r"[,|]", regex_env) if x.strip()]
 
         return cls(
             exclude_ids=exclude_ids,

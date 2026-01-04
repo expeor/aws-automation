@@ -62,11 +62,7 @@ class AbuseIPSheetWriter(BaseSheetWriter):
         border = self.styles.thin_border
 
         for row_idx, ip in enumerate(sorted_ips, start=2):
-            details = (
-                abuse_ip_details.get(ip, {})
-                if isinstance(abuse_ip_details, dict)
-                else {}
-            )
+            details = abuse_ip_details.get(ip, {}) if isinstance(abuse_ip_details, dict) else {}
             request_count = client_ip_counts.get(ip, 0)
 
             # Count (A)
@@ -201,9 +197,7 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
             request = log.get("request", "N/A")
             user_agent = log.get("user_agent", "N/A")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
-            backend_status = self.convert_status_code(
-                log.get("target_status_code", "N/A")
-            )
+            backend_status = self.convert_status_code(log.get("target_status_code", "N/A"))
 
             values = [
                 timestamp_str,

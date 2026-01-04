@@ -78,11 +78,7 @@ class ENICache:
             self.cache_dir = cache_dir
         else:
             # plugins/vpc/ip_search -> vpc -> plugins -> project_root
-            project_root = os.path.dirname(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                )
-            )
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
             self.cache_dir = os.path.join(project_root, "temp", "eni")
 
         os.makedirs(self.cache_dir, exist_ok=True)
@@ -123,8 +119,7 @@ class ENICache:
             self.cache = {
                 ip_str: entry
                 for ip_str, entry in data.items()
-                if isinstance(entry, dict)
-                and current - entry.get("last_accessed", 0) < expiry_secs
+                if isinstance(entry, dict) and current - entry.get("last_accessed", 0) < expiry_secs
             }
 
             self._rebuild_ip_index()
@@ -432,9 +427,7 @@ def map_eni_to_resource(eni: dict[str, Any]) -> str:
 # =============================================================================
 
 
-def eni_to_result(
-    ip: str, eni: dict[str, Any], detailed: bool = False
-) -> PrivateIPResult:
+def eni_to_result(ip: str, eni: dict[str, Any], detailed: bool = False) -> PrivateIPResult:
     """ENI 데이터를 검색 결과로 변환"""
     name = ""
     for tag in eni.get("TagSet", []):
@@ -595,9 +588,7 @@ def search_by_query(queries: list[str], cache: ENICache) -> list[PrivateIPResult
     return results
 
 
-def _search_by_field(
-    cache: ENICache, query_type: str, value: str
-) -> list[tuple[str, dict[str, Any]]]:
+def _search_by_field(cache: ENICache, query_type: str, value: str) -> list[tuple[str, dict[str, Any]]]:
     """필드 기반 검색 (캐시 전체 순회)"""
     results = []
     value_lower = value.lower()

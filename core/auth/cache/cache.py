@@ -228,9 +228,7 @@ class TokenCache:
         """
         try:
             # ISO 8601 형식 파싱
-            expires_at = datetime.strptime(
-                self.expires_at, "%Y-%m-%dT%H:%M:%SZ"
-            ).replace(tzinfo=timezone.utc)
+            expires_at = datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
             buffer = timedelta(seconds=buffer_seconds)
             return datetime.now(timezone.utc) >= (expires_at - buffer)
@@ -241,9 +239,7 @@ class TokenCache:
     def get_expires_at_datetime(self) -> datetime | None:
         """만료 시간을 datetime 객체로 반환"""
         try:
-            return datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
             return None
 
@@ -357,9 +353,7 @@ class TokenCacheManager:
         """
         # session_name이 있으면 session_name 사용, 없으면 start_url 사용
         input_str = self.session_name if self.session_name else self.start_url
-        return hashlib.sha1(
-            input_str.encode("utf-8"), usedforsecurity=False
-        ).hexdigest()
+        return hashlib.sha1(input_str.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     @property
     def cache_path(self) -> Path:

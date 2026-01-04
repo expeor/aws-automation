@@ -34,11 +34,7 @@ def run(ctx) -> dict[str, Any]:
         print(f"    리전: {event.region}")
         print(f"    시작: {event.start_time}")
         if event.description:
-            desc = (
-                event.description[:100] + "..."
-                if len(event.description) > 100
-                else event.description
-            )
+            desc = event.description[:100] + "..." if len(event.description) > 100 else event.description
             print(f"    설명: {desc}")
         print()
 

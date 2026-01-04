@@ -4,6 +4,7 @@ core/parallel/executor.py - 병렬 세션 실행기
 Map-Reduce 패턴으로 멀티 계정/리전 작업을 병렬 처리합니다.
 ThreadPoolExecutor 기반이며, Rate limiting과 재시도를 지원합니다.
 """
+
 from __future__ import annotations
 
 import logging
@@ -120,10 +121,7 @@ class ParallelSessionExecutor:
             logger.warning("실행할 작업이 없습니다")
             return ParallelExecutionResult()
 
-        logger.info(
-            f"병렬 실행 시작: {len(tasks)}개 작업, "
-            f"max_workers={self.config.max_workers}, service={service}"
-        )
+        logger.info(f"병렬 실행 시작: {len(tasks)}개 작업, max_workers={self.config.max_workers}, service={service}")
 
         results: list[TaskResult[T]] = []
         start_time = time.monotonic()
@@ -173,9 +171,7 @@ class ParallelSessionExecutor:
         exec_result = ParallelExecutionResult(results=results)
 
         logger.info(
-            f"병렬 실행 완료: 성공 {exec_result.success_count}, "
-            f"실패 {exec_result.error_count}, "
-            f"총 {total_time:.0f}ms"
+            f"병렬 실행 완료: 성공 {exec_result.success_count}, 실패 {exec_result.error_count}, 총 {total_time:.0f}ms"
         )
 
         return exec_result
@@ -367,10 +363,7 @@ class ParallelSessionExecutor:
 
                 # 재시도 대기
                 delay = self._retry_config.get_delay(attempt)
-                logger.debug(
-                    f"[{task.account_id}/{task.region}] 시도 {attempt + 1} 실패, "
-                    f"{delay:.2f}초 후 재시도..."
-                )
+                logger.debug(f"[{task.account_id}/{task.region}] 시도 {attempt + 1} 실패, {delay:.2f}초 후 재시도...")
                 time.sleep(delay)
 
         # 재시도 소진 (도달하면 안 됨)
@@ -381,11 +374,7 @@ class ParallelSessionExecutor:
             error=TaskError(
                 identifier=task.account_id,
                 region=task.region,
-                category=(
-                    categorize_error(last_error)
-                    if last_error
-                    else ErrorCategory.UNKNOWN
-                ),
+                category=(categorize_error(last_error) if last_error else ErrorCategory.UNKNOWN),
                 error_code=get_error_code(last_error) if last_error else "Unknown",
                 message="최대 재시도 횟수 초과",
                 retries=self._retry_config.max_retries,

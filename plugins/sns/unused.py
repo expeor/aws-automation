@@ -81,9 +81,7 @@ class SNSAnalysisResult:
     findings: list[TopicFinding] = field(default_factory=list)
 
 
-def collect_sns_topics(
-    session, account_id: str, account_name: str, region: str
-) -> list[SNSTopicInfo]:
+def collect_sns_topics(session, account_id: str, account_name: str, region: str) -> list[SNSTopicInfo]:
     """SNS 토픽 수집"""
     from botocore.exceptions import ClientError
 
@@ -132,9 +130,7 @@ def collect_sns_topics(
                         Statistics=["Sum"],
                     )
                     if pub_resp.get("Datapoints"):
-                        info.messages_published = sum(
-                            d["Sum"] for d in pub_resp["Datapoints"]
-                        )
+                        info.messages_published = sum(d["Sum"] for d in pub_resp["Datapoints"])
 
                     # NumberOfNotificationsDelivered
                     del_resp = cloudwatch.get_metric_statistics(
@@ -147,9 +143,7 @@ def collect_sns_topics(
                         Statistics=["Sum"],
                     )
                     if del_resp.get("Datapoints"):
-                        info.notifications_delivered = sum(
-                            d["Sum"] for d in del_resp["Datapoints"]
-                        )
+                        info.notifications_delivered = sum(d["Sum"] for d in del_resp["Datapoints"])
 
                     # NumberOfNotificationsFailed
                     fail_resp = cloudwatch.get_metric_statistics(
@@ -162,9 +156,7 @@ def collect_sns_topics(
                         Statistics=["Sum"],
                     )
                     if fail_resp.get("Datapoints"):
-                        info.notifications_failed = sum(
-                            d["Sum"] for d in fail_resp["Datapoints"]
-                        )
+                        info.notifications_failed = sum(d["Sum"] for d in fail_resp["Datapoints"])
 
                 except ClientError:
                     pass
@@ -177,9 +169,7 @@ def collect_sns_topics(
     return topics
 
 
-def analyze_topics(
-    topics: list[SNSTopicInfo], account_id: str, account_name: str, region: str
-) -> SNSAnalysisResult:
+def analyze_topics(topics: list[SNSTopicInfo], account_id: str, account_name: str, region: str) -> SNSAnalysisResult:
     """SNS 토픽 분석"""
     result = SNSAnalysisResult(
         account_id=account_id,
@@ -247,14 +237,10 @@ def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -309,15 +295,9 @@ def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
                 ws_detail.cell(row=detail_row, column=3, value=t.topic_name)
                 ws_detail.cell(row=detail_row, column=4, value=t.subscription_count)
                 ws_detail.cell(row=detail_row, column=5, value=f.status.value)
-                ws_detail.cell(
-                    row=detail_row, column=6, value=int(t.messages_published)
-                )
-                ws_detail.cell(
-                    row=detail_row, column=7, value=int(t.notifications_delivered)
-                )
-                ws_detail.cell(
-                    row=detail_row, column=8, value=int(t.notifications_failed)
-                )
+                ws_detail.cell(row=detail_row, column=6, value=int(t.messages_published))
+                ws_detail.cell(row=detail_row, column=7, value=int(t.notifications_delivered))
+                ws_detail.cell(row=detail_row, column=8, value=int(t.notifications_failed))
                 ws_detail.cell(row=detail_row, column=9, value=f.recommendation)
 
     for sheet in wb.worksheets:
@@ -325,9 +305,7 @@ def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -337,9 +315,7 @@ def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> SNSAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SNSAnalysisResult | None:
     """단일 계정/리전의 SNS 토픽 수집 및 분석 (병렬 실행용)"""
     topics = collect_sns_topics(session, account_id, account_name, region)
     if not topics:

@@ -154,9 +154,7 @@ class LBAnalysisResult:
 # =============================================================================
 
 
-def collect_v2_load_balancers(
-    session, account_id: str, account_name: str, region: str
-) -> list[LoadBalancerInfo]:
+def collect_v2_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
     """ALB/NLB/GWLB 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -192,10 +190,7 @@ def collect_v2_load_balancers(
                     scheme=data.get("Scheme", ""),
                     state=data.get("State", {}).get("Code", ""),
                     vpc_id=data.get("VpcId", ""),
-                    availability_zones=[
-                        az.get("ZoneName", "")
-                        for az in data.get("AvailabilityZones", [])
-                    ],
+                    availability_zones=[az.get("ZoneName", "") for az in data.get("AvailabilityZones", [])],
                     created_time=data.get("CreatedTime"),
                     tags=tags,
                     account_id=account_id,
@@ -211,9 +206,7 @@ def collect_v2_load_balancers(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
 
@@ -269,9 +262,7 @@ def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
 # =============================================================================
 
 
-def collect_classic_load_balancers(
-    session, account_id: str, account_name: str, region: str
-) -> list[LoadBalancerInfo]:
+def collect_classic_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
     """Classic Load Balancer 목록 수집"""
     from botocore.exceptions import ClientError
 
@@ -302,9 +293,7 @@ def collect_classic_load_balancers(
             healthy = 0
             try:
                 if instances:
-                    health_response = elb.describe_instance_health(
-                        LoadBalancerName=lb_name
-                    )
+                    health_response = elb.describe_instance_health(LoadBalancerName=lb_name)
                     for state in health_response.get("InstanceStates", []):
                         if state.get("State") == "InService":
                             healthy += 1
@@ -336,9 +325,7 @@ def collect_classic_load_balancers(
         if "not available" not in str(e).lower():
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             if not is_quiet():
-                console.print(
-                    f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]"
-                )
+                console.print(f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
 
@@ -462,9 +449,7 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
         wb.remove(active_sheet)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     thin_border = Border(
         left=Side(style="thin"),
@@ -474,15 +459,9 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
     )
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.UNHEALTHY: PatternFill(
-            start_color="FFE66D", end_color="FFE66D", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.UNHEALTHY: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -580,9 +559,7 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 50
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
 
     ws2.freeze_panes = "A2"
 
@@ -600,14 +577,10 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> LBAnalysisResult:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LBAnalysisResult:
     """단일 계정/리전의 ELB 수집 및 분석 (병렬 실행용)"""
     v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
-    classic_lbs = collect_classic_load_balancers(
-        session, account_id, account_name, region
-    )
+    classic_lbs = collect_classic_load_balancers(session, account_id, account_name, region)
     all_lbs = v2_lbs + classic_lbs
     return analyze_load_balancers(all_lbs, account_id, account_name, region)
 
@@ -617,9 +590,7 @@ def run(ctx) -> None:
     console.print("[bold]미사용 ELB 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석
-    result = parallel_collect(
-        ctx, _collect_and_analyze, max_workers=20, service="elasticloadbalancing"
-    )
+    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elasticloadbalancing")
 
     all_results: list[LBAnalysisResult] = result.get_data()
 

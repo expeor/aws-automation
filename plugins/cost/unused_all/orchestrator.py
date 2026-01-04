@@ -141,9 +141,7 @@ def collect_session_resources(
     # 선택적 스캔: 선택된 리소스만 수집
     collectors_to_run = REGIONAL_COLLECTORS
     if selected_resources:
-        collectors_to_run = {
-            k: v for k, v in REGIONAL_COLLECTORS.items() if k in selected_resources
-        }
+        collectors_to_run = {k: v for k, v in REGIONAL_COLLECTORS.items() if k in selected_resources}
 
     # 리전별 리소스 병렬 수집 (최대 10개 동시 실행)
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -207,9 +205,7 @@ def collect_session_resources(
     return result
 
 
-def _merge_session_result(
-    final: UnusedAllResult, session_result: SessionCollectionResult
-) -> None:
+def _merge_session_result(final: UnusedAllResult, session_result: SessionCollectionResult) -> None:
     """세션 결과를 최종 결과에 병합 (매핑 기반)"""
     final.summaries.append(session_result.summary)
 
@@ -257,8 +253,7 @@ def collect_options(ctx: ExecutionContext) -> None:
     if scan_mode == "select":
         # 리소스 선택을 위한 체크박스
         resource_choices = [
-            questionary.Choice(f"{cfg['display']} ({key})", value=key)
-            for key, cfg in RESOURCE_FIELD_MAP.items()
+            questionary.Choice(f"{cfg['display']} ({key})", value=key) for key, cfg in RESOURCE_FIELD_MAP.items()
         ]
 
         selected = questionary.checkbox(
@@ -324,9 +319,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
 
         # 선택적 스캔을 위한 래퍼 함수
         def collect_wrapper(session, account_id, account_name, region):
-            return collect_session_resources(
-                session, account_id, account_name, region, selected_resources=selected
-            )
+            return collect_session_resources(session, account_id, account_name, region, selected_resources=selected)
 
         with quiet_mode():
             parallel_result = parallel_collect(
@@ -350,9 +343,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
             # 세션별 에러 수집
             if session_result.errors:
                 for err in session_result.errors:
-                    all_errors.append(
-                        f"{task_result.identifier}/{task_result.region}: {err}"
-                    )
+                    all_errors.append(f"{task_result.identifier}/{task_result.region}: {err}")
         elif task_result.error:
             all_errors.append(str(task_result.error))
 
@@ -361,10 +352,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
         return
 
     # 총 절감 가능 금액 계산 (WASTE_FIELDS 활용)
-    total_waste = sum(
-        sum(getattr(s, field, 0) for field in WASTE_FIELDS)
-        for s in final_result.summaries
-    )
+    total_waste = sum(sum(getattr(s, field, 0) for field in WASTE_FIELDS) for s in final_result.summaries)
 
     # 요약 출력 (RESOURCE_FIELD_MAP 활용)
     console.print("\n" + "=" * 50)

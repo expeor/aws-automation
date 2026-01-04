@@ -324,11 +324,7 @@ def get_port_info(port: int) -> CriticalPort | None:
 
 def check_port_range(from_port: int, to_port: int) -> list[CriticalPort]:
     """포트 범위 내 위험 포트 조회 (웹 포트 제외)"""
-    return [
-        info
-        for port, info in PORT_INFO.items()
-        if from_port <= port <= to_port and port in ALL_RISKY_PORTS
-    ]
+    return [info for port, info in PORT_INFO.items() if from_port <= port <= to_port and port in ALL_RISKY_PORTS]
 
 
 def check_port_range_all(from_port: int, to_port: int) -> list[CriticalPort]:

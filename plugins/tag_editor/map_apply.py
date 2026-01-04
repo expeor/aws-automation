@@ -140,9 +140,7 @@ def apply_map_tag(
                                 name=res.name,
                                 operation="add",
                                 result=TagOperationResult.FAILED,
-                                error_message=error_info.get(
-                                    "ErrorMessage", "Unknown error"
-                                ),
+                                error_message=error_info.get("ErrorMessage", "Unknown error"),
                                 previous_value=res.map_tag_value,
                                 new_value=tag_value,
                             )
@@ -286,16 +284,10 @@ def _collect_and_apply(
 ) -> MapTagApplyResult:
     """단일 계정/리전의 MAP 태그 적용"""
     # 1. 리소스 수집
-    audit_result = collect_resources_with_tags(
-        session, account_id, account_name, region
-    )
+    audit_result = collect_resources_with_tags(session, account_id, account_name, region)
 
     # 2. 대상 필터링
-    targets = (
-        [r for r in audit_result.resources if not r.has_map_tag]
-        if untagged_only
-        else audit_result.resources
-    )
+    targets = [r for r in audit_result.resources if not r.has_map_tag] if untagged_only else audit_result.resources
 
     if not targets:
         return MapTagApplyResult(
@@ -306,9 +298,7 @@ def _collect_and_apply(
         )
 
     # 3. 태그 적용
-    return apply_map_tag(
-        session, account_id, account_name, region, targets, tag_value, dry_run
-    )
+    return apply_map_tag(session, account_id, account_name, region, targets, tag_value, dry_run)
 
 
 def run(ctx: ExecutionContext) -> None:
@@ -330,13 +320,9 @@ def run(ctx: ExecutionContext) -> None:
 
     # 병렬 수집 및 적용
     def worker(session, account_id: str, account_name: str, region: str):
-        return _collect_and_apply(
-            session, account_id, account_name, region, tag_value, untagged_only, dry_run
-        )
+        return _collect_and_apply(session, account_id, account_name, region, tag_value, untagged_only, dry_run)
 
-    result = parallel_collect(
-        ctx, worker, max_workers=10, service="resourcegroupstaggingapi"
-    )
+    result = parallel_collect(ctx, worker, max_workers=10, service="resourcegroupstaggingapi")
 
     results: list[MapTagApplyResult] = result.get_data()
 

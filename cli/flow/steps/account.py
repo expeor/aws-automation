@@ -5,7 +5,6 @@
 SSO 멀티계정 환경에서 작업할 계정을 선택.
 """
 
-
 from rich.console import Console
 
 from cli.ui.console import print_box_end, print_box_line, print_box_start
@@ -48,14 +47,10 @@ class AccountStep:
             return ctx
 
         # 단일 계정만 지원하는 도구인지 확인
-        is_single_account_only = bool(
-            ctx.tool and ctx.tool.supports_single_account_only
-        )
+        is_single_account_only = bool(ctx.tool and ctx.tool.supports_single_account_only)
 
         # 계정 선택 UI
-        selected_accounts = self._select_accounts(
-            ctx.accounts, single_only=is_single_account_only
-        )
+        selected_accounts = self._select_accounts(ctx.accounts, single_only=is_single_account_only)
         ctx.accounts = selected_accounts
 
         return ctx
@@ -122,9 +117,7 @@ class AccountStep:
 
             # 번호 파싱
             try:
-                indices = self._parse_selection(
-                    selection, len(sorted_accounts), single_only=single_only
-                )
+                indices = self._parse_selection(selection, len(sorted_accounts), single_only=single_only)
                 if not indices:
                     console.print("[dim]올바른 번호 입력[/dim]")
                     continue
@@ -145,9 +138,7 @@ class AccountStep:
                 console.print(f"[dim]{e}[/dim]")
                 continue
 
-    def _parse_selection(
-        self, selection: str, max_num: int, single_only: bool = False
-    ) -> list[int]:
+    def _parse_selection(self, selection: str, max_num: int, single_only: bool = False) -> list[int]:
         """선택 문자열 파싱
 
         Args:

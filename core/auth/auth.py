@@ -339,8 +339,7 @@ class Manager:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
-                executor.submit(process_account, acc_id, acc_info): acc_id
-                for acc_id, acc_info in accounts.items()
+                executor.submit(process_account, acc_id, acc_info): acc_id for acc_id, acc_info in accounts.items()
             }
 
             for future in concurrent.futures.as_completed(futures):

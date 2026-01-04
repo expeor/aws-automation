@@ -196,11 +196,7 @@ class RoleStep:
 
         if not fallback_candidates:
             console.print("[dim]Fallback 없음 - 해당 계정 스킵[/dim]")
-            confirm = (
-                console.input(f"[dim]{missing_count}개 스킵? [y/N][/dim] > ")
-                .strip()
-                .lower()
-            )
+            confirm = console.input(f"[dim]{missing_count}개 스킵? [y/N][/dim] > ").strip().lower()
             if confirm != "y":
                 raise KeyboardInterrupt("사용자 취소")
             return None, FallbackStrategy.SKIP_ACCOUNT

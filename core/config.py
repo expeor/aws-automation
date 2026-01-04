@@ -108,9 +108,7 @@ class Settings:
     MAX_LOG_LINE_LENGTH: int = 2000
 
     # 플러그인 설정
-    PLUGIN_EXCLUDE_DIRS: frozenset[str] = frozenset(
-        {"__pycache__", "_templates", "_legacy", ".git"}
-    )
+    PLUGIN_EXCLUDE_DIRS: frozenset[str] = frozenset({"__pycache__", "_templates", "_legacy", ".git"})
 
     # 분석 카테고리 우선순위
     ANALYSIS_CATEGORIES: tuple = (
@@ -136,9 +134,7 @@ class Settings:
     # 취약 프로토콜 목록
     # - SSLv3: POODLE 취약점
     # - TLSv1/1.1: 2020년 deprecated (RFC 8996)
-    SECURITY_VULNERABLE_PROTOCOLS: frozenset[str] = frozenset(
-        {"SSLv3", "TLSv1", "TLSv1.1"}
-    )
+    SECURITY_VULNERABLE_PROTOCOLS: frozenset[str] = frozenset({"SSLv3", "TLSv1", "TLSv1.1"})
 
     # 안전한 프로토콜 목록
     SECURITY_SECURE_PROTOCOLS: frozenset[str] = frozenset({"TLSv1.2", "TLSv1.3"})
@@ -150,9 +146,7 @@ class Settings:
     # - NULL: 암호화 없음
     # - EXPORT: 약한 키 길이
     # - anon: 인증 없음 (MITM 취약)
-    SECURITY_WEAK_CIPHER_PATTERNS: frozenset[str] = frozenset(
-        {"RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon"}
-    )
+    SECURITY_WEAK_CIPHER_PATTERNS: frozenset[str] = frozenset({"RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon"})
 
     # 인증서 만료 경고 임계값 (일)
     SECURITY_CERT_EXPIRY_CRITICAL: int = 7  # 7일 이내 = CRITICAL
@@ -211,11 +205,7 @@ def get_default_region() -> str:
     Returns:
         리전 이름
     """
-    return (
-        os.environ.get("AWS_REGION")
-        or os.environ.get("AWS_DEFAULT_REGION")
-        or settings.DEFAULT_REGION
-    )
+    return os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or settings.DEFAULT_REGION
 
 
 def get_env_bool(key: str, default: bool = False) -> bool:

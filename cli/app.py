@@ -348,9 +348,7 @@ def list_tools_command(category, as_json):
                     path = f"{cat['name']}/{tool.get('module', '')}"
                     name = tool.get("name", "")
                     perm = tool.get("permission", "read")
-                    perm_str = {"read": "R", "write": "W", "delete": "D"}.get(
-                        perm, perm
-                    )
+                    perm_str = {"read": "R", "write": "W", "delete": "D"}.get(perm, perm)
                     table.add_row(path, name, perm_str)
 
         console.print(table)
@@ -522,9 +520,7 @@ def group_create():
     # 5. 저장
     manager = ProfileGroupsManager()
     if manager.add(name, kind, selected_profiles):
-        console.print(
-            f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]"
-        )
+        console.print(f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]")
     else:
         console.print("\n[red]그룹 저장 실패 (이미 존재하거나 최대 개수 초과)[/red]")
         raise SystemExit(1)
@@ -584,9 +580,7 @@ def _get_profiles_by_kind(kind: str) -> list:
 
             provider_type = detect_provider_type(profile_config)
 
-            if (
-                kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE
-            ) or (
+            if (kind == "sso_profile" and provider_type == ProviderType.SSO_PROFILE) or (
                 kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS
             ):
                 result.append(profile_name)
@@ -735,9 +729,7 @@ _register_category_commands()
 @click.argument("query", nargs=-1)
 @click.option("-p", "--profile", default=None, help="SSO 프로파일")
 @click.option("-c", "--csv", "save_csv", is_flag=True, help="결과를 CSV로 저장")
-@click.option(
-    "-d", "--detail", "detail_mode", is_flag=True, help="상세 모드 (API로 리소스 정보 조회)"
-)
+@click.option("-d", "--detail", "detail_mode", is_flag=True, help="상세 모드 (API로 리소스 정보 조회)")
 @click.option("--no-public", "no_public", is_flag=True, help="Public 검색 비활성화")
 def ip_command(query, profile, save_csv, detail_mode, no_public):
     """IP 검색 (Public + Private 통합)
@@ -853,9 +845,7 @@ def _run_ip_search_direct(
             from plugins.vpc.ip_search.main import _enrich_with_detail
 
             with console.status("[bold magenta]리소스 상세 정보 조회 중..."):
-                results["private"] = _enrich_with_detail(
-                    ctx, results["private"], cache, profile
-                )
+                results["private"] = _enrich_with_detail(ctx, results["private"], cache, profile)
 
         # 결과 출력
         from plugins.vpc.ip_search.main import _display_results

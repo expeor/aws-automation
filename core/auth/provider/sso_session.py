@@ -93,9 +93,7 @@ class SSOSessionProvider(BaseProvider):
         # boto3 클라이언트
         self._base_session = boto3.Session(region_name=config.region)
         self._sso_client = self._base_session.client("sso", region_name=config.region)
-        self._sso_oidc_client = self._base_session.client(
-            "sso-oidc", region_name=config.region
-        )
+        self._sso_oidc_client = self._base_session.client("sso-oidc", region_name=config.region)
 
     @property
     def _provider_type(self) -> ProviderType:
@@ -233,9 +231,9 @@ class SSOSessionProvider(BaseProvider):
         """토큰 캐시 저장"""
         # 만료 시간 계산 (기존 aws_sso_helper.py 방식)
         expires_in = token_response.get("expiresIn", 28800)  # 기본 8시간
-        expires_at_str = datetime.fromtimestamp(
-            datetime.now(timezone.utc).timestamp() + expires_in
-        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        expires_at_str = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() + expires_in).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
 
         self._token_cache = TokenCache(
             access_token=token_response["accessToken"],
@@ -345,9 +343,7 @@ class SSOSessionProvider(BaseProvider):
                 if retry_on_expired:
                     logger.info("SSO 토큰 만료됨, 재인증 시도...")
                     self.authenticate(force=True)  # 강제 재인증
-                    return self.get_session(
-                        account_id, role_name, region, retry_on_expired=False
-                    )
+                    return self.get_session(account_id, role_name, region, retry_on_expired=False)
 
                 raise TokenExpiredError(
                     f"SSO 토큰이 만료되었습니다: {error_code}",

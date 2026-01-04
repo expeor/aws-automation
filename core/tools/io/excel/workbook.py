@@ -8,6 +8,7 @@ Note:
     이 모듈은 Lazy Import 패턴을 사용합니다.
     openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+
 from __future__ import annotations
 
 import csv
@@ -73,9 +74,7 @@ logger = logging.getLogger(__name__)
 
 
 # Style 타입 정의
-StyleType = Literal[
-    "data", "center", "wrap", "number", "currency", "percent", "text", "date"
-]
+StyleType = Literal["data", "center", "wrap", "number", "currency", "percent", "text", "date"]
 
 
 @dataclass
@@ -154,9 +153,7 @@ class SummarySheet:
         ws.merge_cells(f"A{self._current_row}:B{self._current_row}")
         cell = ws.cell(row=self._current_row, column=1, value=title)
         cell.font = Font(name="맑은 고딕", size=16, bold=True, color="1F4E79")
-        cell.fill = PatternFill(
-            start_color="D6EAF8", end_color="D6EAF8", fill_type="solid"
-        )
+        cell.fill = PatternFill(start_color="D6EAF8", end_color="D6EAF8", fill_type="solid")
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = get_thin_border()
         # B열에도 테두리 적용
@@ -180,9 +177,7 @@ class SummarySheet:
         ws.merge_cells(f"A{self._current_row}:B{self._current_row}")
         cell = ws.cell(row=self._current_row, column=1, value=section_name)
         cell.font = Font(name="맑은 고딕", size=12, bold=True, color="2F5597")
-        cell.fill = PatternFill(
-            start_color="EBF1FA", end_color="EBF1FA", fill_type="solid"
-        )
+        cell.fill = PatternFill(start_color="EBF1FA", end_color="EBF1FA", fill_type="solid")
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = get_thin_border()
         ws.cell(row=self._current_row, column=2).border = get_thin_border()
@@ -239,9 +234,7 @@ class SummarySheet:
                 "info": "CCE5FF",
             }
             color = highlight_colors.get(highlight, "FFFFFF")
-            value_cell.fill = PatternFill(
-                start_color=color, end_color=color, fill_type="solid"
-            )
+            value_cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
 
         self._current_row += 1
         return self
@@ -297,20 +290,14 @@ class SummarySheet:
             for i, (name, count) in enumerate(items[:max_items], 1):
                 # 이름이 너무 길면 자르기
                 display_name = name if len(str(name)) <= 50 else str(name)[:47] + "..."
-                name_cell = ws.cell(
-                    row=self._current_row, column=1, value=f"{i}. {display_name}"
-                )
+                name_cell = ws.cell(row=self._current_row, column=1, value=f"{i}. {display_name}")
                 name_cell.font = value_font
                 name_cell.alignment = align_left
                 name_cell.border = border
 
                 # 값 포맷팅
-                display_value = (
-                    f"{count:,}" if isinstance(count, (int, float)) else str(count)
-                )
-                count_cell = ws.cell(
-                    row=self._current_row, column=2, value=display_value
-                )
+                display_value = f"{count:,}" if isinstance(count, (int, float)) else str(count)
+                count_cell = ws.cell(row=self._current_row, column=2, value=display_value)
                 count_cell.font = value_font
                 count_cell.alignment = align_right
                 count_cell.border = border
@@ -395,9 +382,7 @@ class Sheet:
             "text": (_get_align_wrap(), NUMBER_FORMAT_TEXT),  # 텍스트 강제 + 줄바꿈
         }
 
-        alignment, number_format = style_map.get(
-            col_def.style, (_get_align_wrap(), None)
-        )
+        alignment, number_format = style_map.get(col_def.style, (_get_align_wrap(), None))
         cell.alignment = alignment
 
         if number_format and cell.value is not None:

@@ -269,9 +269,7 @@ class ToolSearchEngine:
 
     def _is_chosung_only(self, text: str) -> bool:
         """초성만으로 구성되어 있는지 확인"""
-        return all(
-            not (char not in CHOSUNG_LIST and not char.isspace()) for char in text
-        )
+        return all(not (char not in CHOSUNG_LIST and not char.isspace()) for char in text)
 
     def get_suggestions(self, prefix: str, limit: int = 5) -> list[str]:
         """자동완성 제안

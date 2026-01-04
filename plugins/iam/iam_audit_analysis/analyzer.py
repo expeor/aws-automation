@@ -131,9 +131,7 @@ class RoleAnalysisResult:
 
     @property
     def is_unused(self) -> bool:
-        return (
-            self.role.days_since_last_use == -1 or self.role.days_since_last_use >= 90
-        )
+        return self.role.days_since_last_use == -1 or self.role.days_since_last_use >= 90
 
 
 @dataclass
@@ -423,9 +421,7 @@ class IAMAnalyzer:
 
         # 3. Password Policy 분석
         if self.iam_data.password_policy:
-            result.policy_result = self._analyze_password_policy(
-                self.iam_data.password_policy
-            )
+            result.policy_result = self._analyze_password_policy(self.iam_data.password_policy)
 
         # 4. Account 분석
         if self.iam_data.account_summary:
@@ -453,10 +449,7 @@ class IAMAnalyzer:
             )
 
         # 2. 비활성 사용자 (90일 이상 로그인 없음)
-        if (
-            user.has_console_access
-            and user.days_since_last_login >= self.UNUSED_THRESHOLD_DAYS
-        ):
+        if user.has_console_access and user.days_since_last_login >= self.UNUSED_THRESHOLD_DAYS:
             result.issues.append(
                 Issue(
                     issue_type=IssueType.INACTIVE_USER,
@@ -1060,9 +1053,7 @@ class IAMAnalyzer:
         # 1-3. FullAccess 정책에서 암묵적 권한 추가
         for policy_name in attached_policies:
             if policy_name in self.FULLACCESS_POLICY_PERMISSIONS:
-                effective_permissions.update(
-                    self.FULLACCESS_POLICY_PERMISSIONS[policy_name]
-                )
+                effective_permissions.update(self.FULLACCESS_POLICY_PERMISSIONS[policy_name])
 
         # 2. 각 privesc 경로 검사
         detected_paths = []

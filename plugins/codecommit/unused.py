@@ -561,9 +561,7 @@ def run_empty_repos(ctx) -> dict[str, Any]:
 
     print(f"\n빈 리포지토리 {len(empty)}개:")
     for repo in empty:
-        created = (
-            repo.creation_date.strftime("%Y-%m-%d") if repo.creation_date else "N/A"
-        )
+        created = repo.creation_date.strftime("%Y-%m-%d") if repo.creation_date else "N/A"
         print(f"  {repo.name} (생성: {created})")
 
     return {

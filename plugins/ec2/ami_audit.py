@@ -154,9 +154,7 @@ class AMIAnalysisResult:
 # =============================================================================
 
 
-def collect_amis(
-    session, account_id: str, account_name: str, region: str
-) -> list[AMIInfo]:
+def collect_amis(session, account_id: str, account_name: str, region: str) -> list[AMIInfo]:
     """AMI 목록 수집 (자체 소유만)"""
     from botocore.exceptions import ClientError
 
@@ -221,9 +219,7 @@ def collect_amis(
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if not is_quiet():
-            console.print(
-                f"    [yellow]{account_name}/{region} AMI 수집 오류: {error_code}[/yellow]"
-            )
+            console.print(f"    [yellow]{account_name}/{region} AMI 수집 오류: {error_code}[/yellow]")
 
     return amis
 
@@ -346,18 +342,12 @@ def generate_report(results: list[AMIAnalysisResult], output_dir: str) -> str:
         wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
 
     status_fills = {
-        UsageStatus.UNUSED: PatternFill(
-            start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
-        ),
-        UsageStatus.NORMAL: PatternFill(
-            start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"
-        ),
+        UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
@@ -456,9 +446,7 @@ def generate_report(results: list[AMIAnalysisResult], output_dir: str) -> str:
     for sheet in [ws, ws2]:
         for col in sheet.columns:
             max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(
-                max(max_len + 2, 10), 50
-            )
+            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
 
     ws2.freeze_panes = "A2"
 
@@ -476,9 +464,7 @@ def generate_report(results: list[AMIAnalysisResult], output_dir: str) -> str:
 # =============================================================================
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> AMIAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> AMIAnalysisResult | None:
     """단일 계정/리전의 AMI 수집 및 분석 (병렬 실행용)"""
     # 수집
     amis = collect_amis(session, account_id, account_name, region)
@@ -502,9 +488,7 @@ def run(ctx) -> None:
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
     # None 결과 필터링
-    all_results: list[AMIAnalysisResult] = [
-        r for r in result.get_data() if r is not None
-    ]
+    all_results: list[AMIAnalysisResult] = [r for r in result.get_data() if r is not None]
 
     # 에러 출력
     if result.error_count > 0:
@@ -525,9 +509,7 @@ def run(ctx) -> None:
         "unused_cost": sum(r.unused_monthly_cost for r in all_results),
     }
 
-    console.print(
-        f"\n[bold]전체 AMI: {totals['total']}개 ({totals['total_size']}GB)[/bold]"
-    )
+    console.print(f"\n[bold]전체 AMI: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
     if totals["unused"] > 0:
         console.print(
             f"  [red bold]미사용: {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]"

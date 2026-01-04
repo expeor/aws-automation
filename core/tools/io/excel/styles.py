@@ -7,6 +7,7 @@ Note:
     이 모듈은 Lazy Import 패턴을 사용합니다.
     openpyxl 등 무거운 의존성을 실제 사용 시점에만 로드합니다.
 """
+
 from __future__ import annotations
 
 import logging
@@ -130,22 +131,12 @@ def _get_alignment(name: str) -> Alignment:
 
     alignments = {
         "ALIGN_LEFT": Alignment(horizontal="left", vertical="center", wrap_text=False),
-        "ALIGN_CENTER": Alignment(
-            horizontal="center", vertical="center", wrap_text=False
-        ),
-        "ALIGN_RIGHT": Alignment(
-            horizontal="right", vertical="center", wrap_text=False
-        ),
+        "ALIGN_CENTER": Alignment(horizontal="center", vertical="center", wrap_text=False),
+        "ALIGN_RIGHT": Alignment(horizontal="right", vertical="center", wrap_text=False),
         "ALIGN_WRAP": Alignment(horizontal="left", vertical="center", wrap_text=True),
-        "ALIGN_LEFT_WRAP": Alignment(
-            horizontal="left", vertical="center", wrap_text=True
-        ),
-        "ALIGN_CENTER_WRAP": Alignment(
-            horizontal="center", vertical="center", wrap_text=True
-        ),
-        "ALIGN_RIGHT_WRAP": Alignment(
-            horizontal="right", vertical="center", wrap_text=True
-        ),
+        "ALIGN_LEFT_WRAP": Alignment(horizontal="left", vertical="center", wrap_text=True),
+        "ALIGN_CENTER_WRAP": Alignment(horizontal="center", vertical="center", wrap_text=True),
+        "ALIGN_RIGHT_WRAP": Alignment(horizontal="right", vertical="center", wrap_text=True),
     }
 
     if name in alignments:
@@ -384,9 +375,7 @@ def get_basic_header_style() -> dict[str, Any]:
 
     return {
         "font": Font(name="Consolas", bold=True),
-        "fill": PatternFill(
-            start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"
-        ),
+        "fill": PatternFill(start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"),
         "alignment": Alignment(horizontal="center", vertical="center"),
         "border": get_thin_border(),
     }
@@ -398,9 +387,7 @@ def get_center_header_style() -> dict[str, Any]:
 
     return {
         "font": Font(name="Consolas", bold=True, size=12),
-        "fill": PatternFill(
-            start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"
-        ),
+        "fill": PatternFill(start_color=COLOR_INFO, end_color=COLOR_INFO, fill_type="solid"),
         "alignment": _get_alignment("ALIGN_CENTER"),
         "border": get_thin_border(),
     }
@@ -423,9 +410,7 @@ def get_summary_cell_style() -> dict[str, Any]:
 
     return {
         "font": Font(name="Consolas", bold=True),
-        "fill": PatternFill(
-            start_color="F0F0F0", end_color="F0F0F0", fill_type="solid"
-        ),
+        "fill": PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid"),
         "alignment": _get_alignment("ALIGN_CENTER"),
         "border": get_thin_border(),
     }
@@ -472,9 +457,7 @@ def create_summary_cell_style() -> dict[str, Any]:
     return {
         "font": Font(bold=True),
         "alignment": _get_alignment("ALIGN_CENTER"),
-        "fill": PatternFill(
-            start_color="E0E0E0", end_color="E0E0E0", fill_type="solid"
-        ),
+        "fill": PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid"),
         "border": get_thin_border(),
     }
 

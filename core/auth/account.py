@@ -147,9 +147,7 @@ def get_account_info(session, fallback: str = "unknown") -> tuple[str, str | Non
     return account_id, account_alias
 
 
-def format_account_identifier(
-    session, fallback: str = "unknown", format: str = "alias_or_id"
-) -> str:
+def format_account_identifier(session, fallback: str = "unknown", format: str = "alias_or_id") -> str:
     """포맷된 계정 식별자 반환
 
     Args:

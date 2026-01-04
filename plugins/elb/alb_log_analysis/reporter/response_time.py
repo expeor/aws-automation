@@ -17,9 +17,7 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
     def write(self) -> None:
         """Create response time sheet."""
         try:
-            if not (
-                self.data.get("response_time") or self.data.get("long_response_times")
-            ):
+            if not (self.data.get("response_time") or self.data.get("long_response_times")):
                 return
 
             # Get and filter logs
@@ -30,14 +28,12 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
             # Sort by response time (descending), filter nulls
             sorted_logs = sorted(
                 long_response_logs,
-                key=lambda x: x.get("response_time")
-                if x.get("response_time") is not None
-                else -1,
+                key=lambda x: x.get("response_time") if x.get("response_time") is not None else -1,
                 reverse=True,
             )
-            filtered_logs = [
-                log for log in sorted_logs if log.get("response_time") is not None
-            ][: SheetConfig.TOP_RESPONSE_TIME_LIMIT]
+            filtered_logs = [log for log in sorted_logs if log.get("response_time") is not None][
+                : SheetConfig.TOP_RESPONSE_TIME_LIMIT
+            ]
 
             if not filtered_logs:
                 return

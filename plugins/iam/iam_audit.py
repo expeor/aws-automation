@@ -42,9 +42,7 @@ REQUIRED_PERMISSIONS = {
 }
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> tuple[Any, dict[str, Any]] | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> tuple[Any, dict[str, Any]] | None:
     """단일 계정의 IAM 수집 및 분석 (병렬 실행용)"""
     collector = IAMCollector()
     iam_data = collector.collect(session, account_id, account_name)
@@ -124,13 +122,9 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
 
     # Critical Issues
     if totals["critical_issues"] > 0 or totals["root_access_key_count"] > 0:
-        console.print(
-            f"  [red bold]CRITICAL 이슈: {totals['critical_issues']}건[/red bold]"
-        )
+        console.print(f"  [red bold]CRITICAL 이슈: {totals['critical_issues']}건[/red bold]")
         if totals["root_access_key_count"] > 0:
-            console.print(
-                f"    - Root Access Key 존재: {totals['root_access_key_count']}개 계정"
-            )
+            console.print(f"    - Root Access Key 존재: {totals['root_access_key_count']}개 계정")
         if totals["root_no_mfa_count"] > 0:
             console.print(f"    - Root MFA 미설정: {totals['root_no_mfa_count']}개 계정")
 

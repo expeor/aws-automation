@@ -170,9 +170,7 @@ class ListenerRulesAnalyzer:
 
         return results
 
-    def _analyze_listener(
-        self, listener: dict[str, Any], lb_name: str
-    ) -> ListenerAnalysis | None:
+    def _analyze_listener(self, listener: dict[str, Any], lb_name: str) -> ListenerAnalysis | None:
         """단일 리스너 분석"""
         listener_arn = listener["ListenerArn"]
         lb_arn = listener["LoadBalancerArn"]
@@ -251,9 +249,7 @@ class ListenerRulesAnalyzer:
 
         return analysis
 
-    def _analyze_conditions(
-        self, analysis: RuleAnalysis, conditions: list[dict]
-    ) -> None:
+    def _analyze_conditions(self, analysis: RuleAnalysis, conditions: list[dict]) -> None:
         """조건 세부 분석"""
         for cond in conditions:
             field_type = cond.get("Field", "")
@@ -317,9 +313,7 @@ class ListenerRulesAnalyzer:
 
         return round(score, 2)
 
-    def _generate_findings(
-        self, rules: list[RuleAnalysis], listener_arn: str
-    ) -> list[RuleFinding]:
+    def _generate_findings(self, rules: list[RuleAnalysis], listener_arn: str) -> list[RuleFinding]:
         """분석 결과로부터 발견 항목 생성"""
         findings = []
 
@@ -414,8 +408,7 @@ class ListenerRulesAnalyzer:
                         severity=FindingSeverity.INFO,
                         category=FindingCategory.PRIORITY,
                         title="연속 우선순위 사용",
-                        description=f"연속된 우선순위 사용 {len(gaps)}건. "
-                        "새 규칙 삽입 시 재정렬 필요할 수 있음.",
+                        description=f"연속된 우선순위 사용 {len(gaps)}건. 새 규칙 삽입 시 재정렬 필요할 수 있음.",
                         recommendation="우선순위 간격을 10 또는 100 단위로 유지하세요.",
                     )
                 )
@@ -451,9 +444,7 @@ class ListenerRulesAnalyzer:
 
         return findings
 
-    def _check_optimization_opportunities(
-        self, rules: list[RuleAnalysis]
-    ) -> list[RuleFinding]:
+    def _check_optimization_opportunities(self, rules: list[RuleAnalysis]) -> list[RuleFinding]:
         """최적화 기회 탐지"""
         findings = []
 
@@ -494,8 +485,7 @@ class ListenerRulesAnalyzer:
                         severity=FindingSeverity.INFO,
                         category=FindingCategory.OPTIMIZATION,
                         title="와일드카드 사용 검토",
-                        description=f"규칙에서 {len(exact_paths)}개의 정확한 경로를 사용. "
-                        f"예: {exact_paths[:2]}",
+                        description=f"규칙에서 {len(exact_paths)}개의 정확한 경로를 사용. 예: {exact_paths[:2]}",
                         rule_arn=rule.rule_arn,
                         rule_priority=rule.priority,
                         recommendation="공통 패턴이 있다면 /api/* 같은 와일드카드 사용을 검토하세요.",
@@ -530,8 +520,7 @@ class ListenerRulesAnalyzer:
                     severity=FindingSeverity.MEDIUM,
                     category=FindingCategory.PERFORMANCE,
                     title="규칙 수 과다",
-                    description=f"리스너에 {len(non_default_rules)}개의 규칙이 있습니다. "
-                    "최대 100개까지 지원.",
+                    description=f"리스너에 {len(non_default_rules)}개의 규칙이 있습니다. 최대 100개까지 지원.",
                     recommendation="규칙 수가 많으면 평가 시간이 증가합니다. 통합을 검토하세요.",
                 )
             )
@@ -550,10 +539,7 @@ class ListenerRulesAnalyzer:
         auth_rules = [
             r
             for r in non_default_rules
-            if any(
-                a.get("Type") in ("authenticate-cognito", "authenticate-oidc")
-                for a in r.actions
-            )
+            if any(a.get("Type") in ("authenticate-cognito", "authenticate-oidc") for a in r.actions)
         ]
         if auth_rules:
             # 인증 후 forward가 없는 규칙 체크
@@ -599,11 +585,7 @@ class ToolRunner(BaseToolRunner):
             try:
                 # ALB만 조회
                 lbs_resp = elbv2.describe_load_balancers()
-                albs = [
-                    lb
-                    for lb in lbs_resp.get("LoadBalancers", [])
-                    if lb.get("Type") == "application"
-                ]
+                albs = [lb for lb in lbs_resp.get("LoadBalancers", []) if lb.get("Type") == "application"]
 
                 if not albs:
                     continue
@@ -665,22 +647,16 @@ class ToolRunner(BaseToolRunner):
 
         summary_table.add_row("분석한 리스너", str(len(all_results)))
         summary_table.add_row("발견 항목", str(len(all_findings)))
-        summary_table.add_row(
-            "[red]CRITICAL[/red]", str(severity_counts.get("CRITICAL", 0))
-        )
+        summary_table.add_row("[red]CRITICAL[/red]", str(severity_counts.get("CRITICAL", 0)))
         summary_table.add_row("[red]HIGH[/red]", str(severity_counts.get("HIGH", 0)))
-        summary_table.add_row(
-            "[yellow]MEDIUM[/yellow]", str(severity_counts.get("MEDIUM", 0))
-        )
+        summary_table.add_row("[yellow]MEDIUM[/yellow]", str(severity_counts.get("MEDIUM", 0)))
         summary_table.add_row("[dim]LOW[/dim]", str(severity_counts.get("LOW", 0)))
         summary_table.add_row("[dim]INFO[/dim]", str(severity_counts.get("INFO", 0)))
 
         console.print(summary_table)
 
         # 주요 발견 항목 출력 (HIGH 이상)
-        high_findings = [
-            f for f in all_findings if f["Severity"] in ("CRITICAL", "HIGH")
-        ]
+        high_findings = [f for f in all_findings if f["Severity"] in ("CRITICAL", "HIGH")]
 
         if high_findings:
             console.print()
@@ -704,19 +680,12 @@ class ToolRunner(BaseToolRunner):
         # 엑셀 출력
         if all_results and self.ctx:
             # 출력 디렉토리 생성
-            output_dir = (
-                OutputPath(self.ctx.profile_name or "default")
-                .sub("elb")
-                .with_date()
-                .build()
-            )
+            output_dir = OutputPath(self.ctx.profile_name or "default").sub("elb").with_date().build()
 
             # 엑셀 파일로 저장
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = f"{output_dir}/ALB_Listener_Rules_{timestamp}.xlsx"
-            save_dict_list_to_excel(
-                all_results, output_path, sheet_name="Listener_Summary"
-            )
+            save_dict_list_to_excel(all_results, output_path, sheet_name="Listener_Summary")
             console.print(f"\n[bold green]보고서 저장: {output_path}[/bold green]")
 
 

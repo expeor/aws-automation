@@ -124,10 +124,7 @@ class FavoritesManager:
 
     def is_favorite(self, category: str, tool_module: str) -> bool:
         """즐겨찾기 여부 확인"""
-        return any(
-            item.category == category and item.tool_module == tool_module
-            for item in self._items
-        )
+        return any(item.category == category and item.tool_module == tool_module for item in self._items)
 
     def get_all(self) -> list[FavoriteItem]:
         """전체 즐겨찾기 목록 (순서대로)"""

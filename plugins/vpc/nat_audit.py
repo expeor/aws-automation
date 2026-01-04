@@ -30,9 +30,7 @@ REQUIRED_PERMISSIONS = {
 }
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> tuple[Any, dict[str, Any]] | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> tuple[Any, dict[str, Any]] | None:
     """단일 계정/리전의 NAT Gateway 수집 및 분석 (병렬 실행용)"""
     collector = NATCollector()
     audit_data = collector.collect(session, account_id, account_name, region)
@@ -101,17 +99,13 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
         "normal_count": sum(s.get("normal_count", 0) for s in stats_list),
         "total_monthly_cost": sum(s.get("total_monthly_cost", 0) for s in stats_list),
         "total_monthly_waste": sum(s.get("total_monthly_waste", 0) for s in stats_list),
-        "total_annual_savings": sum(
-            s.get("total_annual_savings", 0) for s in stats_list
-        ),
+        "total_annual_savings": sum(s.get("total_annual_savings", 0) for s in stats_list),
     }
 
     console.print(f"\n  [bold]NAT Gateway:[/bold] 총 {totals['total_nat_count']}개")
 
     if totals["unused_count"] > 0:
-        console.print(
-            f"    [red bold]미사용 (삭제 권장): {totals['unused_count']}개[/red bold]"
-        )
+        console.print(f"    [red bold]미사용 (삭제 권장): {totals['unused_count']}개[/red bold]")
     if totals["low_usage_count"] > 0:
         console.print(f"    [yellow]저사용 (검토 필요): {totals['low_usage_count']}개[/yellow]")
     if totals["normal_count"] > 0:
@@ -122,9 +116,7 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
 
     if totals["total_monthly_waste"] > 0:
         console.print(f"    [red]월간 낭비 추정: ${totals['total_monthly_waste']:,.2f}[/red]")
-        console.print(
-            f"    [red]연간 절감 가능: ${totals['total_annual_savings']:,.2f}[/red]"
-        )
+        console.print(f"    [red]연간 절감 가능: ${totals['total_annual_savings']:,.2f}[/red]")
 
 
 def _create_output_directory(ctx) -> str:

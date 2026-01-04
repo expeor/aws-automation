@@ -76,9 +76,7 @@ def run(ctx) -> None:
                 sso_data = collector.collect(session, account_id, account_name)
 
                 if sso_data is None:
-                    console.print(
-                        "[yellow]이 계정에서 Identity Center에 접근할 수 없습니다.[/yellow]"
-                    )
+                    console.print("[yellow]이 계정에서 Identity Center에 접근할 수 없습니다.[/yellow]")
                     console.print("[dim]Identity Center 관리 계정으로 다시 시도하세요.[/dim]")
                     continue
 
@@ -102,9 +100,7 @@ def run(ctx) -> None:
                     console.print(f"[red]오류: {error_code} - {error_msg}[/red]")
                 continue
             except Exception as e:
-                console.print(
-                    f"[red]{account_name} 수집 오류: {type(e).__name__} - {e}[/red]"
-                )
+                console.print(f"[red]{account_name} 수집 오류: {type(e).__name__} - {e}[/red]")
                 continue
 
     # 건너뛴 계정/오류 출력
@@ -153,17 +149,11 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
     totals = {
         "total_users": sum(s.get("total_users", 0) for s in stats_list),
         "total_groups": sum(s.get("total_groups", 0) for s in stats_list),
-        "total_permission_sets": sum(
-            s.get("total_permission_sets", 0) for s in stats_list
-        ),
+        "total_permission_sets": sum(s.get("total_permission_sets", 0) for s in stats_list),
         "users_with_admin": sum(s.get("users_with_admin", 0) for s in stats_list),
         "users_no_assignment": sum(s.get("users_no_assignment", 0) for s in stats_list),
-        "admin_permission_sets": sum(
-            s.get("admin_permission_sets", 0) for s in stats_list
-        ),
-        "high_risk_permission_sets": sum(
-            s.get("high_risk_permission_sets", 0) for s in stats_list
-        ),
+        "admin_permission_sets": sum(s.get("admin_permission_sets", 0) for s in stats_list),
+        "high_risk_permission_sets": sum(s.get("high_risk_permission_sets", 0) for s in stats_list),
         "empty_groups": sum(s.get("empty_groups", 0) for s in stats_list),
         "critical_issues": sum(s.get("critical_issues", 0) for s in stats_list),
         "high_issues": sum(s.get("high_issues", 0) for s in stats_list),
@@ -173,24 +163,16 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
 
     # Critical/High Issues
     if totals["critical_issues"] > 0:
-        console.print(
-            f"  [red bold]CRITICAL 이슈: {totals['critical_issues']}건[/red bold]"
-        )
+        console.print(f"  [red bold]CRITICAL 이슈: {totals['critical_issues']}건[/red bold]")
     if totals["high_issues"] > 0:
         console.print(f"  [yellow]HIGH 이슈: {totals['high_issues']}건[/yellow]")
 
     # Permission Set 통계
-    console.print(
-        f"\n  [bold]Permission Sets:[/bold] 총 {totals['total_permission_sets']}개"
-    )
+    console.print(f"\n  [bold]Permission Sets:[/bold] 총 {totals['total_permission_sets']}개")
     if totals["admin_permission_sets"] > 0:
-        console.print(
-            f"    - Admin 권한: [yellow]{totals['admin_permission_sets']}개[/yellow]"
-        )
+        console.print(f"    - Admin 권한: [yellow]{totals['admin_permission_sets']}개[/yellow]")
     if totals["high_risk_permission_sets"] > 0:
-        console.print(
-            f"    - 위험 정책 포함: [yellow]{totals['high_risk_permission_sets']}개[/yellow]"
-        )
+        console.print(f"    - 위험 정책 포함: [yellow]{totals['high_risk_permission_sets']}개[/yellow]")
 
     # User 통계
     console.print(f"\n  [bold]Users:[/bold] 총 {totals['total_users']}명")

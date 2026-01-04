@@ -204,9 +204,7 @@ def collect_buckets(session, account_id: str, account_name: str) -> list[BucketI
                     "s3",
                     region_name=region if region != "unknown" else "us-east-1",
                 )
-                obj_response = s3_regional.list_objects_v2(
-                    Bucket=bucket_name, MaxKeys=1
-                )
+                obj_response = s3_regional.list_objects_v2(Bucket=bucket_name, MaxKeys=1)
                 bucket_info.object_count = obj_response.get("KeyCount", 0)
             except ClientError:
                 pass
@@ -223,10 +221,7 @@ def collect_buckets(session, account_id: str, account_name: str) -> list[BucketI
             s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
             bucket_info.has_lifecycle = True
         except ClientError as e:
-            if (
-                e.response.get("Error", {}).get("Code")
-                != "NoSuchLifecycleConfiguration"
-            ):
+            if e.response.get("Error", {}).get("Code") != "NoSuchLifecycleConfiguration":
                 pass
 
         try:
@@ -238,17 +233,12 @@ def collect_buckets(session, account_id: str, account_name: str) -> list[BucketI
 
         try:
             encryption = s3.get_bucket_encryption(Bucket=bucket_name)
-            rules = encryption.get("ServerSideEncryptionConfiguration", {}).get(
-                "Rules", []
-            )
+            rules = encryption.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
             if rules:
                 sse = rules[0].get("ApplyServerSideEncryptionByDefault", {})
                 bucket_info.encryption_type = sse.get("SSEAlgorithm", "None")
         except ClientError as e:
-            if (
-                e.response.get("Error", {}).get("Code")
-                != "ServerSideEncryptionConfigurationNotFoundError"
-            ):
+            if e.response.get("Error", {}).get("Code") != "ServerSideEncryptionConfigurationNotFoundError":
                 pass
 
         buckets.append(bucket_info)
@@ -256,9 +246,7 @@ def collect_buckets(session, account_id: str, account_name: str) -> list[BucketI
     return buckets
 
 
-def analyze_buckets(
-    buckets: list[BucketInfo], account_id: str, account_name: str
-) -> S3AnalysisResult:
+def analyze_buckets(buckets: list[BucketInfo], account_id: str, account_name: str) -> S3AnalysisResult:
     """버킷 분석"""
     result = S3AnalysisResult(
         account_id=account_id,
@@ -326,14 +314,10 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
@@ -388,9 +372,7 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
                 ws_detail.cell(row=detail_row, column=3, value=bucket.region)
                 ws_detail.cell(row=detail_row, column=4, value=f.status.value)
                 ws_detail.cell(row=detail_row, column=5, value=bucket.object_count)
-                ws_detail.cell(
-                    row=detail_row, column=6, value=f"{bucket.total_size_mb:.2f} MB"
-                )
+                ws_detail.cell(row=detail_row, column=6, value=f"{bucket.total_size_mb:.2f} MB")
                 ws_detail.cell(
                     row=detail_row,
                     column=7,
@@ -410,9 +392,7 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 50
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -422,9 +402,7 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> S3AnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> S3AnalysisResult | None:
     """단일 계정의 S3 버킷 수집 및 분석 (병렬 실행용)
 
     S3는 글로벌 서비스이므로 region은 무시됩니다.
@@ -454,9 +432,7 @@ def run(ctx) -> None:
     total_versioning = sum(r.versioning_only_buckets for r in results)
 
     console.print("\n[bold]종합 결과[/bold]")
-    console.print(
-        f"빈 버킷: [yellow]{total_empty}개[/yellow], 버전만: [yellow]{total_versioning}개[/yellow]"
-    )
+    console.print(f"빈 버킷: [yellow]{total_empty}개[/yellow], 버전만: [yellow]{total_versioning}개[/yellow]")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

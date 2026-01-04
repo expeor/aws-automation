@@ -131,11 +131,7 @@ def run(ctx) -> None:
 
         # 압축 해제
         if isinstance(downloaded_files, list) and downloaded_files:
-            gz_directory = (
-                os.path.dirname(downloaded_files[0])
-                if isinstance(downloaded_files[0], str)
-                else gz_dir
-            )
+            gz_directory = os.path.dirname(downloaded_files[0]) if isinstance(downloaded_files[0], str) else gz_dir
         else:
             gz_directory = gz_dir
 
@@ -147,9 +143,7 @@ def run(ctx) -> None:
 
         # abuse_ips 처리
         if isinstance(analysis_results.get("abuse_ips"), (dict, set)):
-            analysis_results["abuse_ips_list"] = list(
-                analysis_results.get("abuse_ips", set())
-            )
+            analysis_results["abuse_ips_list"] = list(analysis_results.get("abuse_ips", set()))
             analysis_results["abuse_ips"] = "AbuseIPDB IPs processed"
 
         # Step 4: Excel 보고서 생성
@@ -166,9 +160,7 @@ def run(ctx) -> None:
 
         final_report_path = reporter.generate_report(report_path)
 
-        console.print(
-            f"[bold green]✅ 보고서 생성 완료![/bold green]\n" f"   경로: {final_report_path}"
-        )
+        console.print(f"[bold green]✅ 보고서 생성 완료![/bold green]\n   경로: {final_report_path}")
 
         # Step 5: 임시 파일 정리
         _cleanup_temp_files(analyzer, gz_directory, log_directory)
@@ -288,19 +280,13 @@ def _select_alb_with_pagination(
         if user_input.startswith("/"):
             search_term = user_input[1:].strip().lower()
             if search_term:
-                filtered_list = [
-                    item for item in alb_list if search_term in item["name"].lower()
-                ]
+                filtered_list = [item for item in alb_list if search_term in item["name"].lower()]
                 current_page = 0
                 if not filtered_list:
-                    console.print(
-                        f"[yellow]'{search_term}' 검색 결과가 없습니다. 전체 목록으로 복원합니다.[/yellow]"
-                    )
+                    console.print(f"[yellow]'{search_term}' 검색 결과가 없습니다. 전체 목록으로 복원합니다.[/yellow]")
                     filtered_list = alb_list
                 else:
-                    console.print(
-                        f"[green]'{search_term}' 검색 결과: {len(filtered_list)}개[/green]"
-                    )
+                    console.print(f"[green]'{search_term}' 검색 결과: {len(filtered_list)}개[/green]")
             else:
                 # 빈 검색어는 전체 목록 복원
                 filtered_list = alb_list
@@ -381,12 +367,9 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
     for lb in sorted(albs, key=lambda x: x["LoadBalancerName"]):
         # 로그 설정 확인
         try:
-            attrs = elbv2_client.describe_load_balancer_attributes(
-                LoadBalancerArn=lb["LoadBalancerArn"]
-            )
+            attrs = elbv2_client.describe_load_balancer_attributes(LoadBalancerArn=lb["LoadBalancerArn"])
             log_enabled = any(
-                attr["Key"] == "access_logs.s3.enabled" and attr["Value"] == "true"
-                for attr in attrs["Attributes"]
+                attr["Key"] == "access_logs.s3.enabled" and attr["Value"] == "true" for attr in attrs["Attributes"]
             )
             status = "✅" if log_enabled else "❌"
         except Exception:
@@ -409,9 +392,7 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
 
     # 로그 설정 확인
     try:
-        attrs = elbv2_client.describe_load_balancer_attributes(
-            LoadBalancerArn=selected_lb["LoadBalancerArn"]
-        )
+        attrs = elbv2_client.describe_load_balancer_attributes(LoadBalancerArn=selected_lb["LoadBalancerArn"])
 
         log_config = {}
         for attr in attrs["Attributes"]:
@@ -429,9 +410,7 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
             return _get_bucket_input_manual()
 
         if not log_config.get("bucket"):
-            console.print(
-                f"[yellow]⚠️ '{selected_lb['LoadBalancerName']}'의 로그 버킷 정보가 없습니다.[/yellow]"
-            )
+            console.print(f"[yellow]⚠️ '{selected_lb['LoadBalancerName']}'의 로그 버킷 정보가 없습니다.[/yellow]")
             return _get_bucket_input_manual()
 
         # S3 경로 생성
@@ -524,10 +503,7 @@ def _get_time_range_input() -> tuple[datetime, datetime]:
     yesterday = now - timedelta(days=1)
 
     console.print("\n[bold cyan]⏰ 분석 시간 범위 설정[/bold cyan]")
-    console.print(
-        f"[dim]기본값: {yesterday.strftime('%Y-%m-%d %H:%M')} ~ "
-        f"{now.strftime('%Y-%m-%d %H:%M')}[/dim]"
-    )
+    console.print(f"[dim]기본값: {yesterday.strftime('%Y-%m-%d %H:%M')} ~ {now.strftime('%Y-%m-%d %H:%M')}[/dim]")
 
     # 빠른 선택 (기본값인 24시간을 첫 번째에 배치)
     quick_choices = [
@@ -580,8 +556,7 @@ def _get_time_range_input() -> tuple[datetime, datetime]:
         end_time = now
 
     console.print(
-        f"[green]✓ 분석 기간: {start_time.strftime('%Y-%m-%d %H:%M')} ~ "
-        f"{end_time.strftime('%Y-%m-%d %H:%M')}[/green]"
+        f"[green]✓ 분석 기간: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}[/green]"
     )
     return start_time, end_time
 

@@ -36,17 +36,11 @@ class URLSheetWriter(BaseSheetWriter):
                 top_method = top_method.replace("-", "")
 
             # Unique IPs
-            if "unique_ips" in details and isinstance(
-                details.get("unique_ips"), (int, float)
-            ):
+            if "unique_ips" in details and isinstance(details.get("unique_ips"), (int, float)):
                 unique_ips = int(details.get("unique_ips") or 0)
             else:
                 client_ips_val = details.get("client_ips", set())
-                unique_ips = (
-                    len(client_ips_val)
-                    if isinstance(client_ips_val, (set, list, tuple))
-                    else 0
-                )
+                unique_ips = len(client_ips_val) if isinstance(client_ips_val, (set, list, tuple)) else 0
 
             # Average response time
             avg_response_time = self._parse_avg_response_time(details)
@@ -89,9 +83,7 @@ class URLSheetWriter(BaseSheetWriter):
             )
 
         # Sort and limit
-        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[
-            : SheetConfig.TOP_URL_LIMIT
-        ]
+        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[: SheetConfig.TOP_URL_LIMIT]
 
         if not url_data_sorted:
             return
@@ -111,12 +103,8 @@ class URLSheetWriter(BaseSheetWriter):
         """Write simple URL count statistics."""
         url_counts = self.data["request_url_counts"]
 
-        url_data = [
-            {"Count": count, "Request": url} for url, count in url_counts.items()
-        ]
-        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[
-            : SheetConfig.TOP_URL_LIMIT
-        ]
+        url_data = [{"Count": count, "Request": url} for url, count in url_counts.items()]
+        url_data_sorted = sorted(url_data, key=lambda x: x["Count"], reverse=True)[: SheetConfig.TOP_URL_LIMIT]
 
         if not url_data_sorted:
             return
@@ -155,11 +143,7 @@ class URLSheetWriter(BaseSheetWriter):
             return ""
 
         # Filter valid status codes
-        valid_counts = {
-            k: v
-            for k, v in status_counts.items()
-            if k and str(k).strip() not in ("", "-", "N/A")
-        }
+        valid_counts = {k: v for k, v in status_counts.items() if k and str(k).strip() not in ("", "-", "N/A")}
 
         if not valid_counts:
             return ""
@@ -176,11 +160,7 @@ class URLSheetWriter(BaseSheetWriter):
         if total == 0:
             return 0.0
 
-        error_count = sum(
-            count
-            for status, count in status_counts.items()
-            if str(status).startswith(("4", "5"))
-        )
+        error_count = sum(count for status, count in status_counts.items() if str(status).startswith(("4", "5")))
 
         return round((error_count / total) * 100, 2)
 

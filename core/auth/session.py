@@ -47,6 +47,7 @@ Flow에서 선택된 계정/역할 정보를 자동으로 사용.
         ec2 = session.client("ec2")
         # identifier: SSO Session이면 account_id, 그 외는 profile_name
 """
+
 from __future__ import annotations
 
 import logging
@@ -739,9 +740,7 @@ def get_current_context_info() -> dict[str, str] | None:
 
     try:
         # 1. 환경 변수에서 프로파일 확인
-        profile_name = os.environ.get("AWS_PROFILE") or os.environ.get(
-            "AWS_DEFAULT_PROFILE"
-        )
+        profile_name = os.environ.get("AWS_PROFILE") or os.environ.get("AWS_DEFAULT_PROFILE")
 
         # 2. AWS 설정에서 기본 프로파일 확인
         loader = Loader()

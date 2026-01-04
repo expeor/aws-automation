@@ -104,9 +104,7 @@ class ECRAnalysisResult:
     findings: list[ECRRepoFinding] = field(default_factory=list)
 
 
-def collect_ecr_repos(
-    session, account_id: str, account_name: str, region: str
-) -> list[ECRRepoInfo]:
+def collect_ecr_repos(session, account_id: str, account_name: str, region: str) -> list[ECRRepoInfo]:
     """ECR 리포지토리 수집"""
     from botocore.exceptions import ClientError
 
@@ -173,9 +171,7 @@ def collect_ecr_repos(
     return repos
 
 
-def analyze_ecr_repos(
-    repos: list[ECRRepoInfo], account_id: str, account_name: str, region: str
-) -> ECRAnalysisResult:
+def analyze_ecr_repos(repos: list[ECRRepoInfo], account_id: str, account_name: str, region: str) -> ECRAnalysisResult:
     """ECR 리포지토리 분석"""
     result = ECRAnalysisResult(
         account_id=account_id,
@@ -252,14 +248,10 @@ def generate_report(results: list[ECRAnalysisResult], output_dir: str) -> str:
     if wb.active:
         wb.remove(wb.active)
 
-    header_fill = PatternFill(
-        start_color="4472C4", end_color="4472C4", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    yellow_fill = PatternFill(
-        start_color="FFE066", end_color="FFE066", fill_type="solid"
-    )
+    yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     ws = wb.create_sheet("Summary")
     ws["A1"] = "ECR 분석 보고서"
@@ -314,9 +306,7 @@ def generate_report(results: list[ECRAnalysisResult], output_dir: str) -> str:
                 ws_detail.cell(row=detail_row, column=4, value=f.status.value)
                 ws_detail.cell(row=detail_row, column=5, value=repo.image_count)
                 ws_detail.cell(row=detail_row, column=6, value=repo.old_image_count)
-                ws_detail.cell(
-                    row=detail_row, column=7, value=f"{repo.total_size_gb:.2f} GB"
-                )
+                ws_detail.cell(row=detail_row, column=7, value=f"{repo.total_size_gb:.2f} GB")
                 ws_detail.cell(
                     row=detail_row,
                     column=8,
@@ -334,9 +324,7 @@ def generate_report(results: list[ECRAnalysisResult], output_dir: str) -> str:
             max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
             col_idx = col[0].column  # type: ignore
             if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(
-                    max(max_len + 2, 10), 40
-                )
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -346,9 +334,7 @@ def generate_report(results: list[ECRAnalysisResult], output_dir: str) -> str:
     return filepath
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> ECRAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ECRAnalysisResult | None:
     """단일 계정/리전의 ECR 리포지토리 수집 및 분석 (병렬 실행용)"""
     repos = collect_ecr_repos(session, account_id, account_name, region)
     if not repos:

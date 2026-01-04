@@ -116,9 +116,7 @@ class SGExcelReporter:
                 "active": sum(s["active"] for s in self.summary.values()),
                 "unused": sum(s["unused"] for s in self.summary.values()),
                 "default_sg": sum(s["default_sg"] for s in self.summary.values()),
-                "in_default_vpc": sum(
-                    s["in_default_vpc"] for s in self.summary.values()
-                ),
+                "in_default_vpc": sum(s["in_default_vpc"] for s in self.summary.values()),
             }
             ws.add_row(
                 [
@@ -162,9 +160,7 @@ class SGExcelReporter:
             rule = result.rule
 
             # Exposed ports (전체)
-            exposed_ports_str = ", ".join(
-                [f"{p.port}/{p.name}" for p in result.exposed_critical_ports]
-            )
+            exposed_ports_str = ", ".join([f"{p.port}/{p.name}" for p in result.exposed_critical_ports])
 
             # Reason
             port_info = ""
@@ -357,9 +353,7 @@ class SGExcelReporter:
             # Exposed ports (전체)
             exposed_ports_str = ""
             if result.exposed_critical_ports:
-                port_names = [
-                    f"{p.port}/{p.name}" for p in result.exposed_critical_ports
-                ]
+                port_names = [f"{p.port}/{p.name}" for p in result.exposed_critical_ports]
                 exposed_ports_str = ", ".join(port_names)
 
             # Warnings 통합 (stale_reason + warnings)
@@ -477,9 +471,7 @@ class SGExcelReporter:
             # 포트 정보 (전체)
             exposed_ports_str = ""
             if result.exposed_critical_ports:
-                port_names = [
-                    f"{p.port}/{p.name}" for p in result.exposed_critical_ports
-                ]
+                port_names = [f"{p.port}/{p.name}" for p in result.exposed_critical_ports]
                 exposed_ports_str = ", ".join(port_names)
 
             # Issue 통합 (Stale + Risk Level + 추가 경고)
