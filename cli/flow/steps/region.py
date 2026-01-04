@@ -169,41 +169,28 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions = common_region_codes + other_regions
 
-        # 빈 상태에서 시작 (사용자가 직접 선택)
-        selected_indices = set()
+        print_box_start(f"리전 선택 ({len(all_regions)}개)")
 
-        def display():
-            print_box_start(f"리전 선택 ({len(all_regions)}개)")
+        # 2열 레이아웃
+        half = (len(all_regions) + 1) // 2
+        for i in range(half):
+            left_idx = i + 1
+            left = all_regions[i]
+            left_name = REGION_NAMES.get(left, "")[:6]
+            left_str = f"{left_idx:>2}) {left:<14} {left_name:<6}"
 
-            # 2열 레이아웃
-            half = (len(all_regions) + 1) // 2
-            for i in range(half):
-                left_idx = i + 1
-                left = all_regions[i]
-                left_check = "[green]v[/green]" if i in selected_indices else " "
-                left_name = REGION_NAMES.get(left, "")[:6]
-                left_str = f"{left_idx:>2}){left_check}{left:<14} {left_name:<6}"
+            if i + half < len(all_regions):
+                right_idx = i + half + 1
+                right = all_regions[i + half]
+                right_name = REGION_NAMES.get(right, "")[:6]
+                right_str = f"{right_idx:>2}) {right:<14} {right_name}"
+                print_box_line(f" {left_str}  {right_str}")
+            else:
+                print_box_line(f" {left_str}")
 
-                if i + half < len(all_regions):
-                    right_idx = i + half + 1
-                    right = all_regions[i + half]
-                    right_check = (
-                        "[green]v[/green]" if (i + half) in selected_indices else " "
-                    )
-                    right_name = REGION_NAMES.get(right, "")[:6]
-                    right_str = f"{right_idx:>2}){right_check}{right:<14} {right_name}"
-                    print_box_line(f" {left_str}  {right_str}")
-                else:
-                    print_box_line(f" {left_str}")
-
-            print_box_line()
-            count_display = f"{len(selected_indices)}개" if len(selected_indices) >= 2 else f"{len(selected_indices)}개 [yellow](2개 이상 필요)[/yellow]"
-            print_box_line(
-                f"[dim]번호: 토글 | a: 전체 | d: 완료 ({count_display})[/dim]"
-            )
-            print_box_end()
-
-        display()
+        print_box_line()
+        print_box_line("[dim]번호 입력 (쉼표/공백 구분) | a: 전체[/dim]")
+        print_box_end()
 
         while True:
             choice = console.input("> ").strip().lower()
@@ -211,31 +198,24 @@ class RegionStep:
             if not choice:
                 continue
 
-            if choice == "d":
-                if len(selected_indices) < 2:
-                    console.print("[yellow]2개 이상 선택해주세요[/yellow]")
-                    continue
-                return [all_regions[i] for i in sorted(selected_indices)]
-
             if choice == "a":
-                if len(selected_indices) == len(all_regions):
-                    selected_indices.clear()
-                else:
-                    selected_indices = set(range(len(all_regions)))
-                display()
-                continue
+                return all_regions.copy()
 
-            # 번호 토글
+            # 번호 파싱 및 즉시 반환
             try:
                 nums = [int(n) for n in choice.replace(",", " ").split()]
+                selected = []
                 for num in nums:
                     if 1 <= num <= len(all_regions):
-                        idx = num - 1
-                        if idx in selected_indices:
-                            selected_indices.discard(idx)
-                        else:
-                            selected_indices.add(idx)
-                display()
+                        region = all_regions[num - 1]
+                        if region not in selected:
+                            selected.append(region)
+
+                if len(selected) < 2:
+                    console.print("[yellow]2개 이상 선택해주세요[/yellow]")
+                    continue
+
+                return selected
             except ValueError:
                 console.print("[dim]숫자 입력[/dim]")
 
