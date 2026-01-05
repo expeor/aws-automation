@@ -963,10 +963,7 @@ def find_athena_usage(session, region: str, key_arns: set[str]) -> dict[str, lis
         # list_work_groups는 paginator를 지원하지 않음 - 수동 페이징
         next_token = None
         while True:
-            if next_token:
-                response = athena.list_work_groups(NextToken=next_token)
-            else:
-                response = athena.list_work_groups()
+            response = athena.list_work_groups(NextToken=next_token) if next_token else athena.list_work_groups()
 
             for wg in response.get("WorkGroups", []):
                 wg_name = wg.get("Name", "")

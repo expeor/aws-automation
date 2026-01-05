@@ -146,9 +146,8 @@ def analyze_key_policy(policy_str: str, account_id: str) -> list[PolicyFinding]:
         # Principal 분석
         if isinstance(principals, str):
             principals = {"AWS": [principals]} if principals != "*" else {"AWS": "*"}
-        elif isinstance(principals, dict):
-            if "AWS" in principals and isinstance(principals["AWS"], str):
-                principals["AWS"] = [principals["AWS"]]
+        elif isinstance(principals, dict) and "AWS" in principals and isinstance(principals["AWS"], str):
+            principals["AWS"] = [principals["AWS"]]
 
         aws_principals = principals.get("AWS", [])
 
