@@ -29,15 +29,11 @@ class TestCollectAndAnalyze:
         mock_analyzer_cls.return_value = mock_analyzer
 
         mock_session = MagicMock()
-        result = _collect_and_analyze(
-            mock_session, "123456789012", "test-account", "us-east-1"
-        )
+        result = _collect_and_analyze(mock_session, "123456789012", "test-account", "us-east-1")
 
         assert result is not None
         assert result == (mock_analysis_result, mock_stats)
-        mock_collector.collect.assert_called_once_with(
-            mock_session, "123456789012", "test-account"
-        )
+        mock_collector.collect.assert_called_once_with(mock_session, "123456789012", "test-account")
 
 
 class TestPrintSummary:
@@ -203,9 +199,7 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = (
-            "/output/123456789012/iam/security/2024-01-01"
-        )
+        mock_path_instance.build.return_value = "/output/123456789012/iam/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)
@@ -225,9 +219,7 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = (
-            "/output/my-profile/iam/security/2024-01-01"
-        )
+        mock_path_instance.build.return_value = "/output/my-profile/iam/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)

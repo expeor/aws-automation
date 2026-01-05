@@ -73,13 +73,9 @@ def mock_sso_execution_context():
 
     # Mock accounts
     account1 = AccountInfo(id="111111111111", name="dev-account", roles=["AdminRole"])
-    account2 = AccountInfo(
-        id="222222222222", name="prod-account", roles=["ReadOnlyRole"]
-    )
+    account2 = AccountInfo(id="222222222222", name="prod-account", roles=["ReadOnlyRole"])
     ctx.get_target_accounts.return_value = [account1, account2]
-    ctx.get_effective_role.side_effect = lambda acc_id: (
-        "AdminRole" if acc_id == "111111111111" else "ReadOnlyRole"
-    )
+    ctx.get_effective_role.side_effect = lambda acc_id: ("AdminRole" if acc_id == "111111111111" else "ReadOnlyRole")
 
     # Mock provider
     ctx.provider = MagicMock()

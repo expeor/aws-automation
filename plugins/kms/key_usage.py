@@ -1227,7 +1227,9 @@ def run(ctx) -> None:
             console.print(f"[dim]스캔 리전: {scanned_regions}개[/dim]")
         else:
             console.print(f"[yellow]CMK가 없습니다.[/yellow] (AWS 관리 키만 {total_keys}개 존재)")
-            console.print("[dim]CMK(고객 관리 키)만 사용처를 분석합니다. AWS 관리 키는 AWS 서비스가 자동 관리합니다.[/dim]")
+            console.print(
+                "[dim]CMK(고객 관리 키)만 사용처를 분석합니다. AWS 관리 키는 AWS 서비스가 자동 관리합니다.[/dim]"
+            )
         return
 
     console.print("\n[bold]종합 결과[/bold]")

@@ -42,10 +42,7 @@ REQUIRED_PERMISSIONS = {
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LBAnalysisResult | None:
     """단일 계정/리전의 ALB 수집 및 분석 (병렬 실행용)"""
-    albs = collect_v2_load_balancers(
-        session, account_id, account_name, region,
-        lb_type_filter="application"
-    )
+    albs = collect_v2_load_balancers(session, account_id, account_name, region, lb_type_filter="application")
     if not albs:
         return None
     return analyze_load_balancers(albs, account_id, account_name, region, lb_type_filter="application")

@@ -156,9 +156,7 @@ class TestCategorizeError:
 
     def test_invalid_request(self):
         """Invalid request 분류"""
-        assert (
-            categorize_error("InvalidParameterValue") == ErrorCategory.INVALID_REQUEST
-        )
+        assert categorize_error("InvalidParameterValue") == ErrorCategory.INVALID_REQUEST
         assert categorize_error("ValidationError") == ErrorCategory.INVALID_REQUEST
         assert categorize_error("MalformedRequest") == ErrorCategory.INVALID_REQUEST
 
@@ -415,9 +413,7 @@ class TestErrorCollector:
                 severity=ErrorSeverity.WARNING,
             )
 
-        threads = [
-            threading.Thread(target=add_error, args=(i,)) for i in range(error_count)
-        ]
+        threads = [threading.Thread(target=add_error, args=(i,)) for i in range(error_count)]
         for t in threads:
             t.start()
         for t in threads:

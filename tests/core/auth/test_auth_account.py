@@ -30,9 +30,7 @@ class TestGetAccountDisplayName:
         """Alias가 있을 때 Alias 반환"""
         mock_session = MagicMock()
         mock_iam = MagicMock()
-        mock_iam.list_account_aliases.return_value = {
-            "AccountAliases": ["my-account-alias"]
-        }
+        mock_iam.list_account_aliases.return_value = {"AccountAliases": ["my-account-alias"]}
         mock_session.client.return_value = mock_iam
 
         result = get_account_display_name(mock_session)
@@ -93,9 +91,7 @@ class TestGetAccountDisplayNameFromCtx:
 
         mock_session = MagicMock()
 
-        result = get_account_display_name_from_ctx(
-            mock_ctx, mock_session, "111111111111"
-        )
+        result = get_account_display_name_from_ctx(mock_ctx, mock_session, "111111111111")
 
         assert result == "Production Account"
         # SSO Session이면 API 호출하지 않음
@@ -113,9 +109,7 @@ class TestGetAccountDisplayNameFromCtx:
 
         mock_session = MagicMock()
 
-        result = get_account_display_name_from_ctx(
-            mock_ctx, mock_session, "111111111111"
-        )
+        result = get_account_display_name_from_ctx(mock_ctx, mock_session, "111111111111")
 
         assert result == "111111111111"
 
@@ -135,9 +129,7 @@ class TestGetAccountDisplayNameFromCtx:
             "sts": mock_sts,
         }[service]
 
-        result = get_account_display_name_from_ctx(
-            mock_ctx, mock_session, "111111111111"
-        )
+        result = get_account_display_name_from_ctx(mock_ctx, mock_session, "111111111111")
 
         # 빈 accounts 리스트면 API 호출로 fallback
         assert result == "111111111111"
@@ -154,9 +146,7 @@ class TestGetAccountDisplayNameFromCtx:
         mock_iam.list_account_aliases.return_value = {"AccountAliases": ["my-alias"]}
         mock_session.client.return_value = mock_iam
 
-        result = get_account_display_name_from_ctx(
-            mock_ctx, mock_session, "profile-name"
-        )
+        result = get_account_display_name_from_ctx(mock_ctx, mock_session, "profile-name")
 
         assert result == "my-alias"
         mock_session.client.assert_called()
@@ -396,9 +386,7 @@ class TestFormatAccountIdentifier:
             "iam": mock_iam,
         }[service]
 
-        result = format_account_identifier(
-            mock_session, fallback="no-alias", format="alias"
-        )
+        result = format_account_identifier(mock_session, fallback="no-alias", format="alias")
 
         assert result == "no-alias"
 
@@ -445,9 +433,7 @@ class TestFormatAccountIdentifier:
         mock_iam = MagicMock()
 
         mock_sts.get_caller_identity.return_value = {"Account": "123456789012"}
-        mock_iam.list_account_aliases.return_value = {
-            "AccountAliases": ["default-test-alias"]
-        }
+        mock_iam.list_account_aliases.return_value = {"AccountAliases": ["default-test-alias"]}
 
         mock_session.client.side_effect = lambda service: {
             "sts": mock_sts,
@@ -465,9 +451,7 @@ class TestFormatAccountIdentifier:
         mock_iam = MagicMock()
 
         mock_sts.get_caller_identity.return_value = {"Account": "123456789012"}
-        mock_iam.list_account_aliases.return_value = {
-            "AccountAliases": ["unknown-format-alias"]
-        }
+        mock_iam.list_account_aliases.return_value = {"AccountAliases": ["unknown-format-alias"]}
 
         mock_session.client.side_effect = lambda service: {
             "sts": mock_sts,

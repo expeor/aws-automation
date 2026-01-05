@@ -295,9 +295,7 @@ def _parse_user_identity(user_identity: dict) -> tuple[str, str]:
         return user_identity.get("arn", "Unknown"), user_type
 
 
-def _collect_security_events(
-    session, account_id: str, account_name: str, region: str
-) -> SecurityEventResult | None:
+def _collect_security_events(session, account_id: str, account_name: str, region: str) -> SecurityEventResult | None:
     """단일 계정/리전의 보안 이벤트 수집"""
     from botocore.exceptions import ClientError
 
@@ -319,9 +317,7 @@ def _collect_security_events(
             paginator = cloudtrail.get_paginator("lookup_events")
 
             for page in paginator.paginate(
-                LookupAttributes=[
-                    {"AttributeKey": "EventName", "AttributeValue": event_name}
-                ],
+                LookupAttributes=[{"AttributeKey": "EventName", "AttributeValue": event_name}],
                 StartTime=start_time,
                 EndTime=end_time,
                 MaxResults=50,
@@ -329,6 +325,7 @@ def _collect_security_events(
                 for event in page.get("Events", []):
                     # CloudTrailEvent JSON 파싱
                     import json
+
                     try:
                         event_data = json.loads(event.get("CloudTrailEvent", "{}"))
                     except json.JSONDecodeError:
@@ -339,10 +336,7 @@ def _collect_security_events(
 
                     # 리소스 정보 추출
                     resources = event.get("Resources", [])
-                    resource_str = ", ".join(
-                        r.get("ResourceName", r.get("ResourceType", ""))
-                        for r in resources[:3]
-                    )
+                    resource_str = ", ".join(r.get("ResourceName", r.get("ResourceType", "")) for r in resources[:3])
 
                     error_code = event_data.get("errorCode", "")
                     error_message = event_data.get("errorMessage", "")
@@ -457,10 +451,9 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         ws_actors.cell(row=1, column=col).font = header_font
 
     # 행위자별 집계
-    actor_stats: dict[str, dict] = defaultdict(lambda: {
-        "type": "", "count": 0, "critical": 0, "high": 0,
-        "events": defaultdict(int), "ips": set()
-    })
+    actor_stats: dict[str, dict] = defaultdict(
+        lambda: {"type": "", "count": 0, "critical": 0, "high": 0, "events": defaultdict(int), "ips": set()}
+    )
     for e in all_events:
         key = e.user_identity
         actor_stats[key]["type"] = e.user_type
@@ -506,9 +499,7 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         ws_ip.cell(row=1, column=col).font = header_font
 
     # IP별 집계
-    ip_stats: dict[str, dict] = defaultdict(lambda: {
-        "count": 0, "actors": set(), "critical": 0, "type": "Unknown"
-    })
+    ip_stats: dict[str, dict] = defaultdict(lambda: {"count": 0, "actors": set(), "critical": 0, "type": "Unknown"})
     for e in all_events:
         ip = e.source_ip
         ip_stats[ip]["count"] += 1
@@ -520,10 +511,28 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
             ip_stats[ip]["type"] = "AWS Internal"
         elif ip.endswith(".amazonaws.com"):
             ip_stats[ip]["type"] = "AWS Service"
-        elif ip.startswith(("10.", "172.16.", "172.17.", "172.18.", "172.19.",
-                           "172.20.", "172.21.", "172.22.", "172.23.", "172.24.",
-                           "172.25.", "172.26.", "172.27.", "172.28.", "172.29.",
-                           "172.30.", "172.31.", "192.168.")):
+        elif ip.startswith(
+            (
+                "10.",
+                "172.16.",
+                "172.17.",
+                "172.18.",
+                "172.19.",
+                "172.20.",
+                "172.21.",
+                "172.22.",
+                "172.23.",
+                "172.24.",
+                "172.25.",
+                "172.26.",
+                "172.27.",
+                "172.28.",
+                "172.29.",
+                "172.30.",
+                "172.31.",
+                "192.168.",
+            )
+        ):
             ip_stats[ip]["type"] = "Private"
         else:
             ip_stats[ip]["type"] = "Public"
@@ -557,8 +566,9 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         ws_time.cell(row=1, column=col).font = header_font
 
     # 시간대별 집계 (0-23시)
-    hourly_stats: dict[int, dict] = {h: {"count": 0, "critical": 0, "high": 0, "events": defaultdict(int)}
-                                      for h in range(24)}
+    hourly_stats: dict[int, dict] = {
+        h: {"count": 0, "critical": 0, "high": 0, "events": defaultdict(int)} for h in range(24)
+    }
     for e in all_events:
         hour = e.event_time.hour
         hourly_stats[hour]["count"] += 1
@@ -589,8 +599,18 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
     # ========== Events 시트 ==========
     ws_events = wb.create_sheet("Events")
     event_headers = [
-        "Account", "Region", "시간", "카테고리", "이벤트",
-        "설명", "심각도", "사용자", "유형", "IP", "오류", "리소스"
+        "Account",
+        "Region",
+        "시간",
+        "카테고리",
+        "이벤트",
+        "설명",
+        "심각도",
+        "사용자",
+        "유형",
+        "IP",
+        "오류",
+        "리소스",
     ]
     for col, h in enumerate(event_headers, 1):
         ws_events.cell(row=1, column=col, value=h).fill = header_fill
@@ -647,7 +667,9 @@ def run(ctx) -> None:
         added_global = True
 
     console.print(f"[dim]감시 이벤트: {len(SECURITY_EVENTS)}개 (최근 90일)[/dim]")
-    console.print("[dim]카테고리: 인증, IAM, S3, KMS, CloudTrail, CloudWatch, VPC, GuardDuty, Config, Lambda, Organizations, EBS, RDS, EC2[/dim]")
+    console.print(
+        "[dim]카테고리: 인증, IAM, S3, KMS, CloudTrail, CloudWatch, VPC, GuardDuty, Config, Lambda, Organizations, EBS, RDS, EC2[/dim]"
+    )
 
     # 스캔 리전 표시
     region_list = ", ".join(ctx.regions)

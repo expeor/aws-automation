@@ -2,7 +2,6 @@
 tests/test_core_filter.py - core/filter.py 테스트
 """
 
-
 import pytest
 
 from core.auth.types import AccountInfo

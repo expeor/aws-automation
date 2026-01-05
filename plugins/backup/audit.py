@@ -136,9 +136,7 @@ class BackupAnalysisResult:
         return [j for j in self.jobs if j.is_failed]
 
 
-def _collect_backup_data(
-    session, account_id: str, account_name: str, region: str
-) -> BackupAnalysisResult | None:
+def _collect_backup_data(session, account_id: str, account_name: str, region: str) -> BackupAnalysisResult | None:
     """단일 계정/리전의 Backup 데이터 수집"""
     from botocore.exceptions import ClientError
 

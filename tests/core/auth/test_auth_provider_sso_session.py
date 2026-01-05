@@ -99,9 +99,7 @@ class TestSSOSessionProvider:
         """캐시된 토큰으로 인증"""
         # 유효한 토큰 캐시 설정
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="cached-access-token",
             expires_at=future_time,
@@ -123,15 +121,11 @@ class TestSSOSessionProvider:
         mock_cache_manager.save.assert_not_called()
 
     @patch("core.auth.provider.sso_session.TokenCacheManager")
-    def test_authenticate_with_expired_token_and_refresh(
-        self, mock_cache_manager_class, config
-    ):
+    def test_authenticate_with_expired_token_and_refresh(self, mock_cache_manager_class, config):
         """만료된 토큰 + 갱신 토큰으로 인증"""
         # 만료된 토큰 캐시 설정 (갱신 토큰 있음)
         mock_cache_manager = MagicMock()
-        past_time = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        past_time = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="expired-access-token",
             expires_at=past_time,
@@ -144,9 +138,7 @@ class TestSSOSessionProvider:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso_oidc = MagicMock()
             # 토큰 갱신 응답
@@ -174,9 +166,7 @@ class TestSSOSessionProvider:
         mock_cache_manager.load.return_value = None
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso_oidc = MagicMock()
 
@@ -220,9 +210,7 @@ class TestSSOSessionProvider:
     def test_get_session_success(self, mock_cache_manager_class, config):
         """세션 획득 성공"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -234,9 +222,7 @@ class TestSSOSessionProvider:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso = MagicMock()
             mock_sso.get_role_credentials.return_value = {
@@ -254,9 +240,7 @@ class TestSSOSessionProvider:
 
             provider = SSOSessionProvider(config)
             provider.authenticate()
-            session = provider.get_session(
-                account_id="111111111111", role_name="AdminRole"
-            )
+            session = provider.get_session(account_id="111111111111", role_name="AdminRole")
 
         assert session is not None
         mock_sso.get_role_credentials.assert_called_once_with(
@@ -269,9 +253,7 @@ class TestSSOSessionProvider:
     def test_get_session_missing_params(self, mock_cache_manager_class, config):
         """필수 파라미터 누락 시 오류"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -296,9 +278,7 @@ class TestSSOSessionProvider:
     def test_list_accounts_success(self, mock_cache_manager_class, config):
         """계정 목록 조회 성공"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -310,9 +290,7 @@ class TestSSOSessionProvider:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso = MagicMock()
 
@@ -363,9 +341,7 @@ class TestSSOSessionProvider:
     def test_refresh_with_refresh_token(self, mock_cache_manager_class, config):
         """갱신 토큰으로 갱신"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="old-access-token",
             expires_at=future_time,
@@ -378,9 +354,7 @@ class TestSSOSessionProvider:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso_oidc = MagicMock()
             mock_sso_oidc.create_token.return_value = {
@@ -405,9 +379,7 @@ class TestSSOSessionProvider:
     def test_refresh_without_refresh_token(self, mock_cache_manager_class, config):
         """갱신 토큰 없이 갱신 시 디바이스 인증"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -420,9 +392,7 @@ class TestSSOSessionProvider:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso_oidc = MagicMock()
 
@@ -481,9 +451,7 @@ class TestSSOSessionProviderEdgeCases:
         mock_cache_manager.load.return_value = None
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso_oidc = MagicMock()
 
@@ -505,9 +473,7 @@ class TestSSOSessionProviderEdgeCases:
             mock_sso_oidc.exceptions.AuthorizationPendingException = type(
                 "AuthorizationPendingException", (Exception,), {}
             )
-            mock_sso_oidc.create_token.side_effect = (
-                mock_sso_oidc.exceptions.AuthorizationPendingException()
-            )
+            mock_sso_oidc.create_token.side_effect = mock_sso_oidc.exceptions.AuthorizationPendingException()
 
             mock_session.client.side_effect = lambda service, **kwargs: {
                 "sso": MagicMock(),
@@ -533,9 +499,7 @@ class TestSSOSessionProviderEdgeCases:
         mock_cache_manager.load.return_value = None
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso_oidc = MagicMock()
 
@@ -554,9 +518,7 @@ class TestSSOSessionProviderEdgeCases:
             }
 
             # SlowDown 후 성공
-            mock_sso_oidc.exceptions.SlowDownException = type(
-                "SlowDownException", (Exception,), {}
-            )
+            mock_sso_oidc.exceptions.SlowDownException = type("SlowDownException", (Exception,), {})
             mock_sso_oidc.exceptions.AuthorizationPendingException = type(
                 "AuthorizationPendingException", (Exception,), {}
             )
@@ -584,14 +546,10 @@ class TestSSOSessionProviderEdgeCases:
         assert provider._authenticated is True
 
     @patch("core.auth.provider.sso_session.TokenCacheManager")
-    def test_get_session_with_cached_credentials(
-        self, mock_cache_manager_class, config
-    ):
+    def test_get_session_with_cached_credentials(self, mock_cache_manager_class, config):
         """캐시된 자격증명으로 세션 획득"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -603,9 +561,7 @@ class TestSSOSessionProviderEdgeCases:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso = MagicMock()
             mock_session.client.side_effect = lambda service, **kwargs: {
@@ -639,9 +595,7 @@ class TestSSOSessionProviderEdgeCases:
         from core.auth.types import AccountInfo
 
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -653,9 +607,7 @@ class TestSSOSessionProviderEdgeCases:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso = MagicMock()
             mock_session.client.side_effect = lambda service, **kwargs: {
@@ -669,9 +621,7 @@ class TestSSOSessionProviderEdgeCases:
 
             # 계정 캐시에 미리 저장
             cached_accounts = {
-                "111111111111": AccountInfo(
-                    id="111111111111", name="Cached Account", roles=["CachedRole"]
-                )
+                "111111111111": AccountInfo(id="111111111111", name="Cached Account", roles=["CachedRole"])
             }
             provider._account_cache.set_all(cached_accounts)
 
@@ -685,9 +635,7 @@ class TestSSOSessionProviderEdgeCases:
     def test_list_account_roles_error_handling(self, mock_cache_manager_class, config):
         """계정 역할 목록 조회 오류 처리"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -699,9 +647,7 @@ class TestSSOSessionProviderEdgeCases:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso = MagicMock()
 
@@ -740,9 +686,7 @@ class TestSSOSessionProviderEdgeCases:
     def test_get_aws_config(self, mock_cache_manager_class, config):
         """AWS 설정 정보 반환"""
         mock_cache_manager = MagicMock()
-        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future_time = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_token_cache = TokenCache(
             access_token="access-token",
             expires_at=future_time,
@@ -754,9 +698,7 @@ class TestSSOSessionProviderEdgeCases:
         mock_cache_manager.load.return_value = mock_token_cache
         mock_cache_manager_class.return_value = mock_cache_manager
 
-        with patch(
-            "core.auth.provider.sso_session.boto3.Session"
-        ) as mock_session_class:
+        with patch("core.auth.provider.sso_session.boto3.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_sso = MagicMock()
             mock_sso.get_role_credentials.return_value = {
@@ -791,9 +733,7 @@ class TestSSOSessionProviderEdgeCases:
 
             provider = SSOSessionProvider(config)
             provider.authenticate()
-            aws_config = provider.get_aws_config(
-                account_id="111111111111", role_name="AdminRole"
-            )
+            aws_config = provider.get_aws_config(account_id="111111111111", role_name="AdminRole")
 
         assert "region_name" in aws_config
         assert "credentials" in aws_config

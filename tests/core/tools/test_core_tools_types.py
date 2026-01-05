@@ -2,7 +2,6 @@
 tests/test_core_tools_types.py - core/tools/types.py 테스트
 """
 
-
 from core.tools.types import (
     AREA_COMMANDS,
     AREA_DISPLAY_BY_KEY,

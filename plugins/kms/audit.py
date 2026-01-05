@@ -271,7 +271,9 @@ def collect_kms_audit(session, account_id: str, account_name: str, region: str) 
                                     GrantInfo(
                                         grantee_principal=grant.get("GranteePrincipal", ""),
                                         operations=grant.get("Operations", []),
-                                        constraints=str(grant.get("Constraints", {})) if grant.get("Constraints") else "",
+                                        constraints=str(grant.get("Constraints", {}))
+                                        if grant.get("Constraints")
+                                        else "",
                                     )
                                 )
                     except ClientError:

@@ -41,9 +41,7 @@ class TestUnusedEC2Analysis:
 
         # 분석 실행
         analysis = UnusedEC2Analysis(mock_context)
-        results = analysis.collect_from_session(
-            mock_session, "123456789012", "ap-northeast-2"
-        )
+        results = analysis.collect_from_session(mock_session, "123456789012", "ap-northeast-2")
 
         # 검증
         assert len(results) == 1
@@ -62,9 +60,7 @@ class TestUnusedEC2Analysis:
         mock_session.client.return_value = mock_ec2_client
 
         analysis = UnusedEC2Analysis(mock_context)
-        results = analysis.collect_from_session(
-            mock_session, "123456789012", "ap-northeast-2"
-        )
+        results = analysis.collect_from_session(mock_session, "123456789012", "ap-northeast-2")
 
         assert len(results) == 0
 
@@ -93,9 +89,7 @@ class TestUnusedEC2Analysis:
         mock_session.client.return_value = mock_ec2_client
 
         analysis = UnusedEC2Analysis(mock_context)
-        results = analysis.collect_from_session(
-            mock_session, "123456789012", "ap-northeast-2"
-        )
+        results = analysis.collect_from_session(mock_session, "123456789012", "ap-northeast-2")
 
         assert results[0]["StopDate"] == "2024-06-15"
 
@@ -125,10 +119,7 @@ class TestUnusedAMIAnalysis:
         mock_session.client.return_value = mock_ec2_client
 
         # 테스트 (실제 플러그인에 따라 수정 필요)
-        assert (
-            mock_ec2_client.describe_images.return_value["Images"][0]["ImageId"]
-            == "ami-unused001"
-        )
+        assert mock_ec2_client.describe_images.return_value["Images"][0]["ImageId"] == "ami-unused001"
 
 
 class TestUnusedEIPAnalysis:
@@ -187,14 +178,8 @@ class TestPreviousGenInstance:
             ]
         }
 
-        instances = mock_ec2_client.describe_instances.return_value["Reservations"][0][
-            "Instances"
-        ]
-        old_gen = [
-            i
-            for i in instances
-            if i["InstanceType"].split(".")[0] in previous_gen_types
-        ]
+        instances = mock_ec2_client.describe_instances.return_value["Reservations"][0]["Instances"]
+        old_gen = [i for i in instances if i["InstanceType"].split(".")[0] in previous_gen_types]
 
         assert len(old_gen) == 1
         assert old_gen[0]["InstanceId"] == "i-old001"

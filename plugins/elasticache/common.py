@@ -182,7 +182,9 @@ def collect_memcached_clusters(session, account_id: str, account_name: str, regi
     return clusters
 
 
-def _fetch_cloudwatch_metrics(cloudwatch, cluster: ClusterInfo, cluster_id: str, dimension_name: str, start_time, end_time):
+def _fetch_cloudwatch_metrics(
+    cloudwatch, cluster: ClusterInfo, cluster_id: str, dimension_name: str, start_time, end_time
+):
     """CloudWatch 지표 조회"""
     from botocore.exceptions import ClientError
 
@@ -331,8 +333,17 @@ def generate_unused_report(
     # Detail 시트
     ws_detail = wb.create_sheet("Clusters")
     detail_headers = [
-        "Account", "Region", "Cluster ID", "Engine", "Node Type",
-        "Nodes", "상태", "Avg Conn", "Avg CPU", "월간 비용", "권장 조치",
+        "Account",
+        "Region",
+        "Cluster ID",
+        "Engine",
+        "Node Type",
+        "Nodes",
+        "상태",
+        "Avg Conn",
+        "Avg CPU",
+        "월간 비용",
+        "권장 조치",
     ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill

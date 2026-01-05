@@ -275,9 +275,7 @@ class TestExtractNameFromArn:
         config = StaticCredentialsConfig()
         provider = StaticCredentialsProvider(config)
 
-        result = provider._extract_name_from_arn(
-            "arn:aws:iam::111111111111:user/my-user"
-        )
+        result = provider._extract_name_from_arn("arn:aws:iam::111111111111:user/my-user")
         assert result == "user-my-user"
 
     def test_role_arn(self):
@@ -285,9 +283,7 @@ class TestExtractNameFromArn:
         config = StaticCredentialsConfig()
         provider = StaticCredentialsProvider(config)
 
-        result = provider._extract_name_from_arn(
-            "arn:aws:iam::111111111111:role/AdminRole"
-        )
+        result = provider._extract_name_from_arn("arn:aws:iam::111111111111:role/AdminRole")
         assert result == "role-AdminRole"
 
     def test_assumed_role_arn(self):
@@ -295,9 +291,7 @@ class TestExtractNameFromArn:
         config = StaticCredentialsConfig()
         provider = StaticCredentialsProvider(config)
 
-        result = provider._extract_name_from_arn(
-            "arn:aws:sts::111111111111:assumed-role/AdminRole/session-name"
-        )
+        result = provider._extract_name_from_arn("arn:aws:sts::111111111111:assumed-role/AdminRole/session-name")
         assert result == "assumed-AdminRole"
 
     def test_unknown_arn(self):
@@ -305,9 +299,7 @@ class TestExtractNameFromArn:
         config = StaticCredentialsConfig()
         provider = StaticCredentialsProvider(config)
 
-        result = provider._extract_name_from_arn(
-            "arn:aws:sts::111111111111:federated-user/username"
-        )
+        result = provider._extract_name_from_arn("arn:aws:sts::111111111111:federated-user/username")
         assert result == "unknown"
 
 

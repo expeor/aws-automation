@@ -129,9 +129,7 @@ class TestToolRequiresSession:
         assert flow_runner._tool_requires_session(ctx) is True
 
     @patch("core.tools.discovery.discover_categories")
-    def test_tool_without_require_session_defaults_true(
-        self, mock_discover, flow_runner
-    ):
+    def test_tool_without_require_session_defaults_true(self, mock_discover, flow_runner):
         """require_session 없으면 True (기본값)"""
         mock_discover.return_value = [
             {
@@ -232,9 +230,7 @@ class TestExecuteTool:
         assert mock_context.error is None
 
     @patch("core.tools.discovery.load_tool")
-    def test_tool_execution_with_collect_options(
-        self, mock_load, flow_runner, mock_context
-    ):
+    def test_tool_execution_with_collect_options(self, mock_load, flow_runner, mock_context):
         """collect_options 호출 확인"""
         mock_run = MagicMock()
         mock_collect = MagicMock()
@@ -357,9 +353,7 @@ class TestRunOnce:
     @patch.object(FlowRunner, "_execute_tool")
     @patch.object(FlowRunner, "_tool_requires_session")
     @patch("cli.flow.runner.CategoryStep")
-    def test_run_once_no_session_required(
-        self, mock_cat_step, mock_requires, mock_execute, flow_runner
-    ):
+    def test_run_once_no_session_required(self, mock_cat_step, mock_requires, mock_execute, flow_runner):
         """세션 불필요 도구 실행"""
         # Setup
         tool = ToolInfo(

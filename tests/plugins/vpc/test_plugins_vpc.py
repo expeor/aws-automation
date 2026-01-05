@@ -2,7 +2,6 @@
 tests/test_plugins_vpc.py - VPC 플러그인 테스트
 """
 
-
 from plugins.vpc.sg_audit_analysis.critical_ports import (
     ALL_RISKY_PORTS,
     PORT_INFO,

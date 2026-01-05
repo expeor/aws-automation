@@ -301,9 +301,7 @@ class TestHeadlessRunnerAuth:
 
     @patch("cli.headless.console")
     @patch("core.auth.config.load_config")
-    def test_setup_auth_profile_not_found(
-        self, mock_load_config, mock_console, basic_config
-    ):
+    def test_setup_auth_profile_not_found(self, mock_load_config, mock_console, basic_config):
         """프로파일을 찾을 수 없을 때"""
         mock_config = MagicMock()
         mock_config.sessions = {}
@@ -323,9 +321,7 @@ class TestHeadlessRunnerAuth:
     @patch("cli.headless.console")
     @patch("core.auth.config.load_config")
     @patch("core.auth.config.detect_provider_type")
-    def test_setup_static_credentials(
-        self, mock_detect, mock_load_config, mock_console, basic_config
-    ):
+    def test_setup_static_credentials(self, mock_detect, mock_load_config, mock_console, basic_config):
         """Static Credentials 설정"""
         from core.auth.types import ProviderType
 
@@ -349,17 +345,13 @@ class TestHeadlessRunnerAuth:
     @patch("cli.headless.console")
     @patch("core.auth.config.load_config")
     @patch("core.auth.config.detect_provider_type")
-    def test_setup_sso_profile(
-        self, mock_detect, mock_load_config, mock_console, basic_config
-    ):
+    def test_setup_sso_profile(self, mock_detect, mock_load_config, mock_console, basic_config):
         """SSO Profile 설정"""
         from core.auth.types import ProviderType
 
         mock_config = MagicMock()
         mock_config.sessions = {}
-        mock_config.profiles = {
-            "test-profile": {"sso_start_url": "https://test.awsapps.com/start"}
-        }
+        mock_config.profiles = {"test-profile": {"sso_start_url": "https://test.awsapps.com/start"}}
         mock_load_config.return_value = mock_config
         mock_detect.return_value = ProviderType.SSO_PROFILE
 
