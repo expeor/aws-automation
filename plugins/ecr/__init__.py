@@ -17,6 +17,6 @@ TOOLS = [
         "description": "오래된/미사용 ECR 이미지 탐지",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
 ]

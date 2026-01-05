@@ -1,37 +1,24 @@
 """
-plugins/elasticache/unused.py - ElastiCache 미사용 클러스터 분석
+plugins/elasticache/common.py - ElastiCache 공통 유틸리티
 
-유휴/저사용 ElastiCache 클러스터 탐지 (CloudWatch 지표 기반)
-
-플러그인 규약:
-    - run(ctx): 필수. 실행 함수.
+Redis, Memcached에서 공유하는 데이터 구조와 헬퍼 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-
-from rich.console import Console
-
-from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
-
-console = Console()
 
 # 미사용 기준: 7일간 연결 수 평균 0
 UNUSED_DAYS_THRESHOLD = 7
 # 저사용 기준: CPU 평균 5% 미만
 LOW_USAGE_CPU_THRESHOLD = 5.0
 
-# 필요한 AWS 권한 목록
-REQUIRED_PERMISSIONS = {
-    "read": [
-        "elasticache:DescribeReplicationGroups",
-        "elasticache:DescribeCacheClusters",
-        "cloudwatch:GetMetricStatistics",
-    ],
-}
+
+class CacheEngine(Enum):
+    """캐시 엔진 타입"""
+
+    REDIS = "redis"
+    MEMCACHED = "memcached"
 
 
 class ClusterStatus(Enum):
@@ -62,8 +49,7 @@ class ClusterInfo:
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정 (노드 타입별 대략치)"""
-        # 간단한 가격 맵 (실제로는 pricing 모듈 확장 필요)
+        """대략적인 월간 비용 추정"""
         price_map = {
             "cache.t3.micro": 0.017,
             "cache.t3.small": 0.034,
@@ -76,8 +62,8 @@ class ClusterInfo:
             "cache.r7g.large": 0.222,
             "cache.m6g.large": 0.157,
         }
-        hourly = price_map.get(self.node_type, 0.10)  # 기본값
-        return hourly * 730 * self.num_nodes  # 월간
+        hourly = price_map.get(self.node_type, 0.10)
+        return hourly * 730 * self.num_nodes
 
 
 @dataclass
@@ -96,6 +82,7 @@ class ElastiCacheAnalysisResult:
     account_id: str
     account_name: str
     region: str
+    engine_filter: str | None = None
     total_clusters: int = 0
     unused_clusters: int = 0
     low_usage_clusters: int = 0
@@ -105,9 +92,16 @@ class ElastiCacheAnalysisResult:
     findings: list[ClusterFinding] = field(default_factory=list)
 
 
-def collect_elasticache_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
-    """ElastiCache 클러스터 수집"""
+# =============================================================================
+# 수집 함수
+# =============================================================================
+
+
+def collect_redis_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
+    """Redis 클러스터 수집 (Replication Groups)"""
     from botocore.exceptions import ClientError
+
+    from core.parallel import get_client
 
     elasticache = get_client(session, "elasticache", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
@@ -116,7 +110,6 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
 
-    # Redis 클러스터 (Replication Groups)
     try:
         paginator = elasticache.get_paginator("describe_replication_groups")
         for page in paginator.paginate():
@@ -138,45 +131,27 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                 )
 
                 # CloudWatch 지표 조회
-                try:
-                    # CurrConnections (현재 연결 수)
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CurrConnections",
-                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    # CPUUtilization
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
+                _fetch_cloudwatch_metrics(cloudwatch, cluster, cluster_id, "ReplicationGroupId", start_time, now)
                 clusters.append(cluster)
     except ClientError:
         pass
 
-    # Memcached 클러스터
+    return clusters
+
+
+def collect_memcached_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
+    """Memcached 클러스터 수집"""
+    from botocore.exceptions import ClientError
+
+    from core.parallel import get_client
+
+    elasticache = get_client(session, "elasticache", region_name=region)
+    cloudwatch = get_client(session, "cloudwatch", region_name=region)
+    clusters = []
+
+    now = datetime.now(timezone.utc)
+    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+
     try:
         paginator = elasticache.get_paginator("describe_cache_clusters")
         for page in paginator.paginate(ShowCacheNodeInfo=True):
@@ -199,38 +174,7 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                 )
 
                 # CloudWatch 지표 조회
-                try:
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CurrConnections",
-                        Dimensions=[{"Name": "CacheClusterId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "CacheClusterId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
+                _fetch_cloudwatch_metrics(cloudwatch, cluster, cluster_id, "CacheClusterId", start_time, now)
                 clusters.append(cluster)
     except ClientError:
         pass
@@ -238,14 +182,58 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
     return clusters
 
 
+def _fetch_cloudwatch_metrics(cloudwatch, cluster: ClusterInfo, cluster_id: str, dimension_name: str, start_time, end_time):
+    """CloudWatch 지표 조회"""
+    from botocore.exceptions import ClientError
+
+    try:
+        # CurrConnections
+        conn_resp = cloudwatch.get_metric_statistics(
+            Namespace="AWS/ElastiCache",
+            MetricName="CurrConnections",
+            Dimensions=[{"Name": dimension_name, "Value": cluster_id}],
+            StartTime=start_time,
+            EndTime=end_time,
+            Period=86400,
+            Statistics=["Average"],
+        )
+        if conn_resp.get("Datapoints"):
+            cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(conn_resp["Datapoints"])
+
+        # CPUUtilization
+        cpu_resp = cloudwatch.get_metric_statistics(
+            Namespace="AWS/ElastiCache",
+            MetricName="CPUUtilization",
+            Dimensions=[{"Name": dimension_name, "Value": cluster_id}],
+            StartTime=start_time,
+            EndTime=end_time,
+            Period=86400,
+            Statistics=["Average"],
+        )
+        if cpu_resp.get("Datapoints"):
+            cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(cpu_resp["Datapoints"])
+    except ClientError:
+        pass
+
+
+# =============================================================================
+# 분석 함수
+# =============================================================================
+
+
 def analyze_clusters(
-    clusters: list[ClusterInfo], account_id: str, account_name: str, region: str
+    clusters: list[ClusterInfo],
+    account_id: str,
+    account_name: str,
+    region: str,
+    engine_filter: str | None = None,
 ) -> ElastiCacheAnalysisResult:
     """ElastiCache 클러스터 분석"""
     result = ElastiCacheAnalysisResult(
         account_id=account_id,
         account_name=account_name,
         region=region,
+        engine_filter=engine_filter,
         total_clusters=len(clusters),
     )
 
@@ -288,8 +276,19 @@ def analyze_clusters(
     return result
 
 
-def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+# =============================================================================
+# 보고서 생성
+# =============================================================================
+
+
+def generate_unused_report(
+    results: list[ElastiCacheAnalysisResult],
+    output_dir: str,
+    engine_name: str = "ElastiCache",
+) -> str:
+    """미사용 분석 Excel 보고서 생성"""
+    import os
+
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -305,19 +304,10 @@ def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -
 
     # Summary 시트
     ws = wb.create_sheet("Summary")
-    ws["A1"] = "ElastiCache 미사용 분석 보고서"
+    ws["A1"] = f"{engine_name} 미사용 분석 보고서"
     ws["A1"].font = Font(bold=True, size=14)
 
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "미사용",
-        "저사용",
-        "정상",
-        "미사용 비용",
-        "저사용 비용",
-    ]
+    headers = ["Account", "Region", "전체", "미사용", "저사용", "정상", "미사용 비용", "저사용 비용"]
     row = 3
     for col, h in enumerate(headers, 1):
         ws.cell(row=row, column=col, value=h).fill = header_fill
@@ -341,17 +331,8 @@ def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -
     # Detail 시트
     ws_detail = wb.create_sheet("Clusters")
     detail_headers = [
-        "Account",
-        "Region",
-        "Cluster ID",
-        "Engine",
-        "Node Type",
-        "Nodes",
-        "상태",
-        "Avg Conn",
-        "Avg CPU",
-        "월간 비용",
-        "권장 조치",
+        "Account", "Region", "Cluster ID", "Engine", "Node Type",
+        "Nodes", "상태", "Avg Conn", "Avg CPU", "월간 비용", "권장 조치",
     ]
     for col, h in enumerate(detail_headers, 1):
         ws_detail.cell(row=1, column=col, value=h).fill = header_fill
@@ -377,61 +358,14 @@ def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -
 
     for sheet in wb.worksheets:
         for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
+            max_len = max(len(str(c.value) if c.value else "") for c in col)
+            col_idx = col[0].column
             if col_idx:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
         sheet.freeze_panes = "A2"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"ElastiCache_Unused_{timestamp}.xlsx")
+    filepath = os.path.join(output_dir, f"{engine_name}_Unused_{timestamp}.xlsx")
     os.makedirs(output_dir, exist_ok=True)
     wb.save(filepath)
     return filepath
-
-
-def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ElastiCacheAnalysisResult | None:
-    """단일 계정/리전의 ElastiCache 클러스터 수집 및 분석 (병렬 실행용)"""
-    clusters = collect_elasticache_clusters(session, account_id, account_name, region)
-    if not clusters:
-        return None
-    return analyze_clusters(clusters, account_id, account_name, region)
-
-
-def run(ctx) -> None:
-    """ElastiCache 미사용 클러스터 분석"""
-    console.print("[bold]ElastiCache 분석 시작...[/bold]\n")
-
-    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elasticache")
-    results: list[ElastiCacheAnalysisResult] = [r for r in result.get_data() if r is not None]
-
-    if result.error_count > 0:
-        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
-
-    if not results:
-        console.print("\n[yellow]분석 결과 없음[/yellow]")
-        return
-
-    total_unused = sum(r.unused_clusters for r in results)
-    total_low = sum(r.low_usage_clusters for r in results)
-    unused_cost = sum(r.unused_monthly_cost for r in results)
-    low_cost = sum(r.low_usage_monthly_cost for r in results)
-
-    console.print("\n[bold]종합 결과[/bold]")
-    console.print(
-        f"미사용: [red]{total_unused}개[/red] (${unused_cost:,.2f}/월) / "
-        f"저사용: [yellow]{total_low}개[/yellow] (${low_cost:,.2f}/월)"
-    )
-
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
-
-    output_path = OutputPath(identifier).sub("elasticache", "unused").with_date().build()
-    filepath = generate_report(results, output_path)
-
-    console.print(f"\n[bold green]완료![/bold green] {filepath}")
-    open_in_explorer(output_path)

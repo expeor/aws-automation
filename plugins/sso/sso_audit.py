@@ -197,5 +197,5 @@ def _create_output_directory(ctx) -> str:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("sso-audit").with_date().build()
+    output_path = OutputPath(identifier).sub("sso", "inventory").with_date().build()
     return output_path

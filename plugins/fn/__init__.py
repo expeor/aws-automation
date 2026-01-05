@@ -19,14 +19,14 @@ TOOLS = [
         "description": "미사용 Lambda 함수 탐지 (30일 이상 미호출)",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
     {
         "name": "Lambda 종합 분석",
         "description": "런타임 EOL, 메모리, 비용, 에러율 종합 분석",
         "permission": "read",
         "module": "comprehensive",
-        "area": "cost",
+        "area": "audit",
     },
     {
         "name": "Provisioned Concurrency 분석",
@@ -40,6 +40,6 @@ TOOLS = [
         "description": "오래된 버전 및 미사용 Alias 탐지",
         "permission": "read",
         "module": "versions",
-        "area": "operational",
+        "area": "cleanup",
     },
 ]

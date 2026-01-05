@@ -31,8 +31,8 @@ class FlowRunner:
 
                 console.print()
 
-                # 계속 실행 여부 확인
-                cont = console.input("[dim]계속? [Y/n][/dim] > ").strip().lower()
+                # 다른 보고서 실행 여부 확인
+                cont = console.input("[dim]다른 보고서를 실행하시겠습니까? [Y/n][/dim] > ").strip().lower()
                 if cont == "n":
                     break
 
@@ -49,7 +49,7 @@ class FlowRunner:
                     traceback.print_exc()
                 console.print()
 
-                cont = console.input("[dim]계속? [Y/n][/dim] > ").strip().lower()
+                cont = console.input("[dim]다른 보고서를 실행하시겠습니까? [Y/n][/dim] > ").strip().lower()
                 if cont == "n":
                     break
 

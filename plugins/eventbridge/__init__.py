@@ -17,6 +17,6 @@ TOOLS = [
         "description": "비활성화/미사용 규칙 탐지",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
 ]

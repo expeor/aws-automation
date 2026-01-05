@@ -17,7 +17,7 @@ TOOLS = [
         "description": "AWS Personal Health Dashboard 전체 이벤트 분석 및 보고서 생성",
         "permission": "read",
         "module": "analysis",
-        "area": "operational",
+        "area": "inventory",
         "is_global": True,  # AWS Health API는 us-east-1 고정 - 리전 선택 불필요
     },
     {
@@ -25,7 +25,7 @@ TOOLS = [
         "description": "예정된 패치/유지보수 이벤트 분석 및 보고서 생성",
         "permission": "read",
         "module": "patch_analysis",
-        "area": "operational",
+        "area": "audit",
         "is_global": True,  # AWS Health API는 us-east-1 고정 - 리전 선택 불필요
     },
     {
@@ -33,7 +33,7 @@ TOOLS = [
         "description": "현재 진행 중인 AWS 서비스 장애 조회",
         "permission": "read",
         "module": "issues",
-        "area": "operational",
+        "area": "inventory",
         "is_global": True,  # AWS Health API는 us-east-1 고정 - 리전 선택 불필요
     },
 ]

@@ -29,7 +29,7 @@ TOOLS = [
         "description": "유휴/저사용 ElastiCache 클러스터 탐지 (Redis/Memcached)",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
         # sub_service 미지정 → aa elasticache에서만 표시 (전체 대상)
     },
     # TODO: Redis 전용 도구 추가 시 sub_service: "redis"

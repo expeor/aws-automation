@@ -204,14 +204,14 @@ class TestCreateOutputDirectory:
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
         mock_path_instance.build.return_value = (
-            "/output/123456789012/iam-audit/2024-01-01"
+            "/output/123456789012/iam/security/2024-01-01"
         )
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("123456789012")
-        mock_path_instance.sub.assert_called_once_with("iam-audit")
+        mock_path_instance.sub.assert_called_once_with("iam", "security")
 
     @patch("plugins.iam.iam_audit.OutputPath")
     def test_with_profile_name(self, mock_output_path):
@@ -226,7 +226,7 @@ class TestCreateOutputDirectory:
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
         mock_path_instance.build.return_value = (
-            "/output/my-profile/iam-audit/2024-01-01"
+            "/output/my-profile/iam/security/2024-01-01"
         )
         mock_output_path.return_value = mock_path_instance
 
@@ -246,7 +246,7 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/default/iam-audit/2024-01-01"
+        mock_path_instance.build.return_value = "/output/default/iam/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)

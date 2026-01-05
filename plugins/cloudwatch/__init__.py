@@ -17,13 +17,13 @@ TOOLS = [
         "description": "빈 로그 그룹 및 오래된 로그 탐지",
         "permission": "read",
         "module": "loggroup_audit",
-        "area": "cost",
+        "area": "unused",
     },
     {
         "name": "고아 알람 분석",
         "description": "모니터링 대상 없는 알람 탐지",
         "permission": "read",
         "module": "alarm_orphan",
-        "area": "cost",
+        "area": "unused",
     },
 ]

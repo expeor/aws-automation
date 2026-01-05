@@ -584,7 +584,7 @@ def run(ctx) -> None:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("snapshot-audit").with_date().build()
+    output_path = OutputPath(identifier).sub("ebs", "snapshot").with_date().build()
     filepath = generate_report(all_results, output_path)
 
     console.print(f"[bold green]완료![/bold green] {filepath}")

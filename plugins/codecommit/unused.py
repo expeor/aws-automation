@@ -524,7 +524,7 @@ def run_audit(ctx) -> dict[str, Any]:
 
     if result.total_repos > 0:
         identifier = ctx.profile_name or "default"
-        output_dir = OutputPath(identifier).sub("codecommit").with_date().build()
+        output_dir = OutputPath(identifier).sub("codecommit", "unused").with_date().build()
 
         output_path = reporter.generate_report(
             output_dir=output_dir,

@@ -1,48 +1,48 @@
 """
-plugins/elb/unused.py - 미사용 ELB 분석
+plugins/elb/common.py - ELB 공통 유틸리티
 
-타겟이 없거나 비정상인 Load Balancer 탐지
+ALB, NLB, CLB, GWLB에서 공유하는 데이터 구조와 헬퍼 함수.
 
-분석 기준:
-- ALB/NLB: 타겟 그룹 없음 또는 등록된 타겟 없음 또는 모든 타겟 unhealthy
-- CLB: 등록된 인스턴스 없음 또는 모든 인스턴스 unhealthy
-
-월간 비용:
-- ALB/NLB: ~$16.43/월 (고정) + LCU/NLCU
-- CLB: ~$18.25/월 (고정) + 데이터 처리
-- GWLB: ~$9.13/월 (고정)
-
-플러그인 규약:
-    - run(ctx): 필수. 실행 함수.
+boto3 클라이언트:
+    - ALB/NLB/GWLB: elbv2 클라이언트
+    - CLB: elb 클라이언트
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from rich.console import Console
-
-from core.parallel import get_client, is_quiet, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_elb_monthly_cost
 
-console = Console()
 
-# 필요한 AWS 권한 목록
-REQUIRED_PERMISSIONS = {
-    "read": [
-        "elasticloadbalancing:DescribeLoadBalancers",
-        "elasticloadbalancing:DescribeTargetGroups",
-        "elasticloadbalancing:DescribeTargetHealth",
-        "elasticloadbalancing:DescribeInstanceHealth",
-    ],
-}
+class LBType(Enum):
+    """Load Balancer 타입"""
 
+    ALB = "application"
+    NLB = "network"
+    GWLB = "gateway"
+    CLB = "classic"
 
-# =============================================================================
-# 데이터 구조
-# =============================================================================
+    @classmethod
+    def from_string(cls, value: str) -> "LBType":
+        """문자열에서 LBType 변환"""
+        mapping = {
+            "application": cls.ALB,
+            "network": cls.NLB,
+            "gateway": cls.GWLB,
+            "classic": cls.CLB,
+        }
+        return mapping.get(value, cls.ALB)
+
+    @property
+    def display_name(self) -> str:
+        """표시용 이름"""
+        return {
+            LBType.ALB: "ALB",
+            LBType.NLB: "NLB",
+            LBType.GWLB: "GWLB",
+            LBType.CLB: "CLB",
+        }.get(self, "Unknown")
 
 
 class UsageStatus(Enum):
@@ -56,6 +56,7 @@ class UsageStatus(Enum):
 class Severity(Enum):
     """심각도"""
 
+    CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -105,6 +106,11 @@ class LoadBalancerInfo:
     monthly_cost: float = 0.0
 
     @property
+    def lb_type_enum(self) -> LBType:
+        """LBType enum으로 변환"""
+        return LBType.from_string(self.lb_type)
+
+    @property
     def total_targets(self) -> int:
         """전체 타겟 수"""
         if self.lb_type == "classic":
@@ -137,6 +143,7 @@ class LBAnalysisResult:
     account_id: str
     account_name: str
     region: str
+    lb_type_filter: str | None = None  # 필터링된 LB 타입 (None이면 전체)
     findings: list[LBFinding] = field(default_factory=list)
 
     # 통계
@@ -150,13 +157,29 @@ class LBAnalysisResult:
 
 
 # =============================================================================
-# 수집 - ALB/NLB/GWLB (elbv2)
+# 수집 함수 - ALB/NLB/GWLB (elbv2)
 # =============================================================================
 
 
-def collect_v2_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
-    """ALB/NLB/GWLB 목록 수집"""
+def collect_v2_load_balancers(
+    session,
+    account_id: str,
+    account_name: str,
+    region: str,
+    lb_type_filter: str | None = None,
+) -> list[LoadBalancerInfo]:
+    """ALB/NLB/GWLB 목록 수집
+
+    Args:
+        session: boto3 session
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: 리전
+        lb_type_filter: 필터링할 LB 타입 (application, network, gateway)
+    """
     from botocore.exceptions import ClientError
+
+    from core.parallel import get_client
 
     load_balancers = []
 
@@ -167,8 +190,13 @@ def collect_v2_load_balancers(session, account_id: str, account_name: str, regio
         paginator = elbv2.get_paginator("describe_load_balancers")
         for page in paginator.paginate():
             for data in page.get("LoadBalancers", []):
-                lb_arn = data.get("LoadBalancerArn", "")
                 lb_type = data.get("Type", "application")
+
+                # 타입 필터
+                if lb_type_filter and lb_type != lb_type_filter:
+                    continue
+
+                lb_arn = data.get("LoadBalancerArn", "")
 
                 # 태그 조회
                 tags = {}
@@ -203,10 +231,8 @@ def collect_v2_load_balancers(session, account_id: str, account_name: str, regio
                 lb.target_groups = _get_target_groups(elbv2, lb_arn)
                 load_balancers.append(lb)
 
-    except ClientError as e:
-        error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        if not is_quiet():
-            console.print(f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]")
+    except ClientError:
+        pass
 
     return load_balancers
 
@@ -258,13 +284,20 @@ def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
 
 
 # =============================================================================
-# 수집 - CLB (elb)
+# 수집 함수 - CLB (elb)
 # =============================================================================
 
 
-def collect_classic_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
+def collect_classic_load_balancers(
+    session,
+    account_id: str,
+    account_name: str,
+    region: str,
+) -> list[LoadBalancerInfo]:
     """Classic Load Balancer 목록 수집"""
     from botocore.exceptions import ClientError
+
+    from core.parallel import get_client
 
     load_balancers = []
 
@@ -320,52 +353,18 @@ def collect_classic_load_balancers(session, account_id: str, account_name: str, 
             )
             load_balancers.append(lb)
 
-    except ClientError as e:
-        # CLB가 없는 리전도 있음
-        if "not available" not in str(e).lower():
-            error_code = e.response.get("Error", {}).get("Code", "Unknown")
-            if not is_quiet():
-                console.print(f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]")
+    except ClientError:
+        pass
 
     return load_balancers
 
 
 # =============================================================================
-# 분석
+# 분석 함수
 # =============================================================================
 
 
-def analyze_load_balancers(
-    load_balancers: list[LoadBalancerInfo],
-    account_id: str,
-    account_name: str,
-    region: str,
-) -> LBAnalysisResult:
-    """Load Balancer 미사용 분석"""
-    result = LBAnalysisResult(
-        account_id=account_id,
-        account_name=account_name,
-        region=region,
-    )
-
-    for lb in load_balancers:
-        finding = _analyze_single_lb(lb)
-        result.findings.append(finding)
-
-        if finding.usage_status == UsageStatus.UNUSED:
-            result.unused_count += 1
-            result.unused_monthly_cost += lb.monthly_cost
-        elif finding.usage_status == UsageStatus.UNHEALTHY:
-            result.unhealthy_count += 1
-            result.unused_monthly_cost += lb.monthly_cost  # unhealthy도 낭비
-        else:
-            result.normal_count += 1
-
-    result.total_count = len(load_balancers)
-    return result
-
-
-def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
+def analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
     """개별 LB 분석"""
 
     # 비활성 상태
@@ -432,13 +431,57 @@ def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
     )
 
 
+def analyze_load_balancers(
+    load_balancers: list[LoadBalancerInfo],
+    account_id: str,
+    account_name: str,
+    region: str,
+    lb_type_filter: str | None = None,
+) -> LBAnalysisResult:
+    """Load Balancer 미사용 분석"""
+    result = LBAnalysisResult(
+        account_id=account_id,
+        account_name=account_name,
+        region=region,
+        lb_type_filter=lb_type_filter,
+    )
+
+    for lb in load_balancers:
+        finding = analyze_single_lb(lb)
+        result.findings.append(finding)
+
+        if finding.usage_status == UsageStatus.UNUSED:
+            result.unused_count += 1
+            result.unused_monthly_cost += lb.monthly_cost
+        elif finding.usage_status == UsageStatus.UNHEALTHY:
+            result.unhealthy_count += 1
+            result.unused_monthly_cost += lb.monthly_cost  # unhealthy도 낭비
+        else:
+            result.normal_count += 1
+
+    result.total_count = len(load_balancers)
+    return result
+
+
 # =============================================================================
-# Excel 보고서
+# Excel 보고서 공통
 # =============================================================================
 
 
-def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+def generate_unused_report(
+    results: list[LBAnalysisResult],
+    output_dir: str,
+    lb_type_name: str = "ELB",
+) -> str:
+    """미사용 분석 Excel 보고서 생성
+
+    Args:
+        results: 분석 결과 리스트
+        output_dir: 출력 디렉토리
+        lb_type_name: 보고서 제목에 사용할 LB 타입 이름 (ELB, ALB, NLB, CLB)
+    """
+    import os
+
     from openpyxl import Workbook
     from openpyxl.styles import Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
@@ -466,7 +509,7 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
 
     # Summary
     ws = wb.create_sheet("Summary")
-    ws["A1"] = "Load Balancer 미사용 분석 보고서"
+    ws["A1"] = f"{lb_type_name} 미사용 분석 보고서"
     ws["A1"].font = Font(bold=True, size=14)
     ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
@@ -480,7 +523,7 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
 
     stats = [
         ("항목", "값"),
-        ("전체 LB", totals["total"]),
+        (f"전체 {lb_type_name}", totals["total"]),
         ("미사용", totals["unused"]),
         ("Unhealthy", totals["unhealthy"]),
         ("정상", totals["normal"]),
@@ -565,75 +608,8 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
 
     # 저장
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"ELB_Unused_{timestamp}.xlsx")
+    filepath = os.path.join(output_dir, f"{lb_type_name}_Unused_{timestamp}.xlsx")
     os.makedirs(output_dir, exist_ok=True)
     wb.save(filepath)
 
     return filepath
-
-
-# =============================================================================
-# 메인
-# =============================================================================
-
-
-def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LBAnalysisResult:
-    """단일 계정/리전의 ELB 수집 및 분석 (병렬 실행용)"""
-    v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
-    classic_lbs = collect_classic_load_balancers(session, account_id, account_name, region)
-    all_lbs = v2_lbs + classic_lbs
-    return analyze_load_balancers(all_lbs, account_id, account_name, region)
-
-
-def run(ctx) -> None:
-    """미사용 ELB 분석 실행"""
-    console.print("[bold]미사용 ELB 분석 시작...[/bold]")
-
-    # 병렬 수집 및 분석
-    result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elasticloadbalancing")
-
-    all_results: list[LBAnalysisResult] = result.get_data()
-
-    # 에러 출력
-    if result.error_count > 0:
-        console.print(f"[yellow]일부 오류 발생: {result.error_count}건[/yellow]")
-        console.print(f"[dim]{result.get_error_summary()}[/dim]")
-
-    if not all_results:
-        console.print("[yellow]분석할 ELB 없음[/yellow]")
-        return
-
-    # 요약
-    totals = {
-        "total": sum(r.total_count for r in all_results),
-        "unused": sum(r.unused_count for r in all_results),
-        "unhealthy": sum(r.unhealthy_count for r in all_results),
-        "normal": sum(r.normal_count for r in all_results),
-        "unused_cost": sum(r.unused_monthly_cost for r in all_results),
-    }
-
-    console.print(f"\n[bold]전체 ELB: {totals['total']}개[/bold]")
-    if totals["unused"] > 0:
-        console.print(f"  [red bold]미사용: {totals['unused']}개[/red bold]")
-    if totals["unhealthy"] > 0:
-        console.print(f"  [yellow]Unhealthy: {totals['unhealthy']}개[/yellow]")
-    console.print(f"  [green]정상: {totals['normal']}개[/green]")
-
-    if totals["unused_cost"] > 0:
-        console.print(f"\n  [red]미사용 월 비용: ${totals['unused_cost']:.2f}[/red]")
-
-    # 보고서
-    console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
-
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
-
-    output_path = OutputPath(identifier).sub("elb", "unused").with_date().build()
-    filepath = generate_report(all_results, output_path)
-
-    console.print(f"[bold green]완료![/bold green] {filepath}")
-    open_in_explorer(output_path)

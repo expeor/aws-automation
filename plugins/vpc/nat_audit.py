@@ -129,5 +129,5 @@ def _create_output_directory(ctx) -> str:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("nat-audit").with_date().build()
+    output_path = OutputPath(identifier).sub("vpc", "cost").with_date().build()
     return output_path

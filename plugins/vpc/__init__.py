@@ -31,14 +31,14 @@ TOOLS = [
         "description": "미사용/저사용 NAT Gateway 탐지 및 비용 절감 기회 식별",
         "permission": "read",
         "module": "nat_audit",
-        "area": "cost",
+        "area": "unused",
     },
     {
         "name": "ENI 미사용 분석",
         "description": "미사용 ENI (Elastic Network Interface) 탐지",
         "permission": "read",
         "module": "eni_audit",
-        "area": "cost",
+        "area": "unused",
     },
     {
         "name": "VPC Endpoint 분석",

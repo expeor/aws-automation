@@ -680,7 +680,7 @@ class ToolRunner(BaseToolRunner):
         # 엑셀 출력
         if all_results and self.ctx:
             # 출력 디렉토리 생성
-            output_dir = OutputPath(self.ctx.profile_name or "default").sub("elb").with_date().build()
+            output_dir = OutputPath(self.ctx.profile_name or "default").sub("elb", "inventory").with_date().build()
 
             # 엑셀 파일로 저장
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

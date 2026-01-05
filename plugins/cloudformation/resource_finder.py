@@ -447,7 +447,7 @@ def run_search(ctx) -> dict[str, Any] | None:
 
     if result.count > 0:
         identifier = ctx.profile_name or "default"
-        output_dir = OutputPath(identifier).sub("cloudformation").with_date().build()
+        output_dir = OutputPath(identifier).sub("cloudformation", "inventory").with_date().build()
 
         output_path = reporter.generate_report(
             output_dir=output_dir,
