@@ -226,10 +226,7 @@ region = ap-northeast-2
             parsed = loader.load()
 
             assert "my-sso" in parsed.sessions
-            assert (
-                parsed.sessions["my-sso"].start_url
-                == "https://example.awsapps.com/start"
-            )
+            assert parsed.sessions["my-sso"].start_url == "https://example.awsapps.com/start"
             assert "dev" in parsed.profiles
             assert parsed.profiles["dev"].sso_session == "my-sso"
 
@@ -693,10 +690,7 @@ region = us-west-2
             assert len(parsed.sessions) == 2
             assert "company-sso" in parsed.sessions
             assert "partner-sso" in parsed.sessions
-            assert (
-                parsed.sessions["company-sso"].registration_scopes
-                == "sso:account:access"
-            )
+            assert parsed.sessions["company-sso"].registration_scopes == "sso:account:access"
 
             # 프로파일 확인
             assert len(parsed.profiles) == 3

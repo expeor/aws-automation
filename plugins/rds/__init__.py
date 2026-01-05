@@ -17,13 +17,13 @@ TOOLS = [
         "description": "오래된 수동 스냅샷 탐지 (RDS/Aurora)",
         "permission": "read",
         "module": "snapshot_audit",
-        "area": "cost",
+        "area": "unused",
     },
     {
         "name": "RDS 유휴 인스턴스 분석",
         "description": "유휴/저사용 RDS 인스턴스 탐지",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
 ]

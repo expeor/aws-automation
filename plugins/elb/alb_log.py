@@ -610,7 +610,7 @@ def _create_output_directory(ctx) -> str:
         identifier = "default"
 
     # OutputPath.build()는 문자열(str)을 반환
-    output_path = OutputPath(identifier).sub("alb-log").with_date().build()
+    output_path = OutputPath(identifier).sub("elb", "log").with_date().build()
     return output_path
 
 

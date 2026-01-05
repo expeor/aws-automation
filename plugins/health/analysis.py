@@ -30,7 +30,7 @@ def run(ctx) -> dict[str, Any]:
 
     # 출력 경로 생성
     identifier = ctx.profile_name or "default"
-    output_dir = OutputPath(identifier).sub("phd").with_date().build()
+    output_dir = OutputPath(identifier).sub("health", "inventory").with_date().build()
 
     output_path = reporter.generate_report(
         output_dir=output_dir,

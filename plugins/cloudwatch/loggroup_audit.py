@@ -408,7 +408,7 @@ def run(ctx) -> None:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("loggroup-audit").with_date().build()
+    output_path = OutputPath(identifier).sub("cloudwatch", "inventory").with_date().build()
     filepath = generate_report(results, output_path)
 
     console.print(f"\n[bold green]완료![/bold green] {filepath}")

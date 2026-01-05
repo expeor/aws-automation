@@ -61,12 +61,8 @@ class TestDiscoverCategories:
         for cat in categories:
             for tool in cat["tools"]:
                 assert "name" in tool, f"Tool missing 'name' in {cat['name']}"
-                assert (
-                    "description" in tool
-                ), f"Tool missing 'description' in {cat['name']}"
-                assert (
-                    "permission" in tool
-                ), f"Tool missing 'permission' in {cat['name']}"
+                assert "description" in tool, f"Tool missing 'description' in {cat['name']}"
+                assert "permission" in tool, f"Tool missing 'permission' in {cat['name']}"
 
     def test_cache_works(self):
         """캐싱 동작 확인"""

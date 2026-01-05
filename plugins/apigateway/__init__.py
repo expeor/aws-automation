@@ -17,6 +17,6 @@ TOOLS = [
         "description": "유휴/미사용 API 탐지",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
 ]

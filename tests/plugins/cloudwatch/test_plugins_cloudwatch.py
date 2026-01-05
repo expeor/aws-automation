@@ -130,9 +130,7 @@ class TestAnalyzeLogGroups:
             )
         ]
 
-        result = analyze_log_groups(
-            log_groups, "123456789012", "test", "ap-northeast-2"
-        )
+        result = analyze_log_groups(log_groups, "123456789012", "test", "ap-northeast-2")
 
         assert result.empty_count == 1
         assert result.findings[0].status == LogGroupStatus.EMPTY
@@ -149,15 +147,12 @@ class TestAnalyzeLogGroups:
                 creation_time=datetime.now(timezone.utc) - timedelta(days=365),
                 stored_bytes=1024**3,  # 1GB
                 retention_days=None,
-                last_ingestion_time=datetime.now(timezone.utc)
-                - timedelta(days=OLD_DAYS_THRESHOLD + 10),
+                last_ingestion_time=datetime.now(timezone.utc) - timedelta(days=OLD_DAYS_THRESHOLD + 10),
                 log_stream_count=5,
             )
         ]
 
-        result = analyze_log_groups(
-            log_groups, "123456789012", "test", "ap-northeast-2"
-        )
+        result = analyze_log_groups(log_groups, "123456789012", "test", "ap-northeast-2")
 
         assert result.old_count == 1
         assert result.findings[0].status == LogGroupStatus.OLD
@@ -179,9 +174,7 @@ class TestAnalyzeLogGroups:
             )
         ]
 
-        result = analyze_log_groups(
-            log_groups, "123456789012", "test", "ap-northeast-2"
-        )
+        result = analyze_log_groups(log_groups, "123456789012", "test", "ap-northeast-2")
 
         assert result.no_retention_count == 1
         assert result.findings[0].status == LogGroupStatus.NO_RETENTION
@@ -203,9 +196,7 @@ class TestAnalyzeLogGroups:
             )
         ]
 
-        result = analyze_log_groups(
-            log_groups, "123456789012", "test", "ap-northeast-2"
-        )
+        result = analyze_log_groups(log_groups, "123456789012", "test", "ap-northeast-2")
 
         assert result.normal_count == 1
         assert result.findings[0].status == LogGroupStatus.NORMAL
@@ -264,9 +255,7 @@ class TestAnalyzeLogGroups:
             ),
         ]
 
-        result = analyze_log_groups(
-            log_groups, "123456789012", "test", "ap-northeast-2"
-        )
+        result = analyze_log_groups(log_groups, "123456789012", "test", "ap-northeast-2")
 
         assert result.total_count == 4
         assert result.empty_count == 1

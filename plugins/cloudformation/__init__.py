@@ -23,7 +23,7 @@ TOOLS = [
         "permission": "read",
         "module": "resource_finder",
         "function": "run_search",
-        "area": "operational",
+        "area": "search",
     },
     {
         "name": "CFN Physical ID 검색",
@@ -31,6 +31,6 @@ TOOLS = [
         "permission": "read",
         "module": "resource_finder",
         "function": "run_search_by_physical_id",
-        "area": "operational",
+        "area": "search",
     },
 ]

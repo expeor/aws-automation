@@ -108,5 +108,5 @@ def _create_output_directory(ctx) -> str:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("sg-audit").with_date().build()
+    output_path = OutputPath(identifier).sub("vpc", "security").with_date().build()
     return output_path

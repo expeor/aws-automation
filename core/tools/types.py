@@ -20,11 +20,21 @@ class AreaInfo(TypedDict):
 
 
 # ============================================================================
-# AWS Trusted Advisor 5대 영역만 사용
-# - 새로운 영역을 추가하지 마세요
-# - 참조: https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor.html
+# Area 분류 체계
+# - ReportType (10): 상태 점검 보고서 타입
+# - ToolType (5): 도구 타입 (분석/액션)
+# - 참조: core/tools/output/report_types.py
 # ============================================================================
 AREA_REGISTRY: list[AreaInfo] = [
+    # === ReportType - Core (5) ===
+    {
+        "key": "unused",
+        "command": "/unused",
+        "label": "미사용",
+        "desc": "미사용 리소스 식별",
+        "color": "red",
+        "icon": "🗑️",
+    },
     {
         "key": "security",
         "command": "/security",
@@ -37,17 +47,42 @@ AREA_REGISTRY: list[AreaInfo] = [
         "key": "cost",
         "command": "/cost",
         "label": "비용",
-        "desc": "미사용 리소스 탐지",
+        "desc": "비용 최적화 기회",
         "color": "cyan",
         "icon": "💰",
     },
     {
-        "key": "fault_tolerance",
-        "command": "/ft",
-        "label": "내결함성",
-        "desc": "백업, Multi-AZ",
+        "key": "audit",
+        "command": "/audit",
+        "label": "감사",
+        "desc": "구성 설정 점검",
+        "color": "yellow",
+        "icon": "📋",
+    },
+    {
+        "key": "inventory",
+        "command": "/inventory",
+        "label": "인벤토리",
+        "desc": "리소스 현황 파악",
+        "color": "green",
+        "icon": "📦",
+    },
+    # === ReportType - Extended (5) ===
+    {
+        "key": "backup",
+        "command": "/backup",
+        "label": "백업",
+        "desc": "백업 체계 점검",
         "color": "blue",
-        "icon": "🛡️",
+        "icon": "💾",
+    },
+    {
+        "key": "compliance",
+        "command": "/compliance",
+        "label": "컴플라이언스",
+        "desc": "규정 준수 검증",
+        "color": "bright_magenta",
+        "icon": "✅",
     },
     {
         "key": "performance",
@@ -58,12 +93,62 @@ AREA_REGISTRY: list[AreaInfo] = [
         "icon": "⚡",
     },
     {
-        "key": "operational",
-        "command": "/ops",
-        "label": "운영",
-        "desc": "보고서, 모니터링",
+        "key": "network",
+        "command": "/network",
+        "label": "네트워크",
+        "desc": "네트워크 구조 분석",
         "color": "bright_blue",
-        "icon": "📋",
+        "icon": "🌐",
+    },
+    {
+        "key": "quota",
+        "command": "/quota",
+        "label": "쿼터",
+        "desc": "서비스 한도 모니터링",
+        "color": "bright_yellow",
+        "icon": "📊",
+    },
+    # === ToolType - Analysis (2) ===
+    {
+        "key": "log",
+        "command": "/log",
+        "label": "로그",
+        "desc": "로그 분석 및 검색",
+        "color": "dim",
+        "icon": "📜",
+    },
+    {
+        "key": "search",
+        "command": "/search",
+        "label": "검색",
+        "desc": "리소스 역추적",
+        "color": "bright_cyan",
+        "icon": "🔍",
+    },
+    # === ToolType - Actions (3) ===
+    {
+        "key": "cleanup",
+        "command": "/cleanup",
+        "label": "정리",
+        "desc": "리소스 정리/삭제",
+        "color": "bright_red",
+        "icon": "🧹",
+    },
+    {
+        "key": "tag",
+        "command": "/tag",
+        "label": "태그",
+        "desc": "태그 일괄 적용",
+        "color": "bright_green",
+        "icon": "🏷️",
+    },
+    {
+        "key": "sync",
+        "command": "/sync",
+        "label": "동기화",
+        "desc": "설정/태그 동기화",
+        "color": "bright_white",
+        "icon": "🔄",
     },
 ]
 
@@ -73,10 +158,13 @@ for _area in AREA_REGISTRY:
     AREA_COMMANDS[_area["command"]] = _area["key"]
 # 추가 별칭
 AREA_COMMANDS["/sec"] = "security"
-AREA_COMMANDS["/op"] = "operational"
 
 # 한글 키워드 → internal key 매핑
 AREA_KEYWORDS: dict[str, str] = {
+    # unused
+    "미사용": "unused",
+    "유휴": "unused",
+    "고아": "unused",
     # security
     "보안": "security",
     "취약": "security",
@@ -84,21 +172,30 @@ AREA_KEYWORDS: dict[str, str] = {
     "퍼블릭": "security",
     # cost
     "비용": "cost",
-    "미사용": "cost",
     "절감": "cost",
-    "유휴": "cost",
-    # fault_tolerance
-    "내결함성": "fault_tolerance",
-    "가용성": "fault_tolerance",
-    "백업": "fault_tolerance",
-    "복구": "fault_tolerance",
+    "최적화": "cost",
+    # audit
+    "감사": "audit",
+    "점검": "audit",
+    # inventory
+    "현황": "inventory",
+    "인벤토리": "inventory",
+    "목록": "inventory",
+    # backup
+    "백업": "backup",
+    "복구": "backup",
     # performance
     "성능": "performance",
-    # operational
-    "운영": "operational",
-    "보고서": "operational",
-    "리포트": "operational",
-    "현황": "operational",
+    # search
+    "검색": "search",
+    "추적": "search",
+    # cleanup
+    "정리": "cleanup",
+    "삭제": "cleanup",
+    # tag
+    "태그": "tag",
+    # sync
+    "동기화": "sync",
 }
 
 # 문자열 키 기반 AREA_DISPLAY (category.py 호환)
@@ -130,7 +227,7 @@ class ToolMeta(TypedDict, total=False):
     single_account_only: bool  # True면 단일 계정만 지원 (기본: False)
 
     # 추가 메타
-    meta: dict  # 추가 메타데이터 (cycle, internal_only 등)
+    meta: dict[str, str]  # 추가 메타데이터 (cycle, internal_only 등)
     function: str  # 실행 함수명 (기본: "run")
 
 

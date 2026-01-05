@@ -17,6 +17,20 @@ TOOLS = [
         "description": "미사용/비활성화 CMK 탐지",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
+    },
+    {
+        "name": "CMK 사용처 분석",
+        "description": "고객 관리 키(CMK)가 사용되는 AWS 리소스 매핑",
+        "permission": "read",
+        "module": "key_usage",
+        "area": "search",
+    },
+    {
+        "name": "KMS 감사 보고서",
+        "description": "키 로테이션, 정책, Grants 보안 감사",
+        "permission": "read",
+        "module": "audit",
+        "area": "security",
     },
 ]

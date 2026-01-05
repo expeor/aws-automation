@@ -378,7 +378,7 @@ def run(ctx: ExecutionContext) -> None:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("map-tag-apply").with_date().build()
+    output_path = OutputPath(identifier).sub("tag", "compliance").with_date().build()
     filepath = generate_apply_report(results, output_path)
 
     console.print(f"\n[bold green]완료![/bold green] {filepath}")

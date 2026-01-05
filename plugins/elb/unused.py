@@ -632,7 +632,7 @@ def run(ctx) -> None:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("elb-unused").with_date().build()
+    output_path = OutputPath(identifier).sub("elb", "unused").with_date().build()
     filepath = generate_report(all_results, output_path)
 
     console.print(f"[bold green]완료![/bold green] {filepath}")

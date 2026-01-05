@@ -17,6 +17,6 @@ TOOLS = [
         "description": "미사용 시크릿 탐지 및 비용 분석",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
 ]

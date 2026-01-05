@@ -2,7 +2,6 @@
 tests/test_core_tools_types.py - core/tools/types.py 테스트
 """
 
-
 from core.tools.types import (
     AREA_COMMANDS,
     AREA_DISPLAY_BY_KEY,
@@ -18,13 +17,30 @@ class TestAreaRegistry:
     """AREA_REGISTRY 테스트"""
 
     def test_has_required_areas(self):
-        """필수 영역 존재 확인"""
+        """필수 영역 존재 확인 (ReportType + ToolType)"""
         keys = [a["key"] for a in AREA_REGISTRY]
+        # ReportType - Core (5)
+        assert "unused" in keys
         assert "security" in keys
         assert "cost" in keys
-        assert "fault_tolerance" in keys
+        assert "audit" in keys
+        assert "inventory" in keys
+        # ReportType - Extended (5)
+        assert "backup" in keys
+        assert "compliance" in keys
         assert "performance" in keys
-        assert "operational" in keys
+        assert "network" in keys
+        assert "quota" in keys
+        # ToolType (5)
+        assert "log" in keys
+        assert "search" in keys
+        assert "cleanup" in keys
+        assert "tag" in keys
+        assert "sync" in keys
+
+    def test_area_count(self):
+        """영역 수 확인 (15개: ReportType 10 + ToolType 5)"""
+        assert len(AREA_REGISTRY) == 15
 
     def test_area_has_required_fields(self):
         """각 영역에 필수 필드 존재"""
@@ -48,6 +64,13 @@ class TestAreaRegistry:
         assert security["label"] == "보안"
         assert security["color"] == "magenta"
 
+    def test_unused_area(self):
+        """미사용 영역 상세"""
+        unused = next(a for a in AREA_REGISTRY if a["key"] == "unused")
+        assert unused["command"] == "/unused"
+        assert unused["label"] == "미사용"
+        assert unused["color"] == "red"
+
     def test_cost_area(self):
         """비용 영역 상세"""
         cost = next(a for a in AREA_REGISTRY if a["key"] == "cost")
@@ -63,14 +86,20 @@ class TestAreaCommands:
         """기본 커맨드 매핑"""
         assert AREA_COMMANDS["/security"] == "security"
         assert AREA_COMMANDS["/cost"] == "cost"
-        assert AREA_COMMANDS["/ft"] == "fault_tolerance"
+        assert AREA_COMMANDS["/unused"] == "unused"
+        assert AREA_COMMANDS["/audit"] == "audit"
+        assert AREA_COMMANDS["/inventory"] == "inventory"
+        assert AREA_COMMANDS["/backup"] == "backup"
         assert AREA_COMMANDS["/perf"] == "performance"
-        assert AREA_COMMANDS["/ops"] == "operational"
+        assert AREA_COMMANDS["/log"] == "log"
+        assert AREA_COMMANDS["/search"] == "search"
+        assert AREA_COMMANDS["/cleanup"] == "cleanup"
+        assert AREA_COMMANDS["/tag"] == "tag"
+        assert AREA_COMMANDS["/sync"] == "sync"
 
     def test_alias_commands(self):
         """별칭 커맨드"""
         assert AREA_COMMANDS["/sec"] == "security"
-        assert AREA_COMMANDS["/op"] == "operational"
 
     def test_all_registry_commands_mapped(self):
         """모든 레지스트리 커맨드가 매핑됨"""
@@ -80,6 +109,12 @@ class TestAreaCommands:
 
 class TestAreaKeywords:
     """AREA_KEYWORDS 테스트"""
+
+    def test_unused_keywords(self):
+        """미사용 키워드"""
+        assert AREA_KEYWORDS["미사용"] == "unused"
+        assert AREA_KEYWORDS["유휴"] == "unused"
+        assert AREA_KEYWORDS["고아"] == "unused"
 
     def test_security_keywords(self):
         """보안 키워드"""
@@ -91,27 +126,46 @@ class TestAreaKeywords:
     def test_cost_keywords(self):
         """비용 키워드"""
         assert AREA_KEYWORDS["비용"] == "cost"
-        assert AREA_KEYWORDS["미사용"] == "cost"
         assert AREA_KEYWORDS["절감"] == "cost"
-        assert AREA_KEYWORDS["유휴"] == "cost"
+        assert AREA_KEYWORDS["최적화"] == "cost"
 
-    def test_fault_tolerance_keywords(self):
-        """내결함성 키워드"""
-        assert AREA_KEYWORDS["내결함성"] == "fault_tolerance"
-        assert AREA_KEYWORDS["가용성"] == "fault_tolerance"
-        assert AREA_KEYWORDS["백업"] == "fault_tolerance"
-        assert AREA_KEYWORDS["복구"] == "fault_tolerance"
+    def test_audit_keywords(self):
+        """감사 키워드"""
+        assert AREA_KEYWORDS["감사"] == "audit"
+        assert AREA_KEYWORDS["점검"] == "audit"
+
+    def test_inventory_keywords(self):
+        """인벤토리 키워드"""
+        assert AREA_KEYWORDS["현황"] == "inventory"
+        assert AREA_KEYWORDS["인벤토리"] == "inventory"
+        assert AREA_KEYWORDS["목록"] == "inventory"
+
+    def test_backup_keywords(self):
+        """백업 키워드"""
+        assert AREA_KEYWORDS["백업"] == "backup"
+        assert AREA_KEYWORDS["복구"] == "backup"
 
     def test_performance_keywords(self):
         """성능 키워드"""
         assert AREA_KEYWORDS["성능"] == "performance"
 
-    def test_operational_keywords(self):
-        """운영 키워드"""
-        assert AREA_KEYWORDS["운영"] == "operational"
-        assert AREA_KEYWORDS["보고서"] == "operational"
-        assert AREA_KEYWORDS["리포트"] == "operational"
-        assert AREA_KEYWORDS["현황"] == "operational"
+    def test_search_keywords(self):
+        """검색 키워드"""
+        assert AREA_KEYWORDS["검색"] == "search"
+        assert AREA_KEYWORDS["추적"] == "search"
+
+    def test_cleanup_keywords(self):
+        """정리 키워드"""
+        assert AREA_KEYWORDS["정리"] == "cleanup"
+        assert AREA_KEYWORDS["삭제"] == "cleanup"
+
+    def test_tag_keywords(self):
+        """태그 키워드"""
+        assert AREA_KEYWORDS["태그"] == "tag"
+
+    def test_sync_keywords(self):
+        """동기화 키워드"""
+        assert AREA_KEYWORDS["동기화"] == "sync"
 
 
 class TestAreaDisplayByKey:
@@ -133,6 +187,11 @@ class TestAreaDisplayByKey:
         """보안 디스플레이"""
         assert AREA_DISPLAY_BY_KEY["security"]["label"] == "보안"
         assert AREA_DISPLAY_BY_KEY["security"]["color"] == "magenta"
+
+    def test_unused_display(self):
+        """미사용 디스플레이"""
+        assert AREA_DISPLAY_BY_KEY["unused"]["label"] == "미사용"
+        assert AREA_DISPLAY_BY_KEY["unused"]["color"] == "red"
 
     def test_cost_display(self):
         """비용 디스플레이"""

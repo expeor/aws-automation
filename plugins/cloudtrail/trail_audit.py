@@ -346,7 +346,7 @@ def run(ctx) -> dict[str, Any]:
     else:
         identifier = "default"
 
-    output_dir = OutputPath(identifier).sub("cloudtrail").with_date().build()
+    output_dir = OutputPath(identifier).sub("cloudtrail", "inventory").with_date().build()
     output_path = reporter.generate_report(output_dir=output_dir, file_prefix="cloudtrail_audit")
 
     console.print(f"\n[bold green]완료![/bold green] {output_path}")

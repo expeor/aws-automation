@@ -2,7 +2,6 @@
 tests/test_parallel_decorators.py - core/parallel/decorators.py 테스트
 """
 
-
 import pytest
 from botocore.exceptions import ClientError
 
@@ -435,9 +434,7 @@ class TestWithRetry:
         call_count = {"value": 0}
 
         # ConnectionError는 is_retryable에서 True를 반환하므로 재시도됨
-        @with_retry(
-            max_retries=3, base_delay=0.01, retryable_exceptions=(ConnectionError,)
-        )
+        @with_retry(max_retries=3, base_delay=0.01, retryable_exceptions=(ConnectionError,))
         def retry_connection_error():
             call_count["value"] += 1
             if call_count["value"] < 2:

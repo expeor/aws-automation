@@ -34,22 +34,45 @@ CATEGORY = {
 }
 
 TOOLS = [
-    # === Cost 영역 ===
+    # === Unused 영역 (서브타입별) ===
     {
         "name": "미사용 ELB",
-        "description": "타겟이 없는 로드밸런서 탐지 (ALB/NLB/CLB/GWLB)",
+        "description": "타겟이 없는 로드밸런서 탐지 (ALB/NLB/CLB/GWLB 전체)",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
-        # sub_service 미지정 → aa elb에서만 표시 (전체 LB 대상)
+        "area": "unused",
     },
+    {
+        "name": "ALB 미사용 분석",
+        "description": "타겟이 없는 ALB 탐지",
+        "permission": "read",
+        "module": "alb_unused",
+        "area": "unused",
+        "sub_service": "alb",
+    },
+    {
+        "name": "NLB 미사용 분석",
+        "description": "타겟이 없는 NLB 탐지",
+        "permission": "read",
+        "module": "nlb_unused",
+        "area": "unused",
+        "sub_service": "nlb",
+    },
+    {
+        "name": "CLB 미사용 분석",
+        "description": "인스턴스가 없는 CLB 탐지",
+        "permission": "read",
+        "module": "clb_unused",
+        "area": "unused",
+        "sub_service": "clb",
+    },
+    # === Cost 영역 ===
     {
         "name": "Target Group 분석",
         "description": "미연결/빈 타겟 그룹 탐지 (ALB/NLB)",
         "permission": "read",
         "module": "target_group_audit",
         "area": "cost",
-        # sub_service 미지정 → aa elb에서만 표시
     },
     {
         "name": "CLB Migration Advisor",
@@ -57,7 +80,7 @@ TOOLS = [
         "permission": "read",
         "module": "migration_advisor",
         "area": "cost",
-        "sub_service": "clb",  # CLB 전용
+        "sub_service": "clb",
     },
     # === Security 영역 ===
     {
@@ -66,24 +89,24 @@ TOOLS = [
         "permission": "read",
         "module": "security_audit",
         "area": "security",
-        # sub_service 미지정 → aa elb에서만 표시 (전체 LB 대상)
     },
-    # === Operational 영역 (ALB 전용) ===
+    # === Audit 영역 (ALB 전용) ===
     {
         "name": "ALB Listener Rules 분석",
         "description": "ALB 리스너 규칙 복잡도 및 최적화 분석",
         "permission": "read",
         "module": "listener_rules",
-        "area": "operational",
-        "sub_service": "alb",  # ALB 전용
+        "area": "audit",
+        "sub_service": "alb",
     },
+    # === Log 영역 (ALB 전용) ===
     {
         "name": "ALB 로그 분석",
         "description": "S3에 저장된 ALB 액세스 로그 분석",
         "permission": "read",
         "module": "alb_log",
-        "area": "operational",
+        "area": "log",
         "single_region_only": True,
-        "sub_service": "alb",  # ALB 전용
+        "sub_service": "alb",
     },
 ]

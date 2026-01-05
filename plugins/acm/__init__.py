@@ -17,6 +17,6 @@ TOOLS = [
         "description": "미사용/만료 임박 인증서 탐지",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
 ]

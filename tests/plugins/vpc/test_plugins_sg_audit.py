@@ -18,9 +18,7 @@ class TestCollectSGs:
         mock_collector_cls.return_value = mock_collector
 
         mock_session = MagicMock()
-        result = _collect_sgs(
-            mock_session, "123456789012", "test-account", "ap-northeast-2"
-        )
+        result = _collect_sgs(mock_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert result is None
 
@@ -36,9 +34,7 @@ class TestCollectSGs:
         mock_collector_cls.return_value = mock_collector
 
         mock_session = MagicMock()
-        result = _collect_sgs(
-            mock_session, "123456789012", "test-account", "ap-northeast-2"
-        )
+        result = _collect_sgs(mock_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert result is not None
         assert len(result) == 2
@@ -53,9 +49,7 @@ class TestCollectSGs:
         mock_collector_cls.return_value = mock_collector
 
         mock_session = MagicMock()
-        result = _collect_sgs(
-            mock_session, "123456789012", "test-account", "ap-northeast-2"
-        )
+        result = _collect_sgs(mock_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert result is None
 
@@ -75,15 +69,13 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = (
-            "/output/123456789012/sg-audit/2024-01-01"
-        )
+        mock_path_instance.build.return_value = "/output/123456789012/vpc/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)
 
         mock_output_path.assert_called_once_with("123456789012")
-        mock_path_instance.sub.assert_called_once_with("sg-audit")
+        mock_path_instance.sub.assert_called_once_with("vpc", "security")
 
     @patch("plugins.vpc.sg_audit.OutputPath")
     def test_with_profile_name(self, mock_output_path):
@@ -97,7 +89,7 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/my-profile/sg-audit/2024-01-01"
+        mock_path_instance.build.return_value = "/output/my-profile/vpc/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)
@@ -116,7 +108,7 @@ class TestCreateOutputDirectory:
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/default/sg-audit/2024-01-01"
+        mock_path_instance.build.return_value = "/output/default/vpc/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)

@@ -20,7 +20,7 @@ TOOLS = [
         "description": "유휴/저사용 DynamoDB 테이블 탐지 (CloudWatch 지표 기반)",
         "permission": "read",
         "module": "unused",
-        "area": "cost",
+        "area": "unused",
     },
     {
         "name": "DynamoDB 용량 모드 분석",

@@ -294,9 +294,7 @@ def mock_session_iterator(mock_boto3_session):
         mock_iterator = MagicMock()
         mock_iterator.__enter__ = MagicMock(return_value=mock_iterator)
         mock_iterator.__exit__ = MagicMock(return_value=None)
-        mock_iterator.__iter__ = MagicMock(
-            return_value=iter([(mock_boto3_session, "123456789012", "ap-northeast-2")])
-        )
+        mock_iterator.__iter__ = MagicMock(return_value=iter([(mock_boto3_session, "123456789012", "ap-northeast-2")]))
         mock_iterator.has_any_success.return_value = True
         mock_iterator.has_failures_only.return_value = False
         mock_iterator.has_no_sessions.return_value = False

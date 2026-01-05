@@ -30,7 +30,7 @@ _current_session_name = "default"
 
 def _get_output_dir() -> str:
     """출력 디렉토리 경로: output/{session_name}/ip_search/{date}/"""
-    return OutputPath(_current_session_name).sub("ip_search").with_date("daily").build()
+    return OutputPath(_current_session_name).sub("vpc", "search").with_date("daily").build()
 
 
 # =============================================================================

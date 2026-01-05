@@ -389,7 +389,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
     else:
         identifier = "default"
 
-    output_path = OutputPath(identifier).sub("unused-all").with_date().build()
+    output_path = OutputPath(identifier).sub("cost", "unused-all").with_date().build()
     filepath = generate_report(final_result, output_path)
 
     console.print(f"[bold green]완료![/bold green] {filepath}")

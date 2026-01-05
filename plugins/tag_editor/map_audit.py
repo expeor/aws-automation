@@ -322,7 +322,7 @@ def run(ctx: ExecutionContext) -> None:
 
     untagged_only = ctx.options.get("untagged_only", False)
 
-    output_path = OutputPath(identifier).sub("map-tag-audit").with_date().build()
+    output_path = OutputPath(identifier).sub("tag", "compliance").with_date().build()
     filepath = generate_audit_report(results, output_path, untagged_only=untagged_only)
 
     console.print(f"\n[bold green]완료![/bold green] {filepath}")

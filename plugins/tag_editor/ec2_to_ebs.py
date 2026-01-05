@@ -399,7 +399,7 @@ def run_sync(ctx) -> dict[str, Any] | None:
 
     if summary.results:
         identifier = ctx.profile_name or "default"
-        output_dir = OutputPath(identifier).sub("tag_editor").with_date().build()
+        output_dir = OutputPath(identifier).sub("tag", "compliance").with_date().build()
 
         output_path = reporter.generate_report(
             output_dir=output_dir,

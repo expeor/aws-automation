@@ -19,7 +19,7 @@ TOOLS = [
         "permission": "read",
         "module": "unused",
         "function": "run_audit",
-        "area": "operational",
+        "area": "inventory",
     },
     {
         "name": "빈 리포지토리 조회",
@@ -27,6 +27,6 @@ TOOLS = [
         "permission": "read",
         "module": "unused",
         "function": "run_empty_repos",
-        "area": "cost",
+        "area": "unused",
     },
 ]

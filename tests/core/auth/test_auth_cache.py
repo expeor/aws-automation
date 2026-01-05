@@ -104,17 +104,13 @@ class TestTokenCache:
 
     def test_is_expired_future(self):
         """미래 시간이면 만료되지 않음"""
-        future = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        future = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         token = TokenCache(access_token="test", expires_at=future)
         assert token.is_expired() is False
 
     def test_is_expired_past(self):
         """과거 시간이면 만료됨"""
-        past = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        past = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         token = TokenCache(access_token="test", expires_at=past)
         assert token.is_expired() is True
 
@@ -434,9 +430,7 @@ class TestAccountCache:
         )
 
         # 만료 시간을 과거로 강제 변경
-        cache._cache["222222222222"].expires_at = datetime.now(
-            timezone.utc
-        ) - timedelta(hours=1)
+        cache._cache["222222222222"].expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
 
         all_accounts = cache.get_all()
         assert len(all_accounts) == 1
@@ -491,9 +485,7 @@ class TestAccountCache:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=worker, args=(f"{i}11111111111",)) for i in range(5)
-        ]
+        threads = [threading.Thread(target=worker, args=(f"{i}11111111111",)) for i in range(5)]
 
         for t in threads:
             t.start()
@@ -617,9 +609,7 @@ class TestCredentialsCache:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=worker, args=(f"{i}11111111111",)) for i in range(5)
-        ]
+        threads = [threading.Thread(target=worker, args=(f"{i}11111111111",)) for i in range(5)]
 
         for t in threads:
             t.start()
