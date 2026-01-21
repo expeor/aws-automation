@@ -5,6 +5,8 @@ Route53 비용 계산 (글로벌 서비스):
 - Hosted Zone: $0.50/월 (첫 25개), $0.10/월 (추가)
 - DNS Query: $0.40/백만 쿼리 (Standard)
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_hosted_zone_monthly_cost
 
@@ -17,13 +19,9 @@ Route53 비용 계산 (글로벌 서비스):
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
 
 
 def get_route53_prices(refresh: bool = False) -> dict[str, float]:
@@ -35,7 +33,8 @@ def get_route53_prices(refresh: bool = False) -> dict[str, float]:
     Returns:
         {"hosted_zone_monthly": float, "additional_zone_monthly": float, "query_per_million": float}
     """
-    return _get_cached_prices(refresh)
+    # Route53는 글로벌 서비스 - "global" 키 사용
+    return pricing_service.get_prices("route53", "global", refresh)
 
 
 def get_hosted_zone_price(zone_index: int = 1) -> float:
@@ -96,31 +95,3 @@ def get_query_monthly_cost(queries_millions: float = 0.0) -> float:
     """
     per_million = get_query_price()
     return round(per_million * queries_millions, 2)
-
-
-def _get_cached_prices(refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    # Route53는 글로벌 서비스 - "global" 키 사용
-    if not refresh:
-        cached = _cache.get("route53", "global")
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_route53_prices()
-
-        if prices and prices.get("hosted_zone_monthly", 0) > 0:
-            _cache.set("route53", "global", prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"Route53 가격 조회 실패: {e}")
-
-    # 기본값 반환
-    return {
-        "hosted_zone_monthly": 0.50,
-        "additional_zone_monthly": 0.10,
-        "query_per_million": 0.40,
-    }

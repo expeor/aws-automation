@@ -4,8 +4,10 @@ plugins/cost/pricing - AWS 서비스 비용 조회 및 계산 유틸리티
 AWS Pricing API를 사용하여 실시간 가격 정보를 조회하고 캐싱합니다.
 
 모듈 구성:
+    - utils: PricingService (통합 가격 조회 서비스)
+    - constants: 기본값 및 상수
     - fetcher: AWS Pricing Bulk API 클라이언트
-    - cache: 로컬 가격 캐시 (7일 TTL)
+    - cache: 로컬 가격 캐시 (7일 TTL, filelock 지원)
     - ec2: EC2 인스턴스 가격 조회
     - ebs: EBS 볼륨 가격 조회
     - nat: NAT Gateway 가격 조회
@@ -44,6 +46,11 @@ AWS Pricing API를 사용하여 실시간 가격 정보를 조회하고 캐싱�
 
     # Route53 Hosted Zone 월간 비용
     cost = get_hosted_zone_monthly_cost(zone_count=10)
+
+    # 통합 가격 서비스 사용
+    from plugins.cost.pricing import pricing_service
+    prices = pricing_service.get_prices("ec2", "ap-northeast-2")
+    metrics = pricing_service.get_metrics()
 """
 
 from .cache import PriceCache, clear_cache, get_cache_info
@@ -54,6 +61,15 @@ from .cloudwatch import (
     get_cloudwatch_monthly_cost,
     get_cloudwatch_prices,
     get_cloudwatch_storage_price,
+)
+
+# Constants - 중앙 관리되는 상수 및 기본값
+from .constants import (
+    DEFAULT_PRICES,
+    HOURS_PER_MONTH,
+    LAMBDA_FREE_TIER_GB_SECONDS,
+    LAMBDA_FREE_TIER_REQUESTS,
+    get_default_prices,
 )
 
 # DynamoDB 가격
@@ -72,10 +88,10 @@ from .dynamodb import (
 )
 
 # EBS 가격
-from .ebs import get_ebs_monthly_cost, get_ebs_price, get_ebs_prices_bulk
+from .ebs import get_ebs_monthly_cost, get_ebs_price, get_ebs_prices, get_ebs_prices_bulk
 
 # EC2 가격
-from .ec2 import get_ec2_monthly_cost, get_ec2_price, get_ec2_prices_bulk
+from .ec2 import get_ec2_monthly_cost, get_ec2_price, get_ec2_prices, get_ec2_prices_bulk
 
 # ECR 가격
 from .ecr import get_ecr_monthly_cost, get_ecr_prices, get_ecr_storage_price
@@ -134,6 +150,14 @@ from .route53 import (
     get_route53_prices,
 )
 
+# SageMaker 가격
+from .sagemaker import (
+    get_sagemaker_monthly_cost,
+    get_sagemaker_price,
+    get_sagemaker_prices,
+    get_sagemaker_prices_bulk,
+)
+
 # Secrets Manager 가격
 from .secretsmanager import (
     get_secret_api_price,
@@ -145,6 +169,9 @@ from .secretsmanager import (
 # EBS Snapshot 가격
 from .snapshot import get_snapshot_monthly_cost, get_snapshot_price, get_snapshot_prices
 
+# Utils - PricingService 통합 가격 조회 서비스
+from .utils import PricingService, get_prices, pricing_service
+
 # VPC Endpoint 가격
 from .vpc_endpoint import (
     get_endpoint_data_price,
@@ -154,23 +181,32 @@ from .vpc_endpoint import (
     get_endpoint_prices,
 )
 
-# 월간 시간 상수
-HOURS_PER_MONTH = 730
-
 __all__: list[str] = [
-    # Core
+    # Core - Utils
+    "PricingService",
+    "pricing_service",
+    "get_prices",
+    # Core - Fetcher & Cache
     "PricingFetcher",
     "PriceCache",
     "clear_cache",
     "get_cache_info",
+    # Constants
+    "HOURS_PER_MONTH",
+    "DEFAULT_PRICES",
+    "LAMBDA_FREE_TIER_REQUESTS",
+    "LAMBDA_FREE_TIER_GB_SECONDS",
+    "get_default_prices",
     # EC2
     "get_ec2_price",
     "get_ec2_monthly_cost",
-    "get_ec2_prices_bulk",
+    "get_ec2_prices",
+    "get_ec2_prices_bulk",  # 하위 호환성 alias
     # EBS
     "get_ebs_price",
     "get_ebs_monthly_cost",
-    "get_ebs_prices_bulk",
+    "get_ebs_prices",
+    "get_ebs_prices_bulk",  # 하위 호환성 alias
     # NAT
     "get_nat_prices",
     "get_nat_hourly_price",
@@ -241,6 +277,9 @@ __all__: list[str] = [
     "get_dynamodb_monthly_cost",
     "estimate_dynamodb_provisioned_cost",
     "estimate_dynamodb_ondemand_cost",
-    # Constants
-    "HOURS_PER_MONTH",
+    # SageMaker
+    "get_sagemaker_price",
+    "get_sagemaker_monthly_cost",
+    "get_sagemaker_prices",
+    "get_sagemaker_prices_bulk",  # 하위 호환성 alias
 ]

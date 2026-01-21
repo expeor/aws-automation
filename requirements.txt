@@ -20,6 +20,7 @@ requests>=2.31.0
 
 # Utils
 pytz>=2024.1
+filelock>=3.0
 
 # Security
 cryptography>=42.0.0

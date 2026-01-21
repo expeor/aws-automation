@@ -3,6 +3,11 @@ plugins/elasticache/unused.py - ElastiCache 미사용 클러스터 분석
 
 유휴/저사용 ElastiCache 클러스터 탐지 (CloudWatch 지표 기반)
 
+최적화:
+- CloudWatch GetMetricData API 사용 (배치 조회)
+- 기존: 클러스터당 2 API 호출 → 최적화: 전체 1 API 호출
+- 예: 30개 클러스터 × 2 메트릭 = 60 API → 1 API
+
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
 """
@@ -14,6 +19,7 @@ from enum import Enum
 
 from rich.console import Console
 
+from core.cloudwatch import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
@@ -106,17 +112,24 @@ class ElastiCacheAnalysisResult:
 
 
 def collect_elasticache_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
-    """ElastiCache 클러스터 수집"""
+    """ElastiCache 클러스터 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 클러스터당 2 API 호출 → 최적화: 전체 1-2 API 호출
+    - 예: 30개 클러스터 × 2 메트릭 = 60 API → 1 API
+    """
     from botocore.exceptions import ClientError
 
     elasticache = get_client(session, "elasticache", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    clusters = []
+
+    redis_clusters: list[ClusterInfo] = []
+    memcached_clusters: list[ClusterInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
 
-    # Redis 클러스터 (Replication Groups)
+    # 1단계: Redis 클러스터 (Replication Groups) 수집
     try:
         paginator = elasticache.get_paginator("describe_replication_groups")
         for page in paginator.paginate():
@@ -136,47 +149,11 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                     status=rg.get("Status", ""),
                     created_at=None,
                 )
-
-                # CloudWatch 지표 조회
-                try:
-                    # CurrConnections (현재 연결 수)
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CurrConnections",
-                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    # CPUUtilization
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
-                clusters.append(cluster)
+                redis_clusters.append(cluster)
     except ClientError:
         pass
 
-    # Memcached 클러스터
+    # 2단계: Memcached 클러스터 수집
     try:
         paginator = elasticache.get_paginator("describe_cache_clusters")
         for page in paginator.paginate(ShowCacheNodeInfo=True):
@@ -197,45 +174,75 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                     status=cc.get("CacheClusterStatus", ""),
                     created_at=cc.get("CacheClusterCreateTime"),
                 )
-
-                # CloudWatch 지표 조회
-                try:
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CurrConnections",
-                        Dimensions=[{"Name": "CacheClusterId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "CacheClusterId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
-                clusters.append(cluster)
+                memcached_clusters.append(cluster)
     except ClientError:
         pass
 
-    return clusters
+    # 3단계: 배치 메트릭 조회
+    if redis_clusters:
+        _collect_elasticache_metrics_batch(
+            cloudwatch, redis_clusters, "ReplicationGroupId", start_time, now
+        )
+
+    if memcached_clusters:
+        _collect_elasticache_metrics_batch(
+            cloudwatch, memcached_clusters, "CacheClusterId", start_time, now
+        )
+
+    return redis_clusters + memcached_clusters
+
+
+def _collect_elasticache_metrics_batch(
+    cloudwatch,
+    clusters: list[ClusterInfo],
+    dimension_name: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """ElastiCache 클러스터 메트릭 배치 수집 (내부 함수)"""
+    from botocore.exceptions import ClientError
+
+    metrics_to_fetch = [
+        ("CurrConnections", "avg_connections"),
+        ("CPUUtilization", "avg_cpu"),
+    ]
+
+    # 쿼리 생성
+    queries = []
+    for cluster in clusters:
+        safe_id = sanitize_metric_id(cluster.cluster_id)
+        for metric_name, _ in metrics_to_fetch:
+            metric_key = metric_name.lower()
+            queries.append(
+                MetricQuery(
+                    id=f"{safe_id}_{metric_key}",
+                    namespace="AWS/ElastiCache",
+                    metric_name=metric_name,
+                    dimensions={dimension_name: cluster.cluster_id},
+                    stat="Average",
+                )
+            )
+
+    try:
+        # 배치 조회
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        # 결과 매핑
+        days = (end_time - start_time).days
+        if days <= 0:
+            days = 1
+
+        for cluster in clusters:
+            safe_id = sanitize_metric_id(cluster.cluster_id)
+            for metric_name, attr_name in metrics_to_fetch:
+                metric_key = metric_name.lower()
+                # GetMetricData with Average stat returns sum of averages
+                value = results.get(f"{safe_id}_{metric_key}", 0.0) / days
+                setattr(cluster, attr_name, value)
+
+    except ClientError:
+        # 실패 시 무시 (기본값 0 유지)
+        pass
 
 
 def analyze_clusters(

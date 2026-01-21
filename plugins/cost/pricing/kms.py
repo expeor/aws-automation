@@ -6,6 +6,8 @@ KMS 비용 계산:
 - AWS Managed Key: 무료 (AWS 서비스가 생성)
 - API 요청: ~$0.03/10,000 requests
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_kms_key_monthly_cost
 
@@ -18,13 +20,9 @@ KMS 비용 계산:
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
 
 
 def get_kms_prices(
@@ -40,7 +38,7 @@ def get_kms_prices(
     Returns:
         {"customer_key_monthly": float, "per_10k_requests": float}
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("kms", region, refresh)
 
 
 def get_kms_key_price(
@@ -106,26 +104,3 @@ def get_kms_key_monthly_cost(
     request_cost = (requests / 10000) * request_price
 
     return round(key_cost + request_cost, 2)
-
-
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("kms", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_kms_prices(region)
-
-        if prices and prices.get("customer_key_monthly", 0) > 0:
-            _cache.set("kms", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"KMS 가격 조회 실패: {e}")
-
-    # 기본값 반환
-    return {"customer_key_monthly": 1.0, "per_10k_requests": 0.03}

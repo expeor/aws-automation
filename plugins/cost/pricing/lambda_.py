@@ -6,6 +6,8 @@ Lambda 비용 계산:
 - Duration: GB-초당 $0.0000166667
 - Provisioned Concurrency: GB-시간당 $0.000004646
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_lambda_prices, get_lambda_monthly_cost
 
@@ -25,18 +27,14 @@ Lambda 비용 계산:
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .constants import (
+    HOURS_PER_MONTH,
+    LAMBDA_FREE_TIER_GB_SECONDS,
+    LAMBDA_FREE_TIER_REQUESTS,
+)
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
-
-# 상수
-HOURS_PER_MONTH = 730
-FREE_TIER_REQUESTS = 1_000_000  # 월 100만 요청 무료
-FREE_TIER_GB_SECONDS = 400_000  # 월 40만 GB-초 무료
 
 
 def get_lambda_prices(
@@ -56,7 +54,7 @@ def get_lambda_prices(
             "provisioned_concurrency_per_gb_hour": float,
         }
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("lambda", region, refresh)
 
 
 def get_lambda_request_price(region: str = "ap-northeast-2") -> float:
@@ -122,7 +120,7 @@ def get_lambda_monthly_cost(
     # 요청 비용
     billable_requests = invocations
     if include_free_tier:
-        billable_requests = max(0, invocations - FREE_TIER_REQUESTS)
+        billable_requests = max(0, invocations - LAMBDA_FREE_TIER_REQUESTS)
     request_cost = (billable_requests / 1_000_000) * prices.get("request_per_million", 0.20)
 
     # 실행 시간 비용 (GB-초 단위)
@@ -130,7 +128,7 @@ def get_lambda_monthly_cost(
     gb_seconds = (memory_mb / 1024) * (avg_duration_ms / 1000) * invocations
     billable_gb_seconds = gb_seconds
     if include_free_tier:
-        billable_gb_seconds = max(0, gb_seconds - FREE_TIER_GB_SECONDS)
+        billable_gb_seconds = max(0, gb_seconds - LAMBDA_FREE_TIER_GB_SECONDS)
     duration_cost = billable_gb_seconds * prices.get("duration_per_gb_second", 0.0000166667)
 
     return round(request_cost + duration_cost, 4)
@@ -196,14 +194,14 @@ def estimate_lambda_cost(
     # 요청 비용
     billable_requests = invocations
     if include_free_tier:
-        billable_requests = max(0, invocations - FREE_TIER_REQUESTS)
+        billable_requests = max(0, invocations - LAMBDA_FREE_TIER_REQUESTS)
     request_cost = (billable_requests / 1_000_000) * prices.get("request_per_million", 0.20)
 
     # 실행 시간 비용
     gb_seconds = (memory_mb / 1024) * (avg_duration_ms / 1000) * invocations
     billable_gb_seconds = gb_seconds
     if include_free_tier:
-        billable_gb_seconds = max(0, gb_seconds - FREE_TIER_GB_SECONDS)
+        billable_gb_seconds = max(0, gb_seconds - LAMBDA_FREE_TIER_GB_SECONDS)
     duration_cost = billable_gb_seconds * prices.get("duration_per_gb_second", 0.0000166667)
 
     # Provisioned Concurrency 비용
@@ -219,31 +217,4 @@ def estimate_lambda_cost(
         "duration_cost": round(duration_cost, 4),
         "provisioned_cost": round(provisioned_cost, 4),
         "total_cost": round(total, 4),
-    }
-
-
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("lambda", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_lambda_prices(region)
-
-        if prices and prices.get("request_per_million", 0) > 0:
-            _cache.set("lambda", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"Lambda 가격 조회 실패: {e}")
-
-    # 기본값 반환
-    return {
-        "request_per_million": 0.20,
-        "duration_per_gb_second": 0.0000166667,
-        "provisioned_concurrency_per_gb_hour": 0.000004646,
     }

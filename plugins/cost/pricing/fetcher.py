@@ -144,15 +144,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"EBS 가격 조회 실패 [{region}]: {e}")
-            return {
-                "gp3": 0.08,
-                "gp2": 0.10,
-                "io1": 0.125,
-                "io2": 0.125,
-                "st1": 0.045,
-                "sc1": 0.025,
-                "standard": 0.05,
-            }
+            return {}
 
     def get_vpc_endpoint_prices(self, region: str) -> dict[str, float]:
         """VPC Endpoint 가격 조회 (Pricing API 사용)
@@ -209,11 +201,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"VPC Endpoint 가격 조회 실패 [{region}]: {e}")
-            return {
-                "interface_hourly": 0.01,
-                "gateway_hourly": 0.0,
-                "data_per_gb": 0.01,
-            }
+            return {}
 
     def get_secrets_manager_prices(self, region: str) -> dict[str, float]:
         """Secrets Manager 가격 조회
@@ -256,7 +244,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"Secrets Manager 가격 조회 실패 [{region}]: {e}")
-            return {"per_secret_monthly": 0.40, "per_10k_api_calls": 0.05}
+            return {}
 
     def get_kms_prices(self, region: str) -> dict[str, float]:
         """KMS 가격 조회
@@ -300,7 +288,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"KMS 가격 조회 실패 [{region}]: {e}")
-            return {"customer_key_monthly": 1.0, "per_10k_requests": 0.03}
+            return {}
 
     def get_ecr_prices(self, region: str) -> dict[str, float]:
         """ECR 가격 조회
@@ -340,7 +328,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"ECR 가격 조회 실패 [{region}]: {e}")
-            return {"storage_per_gb_monthly": 0.10}
+            return {}
 
     def get_route53_prices(self) -> dict[str, float]:
         """Route53 가격 조회 (글로벌 서비스)
@@ -387,11 +375,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"Route53 가격 조회 실패: {e}")
-            return {
-                "hosted_zone_monthly": 0.50,
-                "additional_zone_monthly": 0.10,
-                "query_per_million": 0.40,
-            }
+            return {}
 
     def get_snapshot_prices(self, region: str) -> dict[str, float]:
         """EBS Snapshot 가격 조회
@@ -434,7 +418,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"EBS Snapshot 가격 조회 실패 [{region}]: {e}")
-            return {"storage_per_gb_monthly": 0.05}
+            return {}
 
     def get_eip_prices(self, region: str) -> dict[str, float]:
         """Elastic IP 가격 조회
@@ -482,7 +466,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"EIP 가격 조회 실패 [{region}]: {e}")
-            return {"unused_hourly": 0.005, "additional_hourly": 0.005}
+            return {}
 
     def get_elb_prices(self, region: str) -> dict[str, float]:
         """ELB 가격 조회
@@ -539,12 +523,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"ELB 가격 조회 실패 [{region}]: {e}")
-            return {
-                "alb_hourly": 0.0225,
-                "nlb_hourly": 0.0225,
-                "glb_hourly": 0.0125,
-                "clb_hourly": 0.025,
-            }
+            return {}
 
     def get_rds_snapshot_prices(self, region: str) -> dict[str, float]:
         """RDS Snapshot 가격 조회
@@ -592,7 +571,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"RDS Snapshot 가격 조회 실패 [{region}]: {e}")
-            return {"rds_per_gb_monthly": 0.02, "aurora_per_gb_monthly": 0.021}
+            return {}
 
     def get_cloudwatch_prices(self, region: str) -> dict[str, float]:
         """CloudWatch Logs 가격 조회
@@ -636,7 +615,7 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"CloudWatch 가격 조회 실패 [{region}]: {e}")
-            return {"storage_per_gb_monthly": 0.03, "ingestion_per_gb": 0.50}
+            return {}
 
     def get_lambda_prices(self, region: str) -> dict[str, float]:
         """Lambda 가격 조회
@@ -691,12 +670,54 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"Lambda 가격 조회 실패 [{region}]: {e}")
-            # 기본값 (ap-northeast-2 기준)
-            return {
-                "request_per_million": 0.20,
-                "duration_per_gb_second": 0.0000166667,
-                "provisioned_concurrency_per_gb_hour": 0.000004646,
-            }
+            return {}
+
+    def get_sagemaker_prices(self, region: str) -> dict[str, float]:
+        """SageMaker Endpoint 인스턴스 가격 조회 (get_products API 사용)
+
+        Args:
+            region: AWS 리전 코드 (예: ap-northeast-2)
+
+        Returns:
+            {instance_type: hourly_price} 딕셔너리
+        """
+        try:
+            response = self.pricing_client.get_products(
+                ServiceCode="AmazonSageMaker",
+                Filters=[
+                    {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
+                    {
+                        "Type": "TERM_MATCH",
+                        "Field": "productFamily",
+                        "Value": "ML Instance",
+                    },
+                ],
+                MaxResults=100,
+            )
+
+            prices = {}
+            for price_item in response.get("PriceList", []):
+                data = json.loads(price_item) if isinstance(price_item, str) else price_item
+                attrs = data.get("product", {}).get("attributes", {})
+                terms = data.get("terms", {}).get("OnDemand", {})
+
+                instance_type = attrs.get("instanceType", "")
+                if not instance_type:
+                    continue
+
+                for term in terms.values():
+                    for dim in term.get("priceDimensions", {}).values():
+                        price = float(dim.get("pricePerUnit", {}).get("USD", "0"))
+                        if price > 0:
+                            prices[instance_type] = price
+                            break
+
+            logger.info(f"SageMaker 가격 조회 완료: {region} ({len(prices)} types)")
+            return prices
+
+        except (ClientError, BotoCoreError) as e:
+            logger.warning(f"SageMaker 가격 조회 실패 [{region}]: {e}")
+            return {}
 
     def get_dynamodb_prices(self, region: str) -> dict[str, float]:
         """DynamoDB 가격 조회
@@ -761,11 +782,4 @@ class PricingFetcher:
 
         except (ClientError, BotoCoreError) as e:
             logger.warning(f"DynamoDB 가격 조회 실패 [{region}]: {e}")
-            # 기본값 (ap-northeast-2 기준)
-            return {
-                "rcu_per_hour": 0.00013,
-                "wcu_per_hour": 0.00065,
-                "read_per_million": 0.25,
-                "write_per_million": 1.25,
-                "storage_per_gb": 0.25,
-            }
+            return {}

@@ -5,6 +5,8 @@ VPC Endpoint 비용 계산:
 - Interface Endpoint: 시간당 ~$0.01 (리전별 상이) + 데이터 처리 비용
 - Gateway Endpoint (S3, DynamoDB): 무료
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_endpoint_hourly_price, get_endpoint_monthly_cost
 
@@ -20,16 +22,10 @@ VPC Endpoint 비용 계산:
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .constants import HOURS_PER_MONTH
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
-
-# 월 평균 시간
-HOURS_PER_MONTH = 730
 
 
 def get_endpoint_prices(
@@ -45,7 +41,7 @@ def get_endpoint_prices(
     Returns:
         {"interface_hourly": float, "gateway_hourly": float, "data_per_gb": float}
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("vpc_endpoint", region, refresh)
 
 
 def get_endpoint_hourly_price(
@@ -127,26 +123,3 @@ def get_endpoint_monthly_fixed_cost(
         월간 고정 USD 비용
     """
     return get_endpoint_monthly_cost(region, endpoint_type, hours=HOURS_PER_MONTH, data_processed_gb=0)
-
-
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("vpc_endpoint", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_vpc_endpoint_prices(region)
-
-        if prices and prices.get("interface_hourly", 0) > 0:
-            _cache.set("vpc_endpoint", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"VPC Endpoint 가격 조회 실패: {e}")
-
-    # 기본값 반환
-    return {"interface_hourly": 0.01, "gateway_hourly": 0.0, "data_per_gb": 0.01}

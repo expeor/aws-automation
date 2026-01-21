@@ -19,6 +19,7 @@ from plugins.ec2.ami_audit import AMIAnalysisResult
 from plugins.ec2.ebs_audit import EBSAnalysisResult
 from plugins.ec2.eip_audit import EIPAnalysisResult
 from plugins.ec2.snapshot_audit import SnapshotAnalysisResult
+from plugins.ec2.unused import EC2AnalysisResult
 from plugins.ecr.unused import ECRAnalysisResult
 from plugins.efs.unused import EFSAnalysisResult
 from plugins.elasticache.unused import ElastiCacheAnalysisResult
@@ -31,6 +32,7 @@ from plugins.rds.snapshot_audit import RDSSnapshotAnalysisResult
 from plugins.rds.unused import RDSAnalysisResult as RDSInstanceAnalysisResult
 from plugins.route53.empty_zone import Route53AnalysisResult
 from plugins.s3.empty_bucket import S3AnalysisResult
+from plugins.sagemaker.unused import SageMakerAnalysisResult
 from plugins.secretsmanager.unused import SecretAnalysisResult
 from plugins.sns.unused import SNSAnalysisResult
 from plugins.sqs.unused import SQSAnalysisResult
@@ -99,6 +101,16 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "data_unused": "unused",
         "session": "eni_result",
         "final": "eni_results",
+        "data_key": "result",
+    },
+    "ec2_instance": {
+        "display": "EC2 Instance",
+        "total": "ec2_instance_total",
+        "unused": "ec2_instance_unused",
+        "waste": "ec2_instance_monthly_waste",
+        "data_unused": "unused",
+        "session": "ec2_instance_result",
+        "final": "ec2_instance_results",
         "data_key": "result",
     },
     # =========================================================================
@@ -258,6 +270,19 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "data_key": "result",
     },
     # =========================================================================
+    # ML
+    # =========================================================================
+    "sagemaker_endpoint": {
+        "display": "SageMaker Endpoint",
+        "total": "sagemaker_endpoint_total",
+        "unused": "sagemaker_endpoint_unused",
+        "waste": "sagemaker_endpoint_monthly_waste",
+        "data_unused": "unused",
+        "session": "sagemaker_endpoint_result",
+        "final": "sagemaker_endpoint_results",
+        "data_key": "result",
+    },
+    # =========================================================================
     # Messaging
     # =========================================================================
     "sns": {
@@ -389,6 +414,10 @@ class UnusedResourceSummary:
     eni_total: int = 0
     eni_unused: int = 0
 
+    ec2_instance_total: int = 0
+    ec2_instance_unused: int = 0
+    ec2_instance_monthly_waste: float = 0.0
+
     # Networking (VPC)
     nat_total: int = 0
     nat_unused: int = 0
@@ -446,6 +475,11 @@ class UnusedResourceSummary:
     lambda_unused: int = 0
     lambda_monthly_waste: float = 0.0
 
+    # ML
+    sagemaker_endpoint_total: int = 0
+    sagemaker_endpoint_unused: int = 0
+    sagemaker_endpoint_monthly_waste: float = 0.0
+
     # Messaging
     sns_total: int = 0
     sns_unused: int = 0
@@ -491,6 +525,7 @@ class SessionCollectionResult:
     snap_result: SnapshotAnalysisResult | None = None
     eip_result: EIPAnalysisResult | None = None
     eni_result: ENIAnalysisResult | None = None
+    ec2_instance_result: EC2AnalysisResult | None = None
 
     # Networking (VPC)
     nat_findings: list[Any] = field(default_factory=list)
@@ -515,6 +550,9 @@ class SessionCollectionResult:
     apigateway_result: APIGatewayAnalysisResult | None = None
     eventbridge_result: EventBridgeAnalysisResult | None = None
     lambda_result: LambdaAnalysisResult | None = None
+
+    # ML
+    sagemaker_endpoint_result: SageMakerAnalysisResult | None = None
 
     # Messaging
     sns_result: SNSAnalysisResult | None = None
@@ -548,6 +586,7 @@ class UnusedAllResult:
     snap_results: list[SnapshotAnalysisResult] = field(default_factory=list)
     eip_results: list[EIPAnalysisResult] = field(default_factory=list)
     eni_results: list[ENIAnalysisResult] = field(default_factory=list)
+    ec2_instance_results: list[EC2AnalysisResult] = field(default_factory=list)
 
     # Networking (VPC)
     nat_findings: list[Any] = field(default_factory=list)
@@ -572,6 +611,9 @@ class UnusedAllResult:
     apigateway_results: list[APIGatewayAnalysisResult] = field(default_factory=list)
     eventbridge_results: list[EventBridgeAnalysisResult] = field(default_factory=list)
     lambda_results: list[LambdaAnalysisResult] = field(default_factory=list)
+
+    # ML
+    sagemaker_endpoint_results: list[SageMakerAnalysisResult] = field(default_factory=list)
 
     # Messaging
     sns_results: list[SNSAnalysisResult] = field(default_factory=list)

@@ -25,6 +25,21 @@ Example (권장 - parallel_collect):
     if result.error_count > 0:
         print(result.get_error_summary())
 
+Example (Progress tracking 사용):
+    from core.parallel import parallel_collect, quiet_mode
+    from cli.ui import parallel_progress
+
+    with parallel_progress("리소스 수집") as tracker:
+        with quiet_mode():
+            result = parallel_collect(
+                ctx, collect_volumes,
+                max_workers=20,
+                progress_tracker=tracker
+            )
+
+    success, failed, total = tracker.stats
+    print(f"완료: {success}개 성공, {failed}개 실패")
+
 Example (상세 제어 - Executor):
     from core.parallel import ParallelSessionExecutor, ParallelConfig
 

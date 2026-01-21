@@ -5,6 +5,8 @@ Secrets Manager 비용 계산:
 - Secret당 월 비용: ~$0.40 (리전별 상이)
 - API 호출: ~$0.05/10,000 requests
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_secret_monthly_cost
 
@@ -17,13 +19,9 @@ Secrets Manager 비용 계산:
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
 
 
 def get_secret_prices(
@@ -39,7 +37,7 @@ def get_secret_prices(
     Returns:
         {"per_secret_monthly": float, "per_10k_api_calls": float}
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("secretsmanager", region, refresh)
 
 
 def get_secret_price(region: str = "ap-northeast-2") -> float:
@@ -92,26 +90,3 @@ def get_secret_monthly_cost(
     api_cost = (api_calls / 10000) * per_10k_api
 
     return round(secret_cost + api_cost, 2)
-
-
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("secretsmanager", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_secrets_manager_prices(region)
-
-        if prices and prices.get("per_secret_monthly", 0) > 0:
-            _cache.set("secretsmanager", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"Secrets Manager 가격 조회 실패: {e}")
-
-    # 기본값 반환
-    return {"per_secret_monthly": 0.40, "per_10k_api_calls": 0.05}

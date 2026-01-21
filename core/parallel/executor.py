@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     import boto3
 
     from cli.flow.context import ExecutionContext
+    from cli.ui.progress import ParallelTracker
 
 logger = logging.getLogger(__name__)
 
@@ -104,12 +105,17 @@ class ParallelSessionExecutor:
         self,
         func: Callable[[boto3.Session, str, str, str], T],
         service: str = "default",
+        progress_tracker: ParallelTracker | None = None,
     ) -> ParallelExecutionResult[T]:
         """작업 함수를 모든 세션에 병렬 실행
 
         Args:
             func: (session, account_id, account_name, region) -> T 함수
             service: AWS 서비스 이름 (rate limit용, 로깅용)
+            progress_tracker: 진행 상황 추적기 (선택사항).
+                전달 시 자동으로:
+                1. set_total(task_count) 호출
+                2. 각 task 완료 시 on_complete(success) 호출
 
         Returns:
             ParallelExecutionResult[T]: 전체 실행 결과
@@ -122,6 +128,10 @@ class ParallelSessionExecutor:
             return ParallelExecutionResult()
 
         logger.info(f"병렬 실행 시작: {len(tasks)}개 작업, max_workers={self.config.max_workers}, service={service}")
+
+        # progress_tracker에 total 설정
+        if progress_tracker:
+            progress_tracker.set_total(len(tasks))
 
         results: list[TaskResult[T]] = []
         start_time = time.monotonic()
@@ -148,6 +158,10 @@ class ParallelSessionExecutor:
                 try:
                     result = future.result()
                     results.append(result)
+
+                    # progress_tracker에 완료 알림
+                    if progress_tracker:
+                        progress_tracker.on_complete(result.success)
                 except Exception as e:
                     # 예상치 못한 executor 에러
                     logger.error(f"작업 실행 중 예외 [{task.account_id}/{task.region}]: {e}")
@@ -166,6 +180,10 @@ class ParallelSessionExecutor:
                             ),
                         )
                     )
+
+                    # progress_tracker에 실패 알림
+                    if progress_tracker:
+                        progress_tracker.on_complete(success=False)
 
         total_time = (time.monotonic() - start_time) * 1000
         exec_result = ParallelExecutionResult(results=results)
@@ -389,6 +407,7 @@ def parallel_collect(
     collector_func: Callable[[boto3.Session, str, str, str], T],
     max_workers: int = 20,
     service: str = "default",
+    progress_tracker: ParallelTracker | None = None,
 ) -> ParallelExecutionResult[T]:
     """병렬 수집 편의 함수
 
@@ -399,11 +418,15 @@ def parallel_collect(
         collector_func: (session, account_id, account_name, region) -> T
         max_workers: 최대 동시 스레드 수
         service: AWS 서비스 이름
+        progress_tracker: 진행 상황 추적기 (선택사항).
+            전달 시 자동으로:
+            1. set_total(task_count) 호출
+            2. 각 task 완료 시 on_complete(success) 호출
 
     Returns:
         ParallelExecutionResult[T]
 
-    Example:
+    Example (기본 사용):
         def collect_sgs(session, account_id, account_name, region):
             ec2 = session.client("ec2", region_name=region)
             return ec2.describe_security_groups()["SecurityGroups"]
@@ -415,7 +438,19 @@ def parallel_collect(
 
         if result.error_count > 0:
             print(result.get_error_summary())
+
+    Example (progress_tracker 사용):
+        from cli.ui import parallel_progress
+
+        with parallel_progress("리소스 수집") as tracker:
+            with quiet_mode():
+                result = parallel_collect(
+                    ctx, collect_sgs, progress_tracker=tracker
+                )
+
+        success, failed, total = tracker.stats
+        console.print(f"완료: {success}개 성공, {failed}개 실패")
     """
     config = ParallelConfig(max_workers=max_workers)
     executor = ParallelSessionExecutor(ctx, config)
-    return executor.execute(collector_func, service)
+    return executor.execute(collector_func, service, progress_tracker=progress_tracker)

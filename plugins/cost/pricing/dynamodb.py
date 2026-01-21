@@ -10,6 +10,8 @@ DynamoDB 비용 구성:
   - RCU: $0.00013 per hour (~$0.095/월)
 - Storage: $0.25 per GB per month
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_dynamodb_monthly_cost
 
@@ -34,16 +36,10 @@ DynamoDB 비용 구성:
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .constants import HOURS_PER_MONTH
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
-
-# 월간 시간
-HOURS_PER_MONTH = 730
 
 
 def get_dynamodb_prices(
@@ -65,7 +61,7 @@ def get_dynamodb_prices(
             "storage_per_gb": float,
         }
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("dynamodb", region, refresh)
 
 
 def get_dynamodb_provisioned_price(
@@ -225,34 +221,3 @@ def estimate_ondemand_cost(
         write_requests=int(write_requests),
         storage_gb=storage_gb,
     )
-
-
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("dynamodb", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회 시도
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_dynamodb_prices(region)
-
-        if prices and prices.get("storage_per_gb", 0) > 0:
-            _cache.set("dynamodb", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"DynamoDB 가격 조회 실패, 기본값 사용: {e}")
-
-    # 기본값 반환 (ap-northeast-2 기준)
-    default_prices = {
-        "rcu_per_hour": 0.00013,
-        "wcu_per_hour": 0.00065,
-        "read_per_million": 0.25,
-        "write_per_million": 1.25,
-        "storage_per_gb": 0.25,
-    }
-    _cache.set("dynamodb", region, default_prices)
-    return default_prices

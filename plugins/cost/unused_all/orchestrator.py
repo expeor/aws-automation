@@ -13,14 +13,6 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
 
 from core.parallel import is_quiet, parallel_collect, quiet_mode, set_quiet
 from core.tools.output import OutputPath, open_in_explorer
@@ -37,6 +29,11 @@ from .types import (
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
+
+try:
+    from cli.ui import parallel_progress
+except ImportError:
+    parallel_progress = None  # type: ignore[assignment]
 
 console = Console()
 
@@ -306,21 +303,22 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
     # 전역 서비스 추적 초기화
     _reset_global_tracking()
 
+    # 선택적 스캔을 위한 래퍼 함수
+    def collect_wrapper(session, account_id, account_name, region):
+        return collect_session_resources(session, account_id, account_name, region, selected_resources=selected)
+
     # 병렬 수집 실행 (quiet_mode로 콘솔 출력 억제)
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("[cyan]리소스 수집 중...", total=None)
-
-        # 선택적 스캔을 위한 래퍼 함수
-        def collect_wrapper(session, account_id, account_name, region):
-            return collect_session_resources(session, account_id, account_name, region, selected_resources=selected)
-
+    if parallel_progress is not None:
+        with parallel_progress("리소스 수집", console=console) as tracker, quiet_mode():
+            parallel_result = parallel_collect(
+                ctx,
+                collect_wrapper,
+                max_workers=20,
+                service="multi",
+                progress_tracker=tracker,
+            )
+    else:
+        # Fallback: parallel_progress 없이 실행
         with quiet_mode():
             parallel_result = parallel_collect(
                 ctx,
@@ -328,8 +326,6 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
                 max_workers=20,
                 service="multi",
             )
-
-        progress.update(task, description="[green]수집 완료", completed=True)
 
     # 결과 집계
     final_result = UnusedAllResult()

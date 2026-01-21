@@ -45,6 +45,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("EBS Snapshot", "snap_total", "snap_unused", "snap_monthly_waste"),
         ("EIP", "eip_total", "eip_unused", "eip_monthly_waste"),
         ("ENI", "eni_total", "eni_unused", None),
+        ("EC2 Instance", "ec2_instance_total", "ec2_instance_unused", "ec2_instance_monthly_waste"),
         # Networking (VPC)
         ("NAT Gateway", "nat_total", "nat_unused", "nat_monthly_waste"),
         ("VPC Endpoint", "endpoint_total", "endpoint_unused", "endpoint_monthly_waste"),
@@ -74,6 +75,8 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("API Gateway", "apigateway_total", "apigateway_unused", None),
         ("EventBridge", "eventbridge_total", "eventbridge_unused", None),
         ("Lambda", "lambda_total", "lambda_unused", "lambda_monthly_waste"),
+        # ML
+        ("SageMaker Endpoint", "sagemaker_endpoint_total", "sagemaker_endpoint_unused", "sagemaker_endpoint_monthly_waste"),
         # Messaging
         ("SNS", "sns_total", "sns_unused", None),
         ("SQS", "sqs_total", "sqs_unused", None),
@@ -120,6 +123,8 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         + s.rds_instance_monthly_waste
         + s.efs_monthly_waste
         + s.dynamodb_monthly_waste
+        + s.ec2_instance_monthly_waste
+        + s.sagemaker_endpoint_monthly_waste
         for s in result.summaries
     )
     row += 2
@@ -133,6 +138,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     _create_snap_sheet(wb, result.snap_results, header_fill, header_font)
     _create_eip_sheet(wb, result.eip_results, header_fill, header_font)
     _create_eni_sheet(wb, result.eni_results, header_fill, header_font)
+    _create_ec2_instance_sheet(wb, result.ec2_instance_results, header_fill, header_font)
     # Networking (VPC)
     _create_nat_sheet(wb, result.nat_findings, header_fill, header_font)
     _create_endpoint_sheet(wb, result.endpoint_results, header_fill, header_font)
@@ -152,6 +158,8 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     _create_apigateway_sheet(wb, result.apigateway_results, header_fill, header_font)
     _create_eventbridge_sheet(wb, result.eventbridge_results, header_fill, header_font)
     _create_lambda_sheet(wb, result.lambda_results, header_fill, header_font)
+    # ML
+    _create_sagemaker_endpoint_sheet(wb, result.sagemaker_endpoint_results, header_fill, header_font)
     # Messaging
     _create_sns_sheet(wb, result.sns_results, header_fill, header_font)
     _create_sqs_sheet(wb, result.sqs_results, header_fill, header_font)
@@ -1167,6 +1175,102 @@ def _create_dynamodb_sheet(wb, results, header_fill, header_font):
                         t.provisioned_write,
                         f.status.value,
                         f"${t.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ]
+                )
+
+
+def _create_ec2_instance_sheet(wb, results, header_fill, header_font):
+    """EC2 Instance 상세 시트 생성"""
+    ws = wb.create_sheet("EC2 Instance")
+    ws.append(
+        [
+            "Account",
+            "Region",
+            "Instance ID",
+            "Name",
+            "Type",
+            "State",
+            "Platform",
+            "Avg CPU",
+            "Max CPU",
+            "Network In",
+            "Network Out",
+            "Age (days)",
+            "월간 비용",
+            "상태",
+            "권장 조치",
+        ]
+    )
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                i = f.instance
+                ws.append(
+                    [
+                        i.account_name,
+                        i.region,
+                        i.instance_id,
+                        i.name,
+                        i.instance_type,
+                        i.state,
+                        i.platform,
+                        f"{i.avg_cpu:.1f}%",
+                        f"{i.max_cpu:.1f}%",
+                        f"{i.total_network_in / (1024 * 1024):.2f} MB",
+                        f"{i.total_network_out / (1024 * 1024):.2f} MB",
+                        i.age_days,
+                        f"${i.estimated_monthly_cost:.2f}",
+                        f.status.value,
+                        f.recommendation,
+                    ]
+                )
+
+
+def _create_sagemaker_endpoint_sheet(wb, results, header_fill, header_font):
+    """SageMaker Endpoint 상세 시트 생성"""
+    ws = wb.create_sheet("SageMaker Endpoint")
+    ws.append(
+        [
+            "Account",
+            "Region",
+            "Endpoint Name",
+            "Status",
+            "Instance Type",
+            "Instance Count",
+            "Total Invocations",
+            "Avg/Day",
+            "Latency (ms)",
+            "Age (days)",
+            "월간 비용",
+            "상태",
+            "권장 조치",
+        ]
+    )
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                e = f.endpoint
+                ws.append(
+                    [
+                        e.account_name,
+                        e.region,
+                        e.endpoint_name,
+                        e.status,
+                        e.instance_type,
+                        e.instance_count,
+                        e.total_invocations,
+                        f"{e.avg_invocations_per_day:.1f}",
+                        f"{e.model_latency_avg_ms:.2f}",
+                        e.age_days,
+                        f"${e.estimated_monthly_cost:.2f}",
+                        f.status.value,
                         f.recommendation,
                     ]
                 )

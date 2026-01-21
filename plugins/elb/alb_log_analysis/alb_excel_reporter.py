@@ -13,23 +13,16 @@ from secrets import token_hex
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    Progress,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 
 if TYPE_CHECKING:
     from openpyxl.workbook import Workbook
 
 try:
-    from cli.ui import console, logger
+    from cli.ui import console, logger, step_progress
 except ImportError:
     console = Console()
     logger = logging.getLogger(__name__)
+    step_progress = None  # type: ignore[assignment]
 
 
 class ExcelReportError(Exception):
@@ -75,23 +68,10 @@ class ALBExcelReporter:
 
         self._style_cache.register_named_styles(wb)
 
-        if console.is_terminal:
-            with Progress(
-                TextColumn("[bold blue]{task.description}", justify="right"),
-                BarColumn(bar_width=40, complete_style="green", finished_style="green"),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                TimeRemainingColumn(),
-                console=console,
-            ) as progress:
-                task = progress.add_task("[bold]Excel 보고서 생성중...", total=10)
-
-                def update(msg: str, done: bool = False) -> None:
-                    if done:
-                        progress.update(task, advance=1)
-                    progress.update(task, description=msg)
-
-                output_path = self._build_sheets(wb, data, report_name, update)
+        if console.is_terminal and step_progress is not None:
+            with step_progress("Excel 보고서 생성", total_steps=10, console=console) as tracker:
+                callback = tracker.as_callback(include_status=True)
+                output_path = self._build_sheets(wb, data, report_name, callback)
         else:
             output_path = self._build_sheets(wb, data, report_name, None)
 

@@ -13,6 +13,13 @@ CATEGORY = {
 
 TOOLS = [
     {
+        "name": "EC2 인스턴스 미사용 분석",
+        "description": "유휴/저사용 EC2 인스턴스 탐지 (CloudWatch 기반)",
+        "permission": "read",
+        "module": "unused",
+        "area": "unused",
+    },
+    {
         "name": "EBS 미사용 분석",
         "description": "미사용 EBS 볼륨 탐지 및 비용 절감 기회 식별",
         "permission": "read",
