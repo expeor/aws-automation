@@ -8,11 +8,54 @@ AWS 인증 프로파일을 선택하고 Provider를 생성.
 
 from rich.console import Console
 
+from cli.i18n import get_lang, t
 from ..context import ExecutionContext, ProviderKind
 
 console = Console()
 
-# 인증 타입 정의 (표시 순서대로)
+
+def get_auth_type_info() -> dict:
+    """Get auth type info based on current language."""
+    lang = get_lang()
+    if lang == "en":
+        return {
+            ProviderKind.SSO_SESSION: {
+                "name": "SSO Session",
+                "description": "Multi-account, dynamic roles",
+                "badge": " (Recommended)",
+            },
+            ProviderKind.SSO_PROFILE: {
+                "name": "SSO Profile",
+                "description": "Single account, fixed role",
+                "badge": "",
+            },
+            ProviderKind.STATIC_CREDENTIALS: {
+                "name": "IAM Access Key",
+                "description": "Static credentials",
+                "badge": "",
+            },
+        }
+    else:
+        return {
+            ProviderKind.SSO_SESSION: {
+                "name": "SSO 세션",
+                "description": "멀티 계정, 동적 역할",
+                "badge": " (권장)",
+            },
+            ProviderKind.SSO_PROFILE: {
+                "name": "SSO 프로파일",
+                "description": "단일 계정, 고정 역할",
+                "badge": "",
+            },
+            ProviderKind.STATIC_CREDENTIALS: {
+                "name": "IAM Access Key",
+                "description": "정적 자격 증명",
+                "badge": "",
+            },
+        }
+
+
+# 인증 타입 정의 (표시 순서대로) - legacy, use get_auth_type_info() instead
 AUTH_TYPE_INFO = {
     ProviderKind.SSO_SESSION: {
         "name": "SSO 세션",
@@ -53,15 +96,15 @@ class ProfileStep:
         profiles = self._collect_profiles()
 
         if not profiles:
-            console.print("[red]! 사용 가능한 AWS 프로파일이 없습니다.[/red]")
-            console.print("[yellow]* 'aws configure' 또는 'aws configure sso'를 실행해주세요.[/yellow]")
-            raise RuntimeError("프로파일 없음")
+            console.print(f"[red]! {t('flow.no_profiles_available')}[/red]")
+            console.print(f"[yellow]* {t('flow.run_aws_configure')}[/yellow]")
+            raise RuntimeError("No profiles")
 
         # 프로파일이 1개면 자동 선택
         if len(profiles) == 1:
             selected = profiles[0]
             console.print()
-            console.print(f"[dim]프로파일:[/dim] {selected['name']} ({selected['type']})")
+            console.print(f"[dim]{t('flow.profile_label')}[/dim] {selected['name']} ({selected['type']})")
             return self._handle_selected_profile(ctx, selected)
 
         # 타입별로 그룹핑
@@ -77,10 +120,10 @@ class ProfileStep:
         selected_type: ProviderKind | str
         if len(available_types) == 1 and not saved_groups:
             selected_type = available_types[0]
-            type_info = AUTH_TYPE_INFO.get(selected_type, {})
+            type_info = get_auth_type_info().get(selected_type, {})
             name = type_info.get("name", selected_type)
             console.print()
-            console.print(f"[dim]인증:[/dim] {name}")
+            console.print(f"[dim]{t('flow.auth_label')}[/dim] {name}")
         else:
             # 1단계: 인증 타입 선택 (또는 그룹 선택)
             selected_type = self._select_auth_type(profiles_by_type)
@@ -130,7 +173,8 @@ class ProfileStep:
         saved_groups = group_manager.get_all()
 
         # 표시 순서 (AUTH_TYPE_INFO 키 순서)
-        type_order = list(AUTH_TYPE_INFO.keys())
+        auth_type_info = get_auth_type_info()
+        type_order = list(auth_type_info.keys())
         available_types = []
 
         for kind in type_order:
@@ -138,21 +182,21 @@ class ProfileStep:
             if type_profiles:
                 available_types.append((kind, type_profiles))
 
-        print_box_start("인증 방식 선택")
+        print_box_start(t('flow.select_auth_type'))
 
         menu_idx = 1
 
         # 저장된 그룹이 있으면 맨 위에 표시
         if saved_groups:
-            print_box_line(f" {menu_idx}) [cyan]★ 저장된 프로파일 그룹[/cyan] [dim]({len(saved_groups)}개)[/dim]")
+            print_box_line(f" {menu_idx}) [cyan]★ {t('flow.saved_profile_groups')}[/cyan] [dim]({len(saved_groups)})[/dim]")
             menu_idx += 1
             print_box_line(" ────────────────────────")
 
         # 선택지 표시
         for kind, type_profiles in available_types:
-            info = AUTH_TYPE_INFO[kind]
+            info = auth_type_info[kind]
             count = len(type_profiles)
-            print_box_line(f" {menu_idx}) {info['name']}{info['badge']} [dim]({count}개)[/dim]")
+            print_box_line(f" {menu_idx}) {info['name']}{info['badge']} [dim]({count})[/dim]")
             menu_idx += 1
 
         print_box_end()
@@ -169,7 +213,7 @@ class ProfileStep:
             try:
                 idx = int(choice)
                 if not 1 <= idx <= total_options:
-                    console.print(f"[dim]1-{total_options} 범위[/dim]")
+                    console.print(f"[dim]{t('flow.number_range_hint', max=total_options)}[/dim]")
                     continue
 
                 # 그룹 선택
@@ -183,12 +227,12 @@ class ProfileStep:
                 # 인증 타입 선택
                 type_idx = idx - (1 if saved_groups else 0) - 1
                 selected_kind, _ = available_types[type_idx]
-                info = AUTH_TYPE_INFO[selected_kind]
-                console.print(f"[dim]인증:[/dim] {info['name']}")
+                info = auth_type_info[selected_kind]
+                console.print(f"[dim]{t('flow.auth_label')}[/dim] {info['name']}")
                 return selected_kind
 
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
     def _select_profile_group(self, groups):
         """프로파일 그룹 선택"""
@@ -196,17 +240,18 @@ class ProfileStep:
 
         kind_labels = {"sso_profile": "SSO", "static": "Key"}
 
-        print_box_start("프로파일 그룹 선택")
+        print_box_start(t('flow.select_profile_group'))
 
         for idx, g in enumerate(groups, 1):
             kind_label = kind_labels.get(g.kind, g.kind)
             profiles_preview = ", ".join(g.profiles[:2])
             if len(g.profiles) > 2:
-                profiles_preview += f" 외 {len(g.profiles) - 2}개"
+                more = len(g.profiles) - 2
+                profiles_preview += f" +{more}" if get_lang() == "en" else f" 외 {more}개"
             print_box_line(f" {idx}) [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]")
 
         print_box_line("")
-        print_box_line(" [dim]0) 뒤로[/dim]")
+        print_box_line(f" [dim]0) {t('flow.back')}[/dim]")
         print_box_end()
 
         while True:
@@ -222,11 +267,11 @@ class ProfileStep:
                 idx = int(choice)
                 if 1 <= idx <= len(groups):
                     selected = groups[idx - 1]
-                    console.print(f"[dim]그룹:[/dim] {selected.name}")
+                    console.print(f"[dim]{t('flow.group_label')}[/dim] {selected.name}")
                     return selected
-                console.print(f"[dim]0-{len(groups)} 범위[/dim]")
+                console.print(f"[dim]{t('flow.number_range_hint', max=len(groups))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
     def _select_profile_in_type(self, profiles: list[dict], kind: ProviderKind) -> dict | list[dict]:
         """특정 타입 내에서 프로파일 선택 (2단계)
@@ -241,14 +286,15 @@ class ProfileStep:
         if len(profiles) == 1:
             selected = profiles[0]
             console.print()
-            console.print(f"[dim]프로파일:[/dim] {selected['name']}")
+            console.print(f"[dim]{t('flow.profile_label')}[/dim] {selected['name']}")
             return selected
 
         # 이름순 정렬
         sorted_profiles = sorted(profiles, key=lambda x: x["name"].lower())
 
-        info = AUTH_TYPE_INFO.get(kind, {})
-        name = info.get("name", "프로파일")
+        auth_type_info = get_auth_type_info()
+        info = auth_type_info.get(kind, {})
+        name = info.get("name", "Profile")
 
         # STATIC_CREDENTIALS, SSO_PROFILE은 다중 선택 옵션 제공
         supports_multi = kind in (
@@ -257,7 +303,7 @@ class ProfileStep:
         )
         if supports_multi and len(sorted_profiles) > 1:
             console.print()
-            console.print("[dim]1) 단일 선택  2) 다중 선택[/dim]")
+            console.print(f"[dim]{t('flow.select_single_multi')}[/dim]")
 
             while True:
                 mode = console.input("> ").strip()
@@ -266,13 +312,13 @@ class ProfileStep:
                 elif mode == "2":
                     return self._select_multi_profiles(sorted_profiles)
                 elif mode:
-                    console.print("[dim]1 또는 2 입력[/dim]")
+                    console.print(f"[dim]{t('flow.enter_1_or_2')}[/dim]")
 
         # 대규모 프로파일 지원 (20개 이상이면 검색/페이지네이션)
         if len(sorted_profiles) > 20:
             return self._select_single_profile_large(sorted_profiles)
 
-        print_box_start(f"{name} 선택 ({len(sorted_profiles)}개)")
+        print_box_start(t('flow.profile_selection', name=name, count=len(sorted_profiles)))
 
         # 2열 레이아웃
         half = (len(sorted_profiles) + 1) // 2
@@ -302,11 +348,11 @@ class ProfileStep:
                 idx = int(choice)
                 if 1 <= idx <= len(sorted_profiles):
                     selected = sorted_profiles[idx - 1]
-                    console.print(f"[dim]프로파일:[/dim] {selected['name']}")
+                    console.print(f"[dim]{t('flow.profile_label')}[/dim] {selected['name']}")
                     return dict(selected)
-                console.print(f"[dim]1-{len(sorted_profiles)} 범위[/dim]")
+                console.print(f"[dim]{t('flow.number_range_hint', max=len(sorted_profiles))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
     def _select_single_profile_large(self, profiles: list[dict]) -> dict:
         """대규모 프로파일에서 단일 선택 (검색/페이지네이션 지원)"""
@@ -331,9 +377,11 @@ class ProfileStep:
             end_idx = min(start_idx + PAGE_SIZE, len(filtered))
             page_items = filtered[start_idx:end_idx]
 
-            title = f"프로파일 ({len(profiles)}개)"
+            profile_label = "Profile" if get_lang() == "en" else "프로파일"
+            search_label = "Search" if get_lang() == "en" else "검색"
+            title = f"{profile_label} ({len(profiles)})"
             if search_filter:
-                title += f" - 검색: {search_filter} ({len(filtered)}개)"
+                title += f" - {search_label}: {search_filter} ({len(filtered)})"
 
             print_box_start(title)
 
@@ -355,8 +403,10 @@ class ProfileStep:
             print_box_line()
             nav = ""
             if total_pages > 1:
-                nav = f"p{current_page + 1}/{total_pages} </>: 이동 | "
-            print_box_line(f"[dim]{nav}/검색 | c: 해제[/dim]")
+                nav_label = "move" if get_lang() == "en" else "이동"
+                nav = f"p{current_page + 1}/{total_pages} </>: {nav_label} | "
+            clear_label = "clear" if get_lang() == "en" else "해제"
+            print_box_line(f"[dim]{nav}/search | c: {clear_label}[/dim]")
             print_box_end()
 
         display()
@@ -403,11 +453,12 @@ class ProfileStep:
                 if 1 <= idx <= len(filtered):
                     orig_idx, _ = filtered[idx - 1]
                     selected = profiles[orig_idx]
-                    console.print(f"[dim]프로파일:[/dim] {selected['name']}")
+                    console.print(f"[dim]{t('flow.profile_label')}[/dim] {selected['name']}")
                     return dict(selected)
-                console.print(f"[dim]1-{len(filtered)} 범위[/dim]")
+                console.print(f"[dim]{t('flow.number_range_hint', max=len(filtered))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 또는 /검색어[/dim]")
+                hint = "Number or /search" if get_lang() == "en" else "숫자 또는 /검색어"
+                console.print(f"[dim]{hint}[/dim]")
 
     def _select_multi_profiles(self, profiles: list[dict]) -> list[dict]:
         """다중 프로파일 선택 (STATIC_CREDENTIALS용)"""
@@ -435,9 +486,10 @@ class ProfileStep:
             end_idx = min(start_idx + PAGE_SIZE, len(filtered))
             page_items = filtered[start_idx:end_idx]
 
-            title = f"다중 선택 ({len(profiles)}개)"
+            multi_label = "Multi-select" if get_lang() == "en" else "다중 선택"
+            title = f"{multi_label} ({len(profiles)})"
             if search_filter:
-                title += f" - {search_filter} ({len(filtered)}개)"
+                title += f" - {search_filter} ({len(filtered)})"
 
             print_box_start(title)
 
@@ -460,7 +512,9 @@ class ProfileStep:
 
             print_box_line()
             nav = f"p{current_page + 1}/{total_pages} " if total_pages > 1 else ""
-            print_box_line(f"[dim]{nav}a: 전체 | d: 완료 ({len(selected_indices)}개)[/dim]")
+            all_label = "all" if get_lang() == "en" else "전체"
+            done_label = "done" if get_lang() == "en" else "완료"
+            print_box_line(f"[dim]{nav}a: {all_label} | d: {done_label} ({len(selected_indices)})[/dim]")
             print_box_end()
 
         display_profiles()
@@ -475,7 +529,7 @@ class ProfileStep:
 
             if choice_lower == "d":
                 if not selected_indices:
-                    console.print("[dim]최소 1개 선택[/dim]")
+                    console.print(f"[dim]{t('flow.min_one_selection')}[/dim]")
                     continue
                 break
 
@@ -552,10 +606,10 @@ class ProfileStep:
                             selected_indices.add(orig_idx)
                 display_profiles()
             except ValueError:
-                console.print("[dim]숫자, 범위, 패턴 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number_range_pattern')}[/dim]")
 
         selected = [profiles[i] for i in sorted(selected_indices)]
-        console.print(f"[dim]{len(selected)}개 선택됨[/dim]")
+        console.print(f"[dim]{t('flow.selected_count', count=len(selected))}[/dim]")
         return selected
 
     def _get_profile_description(self, profile: dict) -> str:
@@ -601,8 +655,8 @@ class ProfileStep:
         group = manager.get_by_name(group_name)
 
         if not group:
-            console.print(f"[red]그룹을 찾을 수 없습니다: {group_name}[/red]")
-            raise RuntimeError("그룹 없음")
+            console.print(f"[red]{t('flow.group_not_found', name=group_name)}[/red]")
+            raise RuntimeError("Group not found")
 
         # 그룹에 저장된 프로파일 이름으로 실제 프로파일 정보 찾기
         profile_names = set(group.profiles)
@@ -613,17 +667,17 @@ class ProfileStep:
                 matched_profiles.append(p)
 
         if not matched_profiles:
-            console.print(f"[red]그룹 '{group_name}'의 프로파일을 찾을 수 없습니다.[/red]")
-            console.print("[dim]프로파일이 삭제되었거나 이름이 변경되었을 수 있습니다.[/dim]")
-            raise RuntimeError("프로파일 없음")
+            console.print(f"[red]{t('flow.group_profiles_not_found', name=group_name)}[/red]")
+            console.print(f"[dim]{t('flow.profiles_deleted_or_renamed')}[/dim]")
+            raise RuntimeError("Profiles not found")
 
         # 찾지 못한 프로파일 경고
         found_names = {p["name"] for p in matched_profiles}
         missing = profile_names - found_names
         if missing:
-            console.print(f"[yellow]일부 프로파일을 찾을 수 없음: {', '.join(missing)}[/yellow]")
+            console.print(f"[yellow]{t('flow.some_profiles_not_found', profiles=', '.join(missing))}[/yellow]")
 
-        console.print(f"[dim]그룹 '{group_name}': {len(matched_profiles)}개 프로파일[/dim]")
+        console.print(f"[dim]{t('flow.group_profiles_count', name=group_name, count=len(matched_profiles))}[/dim]")
 
         # 멀티 프로파일 플로우로 진입
         return self._handle_multi_profile_flow(ctx, matched_profiles)
@@ -634,7 +688,7 @@ class ProfileStep:
         ctx.profile_name = selected_profiles[0]["name"]
         ctx.profiles = [p["name"] for p in selected_profiles]
 
-        console.print(f"[dim]{len(ctx.profiles)}개 프로파일 순차 실행[/dim]")
+        console.print(f"[dim]{t('flow.sequential_execution', count=len(ctx.profiles))}[/dim]")
         return ctx
 
     def _handle_sso_session_flow(self, ctx: ExecutionContext, profiles: list) -> ExecutionContext:
@@ -737,7 +791,7 @@ class ProfileStep:
                     )
                 # 그 외 타입(AssumeRole 등)은 지원하지 않음 - skip
         except ImportError:
-            console.print("[yellow]* internal.auth 모듈 로드 실패[/yellow]")
+            console.print(f"[yellow]* {t('flow.auth_module_load_failed')}[/yellow]")
 
         return profiles
 
@@ -814,30 +868,30 @@ class ProfileStep:
 
     def _authenticate(self, ctx: ExecutionContext) -> None:
         """인증 수행"""
-        console.print("[dim]인증 중...[/dim]")
+        console.print(f"[dim]{t('flow.authenticating')}[/dim]")
 
         if ctx.provider is None:
-            raise RuntimeError("Provider가 설정되지 않음")
+            raise RuntimeError("Provider not set")
 
         try:
             ctx.provider.authenticate()
-            console.print("[dim]인증 완료[/dim]")
+            console.print(f"[dim]{t('flow.auth_complete')}[/dim]")
         except Exception as e:
-            console.print(f"[red]인증 실패: {e}[/red]")
+            console.print(f"[red]{t('flow.auth_failed', error=str(e))}[/red]")
             raise
 
     def _load_accounts(self, ctx: ExecutionContext) -> list:
         """멀티계정 목록 로드"""
-        console.print("[dim]계정 로드 중...[/dim]")
+        console.print(f"[dim]{t('flow.loading_accounts')}[/dim]")
 
         if ctx.provider is None:
-            raise RuntimeError("Provider가 설정되지 않음")
+            raise RuntimeError("Provider not set")
 
         try:
             accounts_data = ctx.provider.list_accounts()
             accounts = list(accounts_data.values()) if isinstance(accounts_data, dict) else accounts_data
-            console.print(f"[dim]{len(accounts)}개 계정[/dim]")
+            console.print(f"[dim]{t('flow.accounts_count', count=len(accounts))}[/dim]")
             return accounts
         except Exception as e:
-            console.print(f"[yellow]계정 로드 실패: {e}[/yellow]")
+            console.print(f"[yellow]{t('flow.account_load_failed', error=str(e))}[/yellow]")
             return []

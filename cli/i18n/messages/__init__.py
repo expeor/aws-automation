@@ -46,11 +46,15 @@ from cli.i18n.messages.area import AREA_MESSAGES
 from cli.i18n.messages.menu import MENU_MESSAGES
 from cli.i18n.messages.excel import EXCEL_MESSAGES
 from cli.i18n.messages.runner import RUNNER_MESSAGES
+from cli.i18n.messages.cli_commands import CLI_MESSAGES
+from cli.i18n.messages.flow import FLOW_MESSAGES
 
 register_messages("common", COMMON_MESSAGES)
 register_messages("area", AREA_MESSAGES)
 register_messages("menu", MENU_MESSAGES)
 register_messages("excel", EXCEL_MESSAGES)
 register_messages("runner", RUNNER_MESSAGES)
+register_messages("cli", CLI_MESSAGES)
+register_messages("flow", FLOW_MESSAGES)
 
 __all__ = ["MESSAGES", "register_messages", "MessageDict"]

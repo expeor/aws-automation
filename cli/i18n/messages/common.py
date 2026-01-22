@@ -270,4 +270,51 @@ COMMON_MESSAGES = {
         "ko": "새로고침",
         "en": "Refresh",
     },
+    # =========================================================================
+    # Banner & UI
+    # =========================================================================
+    "profile_not_set": {
+        "ko": "프로필 미설정",
+        "en": "No profile set",
+    },
+    "help_quit_hint": {
+        "ko": "h: 도움말 | q: 종료",
+        "en": "h: Help | q: Quit",
+    },
+    "color_legend": {
+        "ko": "색상 범례:",
+        "en": "Color legend:",
+    },
+    "color_yellow": {
+        "ko": "노란색",
+        "en": "Yellow",
+    },
+    "color_red": {
+        "ko": "빨간색",
+        "en": "Red",
+    },
+    "color_green": {
+        "ko": "초록색",
+        "en": "Green",
+    },
+    "color_blue": {
+        "ko": "파란색",
+        "en": "Blue",
+    },
+    "color_cyan": {
+        "ko": "청록색",
+        "en": "Cyan",
+    },
+    "color_magenta": {
+        "ko": "보라색",
+        "en": "Magenta",
+    },
+    "color_orange": {
+        "ko": "주황색",
+        "en": "Orange",
+    },
+    "color_gray": {
+        "ko": "회색",
+        "en": "Gray",
+    },
 }

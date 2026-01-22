@@ -142,7 +142,7 @@ class MainMenu:
         from rich.table import Table
 
         self.console.print()
-        self.console.print(f"[bold]{get_text('도구 탐색', 'Tool Navigation', self.lang)}[/bold]")
+        self.console.print(f"[bold]{t('menu.tool_navigation')}[/bold]")
 
         # Rich Table로 정렬
         cmd_table = Table(
@@ -160,15 +160,15 @@ class MainMenu:
 
         cmd_table.add_row(
             "[dim]a[/dim]",
-            get_text("전체 도구", "All Tools", self.lang),
+            t('menu.all_tools'),
             "[dim]s[/dim]",
-            get_text("AWS 서비스", "AWS Services", self.lang),
+            t('menu.aws_services'),
             "[dim]c[/dim]",
-            get_text("AWS 분류", "AWS Categories", self.lang),
+            t('menu.aws_category'),
         )
         cmd_table.add_row(
             "[dim]t[/dim]",
-            get_text("점검 유형", "Check Types", self.lang),
+            t('menu.check_types'),
             "",
             "",
             "",
@@ -177,7 +177,7 @@ class MainMenu:
         self.console.print(cmd_table)
 
         self.console.print()
-        self.console.print(f"[bold]{get_text('설정', 'Settings', self.lang)}[/bold]")
+        self.console.print(f"[bold]{t('menu.settings')}[/bold]")
         cmd_table2 = Table(
             show_header=False,
             box=None,
@@ -192,15 +192,15 @@ class MainMenu:
         cmd_table2.add_column(width=16)
         cmd_table2.add_row(
             "[dim]f[/dim]",
-            get_text("즐겨찾기", "Favorites", self.lang),
+            t('menu.favorites'),
             "[dim]p[/dim]",
-            get_text("프로필", "Profiles", self.lang),
+            t('menu.profiles'),
             "[dim]g[/dim]",
-            get_text("프로필그룹", "Profile Groups", self.lang),
+            t('menu.profile_groups'),
         )
         cmd_table2.add_row(
             "[dim]q[/dim]",
-            get_text("종료", "Exit", self.lang),
+            t('common.exit'),
             "",
             "",
             "",
@@ -209,7 +209,7 @@ class MainMenu:
         self.console.print(cmd_table2)
 
         self.console.print()
-        self.console.print(f"[dim]{get_text('검색: 키워드 입력', 'Search: Enter keyword', self.lang)}[/dim]")
+        self.console.print(f"[dim]{t('menu.search_keyword_hint')}[/dim]")
 
     def _print_footer(self) -> None:
         """하단 안내 출력"""
@@ -252,9 +252,9 @@ class MainMenu:
 
             # 범위 초과
             if fav_count > 0:
-                self.console.print(f"[red]! 1-{fav_count} 범위의 번호를 입력하세요.[/red]")
+                self.console.print(f"[red]! {t('menu.enter_range_number', max=fav_count)}[/red]")
             else:
-                self.console.print("[red]! 즐겨찾기가 없습니다.[/red]")
+                self.console.print(f"[red]! {t('menu.no_favorites')}[/red]")
             return ("show_menu", None)
 
         # 4. 그 외: 검색
@@ -347,7 +347,7 @@ class MainMenu:
     def _handle_search(self, query: str) -> None:
         """검색 처리"""
         if not self._search_engine:
-            self.console.print("[red]검색 엔진이 초기화되지 않았습니다.[/]")
+            self.console.print(f"[red]{t('menu.search_engine_not_initialized')}[/]")
             return
 
         query_lower = query.lower()
@@ -366,8 +366,8 @@ class MainMenu:
 
         if not results:
             self.console.print()
-            self.console.print(f"[yellow]'{query}' 검색 결과 없음[/]")
-            self.console.print("[dim]다른 키워드로 검색하거나 b 키로 카테고리를 탐색하세요.[/]")
+            self.console.print(f"[yellow]{t('menu.no_results', query=query)}[/]")
+            self.console.print(f"[dim]{t('menu.search_no_results_hint')}[/]")
             wait_for_any_key()
             return
 
@@ -376,7 +376,7 @@ class MainMenu:
 
         self.console.print()
         table = Table(
-            title=f"[bold]{t('common.search')}: {query}[/bold] ({len(results)}{get_text('건', ' results', self.lang)})",
+            title=f"[bold]{t('common.search')}: {query}[/bold] ({t('menu.search_results_count', count=len(results))})",
             show_header=True,
             header_style="dim",
             box=None,
@@ -417,7 +417,7 @@ class MainMenu:
                     self._run_tool_directly(selected.category, selected.tool_module)
                     return
 
-            self.console.print(f"[red]{get_text(f'0-{len(results)} 범위의 번호를 입력하세요.', f'Enter a number between 0-{len(results)}.', self.lang)}[/]")
+            self.console.print(f"[red]{t('menu.enter_range_number', max=len(results))}[/]")
 
     def _handle_area_search(self, query: str, area: str) -> None:
         """영역(area) 기반 검색 처리"""
@@ -443,14 +443,14 @@ class MainMenu:
 
         if not results:
             self.console.print()
-            self.console.print(f"[yellow]'{query}' 검색 결과 없음[/]")
+            self.console.print(f"[yellow]{t('menu.no_results', query=query)}[/]")
             wait_for_any_key()
             return
 
         # 결과 표시
         self.console.print()
         table = Table(
-            title=f"[bold]{query}[/bold] ({len(results)}건)",
+            title=f"[bold]{query}[/bold] ({t('menu.search_results_count', count=len(results))})",
             show_header=True,
             header_style="dim",
             box=None,
@@ -458,9 +458,9 @@ class MainMenu:
             title_justify="left",
         )
         table.add_column("#", style="dim", width=4, justify="right")
-        table.add_column("카테고리", width=16)  # 12 → 16
-        table.add_column("도구", width=28)      # 25 → 28
-        table.add_column("설명", style="dim")
+        table.add_column(t("menu.header_category"), width=16)  # 12 → 16
+        table.add_column(t("menu.header_tools"), width=28)      # 25 → 28
+        table.add_column(t("menu.header_description"), style="dim")
 
         for i, (_, tool) in enumerate(results, 1):
             table.add_row(
@@ -472,7 +472,7 @@ class MainMenu:
 
         self.console.print(table)
         self.console.print()
-        self.console.print("[dim]0: 돌아가기[/dim]")
+        self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
 
         # 선택
         while True:
@@ -491,7 +491,7 @@ class MainMenu:
                     self._run_tool_directly(selected["category"], selected["tool_module"])
                     return
 
-            self.console.print(f"[red]0-{len(results)} 범위의 번호를 입력하세요.[/]")
+            self.console.print(f"[red]{t('menu.range_info', min=0, max=len(results))}[/]")
 
     def _list_all_tools(self) -> None:
         """전체 도구 목록 표시 및 선택 (페이지네이션 적용)"""
@@ -528,7 +528,7 @@ class MainMenu:
 
             self.console.print()
             table = Table(
-                title=f"[bold]전체 도구[/bold] ({total_count}개) - 페이지 {current_page}/{total_pages}",
+                title=f"[bold]{t('menu.all_tools')}[/bold] ({t('menu.count_suffix', count=total_count)}) - {t('menu.page_info', current=current_page, total=total_pages)}",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -536,9 +536,9 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=4, justify="right")
-            table.add_column("카테고리", width=18)  # 14 → 18
-            table.add_column("도구", width=28)      # 22 → 28
-            table.add_column("설명", style="dim")
+            table.add_column(t("menu.header_category"), width=18)  # 14 → 18
+            table.add_column(t("menu.header_tools"), width=28)      # 22 → 28
+            table.add_column(t("menu.header_description"), style="dim")
 
             for idx, tool in enumerate(page_tools, start_idx + 1):
                 table.add_row(
@@ -554,12 +554,12 @@ class MainMenu:
             # 네비게이션 안내
             nav_parts = []
             if current_page > 1:
-                nav_parts.append("[dim]p[/dim] 이전")
+                nav_parts.append(f"[dim]p[/dim] {t('menu.previous')}")
             if current_page < total_pages:
-                nav_parts.append("[dim]n[/dim] 다음")
-            nav_parts.append("[dim]0[/dim] 돌아가기")
+                nav_parts.append(f"[dim]n[/dim] {t('menu.next')}")
+            nav_parts.append(f"[dim]0[/dim] {t('menu.go_back')}")
             self.console.print("  ".join(nav_parts))
-            self.console.print("[dim]번호 입력: 도구 선택 | 키워드 입력: 검색[/dim]")
+            self.console.print(f"[dim]{t('menu.select_tool_prompt')}[/dim]")
 
             # 입력 처리
             choice = self.console.input("> ").strip()
@@ -578,14 +578,14 @@ class MainMenu:
                 if current_page < total_pages:
                     current_page += 1
                 else:
-                    self.console.print("[dim]마지막 페이지입니다.[/dim]")
+                    self.console.print(f"[dim]{t('menu.last_page')}[/dim]")
                 continue
 
             if choice_lower == "p":
                 if current_page > 1:
                     current_page -= 1
                 else:
-                    self.console.print("[dim]첫 번째 페이지입니다.[/dim]")
+                    self.console.print(f"[dim]{t('menu.first_page')}[/dim]")
                 continue
 
             # 숫자 입력: 도구 선택
@@ -597,7 +597,7 @@ class MainMenu:
                     self._run_tool_directly(selected["category"], module)
                     return
                 else:
-                    self.console.print(f"[red]1-{total_count} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=total_count)}[/]")
                 continue
 
             # 키워드 검색
@@ -646,14 +646,14 @@ class MainMenu:
 
         if not results:
             self.console.print()
-            self.console.print(f"[yellow]'{query}' 검색 결과 없음[/]")
+            self.console.print(f"[yellow]{t('menu.no_results', query=query)}[/]")
             wait_for_any_key()
             return
 
         # 검색 결과 표시
         self.console.print()
         table = Table(
-            title=f"[bold]검색: {display_title}[/bold] ({len(results)}건)",
+            title=f"[bold]{t('common.search')}: {display_title}[/bold] ({t('menu.search_results_count', count=len(results))})",
             show_header=True,
             header_style="dim",
             box=None,
@@ -661,9 +661,9 @@ class MainMenu:
             title_justify="left",
         )
         table.add_column("#", style="dim", width=4, justify="right")
-        table.add_column("카테고리", width=18)  # 14 → 18
-        table.add_column("도구", width=28)      # 22 → 28
-        table.add_column("설명", style="dim")
+        table.add_column(t("menu.header_category"), width=18)  # 14 → 18
+        table.add_column(t("menu.header_tools"), width=28)      # 22 → 28
+        table.add_column(t("menu.header_description"), style="dim")
 
         for orig_idx, tool in results:
             table.add_row(
@@ -675,7 +675,7 @@ class MainMenu:
 
         self.console.print(table)
         self.console.print()
-        self.console.print("[dim]번호 입력: 도구 선택 | Enter: 목록으로 돌아가기[/dim]")
+        self.console.print(f"[dim]{t('menu.select_tool_or_return')}[/dim]")
 
         # 선택
         choice = self.console.input("> ").strip()
@@ -694,49 +694,50 @@ class MainMenu:
     def _show_help(self) -> None:
         """도움말 표시"""
         self.console.print()
-        self.console.print("[bold cyan]═══ AWS Automation CLI 도움말 ═══[/bold cyan]")
+        self.console.print(f"[bold cyan]=== {t('menu.help_title')} ===[/bold cyan]")
         self.console.print()
 
         # 메뉴 탐색
-        self.console.print("[bold yellow]도구 탐색[/bold yellow]")
-        self.console.print("  [cyan]a[/cyan]  전체 도구      모든 도구를 한 화면에 표시")
-        self.console.print("  [cyan]s[/cyan]  AWS 서비스     서비스별 목록 (EC2, ELB, VPC...)")
-        self.console.print("  [cyan]c[/cyan]  AWS 분류       카테고리별 탐색 (Compute, Storage...)")
-        self.console.print("  [cyan]t[/cyan]  점검 유형      TA 영역별 (보안, 비용, 성능...)")
-        self.console.print("  [cyan]f[/cyan]  즐겨찾기       자주 사용하는 도구 추가/제거")
+        self.console.print(f"[bold yellow]{t('menu.tool_navigation')}[/bold yellow]")
+        self.console.print(f"  [cyan]a[/cyan]  {t('menu.all_tools'):14} {t('menu.help_all_tools_desc')}")
+        self.console.print(f"  [cyan]s[/cyan]  {t('menu.aws_services'):14} {t('menu.help_services_desc')}")
+        self.console.print(f"  [cyan]c[/cyan]  {t('menu.aws_category'):14} {t('menu.help_categories_desc')}")
+        self.console.print(f"  [cyan]t[/cyan]  {t('menu.check_types'):14} {t('menu.help_check_types_desc')}")
+        self.console.print(f"  [cyan]f[/cyan]  {t('menu.favorites'):14} {t('menu.help_favorites_desc')}")
         self.console.print()
-        self.console.print("[bold yellow]설정[/bold yellow]")
-        self.console.print("  [cyan]g[/cyan]  프로필그룹     프로필 그룹 관리")
-        self.console.print("  [cyan]p[/cyan]  프로필         AWS 프로필 전환 (SSO/Access Key)")
-        self.console.print("  [cyan]h[/cyan]  도움말         이 화면 표시")
-        self.console.print("  [cyan]q[/cyan]  종료           프로그램 종료")
-        self.console.print("  [cyan]1-5[/cyan]               즐겨찾기 바로 실행")
+        self.console.print(f"[bold yellow]{t('menu.settings')}[/bold yellow]")
+        self.console.print(f"  [cyan]g[/cyan]  {t('menu.profile_groups'):14} {t('menu.help_groups_desc')}")
+        self.console.print(f"  [cyan]p[/cyan]  {t('menu.profiles'):14} {t('menu.help_profiles_desc')}")
+        self.console.print(f"  [cyan]h[/cyan]  {t('common.help'):14} {t('menu.help_help_desc')}")
+        self.console.print(f"  [cyan]q[/cyan]  {t('common.exit'):14} {t('menu.help_quit_desc')}")
+        self.console.print(f"  [cyan]1-5[/cyan]               {t('menu.help_favorites_quick_desc')}")
         self.console.print()
 
         # 검색
-        self.console.print("[bold yellow]검색[/bold yellow]")
-        self.console.print("  [white]rds, ec2, iam ...[/white]     AWS 서비스명")
-        self.console.print("  [white]미사용, 보안, 비용[/white]    한글 키워드")
-        self.console.print("  [white]snapshot, backup[/white]      영문 키워드")
+        self.console.print(f"[bold yellow]{t('common.search')}[/bold yellow]")
+        self.console.print(f"  [white]rds, ec2, iam ...[/white]     {t('menu.help_search_services')}")
+        self.console.print(f"  [white]snapshot, backup[/white]      {t('menu.help_search_keyword_en')}")
         self.console.print()
 
         # /command 필터 (AREA_REGISTRY에서 생성)
-        self.console.print("[bold yellow]도메인 필터[/bold yellow]")
+        self.console.print(f"[bold yellow]{t('menu.help_domain_filter')}[/bold yellow]")
         for area in AREA_REGISTRY:
             cmd = area["command"].ljust(12)
-            self.console.print(f"  [green]{cmd}[/green] {area['label']}, {area['desc']}")
+            label = area.get("label_en", area["label"]) if self.lang == "en" else area["label"]
+            desc = area.get("desc_en", area["desc"]) if self.lang == "en" else area["desc"]
+            self.console.print(f"  [green]{cmd}[/green] {label}, {desc}")
         self.console.print()
 
         # CLI 직접 실행
-        self.console.print("[bold yellow]CLI 직접 실행[/bold yellow]")
-        self.console.print("  [dim]$[/dim] aa                   대화형 메뉴")
-        self.console.print("  [dim]$[/dim] aa rds                RDS 도구 목록")
-        self.console.print("  [dim]$[/dim] aa ec2 --help         EC2 도움말")
+        self.console.print(f"[bold yellow]{t('menu.help_cli_direct')}[/bold yellow]")
+        self.console.print(f"  [dim]$[/dim] aa                   {t('menu.help_cli_interactive')}")
+        self.console.print(f"  [dim]$[/dim] aa rds                {t('menu.help_cli_tool_list')}")
+        self.console.print(f"  [dim]$[/dim] aa ec2 --help         {t('menu.help_cli_service_help')}")
         self.console.print()
 
         # 출력
-        self.console.print("[bold yellow]출력 경로[/bold yellow]")
-        self.console.print("  결과 파일: [dim]~/aa-output/<account>/<date>/[/dim]")
+        self.console.print(f"[bold yellow]{t('menu.help_output_path')}[/bold yellow]")
+        self.console.print(f"  {t('menu.help_output_location')}: [dim]~/aa-output/<account>/<date>/[/dim]")
         self.console.print()
 
         wait_for_any_key()
@@ -745,7 +746,7 @@ class MainMenu:
         """즐겨찾기 관리"""
         while True:
             self.console.print()
-            self.console.print("[bold]즐겨찾기 관리[/bold]")
+            self.console.print(f"[bold]{t('menu.favorites_management')}[/bold]")
             self.console.print()
 
             assert self._favorites is not None
@@ -756,18 +757,18 @@ class MainMenu:
                     self.console.print(f"  {i:>2}. {item.tool_name} [dim]{item.category}[/dim]")
                 self.console.print()
             else:
-                self.console.print("[dim]등록된 즐겨찾기가 없습니다.[/dim]")
+                self.console.print(f"[dim]{t('menu.no_favorites_registered')}[/dim]")
                 self.console.print()
 
             # 메뉴 옵션
             self.console.print(
-                "[dim]a[/dim] 추가"
-                + ("  [dim]d[/dim] 삭제  [dim]u[/dim] 위로  [dim]n[/dim] 아래로" if fav_items else "")
-                + "  [dim]0[/dim] 돌아가기"
+                f"[dim]a[/dim] {t('menu.add')}"
+                + (f"  [dim]d[/dim] {t('menu.delete')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}" if fav_items else "")
+                + f"  [dim]0[/dim] {t('menu.go_back')}"
             )
             self.console.print()
 
-            choice = self.console.input("[bold]선택:[/bold] ").strip().lower()
+            choice = self.console.input(f"[bold]{t('common.enter_selection')}:[/bold] ").strip().lower()
 
             if choice == "0" or choice == "":
                 return
@@ -784,22 +785,22 @@ class MainMenu:
     def _add_favorite_interactive(self) -> None:
         """즐겨찾기 추가"""
         self.console.print()
-        self.console.print("[bold]즐겨찾기 추가[/bold]")
-        self.console.print("[dim]도구명 또는 키워드 입력 (취소: Enter)[/dim]")
+        self.console.print(f"[bold]{t('menu.add_favorite')}[/bold]")
+        self.console.print(f"[dim]{t('menu.tool_name_or_keyword')}[/dim]")
 
-        query = self.console.input("검색: ").strip()
+        query = self.console.input(f"{t('common.search')}: ").strip()
 
         if not query:
             return
 
         if not self._search_engine:
-            self.console.print("[dim]검색 엔진 초기화 실패[/dim]")
+            self.console.print(f"[dim]{t('menu.search_init_failed')}[/dim]")
             return
 
         results = self._search_engine.search(query, limit=10)
 
         if not results:
-            self.console.print(f"[dim]'{query}' 결과 없음[/dim]")
+            self.console.print(f"[dim]{t('menu.no_results', query=query)}[/dim]")
             return
 
         # 검색 결과 표시
@@ -811,9 +812,9 @@ class MainMenu:
             self.console.print(f"  {i:>2}. [{r.category}] {r.tool_name}{fav_marker}")
 
         self.console.print()
-        self.console.print("[dim]0: 돌아가기[/dim]")
+        self.console.print(f"[dim]{t('menu.return_zero')}[/dim]")
 
-        choice = self.console.input("번호: ").strip()
+        choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
         if choice == "0" or not choice:
             return
@@ -823,20 +824,20 @@ class MainMenu:
             if 1 <= idx <= len(results):
                 selected = results[idx - 1]
                 if self._favorites.is_favorite(selected.category, selected.tool_module):
-                    self.console.print(f"[dim]'{selected.tool_name}' 이미 등록됨[/dim]")
+                    self.console.print(f"[dim]{t('menu.already_registered', name=selected.tool_name)}[/dim]")
                 else:
                     success = self._favorites.add(selected.category, selected.tool_name, selected.tool_module)
                     if success:
-                        self.console.print(f"[dim]'{selected.tool_name}' 추가됨[/dim]")
+                        self.console.print(f"[dim]{t('menu.added', name=selected.tool_name)}[/dim]")
                     else:
-                        self.console.print("[dim]추가 실패 (최대 20개)[/dim]")
+                        self.console.print(f"[dim]{t('menu.add_failed_max')}[/dim]")
 
     def _remove_favorite_interactive(self, fav_items: list) -> None:
         """즐겨찾기 삭제"""
         self.console.print()
-        self.console.print("[bold]삭제할 번호[/bold] [dim](취소: Enter)[/dim]")
+        self.console.print(f"[bold]{t('menu.delete_number_prompt')}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
 
-        choice = self.console.input("번호: ").strip()
+        choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
         if not choice:
             return
@@ -847,17 +848,17 @@ class MainMenu:
                 item = fav_items[idx - 1]
                 assert self._favorites is not None
                 self._favorites.remove(item.category, item.tool_module)
-                self.console.print(f"[dim]'{item.tool_name}' 삭제됨[/dim]")
+                self.console.print(f"[dim]{t('menu.deleted', name=item.tool_name)}[/dim]")
             else:
-                self.console.print(f"[dim]1-{len(fav_items)} 범위[/dim]")
+                self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(fav_items))}[/dim]")
 
     def _reorder_favorite_interactive(self, fav_items: list, direction: str) -> None:
         """즐겨찾기 순서 변경"""
         self.console.print()
-        label = "위로" if direction == "up" else "아래로"
-        self.console.print(f"[bold]{label} 이동할 번호[/bold] [dim](취소: Enter)[/dim]")
+        label = t('menu.move_up') if direction == "up" else t('menu.move_down')
+        self.console.print(f"[bold]{t('menu.move_number_prompt', direction=label)}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
 
-        choice = self.console.input("번호: ").strip()
+        choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
         if not choice:
             return
@@ -873,17 +874,17 @@ class MainMenu:
                     success = self._favorites.move_down(item.category, item.tool_module)
 
                 if success:
-                    self.console.print(f"[dim]'{item.tool_name}' 이동됨[/dim]")
+                    self.console.print(f"[dim]{t('menu.moved', name=item.tool_name)}[/dim]")
                 else:
-                    pos = "최상위" if direction == "up" else "최하위"
-                    self.console.print(f"[dim]이미 {pos}[/dim]")
+                    pos = t('menu.already_at_top') if direction == "up" else t('menu.already_at_bottom')
+                    self.console.print(f"[dim]{pos}[/dim]")
             else:
-                self.console.print(f"[dim]1-{len(fav_items)} 범위[/dim]")
+                self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(fav_items))}[/dim]")
 
     def _show_profiles(self) -> None:
         """사용 가능한 AWS 프로필 목록 표시"""
         self.console.print()
-        self.console.print("[bold cyan]═══ AWS 인증 프로필 ═══[/bold cyan]")
+        self.console.print(f"[bold cyan]=== {t('menu.aws_auth_profiles')} ===[/bold cyan]")
         self.console.print()
 
         try:
@@ -900,7 +901,7 @@ class MainMenu:
             # SSO 세션 목록
             sso_sessions = list_sso_sessions()
             if sso_sessions:
-                self.console.print("[bold]SSO 세션[/bold] [dim](멀티 계정)[/dim]")
+                self.console.print(f"[bold]{t('menu.sso_session_multi')}[/bold] [dim]({t('menu.sso_session_desc')})[/dim]")
                 for session in sso_sessions:
                     session_config = config.sessions.get(session)
                     if session_config:
@@ -932,7 +933,7 @@ class MainMenu:
 
                 # SSO 프로파일
                 if sso_profiles:
-                    self.console.print("[bold]SSO 프로파일[/bold] [dim](고정 계정/역할)[/dim]")
+                    self.console.print(f"[bold]{t('menu.sso_profile_single')}[/bold] [dim]({t('menu.sso_profile_desc')})[/dim]")
                     for name, cfg in sso_profiles:
                         if cfg and cfg.sso_account_id:
                             self.console.print(f"  [green]●[/green] {name} [dim]({cfg.sso_account_id})[/dim]")
@@ -942,7 +943,7 @@ class MainMenu:
 
                 # Static 프로파일
                 if static_profiles:
-                    self.console.print("[bold]IAM Access Key[/bold] [dim](정적 자격 증명)[/dim]")
+                    self.console.print(f"[bold]{t('menu.iam_access_key')}[/bold] [dim]({t('menu.static_credentials_desc')})[/dim]")
                     for name, cfg in static_profiles:
                         region_info = f" ({cfg.region})" if cfg and cfg.region else ""
                         self.console.print(f"  [yellow]●[/yellow] {name}{region_info}")
@@ -950,18 +951,18 @@ class MainMenu:
 
                 # 기타 (지원하지 않는 타입)
                 if other_profiles:
-                    self.console.print("[bold dim]기타[/bold dim] [dim](미지원)[/dim]")
+                    self.console.print(f"[bold dim]{t('menu.other_unsupported')}[/bold dim] [dim]({t('menu.unsupported')})[/dim]")
                     for name, _ in other_profiles:
                         self.console.print(f"  [dim]○[/dim] {name}")
                     self.console.print()
 
             if not sso_sessions and not profiles:
-                self.console.print("[dim]설정된 프로필이 없습니다.[/dim]")
+                self.console.print(f"[dim]{t('menu.no_profiles_configured')}[/dim]")
                 self.console.print()
-                self.console.print("[dim]~/.aws/config 또는 ~/.aws/credentials를 확인하세요.[/dim]")
+                self.console.print(f"[dim]{t('menu.check_aws_config')}[/dim]")
 
         except Exception as e:
-            self.console.print(f"[red]프로필 로드 실패: {e}[/red]")
+            self.console.print(f"[red]{t('menu.profile_load_failed', error=str(e))}[/red]")
 
         self.console.print()
         wait_for_any_key()
@@ -969,13 +970,13 @@ class MainMenu:
     def _show_settings(self) -> None:
         """설정 표시"""
         self.console.print()
-        self.console.print("[bold]설정[/bold]")
-        self.console.print("[dim]준비 중[/dim]")
+        self.console.print(f"[bold]{t('menu.settings')}[/bold]")
+        self.console.print(f"[dim]{t('menu.preparing')}[/dim]")
 
         from core.tools.cache import get_cache_dir
 
         cache_dir = get_cache_dir("history")
-        self.console.print(f"[dim]이력: {cache_dir}[/dim]")
+        self.console.print(f"[dim]{t('menu.history_location', path=cache_dir)}[/dim]")
 
     def _show_trusted_advisor_view(self) -> None:
         """Trusted Advisor 영역별 탐색 뷰"""
@@ -1006,7 +1007,7 @@ class MainMenu:
         while True:
             self.console.print()
             table = Table(
-                title="[bold]Trusted Advisor 영역[/bold]",
+                title=f"[bold]{t('menu.check_types')}[/bold]",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -1014,22 +1015,24 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("영역", width=14)      # 12 → 14
-            table.add_column("설명", width=30)      # 25 → 30
-            table.add_column("도구", width=6, justify="right")
+            table.add_column(t("menu.header_area"), width=14)      # 12 → 14
+            table.add_column(t("menu.header_description"), width=30)      # 25 → 30
+            table.add_column(t("menu.header_tools"), width=6, justify="right")
 
             for i, area in enumerate(AREA_REGISTRY, 1):
                 tool_count = area_tool_counts.get(area["key"], 0)
+                label = area.get("label_en", area["label"]) if self.lang == "en" else area["label"]
+                desc = area.get("desc_en", area["desc"]) if self.lang == "en" else area["desc"]
                 table.add_row(
                     str(i),
-                    f"[{area['color']}]{area['label']}[/{area['color']}]",
-                    area["desc"],
+                    f"[{area['color']}]{label}[/{area['color']}]",
+                    desc,
                     str(tool_count),
                 )
 
             self.console.print(table)
             self.console.print()
-            self.console.print("[dim]0: 돌아가기[/dim]")
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
 
             choice = self.console.input("> ").strip()
 
@@ -1045,24 +1048,25 @@ class MainMenu:
                     selected_area = AREA_REGISTRY[idx - 1]
                     self._show_tools_in_area(selected_area, all_tools)
                 else:
-                    self.console.print(f"[red]1-{len(AREA_REGISTRY)} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(AREA_REGISTRY))}[/]")
 
     def _show_tools_in_area(self, area: "AreaInfo", all_tools: list) -> None:
         """영역 내 도구 목록 표시 및 선택"""
         from rich.table import Table
 
         area_key = area["key"]
-        tools = [t for t in all_tools if t.get("area") == area_key]
+        tools = [tl for tl in all_tools if tl.get("area") == area_key]
+        area_label = area.get("label_en", area["label"]) if self.lang == "en" else area["label"]
 
         if not tools:
-            self.console.print(f"[yellow]{area['label']} 영역에 도구가 없습니다.[/]")
+            self.console.print(f"[yellow]{t('menu.no_tools_in_area', area=area_label)}[/]")
             wait_for_any_key()
             return
 
         while True:
             self.console.print()
             table = Table(
-                title=f"[bold][{area['color']}]{area['label']}[/{area['color']}][/bold] ({len(tools)}개)",
+                title=f"[bold][{area['color']}]{area_label}[/{area['color']}][/bold] ({t('menu.count_suffix', count=len(tools))})",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -1070,10 +1074,10 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("서비스", width=14)    # 12 → 14
-            table.add_column("도구", width=28)      # 25 → 28
-            table.add_column("권한", width=6)
-            table.add_column("설명", style="dim")
+            table.add_column(t("menu.header_service"), width=14)    # 12 → 14
+            table.add_column(t("menu.header_tools"), width=28)      # 25 → 28
+            table.add_column(t("menu.header_permission"), width=6)
+            table.add_column(t("menu.header_description"), style="dim")
 
             for i, tool in enumerate(tools, 1):
                 perm = tool.get("permission", "read")
@@ -1088,7 +1092,7 @@ class MainMenu:
 
             self.console.print(table)
             self.console.print()
-            self.console.print("[dim]0: 돌아가기[/dim]")
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
 
             choice = self.console.input("> ").strip()
 
@@ -1105,7 +1109,7 @@ class MainMenu:
                     self._run_tool_directly(selected_tool["category"], selected_tool["tool_module"])
                     return
                 else:
-                    self.console.print(f"[red]1-{len(tools)} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
 
     def _show_aws_category_view(self) -> None:
         """AWS 카테고리별 탐색 뷰"""
@@ -1117,14 +1121,14 @@ class MainMenu:
 
         if not aws_categories:
             self.console.print()
-            self.console.print("[yellow]AWS 카테고리에 매핑된 플러그인이 없습니다.[/]")
+            self.console.print(f"[yellow]{t('menu.no_plugins_in_category')}[/]")
             wait_for_any_key()
             return
 
         while True:
             self.console.print()
             table = Table(
-                title="[bold]AWS 카테고리[/bold]",
+                title=f"[bold]{t('menu.aws_category')}[/bold]",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -1132,9 +1136,9 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("카테고리", width=38)  # 30 → 38
-            table.add_column("서비스", width=6, justify="right")
-            table.add_column("도구", width=6, justify="right")
+            table.add_column(t("menu.header_category"), width=38)  # 30 → 38
+            table.add_column(t("menu.header_service"), width=6, justify="right")
+            table.add_column(t("menu.header_tools"), width=6, justify="right")
 
             for i, cat in enumerate(aws_categories, 1):
                 table.add_row(
@@ -1146,7 +1150,7 @@ class MainMenu:
 
             self.console.print(table)
             self.console.print()
-            self.console.print("[dim]0: 돌아가기[/dim]")
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
 
             choice = self.console.input("> ").strip()
 
@@ -1162,7 +1166,7 @@ class MainMenu:
                     selected_cat = aws_categories[idx - 1]
                     self._show_services_in_category(selected_cat)
                 else:
-                    self.console.print(f"[red]1-{len(aws_categories)} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(aws_categories))}[/]")
 
     def _show_services_in_category(self, aws_category: dict) -> None:
         """AWS 카테고리 내 서비스(플러그인) 목록 표시"""
@@ -1171,7 +1175,7 @@ class MainMenu:
         plugins = aws_category.get("plugins", [])
 
         if not plugins:
-            self.console.print("[yellow]이 카테고리에 서비스가 없습니다.[/]")
+            self.console.print(f"[yellow]{t('menu.no_services_in_category')}[/]")
             wait_for_any_key()
             return
 
@@ -1186,9 +1190,9 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("서비스", width=26)    # 20 → 26
-            table.add_column("도구", width=6, justify="right")
-            table.add_column("설명", style="dim")
+            table.add_column(t("menu.header_service"), width=26)    # 20 → 26
+            table.add_column(t("menu.header_tools"), width=6, justify="right")
+            table.add_column(t("menu.header_description"), style="dim")
 
             for i, plugin in enumerate(plugins, 1):
                 display_name = plugin.get("display_name", plugin.get("name", ""))
@@ -1198,7 +1202,7 @@ class MainMenu:
 
             self.console.print(table)
             self.console.print()
-            self.console.print("[dim]0: 돌아가기[/dim]")
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
 
             choice = self.console.input("> ").strip()
 
@@ -1214,7 +1218,7 @@ class MainMenu:
                     selected_plugin = plugins[idx - 1]
                     self._show_tools_in_service(selected_plugin)
                 else:
-                    self.console.print(f"[red]1-{len(plugins)} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(plugins))}[/]")
 
     def _show_tools_in_service(self, plugin: dict) -> None:
         """서비스 내 도구 목록 표시 및 선택"""
@@ -1226,7 +1230,7 @@ class MainMenu:
         category_name = plugin.get("name", "")
 
         if not tools:
-            self.console.print("[yellow]이 서비스에 도구가 없습니다.[/]")
+            self.console.print(f"[yellow]{t('menu.no_tools_in_service')}[/]")
             wait_for_any_key()
             return
 
@@ -1234,7 +1238,7 @@ class MainMenu:
             self.console.print()
             display_name = plugin.get("display_name", category_name).upper()
             table = Table(
-                title=f"[bold]{display_name}[/bold] ({len(tools)}개)",
+                title=f"[bold]{display_name}[/bold] ({t('menu.count_suffix', count=len(tools))})",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -1242,10 +1246,10 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("도구", width=30)      # 25 → 30
-            table.add_column("권한", width=6)
-            table.add_column("영역", width=10)
-            table.add_column("설명", style="dim")
+            table.add_column(t("menu.header_tools"), width=30)      # 25 → 30
+            table.add_column(t("menu.header_permission"), width=6)
+            table.add_column(t("menu.header_area"), width=10)
+            table.add_column(t("menu.header_description"), style="dim")
 
             for i, tool in enumerate(tools, 1):
                 perm = tool.get("permission", "read")
@@ -1263,7 +1267,7 @@ class MainMenu:
 
             self.console.print(table)
             self.console.print()
-            self.console.print("[dim]0: 돌아가기[/dim]")
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
 
             choice = self.console.input("> ").strip()
 
@@ -1281,7 +1285,7 @@ class MainMenu:
                     self._run_tool_directly(category_name, tool_module)
                     return
                 else:
-                    self.console.print(f"[red]1-{len(tools)} 범위의 번호를 입력하세요.[/]")
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
 
     def _get_profiles_by_kind(self, kind: str) -> list:
         """인증 타입별 프로파일 목록 조회
@@ -1325,7 +1329,7 @@ class MainMenu:
 
         while True:
             self.console.print()
-            self.console.print("[bold]프로파일 그룹 관리[/bold]")
+            self.console.print(f"[bold]{t('menu.profile_groups_management')}[/bold]")
             self.console.print()
 
             groups = manager.get_all()
@@ -1336,22 +1340,22 @@ class MainMenu:
                     kind_label = kind_labels.get(g.kind, g.kind)
                     profiles_preview = ", ".join(g.profiles[:2])
                     if len(g.profiles) > 2:
-                        profiles_preview += f" 외 {len(g.profiles) - 2}개"
+                        profiles_preview += f" {t('cli.and_n_more', count=len(g.profiles) - 2)}"
                     self.console.print(f"  {i:>2}. [{kind_label}] {g.name} [dim]({profiles_preview})[/dim]")
                 self.console.print()
             else:
-                self.console.print("[dim]저장된 그룹이 없습니다.[/dim]")
+                self.console.print(f"[dim]{t('menu.no_groups_saved')}[/dim]")
                 self.console.print()
 
             # 메뉴 옵션
             self.console.print(
-                "[dim]a[/dim] 추가"
-                + ("  [dim]d[/dim] 삭제  [dim]e[/dim] 수정  [dim]u[/dim] 위로  [dim]n[/dim] 아래로" if groups else "")
-                + "  [dim]0[/dim] 돌아가기"
+                f"[dim]a[/dim] {t('menu.add')}"
+                + (f"  [dim]d[/dim] {t('menu.delete')}  [dim]e[/dim] {t('menu.edit')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}" if groups else "")
+                + f"  [dim]0[/dim] {t('menu.go_back')}"
             )
             self.console.print()
 
-            choice = self.console.input("[bold]선택:[/bold] ").strip().lower()
+            choice = self.console.input(f"[bold]{t('common.enter_selection')}:[/bold] ").strip().lower()
 
             if choice == "0" or choice == "":
                 return
@@ -1370,68 +1374,68 @@ class MainMenu:
     def _add_profile_group_interactive(self, manager) -> None:
         """프로파일 그룹 추가"""
         self.console.print()
-        self.console.print("[bold]프로파일 그룹 추가[/bold]")
+        self.console.print(f"[bold]{t('cli.create_group_title')}[/bold]")
         self.console.print()
 
         # 1. 인증 타입 선택
-        self.console.print("그룹에 포함할 인증 타입을 선택하세요:")
-        self.console.print("  [cyan]1)[/cyan] SSO 프로파일")
-        self.console.print("  [cyan]2)[/cyan] IAM Access Key")
-        self.console.print("  [dim]0) 취소[/dim]")
+        self.console.print(f"{t('cli.select_auth_type')}")
+        self.console.print(f"  [cyan]1)[/cyan] {t('cli.sso_profile')}")
+        self.console.print(f"  [cyan]2)[/cyan] {t('cli.iam_access_key')}")
+        self.console.print(f"  [dim]0) {t('menu.cancel')}[/dim]")
         self.console.print()
 
-        choice = self.console.input("선택: ").strip()
+        choice = self.console.input(f"{t('cli.select_prompt')}: ").strip()
         if choice == "0" or not choice:
             return
         if choice not in ("1", "2"):
-            self.console.print("[red]1 또는 2를 입력하세요.[/red]")
+            self.console.print(f"[red]{t('menu.range_info', min=1, max=2)}[/red]")
             return
 
         kind = "sso_profile" if choice == "1" else "static"
 
         # 2. 해당 타입의 프로파일 목록 가져오기
         available = self._get_profiles_by_kind(kind)
-        type_label = "SSO 프로파일" if kind == "sso_profile" else "IAM Access Key"
+        type_label = t("cli.sso_profile") if kind == "sso_profile" else t("cli.iam_access_key")
 
         if not available:
-            self.console.print(f"\n[red]사용 가능한 {type_label}이 없습니다.[/red]")
+            self.console.print(f"\n[red]{t('cli.no_profiles_available', type=type_label)}[/red]")
             return
 
         # 3. 프로파일 선택 (멀티)
         self.console.print()
-        self.console.print(f"[bold]{type_label} 선택[/bold] (2개 이상 선택)")
+        self.console.print(f"[bold]{t('cli.select_profiles_title', type=type_label)}[/bold] {t('cli.select_2_or_more')}")
         self.console.print()
         for i, p in enumerate(available, 1):
             self.console.print(f"  [cyan]{i:2})[/cyan] {p}")
         self.console.print()
-        self.console.print("[dim]예: 1 2 3 또는 1,2,3 또는 1-3[/dim]")
-        self.console.print("[dim]0) 취소[/dim]")
+        self.console.print(f"[dim]{t('cli.selection_hint')}[/dim]")
+        self.console.print(f"[dim]0) {t('menu.cancel')}[/dim]")
 
-        selection = self.console.input("선택: ").strip()
+        selection = self.console.input(f"{t('cli.select_prompt')}: ").strip()
         if selection == "0" or not selection:
             return
 
         selected = self._parse_multi_selection(selection, len(available))
         if len(selected) < 2:
-            self.console.print("[red]그룹은 2개 이상 프로파일이 필요합니다. (1개면 단일 선택 사용)[/red]")
+            self.console.print(f"[red]{t('cli.min_2_profiles')}[/red]")
             return
 
         selected_profiles = [available[i] for i in selected]
 
         # 4. 그룹 이름 입력
         self.console.print()
-        self.console.print(f"선택된 프로파일: {', '.join(selected_profiles)}")
+        self.console.print(f"{t('cli.selected_profiles')} {', '.join(selected_profiles)}")
         self.console.print()
-        name = self.console.input("그룹 이름 (취소: Enter): ").strip()
+        name = self.console.input(f"{t('cli.group_name_prompt')} ({t('menu.cancel')}: Enter): ").strip()
 
         if not name:
             return
 
         # 5. 저장
         if manager.add(name, kind, selected_profiles):
-            self.console.print(f"[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]")
+            self.console.print(f"[green]* {t('cli.group_saved', name=name, count=len(selected_profiles))}[/green]")
         else:
-            self.console.print("[red]저장 실패 (이름 중복 또는 최대 개수 초과)[/red]")
+            self.console.print(f"[red]{t('cli.group_save_failed')}[/red]")
 
     def _parse_multi_selection(self, selection: str, max_count: int) -> list:
         """선택 문자열 파싱 (1 2 3, 1,2,3, 1-3 지원)"""
@@ -1463,9 +1467,9 @@ class MainMenu:
     def _remove_profile_group_interactive(self, manager, groups) -> None:
         """프로파일 그룹 삭제"""
         self.console.print()
-        self.console.print("[bold]삭제할 번호[/bold] [dim](취소: Enter)[/dim]")
+        self.console.print(f"[bold]{t('menu.delete_number_prompt')}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
 
-        choice = self.console.input("번호: ").strip()
+        choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
         if not choice:
             return
@@ -1475,16 +1479,16 @@ class MainMenu:
             if 1 <= idx <= len(groups):
                 group = groups[idx - 1]
                 manager.remove(group.name)
-                self.console.print(f"[dim]'{group.name}' 삭제됨[/dim]")
+                self.console.print(f"[dim]{t('menu.deleted', name=group.name)}[/dim]")
             else:
-                self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
+                self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(groups))}[/dim]")
 
     def _edit_profile_group_interactive(self, manager, groups) -> None:
         """프로파일 그룹 수정"""
         self.console.print()
-        self.console.print("[bold]수정할 번호[/bold] [dim](취소: Enter)[/dim]")
+        self.console.print(f"[bold]{t('menu.edit_number_prompt')}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
 
-        choice = self.console.input("번호: ").strip()
+        choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
         if not choice:
             return
@@ -1494,33 +1498,33 @@ class MainMenu:
 
         idx = int(choice)
         if not 1 <= idx <= len(groups):
-            self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
+            self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(groups))}[/dim]")
             return
 
         group = groups[idx - 1]
 
         self.console.print()
-        self.console.print(f"[bold]'{group.name}' 수정[/bold]")
+        self.console.print(f"[bold]{t('menu.edit_group', name=group.name)}[/bold]")
         self.console.print()
-        self.console.print("  1) 이름 변경")
-        self.console.print("  2) 프로파일 변경")
-        self.console.print("  [dim]0) 취소[/dim]")
+        self.console.print(f"  1) {t('menu.change_name')}")
+        self.console.print(f"  2) {t('menu.change_profiles')}")
+        self.console.print(f"  [dim]0) {t('menu.cancel')}[/dim]")
 
-        edit_choice = self.console.input("선택: ").strip()
+        edit_choice = self.console.input(f"{t('menu.selection_prompt')}: ").strip()
 
         if edit_choice == "1":
-            new_name = self.console.input("새 이름: ").strip()
+            new_name = self.console.input(f"{t('menu.new_name_prompt')}: ").strip()
             if new_name:
                 if manager.update(group.name, new_name=new_name):
-                    self.console.print(f"[dim]이름 변경됨: {new_name}[/dim]")
+                    self.console.print(f"[dim]{t('menu.name_changed', name=new_name)}[/dim]")
                 else:
-                    self.console.print("[red]변경 실패 (이름 중복)[/red]")
+                    self.console.print(f"[red]{t('menu.change_failed_duplicate')}[/red]")
 
         elif edit_choice == "2":
             available = self._get_profiles_by_kind(group.kind)
 
             if not available:
-                self.console.print("[red]사용 가능한 프로파일이 없습니다.[/red]")
+                self.console.print(f"[red]{t('menu.no_profiles_available')}[/red]")
                 return
 
             self.console.print()
@@ -1528,9 +1532,9 @@ class MainMenu:
                 marker = " *" if p in group.profiles else ""
                 self.console.print(f"  [cyan]{i:2})[/cyan] {p}{marker}")
             self.console.print()
-            self.console.print("[dim]예: 1 2 3 또는 1,2,3 또는 1-3[/dim]")
+            self.console.print(f"[dim]{t('menu.selection_hint')}[/dim]")
 
-            selection = self.console.input("새 프로파일 선택: ").strip()
+            selection = self.console.input(f"{t('menu.select_new_profiles')}: ").strip()
             if not selection:
                 return
 
@@ -1538,15 +1542,15 @@ class MainMenu:
             if selected:
                 new_profiles = [available[i] for i in selected]
                 if manager.update(group.name, profiles=new_profiles):
-                    self.console.print(f"[dim]프로파일 변경됨 ({len(new_profiles)}개)[/dim]")
+                    self.console.print(f"[dim]{t('menu.profiles_changed', count=len(new_profiles))}[/dim]")
 
     def _reorder_profile_group_interactive(self, manager, groups, direction: str) -> None:
         """프로파일 그룹 순서 변경"""
         self.console.print()
-        label = "위로" if direction == "up" else "아래로"
-        self.console.print(f"[bold]{label} 이동할 번호[/bold] [dim](취소: Enter)[/dim]")
+        label = t('menu.move_up') if direction == "up" else t('menu.move_down')
+        self.console.print(f"[bold]{t('menu.move_number_prompt', direction=label)}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
 
-        choice = self.console.input("번호: ").strip()
+        choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
         if not choice:
             return
@@ -1558,12 +1562,12 @@ class MainMenu:
                 success = manager.move_up(group.name) if direction == "up" else manager.move_down(group.name)
 
                 if success:
-                    self.console.print(f"[dim]'{group.name}' 이동됨[/dim]")
+                    self.console.print(f"[dim]{t('menu.moved', name=group.name)}[/dim]")
                 else:
-                    pos = "최상위" if direction == "up" else "최하위"
-                    self.console.print(f"[dim]이미 {pos}[/dim]")
+                    pos = t('menu.already_at_top') if direction == "up" else t('menu.already_at_bottom')
+                    self.console.print(f"[dim]{pos}[/dim]")
             else:
-                self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
+                self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(groups))}[/dim]")
 
 
 def show_main_menu(lang: str = "ko") -> None:

@@ -8,6 +8,8 @@ from pathlib import Path
 
 from rich.console import Console
 
+from cli.i18n import t
+
 
 def get_version() -> str:
     """버전 문자열 반환"""
@@ -62,7 +64,7 @@ def get_current_context() -> str:
                 return f"[white]{profile}[/]"
     except Exception:
         pass
-    return "[dim]프로필 미설정[/]"
+    return f"[dim]{t('common.profile_not_set')}[/]"
 
 
 def print_banner(console: Console, compact: bool = False) -> None:
@@ -74,7 +76,7 @@ def print_banner(console: Console, compact: bool = False) -> None:
     """
     version = get_version()
     context = get_current_context()
-    hint = "h: 도움말 | q: 종료"
+    hint = t("common.help_quit_hint")
 
     if compact:
         logo = COMPACT_LOGO.format(version=version, context=context, hint=hint)

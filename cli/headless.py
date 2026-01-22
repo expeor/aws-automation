@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from rich.console import Console
 
 from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
+from cli.i18n import t
 from core.filter import expand_region_pattern
 
 console = Console()
@@ -95,10 +96,10 @@ class HeadlessRunner:
 
         except KeyboardInterrupt:
             if not self.config.quiet:
-                console.print("\n[dim]취소됨[/dim]")
+                console.print(f"\n[dim]{t('flow.cancelled')}[/dim]")
             return 130
         except Exception as e:
-            console.print(f"[red]오류: {e}[/red]")
+            console.print(f"[red]{t('flow.error_label', message=str(e))}[/red]")
             if "--debug" in sys.argv:
                 import traceback
 
@@ -119,7 +120,7 @@ class HeadlessRunner:
                     if tool_meta.get("module") == self.config.tool_module:
                         return tool_meta
 
-        console.print(f"[red]도구를 찾을 수 없습니다: {self.config.category}/{self.config.tool_module}[/red]")
+        console.print(f"[red]{t('flow.tool_not_found', category=self.config.category, tool=self.config.tool_module)}[/red]")
         return None
 
     def _build_context(self, tool_meta: dict) -> ExecutionContext:
@@ -148,8 +149,8 @@ class HeadlessRunner:
 
         # SSO Session은 지원하지 않음
         if profile_name in config.sessions:
-            console.print(f"[red]SSO Session은 headless 모드에서 지원하지 않습니다: {profile_name}[/red]")
-            console.print("[dim]SSO Profile 또는 Access Key 프로파일을 사용하세요.[/dim]")
+            console.print(f"[red]{t('flow.sso_session_not_supported', profile=profile_name)}[/red]")
+            console.print(f"[dim]{t('flow.use_sso_or_access_key')}[/dim]")
             return False
 
         # Profile인지 확인
@@ -162,12 +163,12 @@ class HeadlessRunner:
             elif provider_type == ProviderType.STATIC_CREDENTIALS:
                 return self._setup_static()
             else:
-                console.print(f"[red]지원하지 않는 프로파일 유형: {provider_type}[/red]")
+                console.print(f"[red]{t('flow.unsupported_profile_type', type=str(provider_type))}[/red]")
                 return False
 
         # 찾을 수 없음
-        console.print(f"[red]프로파일을 찾을 수 없습니다: {profile_name}[/red]")
-        console.print("[dim]사용 가능한 프로파일:[/dim]")
+        console.print(f"[red]{t('flow.profile_not_found', profile=profile_name)}[/red]")
+        console.print(f"[dim]{t('flow.available_profiles')}[/dim]")
         for name in list(config.profiles.keys())[:5]:
             console.print(f"  [dim]- {name}[/dim]")
         return False
@@ -180,7 +181,7 @@ class HeadlessRunner:
         self._ctx.profile_name = self.config.profile
 
         if not self.config.quiet:
-            console.print(f"[dim]SSO 프로파일 사용: {self.config.profile}[/dim]")
+            console.print(f"[dim]{t('flow.using_sso_profile', profile=self.config.profile)}[/dim]")
 
         return True
 
@@ -192,7 +193,7 @@ class HeadlessRunner:
         self._ctx.profile_name = self.config.profile
 
         if not self.config.quiet:
-            console.print(f"[dim]Static 프로파일 사용: {self.config.profile}[/dim]")
+            console.print(f"[dim]{t('flow.using_static_profile', profile=self.config.profile)}[/dim]")
 
         return True
 
@@ -224,9 +225,9 @@ class HeadlessRunner:
 
         if not self.config.quiet:
             if len(unique_regions) == 1:
-                console.print(f"[dim]리전: {unique_regions[0]}[/dim]")
+                console.print(f"[dim]{t('flow.region_label')} {unique_regions[0]}[/dim]")
             else:
-                console.print(f"[dim]리전: {len(unique_regions)}개[/dim]")
+                console.print(f"[dim]{t('flow.region_label')} {t('flow.regions_count', count=len(unique_regions))}[/dim]")
 
         return True
 
@@ -239,7 +240,7 @@ class HeadlessRunner:
 
         tool = load_tool(self._ctx.category, self._ctx.tool.name)
         if tool is None:
-            console.print(f"[red]도구 로드 실패: {self._ctx.category}/{self._ctx.tool.name}[/red]")
+            console.print(f"[red]{t('flow.tool_load_failed', category=self._ctx.category, tool=self._ctx.tool.name)}[/red]")
             return 1
 
         if not self.config.quiet:
@@ -249,7 +250,7 @@ class HeadlessRunner:
         # 실행
         run_fn = tool.get("run")
         if not run_fn:
-            console.print("[red]도구에 run 함수가 없습니다[/red]")
+            console.print(f"[red]{t('flow.tool_no_run_function')}[/red]")
             return 1
 
         self._ctx.result = run_fn(self._ctx)
@@ -261,12 +262,12 @@ class HeadlessRunner:
         assert self._ctx is not None
         assert self._ctx.tool is not None
         console.print(f"[bold]{self._ctx.tool.name}[/bold]")
-        console.print(f"  프로파일: {self._ctx.profile_name}")
+        console.print(f"  {t('flow.profile_label')} {self._ctx.profile_name}")
 
         if len(self._ctx.regions) == 1:
-            console.print(f"  리전: {self._ctx.regions[0]}")
+            console.print(f"  {t('flow.region_label')} {self._ctx.regions[0]}")
         else:
-            console.print(f"  리전: {len(self._ctx.regions)}개")
+            console.print(f"  {t('flow.region_label')} {t('flow.regions_count', count=len(self._ctx.regions))}")
 
 
 def run_headless(
@@ -295,9 +296,8 @@ def run_headless(
     # tool_path 파싱
     parts = tool_path.split("/")
     if len(parts) != 2:
-        console.print(
-            f"[red]잘못된 도구 경로: {tool_path}[/red]\n[dim]형식: category/tool_module (예: ec2/ebs_audit)[/dim]"
-        )
+        console.print(f"[red]{t('flow.invalid_tool_path', path=tool_path)}[/red]")
+        console.print(f"[dim]{t('flow.tool_path_format_hint')}[/dim]")
         return 1
 
     category, tool_module = parts
