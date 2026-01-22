@@ -74,6 +74,7 @@ class RoleStep:
             missing_accounts=missing_accounts,
             role_account_map=role_account_map,
             total_accounts=len(ctx.accounts),
+            accounts=ctx.accounts,
         )
 
         # 스킵할 계정 결정
@@ -133,22 +134,11 @@ class RoleStep:
 
         print_box_start(f"Role 선택 ({len(sorted_roles)}개)")
 
-        # 2열 레이아웃
-        half = (len(sorted_roles) + 1) // 2
-        for i in range(half):
-            left_idx = i + 1
-            left_name, left_ids = sorted_roles[i]
-            left_pct = len(left_ids) / total_accounts * 100
-            left_str = f"{left_idx:>2}) {left_name[:18]:<18} {left_pct:>3.0f}%"
-
-            if i + half < len(sorted_roles):
-                right_idx = i + half + 1
-                right_name, right_ids = sorted_roles[i + half]
-                right_pct = len(right_ids) / total_accounts * 100
-                right_str = f"{right_idx:>2}) {right_name[:18]:<18} {right_pct:>3.0f}%"
-                print_box_line(f" {left_str}  {right_str}")
-            else:
-                print_box_line(f" {left_str}")
+        # 1열 레이아웃 (Role 이름 전체 표시)
+        for idx, (role_name, account_ids) in enumerate(sorted_roles, 1):
+            pct = len(account_ids) / total_accounts * 100
+            account_count = len(account_ids)
+            print_box_line(f"  {idx:>2}) {role_name:<40} {account_count:>3}개 ({pct:>3.0f}%)")
 
         print_box_end()
 
@@ -173,6 +163,7 @@ class RoleStep:
         missing_accounts: set[str],
         role_account_map: dict[str, list[str]],
         total_accounts: int,
+        accounts: list | None = None,
     ) -> tuple:
         """Fallback 처리
 
@@ -182,6 +173,12 @@ class RoleStep:
         missing_count = len(missing_accounts)
 
         console.print(f"[yellow]{primary_role} 미지원 계정: {missing_count}개[/yellow]")
+
+        # 미지원 계정 목록 표시
+        if accounts:
+            account_map = {acc.id: acc.name for acc in accounts}
+            missing_names = [account_map.get(acc_id, acc_id) for acc_id in sorted(missing_accounts)]
+            console.print(f"[dim]  → {', '.join(missing_names)}[/dim]")
 
         # Fallback 후보 찾기
         fallback_candidates = []
@@ -195,18 +192,20 @@ class RoleStep:
         fallback_candidates.sort(key=lambda x: x[1], reverse=True)
 
         if not fallback_candidates:
-            console.print("[dim]Fallback 없음 - 해당 계정 스킵[/dim]")
-            confirm = console.input(f"[dim]{missing_count}개 스킵? [y/N][/dim] > ").strip().lower()
+            console.print("[dim]Fallback 없음 - 해당 계정 스킵 필요[/dim]")
+            console.print(f"[dim]{missing_count}개 계정 제외하고 진행? (y: 진행 / n: 취소)[/dim]")
+            confirm = console.input("> ").strip().lower()
             if confirm != "y":
+                console.print("[yellow]종료[/yellow]")
                 raise KeyboardInterrupt("사용자 취소")
             return None, FallbackStrategy.SKIP_ACCOUNT
 
         best_fallback = fallback_candidates[0]
 
         print_box_start("Fallback 설정")
-        print_box_line(f" 1) {best_fallback[0]} (권장, {best_fallback[1]}개 커버)")
-        print_box_line(" 2) 다른 Role 선택")
-        print_box_line(f" 3) {missing_count}개 계정 스킵")
+        print_box_line(f"  1) {best_fallback[0]:<40} (권장, {best_fallback[1]}개 커버)")
+        print_box_line(f"  2) 다른 Role 선택")
+        print_box_line(f"  3) {missing_count}개 계정 스킵")
         print_box_end()
 
         while True:
@@ -218,9 +217,9 @@ class RoleStep:
                 return None, FallbackStrategy.SKIP_ACCOUNT
             elif action == "2":
                 # Fallback Role 선택
-                print_box_start("Fallback Role")
+                print_box_start("Fallback Role 선택")
                 for i, (role, covers, _) in enumerate(fallback_candidates, 1):
-                    print_box_line(f" {i}) {role} ({covers}개)")
+                    print_box_line(f"  {i:>2}) {role:<40} ({covers}개 커버)")
                 print_box_end()
 
                 while True:

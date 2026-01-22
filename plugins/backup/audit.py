@@ -20,7 +20,7 @@ from core.tools.output import OutputPath, open_in_explorer
 console = Console()
 
 # 최근 작업 조회 기간
-JOB_DAYS = 7
+JOB_DAYS = 30
 
 REQUIRED_PERMISSIONS = {
     "read": [

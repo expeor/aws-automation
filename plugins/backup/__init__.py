@@ -19,4 +19,11 @@ TOOLS = [
         "module": "audit",
         "area": "backup",
     },
+    {
+        "name": "통합 백업 현황",
+        "description": "AWS Backup + 서비스별 자체 백업 현황 통합 분석 (RDS, DynamoDB, EFS, FSx)",
+        "permission": "read",
+        "module": "comprehensive",
+        "area": "backup",
+    },
 ]
