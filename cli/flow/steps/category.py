@@ -508,7 +508,7 @@ class CategoryStep:
                     left = sorted_tools[i]
                     left_perm = left.get("permission", "read")
                     left_color = PERMISSION_COLORS.get(left_perm, "green")
-                    left_name = left["name"][:20]
+                    left_name = left["name"][:26]
                     left_num = f"[{left_color}]{tool_index:>2}[/{left_color}]"
                     index_map[tool_index] = left
                     tool_index += 1
@@ -517,7 +517,7 @@ class CategoryStep:
                         right = sorted_tools[i + half]
                         right_perm = right.get("permission", "read")
                         right_color = PERMISSION_COLORS.get(right_perm, "green")
-                        right_name = right["name"][:20]
+                        right_name = right["name"][:26]
                         right_num = f"[{right_color}]{tool_index:>2}[/{right_color}]"
                         index_map[tool_index] = right
                         tool_index += 1
