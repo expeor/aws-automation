@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 API Gateway 분석",
-        "name_en": "Unused API Gateway Analysis",
+        "name": "미사용 API Gateway 탐지",
+        "name_en": "Unused API Gateway Detection",
         "description": "유휴/미사용 API 탐지",
         "description_en": "Detect idle/unused APIs",
         "permission": "read",

@@ -17,12 +17,12 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "빈 버킷 분석",
-        "name_en": "Empty Bucket Analysis",
+        "name": "미사용 S3 버킷 탐지",
+        "name_en": "Unused S3 Bucket Detection",
         "description": "객체가 없는 빈 S3 버킷 탐지",
         "description_en": "Detect S3 buckets with no objects",
         "permission": "read",
         "module": "empty_bucket",
-        "area": "cost",
+        "area": "unused",
     },
 ]

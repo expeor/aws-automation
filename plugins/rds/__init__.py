@@ -14,8 +14,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "RDS Snapshot 미사용 분석",
-        "name_en": "Unused RDS Snapshot Analysis",
+        "name": "미사용 RDS Snapshot 탐지",
+        "name_en": "Unused RDS Snapshot Detection",
         "description": "오래된 수동 스냅샷 탐지 (RDS/Aurora)",
         "description_en": "Detect old manual snapshots (RDS/Aurora)",
         "permission": "read",
@@ -23,8 +23,8 @@ TOOLS = [
         "area": "unused",
     },
     {
-        "name": "RDS 유휴 인스턴스 분석",
-        "name_en": "Idle RDS Instance Analysis",
+        "name": "미사용 RDS 인스턴스 탐지",
+        "name_en": "Unused RDS Instance Detection",
         "description": "유휴/저사용 RDS 인스턴스 탐지",
         "description_en": "Detect idle/underutilized RDS instances",
         "permission": "read",

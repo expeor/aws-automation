@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from core.auth.config.loader import AWSProfile
     from core.tools.history import FavoritesManager, RecentHistory
     from core.tools.types import AreaInfo
-from cli.ui.console import console as default_console
+from cli.ui.console import clear_screen, console as default_console
 from cli.ui.console import (
     wait_for_any_key,
 )
@@ -101,7 +101,8 @@ class MainMenu:
         """
         self._ensure_initialized()
 
-        # 배너 출력
+        # 화면 클리어 후 배너 출력
+        clear_screen()
         print_banner(self.console)
 
         # 즐겨찾기 섹션 (최대 5개)
@@ -371,7 +372,8 @@ class MainMenu:
             wait_for_any_key()
             return
 
-        # 검색 결과 표시
+        # 화면 클리어 후 검색 결과 표시
+        clear_screen()
         from rich.table import Table
 
         self.console.print()
@@ -521,6 +523,9 @@ class MainMenu:
         current_page = 1
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             # 현재 페이지의 도구들
             start_idx = (current_page - 1) * PAGE_SIZE
             end_idx = min(start_idx + PAGE_SIZE, total_count)
@@ -745,6 +750,9 @@ class MainMenu:
     def _manage_favorites(self) -> None:
         """즐겨찾기 관리"""
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             self.console.print(f"[bold]{t('menu.favorites_management')}[/bold]")
             self.console.print()
@@ -1005,6 +1013,9 @@ class MainMenu:
                 area_tool_counts[area] = area_tool_counts.get(area, 0) + 1
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             table = Table(
                 title=f"[bold]{t('menu.check_types')}[/bold]",
@@ -1064,6 +1075,9 @@ class MainMenu:
             return
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             table = Table(
                 title=f"[bold][{area['color']}]{area_label}[/{area['color']}][/bold] ({t('menu.count_suffix', count=len(tools))})",
@@ -1126,6 +1140,9 @@ class MainMenu:
             return
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             table = Table(
                 title=f"[bold]{t('menu.aws_category')}[/bold]",
@@ -1180,6 +1197,9 @@ class MainMenu:
             return
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             table = Table(
                 title=f"[bold]{aws_category['name']}[/bold] ({aws_category['name_ko']})",
@@ -1235,6 +1255,9 @@ class MainMenu:
             return
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             display_name = plugin.get("display_name", category_name).upper()
             table = Table(
@@ -1328,6 +1351,9 @@ class MainMenu:
         manager = ProfileGroupsManager()
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             self.console.print()
             self.console.print(f"[bold]{t('menu.profile_groups_management')}[/bold]")
             self.console.print()

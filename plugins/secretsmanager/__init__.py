@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 시크릿 분석",
-        "name_en": "Unused Secret Analysis",
+        "name": "미사용 시크릿 탐지",
+        "name_en": "Unused Secret Detection",
         "description": "미사용 시크릿 탐지 및 비용 분석",
         "description_en": "Detect unused secrets and cost analysis",
         "permission": "read",

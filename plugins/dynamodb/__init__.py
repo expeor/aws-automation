@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 DynamoDB 테이블 분석",
-        "name_en": "Unused DynamoDB Table Analysis",
+        "name": "미사용 DynamoDB 테이블 탐지",
+        "name_en": "Unused DynamoDB Table Detection",
         "description": "유휴/저사용 DynamoDB 테이블 탐지 (CloudWatch 지표 기반)",
         "description_en": "Detect idle/underutilized DynamoDB tables (CloudWatch metrics)",
         "permission": "read",
@@ -21,8 +21,8 @@ TOOLS = [
         "area": "unused",
     },
     {
-        "name": "DynamoDB 용량 모드 분석",
-        "name_en": "DynamoDB Capacity Mode Analysis",
+        "name": "DynamoDB 용량 비용 최적화",
+        "name_en": "DynamoDB Capacity Cost Optimization",
         "description": "Provisioned vs On-Demand 용량 모드 최적화 분석",
         "description_en": "Provisioned vs On-Demand capacity mode optimization",
         "permission": "read",

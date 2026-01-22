@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "Log Group 미사용 분석",
-        "name_en": "Unused Log Group Analysis",
+        "name": "미사용 Log Group 탐지",
+        "name_en": "Unused Log Group Detection",
         "description": "빈 로그 그룹 및 오래된 로그 탐지",
         "description_en": "Detect empty log groups and old logs",
         "permission": "read",
@@ -21,8 +21,8 @@ TOOLS = [
         "area": "unused",
     },
     {
-        "name": "고아 알람 분석",
-        "name_en": "Orphan Alarm Analysis",
+        "name": "미사용 알람 탐지",
+        "name_en": "Unused Alarm Detection",
         "description": "모니터링 대상 없는 알람 탐지",
         "description_en": "Detect alarms without monitoring targets",
         "permission": "read",

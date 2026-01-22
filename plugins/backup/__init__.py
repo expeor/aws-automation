@@ -18,7 +18,7 @@ TOOLS = [
         "description_en": "Backup Vault, Plan, recent job status analysis",
         "permission": "read",
         "module": "audit",
-        "area": "backup",
+        "area": "inventory",
     },
     {
         "name": "통합 백업 현황",
@@ -27,6 +27,6 @@ TOOLS = [
         "description_en": "AWS Backup + service-native backup status (RDS, DynamoDB, EFS, FSx)",
         "permission": "read",
         "module": "comprehensive",
-        "area": "backup",
+        "area": "inventory",
     },
 ]

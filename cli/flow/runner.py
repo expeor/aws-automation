@@ -12,6 +12,7 @@ from typing import Any
 from rich.console import Console
 
 from cli.i18n import t
+from cli.ui.console import clear_screen
 from .context import ExecutionContext, FlowResult, ToolInfo
 from .steps import AccountStep, CategoryStep, ProfileStep, RegionStep, RoleStep
 
@@ -24,6 +25,9 @@ class FlowRunner:
     def run(self, entry_point: str | None = None) -> None:
         """Flow 실행"""
         while True:
+            # 화면 클리어
+            clear_screen()
+
             try:
                 result = self._run_once(entry_point)
 
@@ -67,6 +71,9 @@ class FlowRunner:
             category: 카테고리 이름
             tool_module: 도구 모듈 이름
         """
+        # 화면 클리어
+        clear_screen()
+
         try:
             # 도구 정보 조회
             tool_meta = self._find_tool_meta(category, tool_module)

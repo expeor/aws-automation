@@ -9,6 +9,7 @@ AWS 인증 프로파일을 선택하고 Provider를 생성.
 from rich.console import Console
 
 from cli.i18n import get_lang, t
+from cli.ui.console import clear_screen
 from ..context import ExecutionContext, ProviderKind
 
 console = Console()
@@ -182,6 +183,9 @@ class ProfileStep:
             if type_profiles:
                 available_types.append((kind, type_profiles))
 
+        # 화면 클리어
+        clear_screen()
+
         print_box_start(t('flow.select_auth_type'))
 
         menu_idx = 1
@@ -317,6 +321,9 @@ class ProfileStep:
         # 대규모 프로파일 지원 (20개 이상이면 검색/페이지네이션)
         if len(sorted_profiles) > 20:
             return self._select_single_profile_large(sorted_profiles)
+
+        # 화면 클리어 (프로파일이 2개 이상일 때만)
+        clear_screen()
 
         print_box_start(t('flow.profile_selection', name=name, count=len(sorted_profiles)))
 

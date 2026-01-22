@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 SQS 큐 분석",
-        "name_en": "Unused SQS Queue Analysis",
+        "name": "미사용 SQS 큐 탐지",
+        "name_en": "Unused SQS Queue Detection",
         "description": "유휴/미사용 SQS 큐 탐지",
         "description_en": "Detect idle/unused SQS queues",
         "permission": "read",

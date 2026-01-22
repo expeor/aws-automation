@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 이미지 분석",
-        "name_en": "Unused Image Analysis",
+        "name": "미사용 ECR 이미지 탐지",
+        "name_en": "Unused ECR Image Detection",
         "description": "오래된/미사용 ECR 이미지 탐지",
         "description_en": "Detect old/unused ECR images",
         "permission": "read",

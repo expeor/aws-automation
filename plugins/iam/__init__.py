@@ -15,8 +15,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "IAM 종합 점검",
-        "name_en": "IAM Comprehensive Audit",
+        "name": "IAM 보안 점검",
+        "name_en": "IAM Security Check",
         "description": "사용자, 역할, Access Key, MFA, 비밀번호 정책 등 보안 점검",
         "description_en": "Security audit for users, roles, access keys, MFA, password policies",
         "permission": "read",

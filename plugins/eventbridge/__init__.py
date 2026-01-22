@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 EventBridge 규칙 분석",
-        "name_en": "Unused EventBridge Rule Analysis",
+        "name": "미사용 EventBridge 규칙 탐지",
+        "name_en": "Unused EventBridge Rule Detection",
         "description": "비활성화/미사용 규칙 탐지",
         "description_en": "Detect disabled/unused rules",
         "permission": "read",

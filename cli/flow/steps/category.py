@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from cli.i18n import get_lang, t
-from cli.ui.console import print_box_end, print_box_line, print_box_start
+from cli.ui.console import clear_screen, print_box_end, print_box_line, print_box_start
 from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
 
 from ..context import ExecutionContext, ToolInfo
@@ -247,6 +247,9 @@ class CategoryStep:
         current_page = 1
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             # 현재 페이지 항목
             start_idx = (current_page - 1) * PAGE_SIZE
             end_idx = min(start_idx + PAGE_SIZE, total_count)
@@ -468,6 +471,9 @@ class CategoryStep:
         area_filter: str | None = None
 
         while True:
+            # 화면 클리어
+            clear_screen()
+
             # 필터 적용
             filtered = self._apply_filters(tools, perm_filter, area_filter)
 

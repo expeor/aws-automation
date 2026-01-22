@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "리포지토리 분석",
-        "name_en": "Repository Analysis",
+        "name": "CodeCommit 현황",
+        "name_en": "CodeCommit Inventory",
         "description": "CodeCommit 리포지토리 및 브랜치 현황 분석",
         "description_en": "CodeCommit repository and branch status analysis",
         "permission": "read",
@@ -22,8 +22,8 @@ TOOLS = [
         "area": "inventory",
     },
     {
-        "name": "빈 리포지토리 조회",
-        "name_en": "Empty Repository Detection",
+        "name": "미사용 리포지토리 탐지",
+        "name_en": "Unused Repository Detection",
         "description": "브랜치가 없는 빈 리포지토리 목록 조회",
         "description_en": "Detect repositories with no branches",
         "permission": "read",

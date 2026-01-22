@@ -12,12 +12,12 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "빈 Hosted Zone 분석",
-        "name_en": "Empty Hosted Zone Analysis",
+        "name": "미사용 Hosted Zone 탐지",
+        "name_en": "Unused Hosted Zone Detection",
         "description": "레코드가 없는 빈 Hosted Zone 탐지",
         "description_en": "Detect empty Hosted Zones with no records",
         "permission": "read",
         "module": "empty_zone",
-        "area": "cost",
+        "area": "unused",
     },
 ]

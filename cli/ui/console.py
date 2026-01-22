@@ -50,6 +50,11 @@ def get_console() -> Console:
 console = get_console()
 
 
+def clear_screen() -> None:
+    """화면을 클리어합니다."""
+    console.clear()
+
+
 def get_progress() -> Progress:
     """Rich Progress 인스턴스를 생성하고 반환합니다."""
     return Progress(

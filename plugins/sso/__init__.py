@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "SSO 종합 점검",
-        "name_en": "SSO Comprehensive Audit",
+        "name": "SSO 보안 점검",
+        "name_en": "SSO Security Check",
         "description": "Permission Set 위험 정책, Admin 권한 현황, 미사용 사용자, MFA 점검",
         "description_en": "Permission Set risk policies, admin permissions, unused users, MFA audit",
         "permission": "read",

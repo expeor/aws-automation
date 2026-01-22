@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "CFN 리소스 검색",
-        "name_en": "CFN Resource Search",
+        "name": "CFN 리소스 조회",
+        "name_en": "CFN Resource Lookup",
         "description": "Physical ID 또는 Resource Type으로 CloudFormation Stack 리소스 검색",
         "description_en": "Search CloudFormation Stack resources by Physical ID or Resource Type",
         "permission": "read",
@@ -22,8 +22,8 @@ TOOLS = [
         "area": "search",
     },
     {
-        "name": "CFN Physical ID 검색",
-        "name_en": "CFN Physical ID Search",
+        "name": "CFN Physical ID 조회",
+        "name_en": "CFN Physical ID Lookup",
         "description": "Physical ID로 해당 리소스가 속한 CloudFormation Stack 찾기",
         "description_en": "Find CloudFormation Stack by Physical ID",
         "permission": "read",

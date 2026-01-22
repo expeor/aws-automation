@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 ACM 인증서 분석",
-        "name_en": "Unused ACM Certificate Analysis",
+        "name": "미사용 ACM 인증서 탐지",
+        "name_en": "Unused ACM Certificate Detection",
         "description": "미사용/만료 임박 인증서 탐지",
         "description_en": "Detect unused/expiring certificates",
         "permission": "read",

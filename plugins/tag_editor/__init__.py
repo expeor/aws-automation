@@ -12,13 +12,13 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "MAP 태그 분석",
-        "name_en": "MAP Tag Analysis",
+        "name": "MAP 태그 현황",
+        "name_en": "MAP Tag Status",
         "description": "MAP 2.0 마이그레이션 태그(map-migrated) 현황 분석",
         "description_en": "MAP 2.0 migration tag (map-migrated) status analysis",
         "permission": "read",
         "module": "map_audit",
-        "area": "audit",
+        "area": "inventory",
     },
     {
         "name": "MAP 태그 적용",

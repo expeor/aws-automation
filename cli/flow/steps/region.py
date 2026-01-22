@@ -8,7 +8,7 @@
 from rich.console import Console
 
 from cli.i18n import t
-from cli.ui.console import print_box_end, print_box_line, print_box_start
+from cli.ui.console import clear_screen, print_box_end, print_box_line, print_box_start
 from core.region.data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
 
 from ..context import ExecutionContext
@@ -61,6 +61,9 @@ class RegionStep:
                 t('flow.select_multiple_regions'),
                 t('flow.all_regions', count=len(ALL_REGIONS)),
             ]
+
+        # 화면 클리어 (Global 서비스 제외)
+        clear_screen()
 
         print_box_start(t('flow.region_selection'))
         if is_single_region_only:

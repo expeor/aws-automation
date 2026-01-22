@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "SageMaker Endpoint 미사용 분석",
-        "name_en": "Unused SageMaker Endpoint Analysis",
+        "name": "미사용 SageMaker Endpoint 탐지",
+        "name_en": "Unused SageMaker Endpoint Detection",
         "description": "유휴/미사용 SageMaker Endpoint 탐지 (CloudWatch 기반)",
         "description_en": "Detect idle/unused SageMaker Endpoints (CloudWatch metrics)",
         "permission": "read",

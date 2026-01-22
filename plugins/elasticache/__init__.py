@@ -13,8 +13,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 ElastiCache 클러스터 분석",
-        "name_en": "Unused ElastiCache Cluster Analysis",
+        "name": "미사용 ElastiCache 클러스터 탐지",
+        "name_en": "Unused ElastiCache Cluster Detection",
         "description": "유휴/저사용 ElastiCache 클러스터 탐지 (Redis/Memcached)",
         "description_en": "Detect idle/underutilized ElastiCache clusters (Redis/Memcached)",
         "permission": "read",

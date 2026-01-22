@@ -12,8 +12,8 @@ CATEGORY = {
 
 TOOLS = [
     {
-        "name": "미사용 SNS 토픽 분석",
-        "name_en": "Unused SNS Topic Analysis",
+        "name": "미사용 SNS 토픽 탐지",
+        "name_en": "Unused SNS Topic Detection",
         "description": "유휴/미사용 SNS 토픽 탐지",
         "description_en": "Detect idle/unused SNS topics",
         "permission": "read",
