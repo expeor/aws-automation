@@ -93,6 +93,11 @@ class ENICache:
         self.sorted_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
         self.lock = threading.Lock()
 
+        # Secondary indices for O(1) field lookups
+        self._account_index: dict[str, set[str]] = {}  # account_id -> {ips}
+        self._region_index: dict[str, set[str]] = {}  # region -> {ips}
+        self._vpc_index: dict[str, set[str]] = {}  # vpc_id -> {ips}
+
         # 캐시 로드
         self._load_cache()
 
@@ -127,13 +132,41 @@ class ENICache:
             self.cache = {}
 
     def _rebuild_ip_index(self) -> None:
-        """IP 인덱스 재구성 (CIDR 검색용)"""
+        """IP 인덱스 재구성 (CIDR 검색 + secondary indices)"""
         parsed = []
-        for ip_str in self.cache:
+        # Reset secondary indices
+        self._account_index.clear()
+        self._region_index.clear()
+        self._vpc_index.clear()
+
+        for ip_str, entry in self.cache.items():
+            # Build sorted IP list for CIDR search
             try:
                 parsed.append(ipaddress.ip_address(ip_str))
             except ValueError:
                 continue
+
+            # Build secondary indices
+            for eni in entry.get("interfaces", []):
+                account_id = eni.get("AccountId", "")
+                region = eni.get("Region", "")
+                vpc_id = eni.get("VpcId", "")
+
+                if account_id:
+                    if account_id not in self._account_index:
+                        self._account_index[account_id] = set()
+                    self._account_index[account_id].add(ip_str)
+
+                if region:
+                    if region not in self._region_index:
+                        self._region_index[region] = set()
+                    self._region_index[region].add(ip_str)
+
+                if vpc_id:
+                    if vpc_id not in self._vpc_index:
+                        self._vpc_index[vpc_id] = set()
+                    self._vpc_index[vpc_id].add(ip_str)
+
         self.sorted_ips = sorted(parsed)
 
     def save(self) -> None:
@@ -236,6 +269,10 @@ class ENICache:
         with self.lock:
             self.cache.clear()
             self.sorted_ips.clear()
+            # Clear secondary indices
+            self._account_index.clear()
+            self._region_index.clear()
+            self._vpc_index.clear()
 
         if os.path.exists(self.cache_file):
             os.remove(self.cache_file)
@@ -265,6 +302,88 @@ class ENICache:
             "regions": regions,
             "accounts": accounts,
         }
+
+    # =========================================================================
+    # Secondary Index Search Methods (O(1) lookup by field)
+    # =========================================================================
+
+    def search_by_account(self, account_id: str) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Search ENIs by account ID using secondary index.
+
+        Args:
+            account_id: AWS account ID to search for
+
+        Returns:
+            List of (ip_str, eni_dict) tuples
+        """
+        results = []
+        with self.lock:
+            ip_set = self._account_index.get(account_id, set())
+            for ip_str in ip_set:
+                entry = self.cache.get(ip_str)
+                if entry:
+                    entry["last_accessed"] = time.time()
+                    for eni in entry["interfaces"]:
+                        if eni.get("AccountId") == account_id:
+                            results.append((ip_str, eni))
+        return results
+
+    def search_by_region(self, region: str) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Search ENIs by region using secondary index.
+
+        Args:
+            region: AWS region to search for (e.g., "ap-northeast-2")
+
+        Returns:
+            List of (ip_str, eni_dict) tuples
+        """
+        results = []
+        with self.lock:
+            ip_set = self._region_index.get(region, set())
+            for ip_str in ip_set:
+                entry = self.cache.get(ip_str)
+                if entry:
+                    entry["last_accessed"] = time.time()
+                    for eni in entry["interfaces"]:
+                        if eni.get("Region") == region:
+                            results.append((ip_str, eni))
+        return results
+
+    def search_by_vpc(self, vpc_id: str) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Search ENIs by VPC ID using secondary index.
+
+        Args:
+            vpc_id: VPC ID to search for (e.g., "vpc-abc12345")
+
+        Returns:
+            List of (ip_str, eni_dict) tuples
+        """
+        results = []
+        with self.lock:
+            ip_set = self._vpc_index.get(vpc_id, set())
+            for ip_str in ip_set:
+                entry = self.cache.get(ip_str)
+                if entry:
+                    entry["last_accessed"] = time.time()
+                    for eni in entry["interfaces"]:
+                        if eni.get("VpcId") == vpc_id:
+                            results.append((ip_str, eni))
+        return results
+
+    def get_indexed_accounts(self) -> list[str]:
+        """Get list of all indexed account IDs."""
+        return list(self._account_index.keys())
+
+    def get_indexed_regions(self) -> list[str]:
+        """Get list of all indexed regions."""
+        return list(self._region_index.keys())
+
+    def get_indexed_vpcs(self) -> list[str]:
+        """Get list of all indexed VPC IDs."""
+        return list(self._vpc_index.keys())
 
 
 # =============================================================================
@@ -340,86 +459,9 @@ def fetch_enis_from_account(
 
 def map_eni_to_resource(eni: dict[str, Any]) -> str:
     """ENI Description을 파싱하여 연결된 리소스 추출 (빠른 매핑)"""
-    import re
+    from plugins.vpc.ip_search.parser import parse_eni_to_display_string
 
-    description = eni.get("Description", "")
-    interface_type = eni.get("InterfaceType", "")
-    attachment = eni.get("Attachment", {})
-
-    instance_id = attachment.get("InstanceId")
-    if instance_id:
-        return f"EC2: {instance_id}"
-
-    if not description:
-        return ""
-
-    if "EFS" in description or "mount target" in description.lower():
-        fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
-        if fs_match:
-            return f"EFS: {fs_match.group(0)}"
-        return "EFS"
-
-    if "AWS Lambda VPC ENI" in description:
-        func_match = re.search(r"AWS Lambda VPC ENI-(.+)", description)
-        if func_match:
-            return f"Lambda: {func_match.group(1).strip()}"
-        return "Lambda"
-
-    if "ELB" in description:
-        if "app/" in description:
-            alb_name = description.split("app/")[1].split("/")[0]
-            return f"ALB: {alb_name}"
-        elif "net/" in description:
-            nlb_name = description.split("net/")[1].split("/")[0]
-            return f"NLB: {nlb_name}"
-        else:
-            clb_name = description.replace("ELB ", "").strip()
-            return f"CLB: {clb_name}"
-
-    if "RDSNetworkInterface" in description:
-        rds_patterns = [
-            r"RDSNetworkInterface[:\s-]+([a-zA-Z0-9_-]+)",
-            r"([a-zA-Z0-9_-]+)\..*\.rds\.amazonaws\.com",
-        ]
-        for pattern in rds_patterns:
-            match = re.search(pattern, description, re.IGNORECASE)
-            if match:
-                db_id = match.group(1)
-                if db_id.lower() not in ["network", "interface", "eni"]:
-                    return f"RDS: {db_id}"
-        return "RDS"
-
-    if "VPC Endpoint" in description:
-        return "VPC Endpoint"
-
-    if "FSx" in description or "fsx" in description.lower():
-        fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
-        if fs_match:
-            return f"FSx: {fs_match.group(0)}"
-        return "FSx"
-
-    if "NAT Gateway" in description or interface_type == "nat_gateway":
-        nat_match = re.search(r"nat-[a-zA-Z0-9]+", description)
-        if nat_match:
-            return f"NAT: {nat_match.group(0)}"
-        return "NAT Gateway"
-
-    if "ecs" in interface_type.lower() or "ecs" in description.lower():
-        return "ECS Task"
-
-    if "ElastiCache" in description:
-        return "ElastiCache"
-
-    if "OpenSearch" in description or "Elasticsearch" in description:
-        return "OpenSearch"
-
-    if "Transit Gateway" in description:
-        return "Transit Gateway"
-
-    if "API Gateway" in description:
-        return "API Gateway"
-
-    return ""
+    return parse_eni_to_display_string(eni)
 
 
 # =============================================================================
@@ -589,10 +631,21 @@ def search_by_query(queries: list[str], cache: ENICache) -> list[PrivateIPResult
 
 
 def _search_by_field(cache: ENICache, query_type: str, value: str) -> list[tuple[str, dict[str, Any]]]:
-    """필드 기반 검색 (캐시 전체 순회)"""
+    """
+    필드 기반 검색
+
+    Uses secondary indices for O(1) lookups where available:
+    - VPC_ID: Uses cache._vpc_index
+    - Other types: Falls back to O(n) cache scan
+    """
     results = []
     value_lower = value.lower()
 
+    # O(1) lookup using secondary indices for VPC_ID
+    if query_type == QueryType.VPC_ID:
+        return cache.search_by_vpc(value)
+
+    # O(n) scan for other query types
     with cache.lock:
         for ip_str, entry in cache.cache.items():
             for eni in entry.get("interfaces", []):
@@ -600,10 +653,6 @@ def _search_by_field(cache: ENICache, query_type: str, value: str) -> list[tuple
 
                 if query_type == QueryType.ENI_ID:
                     if eni.get("NetworkInterfaceId", "").lower() == value_lower:
-                        matched = True
-
-                elif query_type == QueryType.VPC_ID:
-                    if eni.get("VpcId", "").lower() == value_lower:
                         matched = True
 
                 elif query_type == QueryType.SUBNET_ID:

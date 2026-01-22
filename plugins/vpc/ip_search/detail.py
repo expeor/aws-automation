@@ -7,6 +7,7 @@ AWS API를 호출하여 ENI에 연결된 리소스의 상세 정보를 조회합
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import botocore.config
@@ -131,65 +132,151 @@ def get_detailed_resource_info(session, eni: dict[str, Any]) -> str | None:
         return None
 
 
+def enrich_resources_parallel(
+    enis: list[dict[str, Any]],
+    session,
+    max_workers: int = 10,
+) -> dict[str, str | None]:
+    """
+    Enrich multiple ENIs with detailed resource information in parallel.
+
+    Uses ThreadPoolExecutor to make concurrent API calls, significantly
+    speeding up detail enrichment for multiple ENIs.
+
+    Args:
+        enis: List of ENI data dictionaries
+        session: boto3 session for API calls
+        max_workers: Maximum number of concurrent workers (default: 10)
+
+    Returns:
+        Dictionary mapping ENI ID to enriched resource info string
+    """
+    if not enis or not session:
+        return {}
+
+    results: dict[str, str | None] = {}
+
+    def _enrich_single(eni: dict[str, Any]) -> tuple[str, str | None]:
+        """Enrich a single ENI and return (eni_id, result)."""
+        eni_id = eni.get("NetworkInterfaceId", "")
+        try:
+            result = get_detailed_resource_info(session, eni)
+            return (eni_id, result)
+        except Exception as e:
+            logger.debug(f"Error enriching {eni_id}: {e}")
+            return (eni_id, None)
+
+    # Use ThreadPoolExecutor for parallel API calls
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_eni = {
+            executor.submit(_enrich_single, eni): eni
+            for eni in enis
+        }
+
+        # Collect results as they complete
+        for future in as_completed(future_to_eni):
+            try:
+                eni_id, enriched_info = future.result()
+                results[eni_id] = enriched_info
+            except Exception as e:
+                eni = future_to_eni[future]
+                eni_id = eni.get("NetworkInterfaceId", "unknown")
+                logger.debug(f"Future error for {eni_id}: {e}")
+                results[eni_id] = None
+
+    return results
+
+
+def enrich_search_results_parallel(
+    private_results: list,
+    cache,
+    session,
+    max_workers: int = 10,
+) -> list:
+    """
+    Enrich private IP search results with detailed resource info in parallel.
+
+    This is a convenience function that takes PrivateIPResult objects,
+    fetches their ENI data from cache, enriches in parallel, and returns
+    updated results with mapped_resource field populated.
+
+    Args:
+        private_results: List of PrivateIPResult objects
+        cache: ENICache instance
+        session: boto3 session for API calls
+        max_workers: Maximum number of concurrent workers
+
+    Returns:
+        List of enriched PrivateIPResult objects
+    """
+    from plugins.vpc.ip_search.private import PrivateIPResult
+
+    if not private_results or not cache or not session:
+        return private_results
+
+    # Collect unique ENIs from results
+    eni_map: dict[str, dict[str, Any]] = {}  # eni_id -> eni_data
+    result_to_eni: dict[int, str] = {}  # result_index -> eni_id
+
+    for idx, result in enumerate(private_results):
+        eni_data_list = cache.get_by_ip(result.ip_address)
+        if eni_data_list:
+            eni_data = eni_data_list[0]
+            eni_data["Region"] = result.region
+            eni_id = eni_data.get("NetworkInterfaceId", "")
+            if eni_id:
+                eni_map[eni_id] = eni_data
+                result_to_eni[idx] = eni_id
+
+    # Enrich all unique ENIs in parallel
+    enriched = enrich_resources_parallel(
+        list(eni_map.values()),
+        session,
+        max_workers=max_workers,
+    )
+
+    # Build enriched results
+    enriched_results = []
+    for idx, result in enumerate(private_results):
+        eni_id = result_to_eni.get(idx)
+        detailed_info = enriched.get(eni_id) if eni_id else None
+
+        if detailed_info:
+            enriched_result = PrivateIPResult(
+                ip_address=result.ip_address,
+                account_id=result.account_id,
+                account_name=result.account_name,
+                region=result.region,
+                eni_id=result.eni_id,
+                vpc_id=result.vpc_id,
+                subnet_id=result.subnet_id,
+                availability_zone=result.availability_zone,
+                private_ip=result.private_ip,
+                public_ip=result.public_ip,
+                interface_type=result.interface_type,
+                status=result.status,
+                description=result.description,
+                security_groups=result.security_groups,
+                name=result.name,
+                is_managed=result.is_managed,
+                managed_by=result.managed_by,
+                mapped_resource=detailed_info,
+            )
+            enriched_results.append(enriched_result)
+        else:
+            enriched_results.append(result)
+
+    return enriched_results
+
+
 def _fast_extract_from_description(description: str, interface_type: str) -> str | None:
     """Description에서 빠르게 정보 추출 (API 호출 없음)"""
-    if not description:
-        return None
+    from plugins.vpc.ip_search.parser import parse_eni_description
 
-    # EFS Mount Target
-    if "EFS" in description or "mount target" in description.lower():
-        fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
-        if fs_match:
-            return f"EFS: {fs_match.group(0)}"
-
-    # Lambda
-    if "AWS Lambda VPC ENI" in description:
-        func_match = re.search(r"AWS Lambda VPC ENI-(.+)", description)
-        if func_match:
-            return f"Lambda: {func_match.group(1).strip()}"
-
-    # ELB
-    if "ELB" in description:
-        if "app/" in description:
-            alb_name = description.split("app/")[1].split("/")[0]
-            return f"ALB: {alb_name}"
-        elif "net/" in description:
-            nlb_name = description.split("net/")[1].split("/")[0]
-            return f"NLB: {nlb_name}"
-        else:
-            clb_name = description.replace("ELB ", "").strip()
-            return f"CLB: {clb_name}"
-
-    # RDS
-    if "RDSNetworkInterface" in description:
-        rds_patterns = [
-            r"RDSNetworkInterface[:\s-]+([a-zA-Z0-9_-]+)",
-            r"([a-zA-Z0-9_-]+)\..*\.rds\.amazonaws\.com",
-        ]
-        for pattern in rds_patterns:
-            match = re.search(pattern, description, re.IGNORECASE)
-            if match:
-                db_id = match.group(1)
-                if db_id.lower() not in ["network", "interface", "eni"]:
-                    return f"RDS: {db_id}"
-        return "RDS"
-
-    # VPC Endpoint
-    if "VPC Endpoint" in description:
-        return "VPC Endpoint"
-
-    # FSx
-    if "FSx" in description:
-        fs_match = re.search(r"fs-[a-zA-Z0-9]+", description)
-        if fs_match:
-            return f"FSx: {fs_match.group(0)}"
-
-    # NAT Gateway
-    if "NAT Gateway" in description or interface_type == "nat_gateway":
-        nat_match = re.search(r"nat-[a-zA-Z0-9]+", description)
-        if nat_match:
-            return f"NAT: {nat_match.group(0)}"
-
+    parsed = parse_eni_description(description, interface_type)
+    if parsed:
+        return str(parsed)
     return None
 
 

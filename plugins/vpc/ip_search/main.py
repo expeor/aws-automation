@@ -25,12 +25,10 @@ console = Console()
 # 세션 및 출력 경로
 # =============================================================================
 
-_current_session_name = "default"
 
-
-def _get_output_dir() -> str:
+def _get_output_dir(session_name: str) -> str:
     """출력 디렉토리 경로: output/{session_name}/ip_search/{date}/"""
-    return OutputPath(_current_session_name).sub("vpc", "search").with_date("daily").build()
+    return OutputPath(session_name).sub("vpc", "search").with_date("daily").build()
 
 
 # =============================================================================
@@ -281,7 +279,7 @@ def _show_public_filter_menu():
     return provider, filter_value
 
 
-def _handle_public_filter_query(query: str, save_csv: bool):
+def _handle_public_filter_query(query: str, save_csv: bool, session_name: str = "default"):
     """
     @ 접두사 쿼리 처리
 
@@ -449,7 +447,7 @@ def _handle_public_filter_query(query: str, save_csv: bool):
 
     # CSV 저장
     if save_csv:
-        filepath = _save_public_csv(unique_results)
+        filepath = _save_public_csv(unique_results, session_name)
         if filepath:
             console.print(f"[green]CSV: {filepath}[/green]")
 
@@ -461,7 +459,9 @@ def _handle_public_filter_query(query: str, save_csv: bool):
 
 def _enrich_with_detail(ctx, private_results: list, cache, session_name: str) -> list:
     """
-    Private 검색 결과에 API 기반 상세 리소스 정보 추가
+    Private 검색 결과에 API 기반 상세 리소스 정보 추가 (병렬 처리)
+
+    Uses parallel enrichment for faster API calls when multiple ENIs are involved.
 
     Args:
         ctx: 실행 컨텍스트
@@ -475,56 +475,20 @@ def _enrich_with_detail(ctx, private_results: list, cache, session_name: str) ->
     if not private_results or not cache:
         return private_results
 
-    from plugins.vpc.ip_search.detail import get_detailed_resource_info
+    from plugins.vpc.ip_search.detail import enrich_search_results_parallel
 
     # 컨텍스트에서 세션 가져오기
     session = getattr(ctx, "session", None)
     if not session:
         return private_results
 
-    enriched = []
-    for result in private_results:
-        try:
-            # 캐시에서 원본 ENI 데이터 가져오기
-            eni_data_list = cache.get_by_ip(result.ip_address)
-            if eni_data_list:
-                eni_data = eni_data_list[0]
-                eni_data["Region"] = result.region
-
-                # API 호출로 상세 정보 가져오기
-                detailed_info = get_detailed_resource_info(session, eni_data)
-                if detailed_info:
-                    # 새 결과 객체 생성 (원본 수정 방지)
-                    from plugins.vpc.ip_search.private import PrivateIPResult
-
-                    enriched_result = PrivateIPResult(
-                        ip_address=result.ip_address,
-                        account_id=result.account_id,
-                        account_name=result.account_name,
-                        region=result.region,
-                        eni_id=result.eni_id,
-                        vpc_id=result.vpc_id,
-                        subnet_id=result.subnet_id,
-                        availability_zone=result.availability_zone,
-                        private_ip=result.private_ip,
-                        public_ip=result.public_ip,
-                        interface_type=result.interface_type,
-                        status=result.status,
-                        description=result.description,
-                        security_groups=result.security_groups,
-                        name=result.name,
-                        is_managed=result.is_managed,
-                        managed_by=result.managed_by,
-                        mapped_resource=detailed_info,  # API에서 가져온 상세 정보
-                    )
-                    enriched.append(enriched_result)
-                    continue
-        except Exception:
-            pass
-
-        enriched.append(result)
-
-    return enriched
+    # Use parallel enrichment for better performance
+    return enrich_search_results_parallel(
+        private_results,
+        cache,
+        session,
+        max_workers=10,
+    )
 
 
 # =============================================================================
@@ -532,7 +496,7 @@ def _enrich_with_detail(ctx, private_results: list, cache, session_name: str) ->
 # =============================================================================
 
 
-def _display_results(results: dict, save_csv: bool = False) -> None:
+def _display_results(results: dict, save_csv: bool = False, session_name: str = "default") -> None:
     """통합 검색 결과 출력"""
     public_results = results.get("public", [])
     private_results = results.get("private", [])
@@ -567,11 +531,11 @@ def _display_results(results: dict, save_csv: bool = False) -> None:
     # CSV 저장
     if save_csv:
         if has_public:
-            filepath = _save_public_csv(public_results)
+            filepath = _save_public_csv(public_results, session_name)
             if filepath:
                 console.print(f"[green]Public CSV: {filepath}[/green]")
         if has_private:
-            filepath = _save_private_csv(private_results)
+            filepath = _save_private_csv(private_results, session_name)
             if filepath:
                 console.print(f"[green]Private CSV: {filepath}[/green]")
 
@@ -635,14 +599,14 @@ def _display_private_table(results):
 # =============================================================================
 
 
-def _save_public_csv(results) -> str:
+def _save_public_csv(results, session_name: str = "default") -> str:
     """Public 결과 CSV 저장"""
     if not results:
         return ""
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"public_ip_{timestamp}.csv"
-    filepath = os.path.join(_get_output_dir(), filename)
+    filepath = os.path.join(_get_output_dir(session_name), filename)
 
     with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
@@ -655,14 +619,14 @@ def _save_public_csv(results) -> str:
     return filepath
 
 
-def _save_private_csv(results) -> str:
+def _save_private_csv(results, session_name: str = "default") -> str:
     """Private 결과 CSV 저장"""
     if not results:
         return ""
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"private_ip_{timestamp}.csv"
-    filepath = os.path.join(_get_output_dir(), filename)
+    filepath = os.path.join(_get_output_dir(session_name), filename)
 
     with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
@@ -806,11 +770,8 @@ def run(ctx):
     Args:
         ctx: 실행 컨텍스트 (ExecutionContext 객체)
     """
-    global _current_session_name
-
     # 세션 이름 (프로파일/리전은 flow에서 이미 선택됨)
     session_name = getattr(ctx, "profile_name", None) or "default"
-    _current_session_name = session_name
 
     # 캐시 로드 (있으면)
     cache = _get_cache(session_name)
@@ -888,7 +849,7 @@ def run(ctx):
 
         # Public IP 범위 필터 검색 (@provider:filter 형식)
         if query_input.startswith("@"):
-            _handle_public_filter_query(query_input, save_csv)
+            _handle_public_filter_query(query_input, save_csv, session_name)
             continue
 
         # 쿼리 파싱
@@ -907,6 +868,6 @@ def run(ctx):
                 results["private"] = _enrich_with_detail(ctx, results["private"], cache, session_name)
 
         # 결과 출력 및 저장
-        _display_results(results, save_csv=save_csv)
+        _display_results(results, save_csv=save_csv, session_name=session_name)
 
     console.print("\n[green]✓ 검색 완료[/green]")

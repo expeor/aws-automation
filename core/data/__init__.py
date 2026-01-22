@@ -7,6 +7,7 @@ Modules:
     - inventory: Resource inventory collection and caching
     - pricing: AWS Pricing API services
     - cloudwatch: CloudWatch metrics collection
+    - ip_ranges: Cloud provider public IP ranges
 
 Design Principle:
     core/ = How (infrastructure) + Data (shared services)
@@ -21,6 +22,9 @@ Usage:
 
     # CloudWatch (canonical path)
     from core.data.cloudwatch import MetricQuery, batch_get_metrics
+
+    # Public IP ranges
+    from core.data.ip_ranges import search_public_ip, get_public_cache_status
 """
 
 from .inventory import InventoryCollector, ResourceCache
@@ -37,6 +41,15 @@ from .pricing import (
 # Re-export CloudWatch utilities
 from .cloudwatch import MetricQuery, batch_get_metrics
 
+# Re-export IP ranges utilities
+from .ip_ranges import (
+    PublicIPResult,
+    search_public_ip,
+    get_public_cache_status,
+    refresh_public_cache,
+    clear_public_cache,
+)
+
 __all__ = [
     # Inventory
     "InventoryCollector",
@@ -50,4 +63,10 @@ __all__ = [
     # CloudWatch
     "MetricQuery",
     "batch_get_metrics",
+    # IP Ranges
+    "PublicIPResult",
+    "search_public_ip",
+    "get_public_cache_status",
+    "refresh_public_cache",
+    "clear_public_cache",
 ]
