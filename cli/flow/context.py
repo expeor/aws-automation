@@ -67,6 +67,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
+    from core.data.inventory import InventoryCollector
     from core.filter import AccountFilter
 
 # core.exceptions에서 BackToMenuError 재사용
@@ -382,6 +383,23 @@ class ExecutionContext:
             accounts = self.target_filter.apply(accounts)
 
         return accounts
+
+    def get_inventory(self) -> "InventoryCollector":
+        """Get or create inventory collector for this context
+
+        Returns:
+            InventoryCollector instance with caching enabled
+
+        Example:
+            inventory = ctx.get_inventory()
+            instances = inventory.collect_ec2()
+            security_groups = inventory.collect_security_groups()
+        """
+        # Lazy import to avoid circular dependencies
+        from core.data.inventory import InventoryCollector
+
+        # Create a new collector that uses the global cache
+        return InventoryCollector(self)
 
 
 @dataclass

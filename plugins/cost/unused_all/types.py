@@ -152,7 +152,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "target_group": {
         "display": "Target Group",
         "total": "tg_total",
-        "unused": "tg_issue",
+        "unused": "tg_unused",
         "waste": None,
         "data_unused": "issue",
         "session": "tg_result",
@@ -195,7 +195,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "rds_snapshot": {
         "display": "RDS Snapshot",
         "total": "rds_snap_total",
-        "unused": "rds_snap_old",
+        "unused": "rds_snap_unused",
         "waste": "rds_snap_monthly_waste",
         "data_unused": "old",
         "session": "rds_snap_result",
@@ -208,7 +208,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "ecr": {
         "display": "ECR",
         "total": "ecr_total",
-        "unused": "ecr_issue",
+        "unused": "ecr_unused",
         "waste": "ecr_monthly_waste",
         "data_unused": "issue",
         "session": "ecr_result",
@@ -228,7 +228,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "s3": {
         "display": "S3",
         "total": "s3_total",
-        "unused": "s3_empty",
+        "unused": "s3_unused",
         "waste": None,
         "data_unused": "empty",
         "session": "s3_result",
@@ -344,7 +344,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "cw_alarm": {
         "display": "CloudWatch Alarm",
         "total": "cw_alarm_total",
-        "unused": "cw_alarm_orphan",
+        "unused": "cw_alarm_unused",
         "waste": None,
         "data_unused": "orphan",
         "session": "cw_alarm_result",
@@ -354,7 +354,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "loggroup": {
         "display": "Log Group",
         "total": "loggroup_total",
-        "unused": "loggroup_issue",
+        "unused": "loggroup_unused",
         "waste": "loggroup_monthly_waste",
         "data_unused": "issue",
         "session": "loggroup_result",
@@ -367,7 +367,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "route53": {
         "display": "Route53",
         "total": "route53_total",
-        "unused": "route53_empty",
+        "unused": "route53_unused",
         "waste": "route53_monthly_waste",
         "data_unused": "empty",
         "session": "route53_result",
@@ -433,7 +433,7 @@ class UnusedResourceSummary:
     elb_monthly_waste: float = 0.0
 
     tg_total: int = 0
-    tg_issue: int = 0
+    tg_unused: int = 0
 
     # Database
     dynamodb_total: int = 0
@@ -449,12 +449,12 @@ class UnusedResourceSummary:
     rds_instance_monthly_waste: float = 0.0
 
     rds_snap_total: int = 0
-    rds_snap_old: int = 0
+    rds_snap_unused: int = 0
     rds_snap_monthly_waste: float = 0.0
 
     # Storage
     ecr_total: int = 0
-    ecr_issue: int = 0
+    ecr_unused: int = 0
     ecr_monthly_waste: float = 0.0
 
     efs_total: int = 0
@@ -462,7 +462,7 @@ class UnusedResourceSummary:
     efs_monthly_waste: float = 0.0
 
     s3_total: int = 0
-    s3_empty: int = 0
+    s3_unused: int = 0
 
     # Serverless
     apigateway_total: int = 0
@@ -501,15 +501,15 @@ class UnusedResourceSummary:
 
     # Monitoring
     cw_alarm_total: int = 0
-    cw_alarm_orphan: int = 0
+    cw_alarm_unused: int = 0
 
     loggroup_total: int = 0
-    loggroup_issue: int = 0
+    loggroup_unused: int = 0
     loggroup_monthly_waste: float = 0.0
 
     # DNS (Global)
     route53_total: int = 0
-    route53_empty: int = 0
+    route53_unused: int = 0
     route53_monthly_waste: float = 0.0
 
 

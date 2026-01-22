@@ -51,7 +51,7 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("VPC Endpoint", "endpoint_total", "endpoint_unused", "endpoint_monthly_waste"),
         # Load Balancing
         ("ELB", "elb_total", "elb_unused", "elb_monthly_waste"),
-        ("Target Group", "tg_total", "tg_issue", None),
+        ("Target Group", "tg_total", "tg_unused", None),
         # Database
         ("DynamoDB", "dynamodb_total", "dynamodb_unused", "dynamodb_monthly_waste"),
         (
@@ -66,11 +66,11 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
             "rds_instance_unused",
             "rds_instance_monthly_waste",
         ),
-        ("RDS Snapshot", "rds_snap_total", "rds_snap_old", "rds_snap_monthly_waste"),
+        ("RDS Snapshot", "rds_snap_total", "rds_snap_unused", "rds_snap_monthly_waste"),
         # Storage
-        ("ECR", "ecr_total", "ecr_issue", "ecr_monthly_waste"),
+        ("ECR", "ecr_total", "ecr_unused", "ecr_monthly_waste"),
         ("EFS", "efs_total", "efs_unused", "efs_monthly_waste"),
-        ("S3", "s3_total", "s3_empty", None),
+        ("S3", "s3_total", "s3_unused", None),
         # Serverless
         ("API Gateway", "apigateway_total", "apigateway_unused", None),
         ("EventBridge", "eventbridge_total", "eventbridge_unused", None),
@@ -85,10 +85,10 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("KMS", "kms_total", "kms_unused", "kms_monthly_waste"),
         ("Secrets Manager", "secret_total", "secret_unused", "secret_monthly_waste"),
         # Monitoring
-        ("CloudWatch Alarm", "cw_alarm_total", "cw_alarm_orphan", None),
-        ("Log Group", "loggroup_total", "loggroup_issue", "loggroup_monthly_waste"),
+        ("CloudWatch Alarm", "cw_alarm_total", "cw_alarm_unused", None),
+        ("Log Group", "loggroup_total", "loggroup_unused", "loggroup_monthly_waste"),
         # DNS (Global)
-        ("Route53", "route53_total", "route53_empty", "route53_monthly_waste"),
+        ("Route53", "route53_total", "route53_unused", "route53_monthly_waste"),
     ]
 
     for name, total_attr, unused_attr, waste_attr in resources:
