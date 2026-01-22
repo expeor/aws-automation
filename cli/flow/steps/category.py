@@ -621,20 +621,6 @@ class CategoryStep:
         tools: list[dict] | None = None,
     ) -> None:
         """필터 헤더 출력"""
-        # 권한 범례 (간결)
-        perm_legend = f"[green]■[/green]{t('menu.permission_read')} [yellow]■[/yellow]{t('menu.permission_write')} [red]■[/red]{t('menu.permission_delete')}"
-        print_box_line(f" {perm_legend}")
-
-        # 영역 범례 (사용 중인 영역만)
-        if tools:
-            used_areas = set(t.get("area", "") for t in tools if t.get("area"))
-            if used_areas:
-                area_parts = []
-                for area_key in used_areas:
-                    info = AREA_DISPLAY.get(area_key, {"label": area_key, "color": "dim"})
-                    area_parts.append(f"[{info['color']}]■[/{info['color']}]{info['label']}")
-                print_box_line(f" {' '.join(area_parts)}")
-
         # 필터 상태
         if perm_filter or area_filter:
             filters = []
