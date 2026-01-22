@@ -281,8 +281,8 @@ class CategoryStep:
             # 열 추가 (동적)
             for _ in range(num_cols):
                 table.add_column("#", style="dim", width=4, justify="right")
-                table.add_column("카테고리", width=14)
-                table.add_column("도구", width=4, justify="right")
+                table.add_column("카테고리", width=22)  # 14 → 22 (한글 11자)
+                table.add_column("도구", width=5, justify="right")  # 4 → 5
 
             # 행별로 데이터 추가
             for row in range(rows_per_col):
@@ -414,9 +414,9 @@ class CategoryStep:
             padding=(0, 1),
             title_justify="left",
         )
-        table.add_column("#", style="dim", width=3, justify="right")
-        table.add_column("카테고리", width=12)
-        table.add_column("도구", width=20)
+        table.add_column("#", style="dim", width=4, justify="right")
+        table.add_column("카테고리", width=16)  # 12 → 16
+        table.add_column("도구", width=26)      # 20 → 26
         table.add_column("설명", style="dim")
 
         for i, r in enumerate(results, 1):
@@ -517,9 +517,9 @@ class CategoryStep:
                         # 2열 출력 (Rich Table 사용)
                         row_table = Table(show_header=False, box=None, padding=(0, 1), pad_edge=False)
                         row_table.add_column(width=3, justify="right")
-                        row_table.add_column(width=20)
+                        row_table.add_column(width=26)  # 20 → 26
                         row_table.add_column(width=3, justify="right")
-                        row_table.add_column(width=20)
+                        row_table.add_column(width=26)  # 20 → 26
                         row_table.add_row(left_num, left_name, right_num, right_name)
                         console.print("[bold #FF9900]│[/]   ", end="")
                         console.print(row_table)
@@ -527,7 +527,7 @@ class CategoryStep:
                         # 1열만 출력
                         row_table = Table(show_header=False, box=None, padding=(0, 1), pad_edge=False)
                         row_table.add_column(width=3, justify="right")
-                        row_table.add_column(width=20)
+                        row_table.add_column(width=26)  # 20 → 26
                         row_table.add_row(left_num, left_name)
                         console.print("[bold #FF9900]│[/]   ", end="")
                         console.print(row_table)

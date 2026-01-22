@@ -144,12 +144,12 @@ class MainMenu:
             padding=(0, 1),
             pad_edge=False,
         )
-        cmd_table.add_column(width=2)  # 키
-        cmd_table.add_column(width=14)  # 설명
-        cmd_table.add_column(width=2)  # 키
-        cmd_table.add_column(width=14)  # 설명
-        cmd_table.add_column(width=2)  # 키
-        cmd_table.add_column(width=14)  # 설명
+        cmd_table.add_column(width=3)   # 키 (2 → 3)
+        cmd_table.add_column(width=16)  # 설명 (14 → 16)
+        cmd_table.add_column(width=3)   # 키 (2 → 3)
+        cmd_table.add_column(width=16)  # 설명 (14 → 16)
+        cmd_table.add_column(width=3)   # 키 (2 → 3)
+        cmd_table.add_column(width=16)  # 설명 (14 → 16)
 
         cmd_table.add_row(
             "[dim]a[/dim]",
@@ -177,12 +177,12 @@ class MainMenu:
             padding=(0, 1),
             pad_edge=False,
         )
-        cmd_table2.add_column(width=2)
-        cmd_table2.add_column(width=14)
-        cmd_table2.add_column(width=2)
-        cmd_table2.add_column(width=14)
-        cmd_table2.add_column(width=2)
-        cmd_table2.add_column(width=14)
+        cmd_table2.add_column(width=3)   # 2 → 3
+        cmd_table2.add_column(width=16)  # 14 → 16
+        cmd_table2.add_column(width=3)   # 2 → 3
+        cmd_table2.add_column(width=16)  # 14 → 16
+        cmd_table2.add_column(width=3)   # 2 → 3
+        cmd_table2.add_column(width=16)  # 14 → 16
         cmd_table2.add_row(
             "[dim]f[/dim]",
             "즐겨찾기",
@@ -376,9 +376,9 @@ class MainMenu:
             padding=(0, 1),
             title_justify="left",
         )
-        table.add_column("#", style="dim", width=3, justify="right")
-        table.add_column("카테고리", width=12)
-        table.add_column("도구", width=20)
+        table.add_column("#", style="dim", width=4, justify="right")
+        table.add_column("카테고리", width=16)  # 12 → 16
+        table.add_column("도구", width=26)      # 20 → 26
         table.add_column("설명", style="dim")
 
         for i, r in enumerate(results, 1):
@@ -386,7 +386,7 @@ class MainMenu:
                 str(i),
                 r.category_display.upper(),
                 r.tool_name,
-                r.description[:35] if r.description else "",
+                r.description[:50] if r.description else "",  # 35 → 50
             )
 
         self.console.print(table)
@@ -450,9 +450,9 @@ class MainMenu:
             padding=(0, 1),
             title_justify="left",
         )
-        table.add_column("#", style="dim", width=3, justify="right")
-        table.add_column("카테고리", width=12)
-        table.add_column("도구", width=25)
+        table.add_column("#", style="dim", width=4, justify="right")
+        table.add_column("카테고리", width=16)  # 12 → 16
+        table.add_column("도구", width=28)      # 25 → 28
         table.add_column("설명", style="dim")
 
         for i, (_, tool) in enumerate(results, 1):
@@ -460,7 +460,7 @@ class MainMenu:
                 str(i),
                 tool.get("category_display", tool.get("category", "")).upper(),
                 tool.get("name", ""),
-                (tool.get("description", "") or "")[:40],
+                (tool.get("description", "") or "")[:55],  # 40 → 55
             )
 
         self.console.print(table)
@@ -529,8 +529,8 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=4, justify="right")
-            table.add_column("카테고리", width=14)
-            table.add_column("도구", width=22)
+            table.add_column("카테고리", width=18)  # 14 → 18
+            table.add_column("도구", width=28)      # 22 → 28
             table.add_column("설명", style="dim")
 
             for idx, tool in enumerate(page_tools, start_idx + 1):
@@ -538,7 +538,7 @@ class MainMenu:
                     str(idx),
                     tool.get("category_display", tool["category"]).upper(),
                     tool.get("name", ""),
-                    tool.get("description", "")[:40],
+                    tool.get("description", "")[:55],  # 40 → 55
                 )
 
             self.console.print(table)
@@ -654,8 +654,8 @@ class MainMenu:
             title_justify="left",
         )
         table.add_column("#", style="dim", width=4, justify="right")
-        table.add_column("카테고리", width=14)
-        table.add_column("도구", width=22)
+        table.add_column("카테고리", width=18)  # 14 → 18
+        table.add_column("도구", width=28)      # 22 → 28
         table.add_column("설명", style="dim")
 
         for orig_idx, tool in results:
@@ -663,7 +663,7 @@ class MainMenu:
                 str(orig_idx),
                 tool.get("category_display", tool["category"]).upper(),
                 tool.get("name", ""),
-                tool.get("description", "")[:40],
+                tool.get("description", "")[:55],  # 40 → 55
             )
 
         self.console.print(table)
@@ -1007,8 +1007,8 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("영역", width=12)
-            table.add_column("설명", width=25)
+            table.add_column("영역", width=14)      # 12 → 14
+            table.add_column("설명", width=30)      # 25 → 30
             table.add_column("도구", width=6, justify="right")
 
             for i, area in enumerate(AREA_REGISTRY, 1):
@@ -1063,8 +1063,8 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("서비스", width=12)
-            table.add_column("도구", width=25)
+            table.add_column("서비스", width=14)    # 12 → 14
+            table.add_column("도구", width=28)      # 25 → 28
             table.add_column("권한", width=6)
             table.add_column("설명", style="dim")
 
@@ -1076,7 +1076,7 @@ class MainMenu:
                     tool.get("category_display", tool["category"]).upper(),
                     tool.get("name", ""),
                     f"[{perm_color}]{perm}[/{perm_color}]",
-                    (tool.get("description", "") or "")[:35],
+                    (tool.get("description", "") or "")[:50],  # 35 → 50
                 )
 
             self.console.print(table)
@@ -1125,7 +1125,7 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("카테고리", width=30)
+            table.add_column("카테고리", width=38)  # 30 → 38
             table.add_column("서비스", width=6, justify="right")
             table.add_column("도구", width=6, justify="right")
 
@@ -1179,14 +1179,14 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("서비스", width=20)
+            table.add_column("서비스", width=26)    # 20 → 26
             table.add_column("도구", width=6, justify="right")
             table.add_column("설명", style="dim")
 
             for i, plugin in enumerate(plugins, 1):
                 display_name = plugin.get("display_name", plugin.get("name", ""))
                 tool_count = len(plugin.get("tools", []))
-                desc = plugin.get("description", "")[:40]
+                desc = plugin.get("description", "")[:55]  # 40 → 55
                 table.add_row(str(i), display_name.upper(), str(tool_count), desc)
 
             self.console.print(table)
@@ -1235,7 +1235,7 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column("도구", width=25)
+            table.add_column("도구", width=30)      # 25 → 30
             table.add_column("권한", width=6)
             table.add_column("영역", width=10)
             table.add_column("설명", style="dim")
@@ -1251,7 +1251,7 @@ class MainMenu:
                     tool.get("name", ""),
                     f"[{perm_color}]{perm}[/{perm_color}]",
                     f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
-                    (tool.get("description", "") or "")[:35],
+                    (tool.get("description", "") or "")[:50],  # 35 → 50
                 )
 
             self.console.print(table)
