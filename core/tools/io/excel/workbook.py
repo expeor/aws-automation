@@ -82,7 +82,8 @@ class ColumnDef:
     """컬럼 정의 클래스
 
     Attributes:
-        header: 헤더 텍스트
+        header: 헤더 텍스트 (기본 언어: 한국어)
+        header_en: 영어 헤더 텍스트 (옵션)
         width: 컬럼 너비 (기본값: 15)
         style: 스타일 타입 ("data", "center", "wrap", "number",
                "currency", "percent")
@@ -91,6 +92,20 @@ class ColumnDef:
     header: str
     width: int = 15
     style: StyleType = "data"
+    header_en: str | None = None
+
+    def get_header(self, lang: str = "ko") -> str:
+        """언어에 따른 헤더 텍스트 반환
+
+        Args:
+            lang: 언어 코드 ("ko" 또는 "en")
+
+        Returns:
+            헤더 텍스트 (영어 요청 시 header_en 사용, 없으면 header 반환)
+        """
+        if lang == "en" and self.header_en:
+            return self.header_en
+        return self.header
 
 
 @dataclass
@@ -408,12 +423,12 @@ class Workbook:
     """Excel Workbook 래퍼 클래스
 
     Usage:
-        wb = Workbook()
+        wb = Workbook(lang="ko")  # or "en" for English headers
 
         columns = [
-            ColumnDef(header="Volume ID", width=22, style="data"),
-            ColumnDef(header="크기(GB)", width=10, style="number"),
-            ColumnDef(header="상태", width=12, style="center"),
+            ColumnDef(header="볼륨 ID", header_en="Volume ID", width=22, style="data"),
+            ColumnDef(header="크기(GB)", header_en="Size (GB)", width=10, style="number"),
+            ColumnDef(header="상태", header_en="Status", width=12, style="center"),
         ]
 
         sheet = wb.new_sheet(name="분석 결과", columns=columns)
@@ -423,15 +438,25 @@ class Workbook:
         wb.save_as(output_dir, "unused_volumes", "ap-northeast-2")
     """
 
-    def __init__(self):
-        """Workbook 초기화"""
+    def __init__(self, lang: str = "ko"):
+        """Workbook 초기화
+
+        Args:
+            lang: 언어 설정 ("ko" 또는 "en", 기본값: "ko")
+        """
         from openpyxl import Workbook as _OpenpyxlWorkbook
 
         self._wb = _OpenpyxlWorkbook()
+        self._lang = lang
         # 기본 시트 제거
         if "Sheet" in self._wb.sheetnames:
             del self._wb["Sheet"]
         self._sheets: list[Sheet] = []
+
+    @property
+    def lang(self) -> str:
+        """현재 언어 설정 반환"""
+        return self._lang
 
     @property
     def styles(self) -> type:
@@ -462,7 +487,9 @@ class Workbook:
         border = get_thin_border()
 
         for col_idx, col_def in enumerate(columns, start=1):
-            cell = ws.cell(row=1, column=col_idx, value=col_def.header)
+            # 언어 설정에 따른 헤더 텍스트 사용
+            header_text = col_def.get_header(self._lang)
+            cell = ws.cell(row=1, column=col_idx, value=header_text)
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = _get_align_center()
@@ -484,7 +511,8 @@ class Workbook:
 
     def new_summary_sheet(
         self,
-        name: str = "분석 요약",
+        name: str | None = None,
+        name_en: str | None = None,
         position: int = 0,
     ) -> SummarySheet:
         """Summary(분석 요약) 시트 생성
@@ -492,13 +520,23 @@ class Workbook:
         Key-Value 형태의 요약 정보를 표시하는 시트.
 
         Args:
-            name: 시트 이름
+            name: 시트 이름 (한국어, 기본값: "분석 요약")
+            name_en: 영어 시트 이름 (기본값: "Summary")
             position: 시트 위치 (0 = 맨 앞)
 
         Returns:
             SummarySheet 인스턴스
         """
-        ws = self._wb.create_sheet(title=name, index=position)
+        # 기본값 설정
+        if name is None:
+            name = "분석 요약"
+        if name_en is None:
+            name_en = "Summary"
+
+        # 언어에 따른 시트 이름 선택
+        sheet_name = name_en if self._lang == "en" else name
+
+        ws = self._wb.create_sheet(title=sheet_name, index=position)
         return SummarySheet(ws, self)
 
     @property

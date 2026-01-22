@@ -152,14 +152,29 @@ def _build_help_text() -> str:
 
 @click.group(cls=GroupedCommandsGroup, invoke_without_command=True)
 @click.version_option(VERSION, prog_name="aa")
+@click.option(
+    "--lang",
+    type=click.Choice(["ko", "en"]),
+    default="ko",
+    help="UI 언어 설정 / UI language (ko: 한국어, en: English)",
+)
 @click.pass_context
-def cli(ctx):
+def cli(ctx, lang):
     """AA - AWS Automation CLI"""
+    # Set language for i18n
+    from cli.i18n import set_lang
+
+    set_lang(lang)
+
+    # Store lang in click context for subcommands
+    ctx.ensure_object(dict)
+    ctx.obj["lang"] = lang
+
     if ctx.invoked_subcommand is None:
         # 서브 명령어 없이 실행된 경우 새로운 메인 메뉴 표시
         from cli.ui.main_menu import show_main_menu
 
-        show_main_menu()
+        show_main_menu(lang=lang)
 
 
 # help 텍스트 동적 설정

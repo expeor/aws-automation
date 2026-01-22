@@ -11,6 +11,7 @@ from typing import Any
 
 from rich.console import Console
 
+from cli.i18n import t
 from .context import ExecutionContext, FlowResult, ToolInfo
 from .steps import AccountStep, CategoryStep, ProfileStep, RegionStep, RoleStep
 
@@ -27,12 +28,12 @@ class FlowRunner:
                 result = self._run_once(entry_point)
 
                 if not result.success:
-                    console.print(f"[red]실행 실패: {result.message}[/red]")
+                    console.print(f"[red]{t('runner.execution_failed', message=result.message)}[/red]")
 
                 console.print()
 
                 # 다른 보고서 실행 여부 확인
-                cont = console.input("[dim]다른 보고서를 실행하시겠습니까? [Y/n][/dim] > ").strip().lower()
+                cont = console.input(f"[dim]{t('runner.run_another')}[/dim] > ").strip().lower()
                 if cont == "n":
                     break
 
@@ -40,16 +41,16 @@ class FlowRunner:
 
             except KeyboardInterrupt:
                 console.print()
-                console.print("[dim]종료[/dim]")
+                console.print(f"[dim]{t('common.exit')}[/dim]")
                 break
             except Exception as e:
                 console.print()
-                console.print(f"[red]오류: {e}[/red]")
+                console.print(f"[red]{t('common.error')}: {e}[/red]")
                 if "--debug" in sys.argv:
                     traceback.print_exc()
                 console.print()
 
-                cont = console.input("[dim]다른 보고서를 실행하시겠습니까? [Y/n][/dim] > ").strip().lower()
+                cont = console.input(f"[dim]{t('runner.run_another')}[/dim] > ").strip().lower()
                 if cont == "n":
                     break
 
@@ -70,7 +71,7 @@ class FlowRunner:
             # 도구 정보 조회
             tool_meta = self._find_tool_meta(category, tool_module)
             if not tool_meta:
-                console.print(f"[red]! '{category}/{tool_module}' 도구를 찾을 수 없습니다.[/red]")
+                console.print(f"[red]! {t('runner.tool_not_found', path=f'{category}/{tool_module}')}[/red]")
                 return
 
             # Context 구성
@@ -108,14 +109,14 @@ class FlowRunner:
             self._save_history(ctx)
 
             console.print()
-            console.print("[dim]완료[/dim]")
+            console.print(f"[dim]{t('runner.done')}[/dim]")
 
         except KeyboardInterrupt:
             console.print()
-            console.print("[dim]취소됨[/dim]")
+            console.print(f"[dim]{t('runner.cancelled')}[/dim]")
         except Exception as e:
             console.print()
-            console.print(f"[red]오류: {e}[/red]")
+            console.print(f"[red]{t('common.error')}: {e}[/red]")
             if "--debug" in sys.argv:
                 traceback.print_exc()
 
@@ -171,7 +172,7 @@ class FlowRunner:
         except Exception as e:
             # 이력 저장 실패는 무시 (실행에 영향 없음)
             if "--debug" in sys.argv:
-                console.print(f"[dim]이력 저장 실패: {e}[/dim]")
+                console.print(f"[dim]{t('runner.history_save_failed', error=str(e))}[/dim]")
 
     def _run_once(self, entry_point: str | None = None) -> FlowResult:
         """한 번의 Flow 실행"""
@@ -185,7 +186,7 @@ class FlowRunner:
 
         if tool_requires_session:
             console.print()
-            console.print("[dim]Ctrl+C: 취소[/dim]")
+            console.print(f"[dim]{t('runner.ctrl_c_hint')}[/dim]")
 
             # Step 2~4: 프로파일/계정/역할/리전 선택
             ctx = ProfileStep().execute(ctx)
@@ -206,7 +207,7 @@ class FlowRunner:
         return FlowResult(
             success=ctx.error is None,
             context=ctx,
-            message=str(ctx.error) if ctx.error else "완료",
+            message=str(ctx.error) if ctx.error else t("runner.done"),
         )
 
     def _tool_requires_session(self, ctx: ExecutionContext) -> bool:
@@ -237,13 +238,13 @@ class FlowRunner:
             # 찾지 못하면 기본값 True
             return True
         except Exception as e:
-            console.print(f"[yellow]도구 설정 확인 실패: {e}[/yellow]")
+            console.print(f"[yellow]{t('runner.tool_config_check_failed', error=str(e))}[/yellow]")
             return True
 
     def _execute_tool(self, ctx: ExecutionContext) -> None:
         """도구 실행 (discovery 기반)"""
         if not ctx.tool or not ctx.category:
-            ctx.error = ValueError("도구 또는 카테고리가 선택되지 않음")
+            ctx.error = ValueError(t("runner.tool_or_category_not_selected"))
             return
 
         # discovery로 도구 로드
@@ -252,13 +253,13 @@ class FlowRunner:
 
             tool = load_tool(ctx.category, ctx.tool.name)
         except ImportError as e:
-            console.print(f"[red]discovery 모듈 로드 실패: {e}[/red]")
+            console.print(f"[red]{t('runner.tool_load_failed', error=str(e))}[/red]")
             ctx.error = e
             return
 
         if tool is None:
             console.print()
-            console.print(f"[yellow]{ctx.category}/{ctx.tool.name} 도구를 찾을 수 없습니다.[/yellow]")
+            console.print(f"[yellow]{t('runner.tool_not_found', path=f'{ctx.category}/{ctx.tool.name}')}[/yellow]")
             return
 
         # 필요 권한 정보 추출
@@ -266,13 +267,13 @@ class FlowRunner:
 
         self._print_execution_summary(ctx, required_permissions)
         console.print()
-        console.print("[dim]실행 중...[/dim]")
+        console.print(f"[dim]{t('runner.executing')}[/dim]")
         console.print()
 
         try:
             # 도구 로드 결과 검증
             if not isinstance(tool, dict):
-                raise TypeError(f"load_tool이 dict가 아닌 {type(tool).__name__}를 반환함")
+                raise TypeError(f"load_tool returned {type(tool).__name__} instead of dict")
 
             # 커스텀 옵션 수집 (있으면)
             collect_fn = tool.get("collect_options")
@@ -282,7 +283,7 @@ class FlowRunner:
             # 실행
             run_fn = tool.get("run")
             if not run_fn:
-                raise ValueError("도구에 run 함수가 없습니다")
+                raise ValueError(t("runner.no_run_function"))
             ctx.result = run_fn(ctx)
 
         except Exception as e:
@@ -295,27 +296,27 @@ class FlowRunner:
         """실행 전 요약 출력"""
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
-        print_box_start("실행 요약")
+        print_box_start(t("runner.execution_summary"))
         if ctx.tool:
-            print_box_line(f" 도구: {ctx.tool.name}")
+            print_box_line(f" {t('runner.summary_tool')}: {ctx.tool.name}")
         if ctx.profile_name:
-            print_box_line(f" 프로파일: {ctx.profile_name}")
+            print_box_line(f" {t('runner.summary_profile')}: {ctx.profile_name}")
 
         if ctx.role_selection:
             role_info = ctx.role_selection.primary_role
             if ctx.role_selection.fallback_role:
                 role_info += f" / {ctx.role_selection.fallback_role}"
-            print_box_line(f" Role: {role_info}")
+            print_box_line(f" {t('runner.summary_role')}: {role_info}")
 
         if ctx.regions:
             if len(ctx.regions) == 1:
-                print_box_line(f" 리전: {ctx.regions[0]}")
+                print_box_line(f" {t('runner.summary_region')}: {ctx.regions[0]}")
             else:
-                print_box_line(f" 리전: {len(ctx.regions)}개")
+                print_box_line(f" {t('runner.summary_region')}: {t('runner.summary_regions_count', count=len(ctx.regions))}")
 
         if ctx.is_multi_account() and ctx.accounts:
             target_count = len(ctx.get_target_accounts())
-            print_box_line(f" 계정: {target_count}개")
+            print_box_line(f" {t('runner.summary_accounts')}: {t('runner.summary_accounts_count', count=target_count)}")
 
         # 필요 권한 표시
         if required_permissions:
@@ -333,7 +334,7 @@ class FlowRunner:
         if not read_perms and not write_perms:
             return
 
-        print_box_line(" 필요 권한:")
+        print_box_line(f" {t('runner.required_permissions')}")
         if read_perms:
             for perm in read_perms:
                 print_box_line(f"   [dim]•[/dim] {perm}")
@@ -372,29 +373,29 @@ class FlowRunner:
             return
 
         console.print()
-        console.print("[yellow]━━━ 권한 오류 ━━━[/yellow]")
-        console.print(f"[red]{error_code}: 필요한 권한이 없습니다.[/red]")
+        console.print(f"[yellow]━━━ {t('runner.permission_error_title')} ━━━[/yellow]")
+        console.print(f"[red]{t('runner.permission_missing', code=error_code)}[/red]")
 
         if required_permissions:
             console.print()
-            console.print("[cyan]이 도구에 필요한 권한:[/cyan]")
+            console.print(f"[cyan]{t('runner.tool_required_permissions')}[/cyan]")
 
             # read 권한
             read_perms = required_permissions.get("read", [])
             if read_perms:
-                console.print("[dim]  Read:[/dim]")
+                console.print(f"[dim]  {t('runner.permission_read')}[/dim]")
                 for perm in read_perms:
                     console.print(f"    - {perm}")
 
             # write 권한
             write_perms = required_permissions.get("write", [])
             if write_perms:
-                console.print("[dim]  Write:[/dim]")
+                console.print(f"[dim]  {t('runner.permission_write')}[/dim]")
                 for perm in write_perms:
                     console.print(f"    - {perm}")
 
             console.print()
-            console.print("[dim]IAM 정책에 위 권한을 추가하거나 관리자에게 문의하세요.[/dim]")
+            console.print(f"[dim]{t('runner.contact_admin')}[/dim]")
         console.print("[yellow]━━━━━━━━━━━━━━━━━[/yellow]")
 
 

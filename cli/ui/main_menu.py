@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
+from cli.i18n import get_lang, get_text, t
 from cli.ui.banner import print_banner
 
 if TYPE_CHECKING:
@@ -52,9 +53,15 @@ SHORTCUTS = {
 class MainMenu:
     """메인 메뉴 클래스 (V2 - 확장성 대응)"""
 
-    def __init__(self, console: Console | None = None):
-        """초기화"""
+    def __init__(self, console: Console | None = None, lang: str = "ko"):
+        """초기화
+
+        Args:
+            console: Rich Console 인스턴스 (기본: 전역 console 사용)
+            lang: 언어 설정 ("ko" 또는 "en", 기본값: "ko")
+        """
         self.console = console or default_console
+        self.lang = lang
         self._categories: list[dict] = []
         self._search_engine: ToolSearchEngine | None = None
         self._recent_history: RecentHistory | None = None
@@ -123,7 +130,7 @@ class MainMenu:
             return []
 
         count_info = f" ({len(fav_items)}/{len(all_favs)})" if len(all_favs) > 5 else ""
-        self.console.print(f"[bold]즐겨찾기{count_info}[/bold]")
+        self.console.print(f"[bold]{t('menu.favorites')}{count_info}[/bold]")
 
         for i, item in enumerate(fav_items, 1):
             self.console.print(f"  {i}. {item.tool_name} [dim]{item.category}[/dim]")
@@ -135,7 +142,7 @@ class MainMenu:
         from rich.table import Table
 
         self.console.print()
-        self.console.print("[bold]도구 탐색[/bold]")
+        self.console.print(f"[bold]{get_text('도구 탐색', 'Tool Navigation', self.lang)}[/bold]")
 
         # Rich Table로 정렬
         cmd_table = Table(
@@ -144,24 +151,24 @@ class MainMenu:
             padding=(0, 1),
             pad_edge=False,
         )
-        cmd_table.add_column(width=3)   # 키 (2 → 3)
-        cmd_table.add_column(width=16)  # 설명 (14 → 16)
-        cmd_table.add_column(width=3)   # 키 (2 → 3)
-        cmd_table.add_column(width=16)  # 설명 (14 → 16)
-        cmd_table.add_column(width=3)   # 키 (2 → 3)
-        cmd_table.add_column(width=16)  # 설명 (14 → 16)
+        cmd_table.add_column(width=3)
+        cmd_table.add_column(width=16)
+        cmd_table.add_column(width=3)
+        cmd_table.add_column(width=16)
+        cmd_table.add_column(width=3)
+        cmd_table.add_column(width=16)
 
         cmd_table.add_row(
             "[dim]a[/dim]",
-            "전체 도구",
+            get_text("전체 도구", "All Tools", self.lang),
             "[dim]s[/dim]",
-            "AWS 서비스",
+            get_text("AWS 서비스", "AWS Services", self.lang),
             "[dim]c[/dim]",
-            "AWS 분류",
+            get_text("AWS 분류", "AWS Categories", self.lang),
         )
         cmd_table.add_row(
             "[dim]t[/dim]",
-            "점검 유형",
+            get_text("점검 유형", "Check Types", self.lang),
             "",
             "",
             "",
@@ -170,30 +177,30 @@ class MainMenu:
         self.console.print(cmd_table)
 
         self.console.print()
-        self.console.print("[bold]설정[/bold]")
+        self.console.print(f"[bold]{get_text('설정', 'Settings', self.lang)}[/bold]")
         cmd_table2 = Table(
             show_header=False,
             box=None,
             padding=(0, 1),
             pad_edge=False,
         )
-        cmd_table2.add_column(width=3)   # 2 → 3
-        cmd_table2.add_column(width=16)  # 14 → 16
-        cmd_table2.add_column(width=3)   # 2 → 3
-        cmd_table2.add_column(width=16)  # 14 → 16
-        cmd_table2.add_column(width=3)   # 2 → 3
-        cmd_table2.add_column(width=16)  # 14 → 16
+        cmd_table2.add_column(width=3)
+        cmd_table2.add_column(width=16)
+        cmd_table2.add_column(width=3)
+        cmd_table2.add_column(width=16)
+        cmd_table2.add_column(width=3)
+        cmd_table2.add_column(width=16)
         cmd_table2.add_row(
             "[dim]f[/dim]",
-            "즐겨찾기",
+            get_text("즐겨찾기", "Favorites", self.lang),
             "[dim]p[/dim]",
-            "프로필",
+            get_text("프로필", "Profiles", self.lang),
             "[dim]g[/dim]",
-            "프로필그룹",
+            get_text("프로필그룹", "Profile Groups", self.lang),
         )
         cmd_table2.add_row(
             "[dim]q[/dim]",
-            "종료",
+            get_text("종료", "Exit", self.lang),
             "",
             "",
             "",
@@ -202,7 +209,7 @@ class MainMenu:
         self.console.print(cmd_table2)
 
         self.console.print()
-        self.console.print("[dim]검색: 키워드 입력[/dim]")
+        self.console.print(f"[dim]{get_text('검색: 키워드 입력', 'Search: Enter keyword', self.lang)}[/dim]")
 
     def _print_footer(self) -> None:
         """하단 안내 출력"""
@@ -266,7 +273,7 @@ class MainMenu:
         self._ensure_initialized()
 
         if action == "exit":
-            self.console.print("[dim]종료[/dim]")
+            self.console.print(f"[dim]{t('common.exit')}[/dim]")
             return False
 
         if action == "show_menu":
@@ -335,7 +342,7 @@ class MainMenu:
 
         # 도구 실행 완료 후 메뉴 복귀 전 대기
         self.console.print()
-        wait_for_any_key("[dim]아무 키나 눌러 메뉴로 돌아가기...[/dim]")
+        wait_for_any_key(f"[dim]{t('common.press_any_key_to_return')}[/dim]")
 
     def _handle_search(self, query: str) -> None:
         """검색 처리"""
@@ -369,7 +376,7 @@ class MainMenu:
 
         self.console.print()
         table = Table(
-            title=f"[bold]검색: {query}[/bold] ({len(results)}건)",
+            title=f"[bold]{t('common.search')}: {query}[/bold] ({len(results)}{get_text('건', ' results', self.lang)})",
             show_header=True,
             header_style="dim",
             box=None,
@@ -377,9 +384,9 @@ class MainMenu:
             title_justify="left",
         )
         table.add_column("#", style="dim", width=4, justify="right")
-        table.add_column("카테고리", width=16)  # 12 → 16
-        table.add_column("도구", width=26)      # 20 → 26
-        table.add_column("설명", style="dim")
+        table.add_column(t("menu.header_category"), width=16)
+        table.add_column(t("menu.header_name"), width=26)
+        table.add_column(t("menu.header_description"), style="dim")
 
         for i, r in enumerate(results, 1):
             table.add_row(
@@ -391,7 +398,7 @@ class MainMenu:
 
         self.console.print(table)
         self.console.print()
-        self.console.print("[dim]0: 돌아가기[/dim]")
+        self.console.print(f"[dim]0: {t('common.back')}[/dim]")
 
         # 선택
         while True:
@@ -410,7 +417,7 @@ class MainMenu:
                     self._run_tool_directly(selected.category, selected.tool_module)
                     return
 
-            self.console.print(f"[red]0-{len(results)} 범위의 번호를 입력하세요.[/]")
+            self.console.print(f"[red]{get_text(f'0-{len(results)} 범위의 번호를 입력하세요.', f'Enter a number between 0-{len(results)}.', self.lang)}[/]")
 
     def _handle_area_search(self, query: str, area: str) -> None:
         """영역(area) 기반 검색 처리"""
@@ -1559,9 +1566,16 @@ class MainMenu:
                 self.console.print(f"[dim]1-{len(groups)} 범위[/dim]")
 
 
-def show_main_menu() -> None:
-    """메인 메뉴 표시 및 루프 실행"""
-    menu = MainMenu()
+def show_main_menu(lang: str = "ko") -> None:
+    """메인 메뉴 표시 및 루프 실행
+
+    Args:
+        lang: 언어 설정 ("ko" 또는 "en", 기본값: "ko")
+    """
+    from cli.i18n import set_lang, t
+
+    set_lang(lang)
+    menu = MainMenu(lang=lang)
 
     while True:
         try:
@@ -1572,5 +1586,5 @@ def show_main_menu() -> None:
                 break
 
         except KeyboardInterrupt:
-            menu.console.print("\n[dim]종료[/dim]")
+            menu.console.print(f"\n[dim]{t('common.exit')}[/dim]")
             break

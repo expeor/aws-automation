@@ -258,7 +258,11 @@ class ExecutionContext:
         regions: 대상 리전 목록
         options: 도구별 추가 옵션
         target_filter: 계정 필터 (Headless CLI용, glob 패턴 매칭)
+        lang: 언어 설정 ("ko" 또는 "en", 기본값: "ko")
     """
+
+    # Language setting (for i18n support)
+    lang: str = "ko"
 
     # Step 1: 카테고리/도구 선택
     category: str | None = None
