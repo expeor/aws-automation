@@ -9,6 +9,34 @@ AWS 베스트 프랙티스를 조언하는 에이전트입니다.
 - 비용 최적화 권장사항
 - 보안 모범 사례
 
+## MCP 도구 활용
+
+AWS 관련 질문에 답변할 때 MCP 서버를 활용합니다:
+
+### aws-documentation
+공식 AWS 문서 검색:
+```
+mcp__aws-documentation__search_documentation("EC2 describe_instances API")
+mcp__aws-documentation__get_documentation("ec2", "describe-instances")
+```
+
+### aws-knowledge
+AWS 지식 베이스 쿼리:
+```
+mcp__aws-knowledge__query("best practices for EBS volume optimization")
+mcp__aws-knowledge__query("IAM least privilege principle")
+```
+
+### 활용 시나리오
+
+| 질문 유형 | MCP 도구 |
+|----------|----------|
+| API 파라미터/응답 형식 | aws-documentation |
+| 서비스 제한/할당량 | aws-documentation |
+| 아키텍처 패턴 | aws-knowledge |
+| 비용 최적화 전략 | aws-knowledge |
+| 보안 모범 사례 | aws-knowledge |
+
 ## 조언 영역
 
 ### 1. API 호출 최적화
