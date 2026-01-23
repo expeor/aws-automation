@@ -393,10 +393,23 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from collections import defaultdict
 
+<<<<<<< HEAD
     from openpyxl.styles import PatternFill
 
     from core.tools.io.excel import ColumnDef, Styles, Workbook
 
+=======
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    if wb.active:
+        wb.remove(wb.active)
+
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+>>>>>>> origin/master
     critical_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     high_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     medium_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
@@ -408,6 +421,7 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         all_events.extend(r.events)
     all_events.sort(key=lambda e: e.event_time, reverse=True)
 
+<<<<<<< HEAD
     wb = Workbook()
 
     # ========== Summary 시트 ==========
@@ -451,6 +465,42 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         ColumnDef(header="IP 목록", width=40),
     ]
     actors_sheet = wb.new_sheet("Actors", actor_columns)
+=======
+    # ========== Summary 시트 ==========
+    ws = wb.create_sheet("Summary")
+    ws["A1"] = "CloudTrail 보안 이벤트 분석 보고서"
+    ws["A1"].font = Font(bold=True, size=14)
+
+    headers = ["Account", "Region", "총 이벤트", "루트 로그인", "로그인 실패", "IAM 변경", "Critical"]
+    row = 3
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=row, column=col, value=h).fill = header_fill
+        ws.cell(row=row, column=col).font = header_font
+
+    for r in results:
+        row += 1
+        ws.cell(row=row, column=1, value=r.account_name)
+        ws.cell(row=row, column=2, value=r.region)
+        ws.cell(row=row, column=3, value=len(r.events))
+        ws.cell(row=row, column=4, value=r.root_logins)
+        ws.cell(row=row, column=5, value=r.failed_logins)
+        ws.cell(row=row, column=6, value=r.iam_changes)
+        ws.cell(row=row, column=7, value=r.critical_events)
+
+        if r.root_logins > 0:
+            ws.cell(row=row, column=4).fill = high_fill
+        if r.failed_logins > 0:
+            ws.cell(row=row, column=5).fill = medium_fill
+        if r.critical_events > 0:
+            ws.cell(row=row, column=7).fill = critical_fill
+
+    # ========== Actors 시트 (행위자별 분석) ==========
+    ws_actors = wb.create_sheet("Actors")
+    actor_headers = ["행위자", "유형", "이벤트 수", "Critical", "High", "주요 활동", "IP 목록"]
+    for col, h in enumerate(actor_headers, 1):
+        ws_actors.cell(row=1, column=col, value=h).fill = header_fill
+        ws_actors.cell(row=1, column=col).font = header_font
+>>>>>>> origin/master
 
     # 행위자별 집계
     actor_stats: dict[str, dict] = defaultdict(
@@ -467,7 +517,13 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         elif e.severity == EventSeverity.HIGH:
             actor_stats[key]["high"] += 1
 
+<<<<<<< HEAD
     for actor, stats in sorted(actor_stats.items(), key=lambda x: -x[1]["count"]):
+=======
+    actor_row = 1
+    for actor, stats in sorted(actor_stats.items(), key=lambda x: -x[1]["count"]):
+        actor_row += 1
+>>>>>>> origin/master
         # 상위 3개 이벤트
         top_events = sorted(stats["events"].items(), key=lambda x: -x[1])[:3]
         top_events_str = ", ".join(f"{k}({v})" for k, v in top_events)
@@ -475,6 +531,7 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         if len(stats["ips"]) > 5:
             ips_str += f" 외 {len(stats['ips']) - 5}개"
 
+<<<<<<< HEAD
         row_num = actors_sheet.add_row([
             actor,
             stats["type"],
@@ -503,6 +560,30 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         ColumnDef(header="유형", width=15),
     ]
     ip_sheet = wb.new_sheet("IP Analysis", ip_columns)
+=======
+        ws_actors.cell(row=actor_row, column=1, value=actor)
+        ws_actors.cell(row=actor_row, column=2, value=stats["type"])
+        ws_actors.cell(row=actor_row, column=3, value=stats["count"])
+        ws_actors.cell(row=actor_row, column=4, value=stats["critical"])
+        ws_actors.cell(row=actor_row, column=5, value=stats["high"])
+        ws_actors.cell(row=actor_row, column=6, value=top_events_str)
+        ws_actors.cell(row=actor_row, column=7, value=ips_str)
+
+        # Root 계정 강조
+        if stats["type"] == "Root":
+            ws_actors.cell(row=actor_row, column=1).fill = high_fill
+        if stats["critical"] > 0:
+            ws_actors.cell(row=actor_row, column=4).fill = critical_fill
+        if stats["high"] > 0:
+            ws_actors.cell(row=actor_row, column=5).fill = high_fill
+
+    # ========== IP Analysis 시트 ==========
+    ws_ip = wb.create_sheet("IP Analysis")
+    ip_headers = ["IP 주소", "이벤트 수", "행위자 수", "주요 행위자", "Critical", "유형"]
+    for col, h in enumerate(ip_headers, 1):
+        ws_ip.cell(row=1, column=col, value=h).fill = header_fill
+        ws_ip.cell(row=1, column=col).font = header_font
+>>>>>>> origin/master
 
     # IP별 집계
     ip_stats: dict[str, dict] = defaultdict(lambda: {"count": 0, "actors": set(), "critical": 0, "type": "Unknown"})
@@ -543,12 +624,19 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         else:
             ip_stats[ip]["type"] = "Public"
 
+<<<<<<< HEAD
     for ip, stats in sorted(ip_stats.items(), key=lambda x: -x[1]["count"]):
+=======
+    ip_row = 1
+    for ip, stats in sorted(ip_stats.items(), key=lambda x: -x[1]["count"]):
+        ip_row += 1
+>>>>>>> origin/master
         actors_list = list(stats["actors"])
         actors_str = ", ".join(actors_list[:3])
         if len(actors_list) > 3:
             actors_str += f" 외 {len(actors_list) - 3}명"
 
+<<<<<<< HEAD
         row_num = ip_sheet.add_row([
             ip,
             stats["count"],
@@ -573,6 +661,27 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         ColumnDef(header="주요 이벤트", width=50),
     ]
     time_sheet = wb.new_sheet("Timeline", time_columns)
+=======
+        ws_ip.cell(row=ip_row, column=1, value=ip)
+        ws_ip.cell(row=ip_row, column=2, value=stats["count"])
+        ws_ip.cell(row=ip_row, column=3, value=len(stats["actors"]))
+        ws_ip.cell(row=ip_row, column=4, value=actors_str)
+        ws_ip.cell(row=ip_row, column=5, value=stats["critical"])
+        ws_ip.cell(row=ip_row, column=6, value=stats["type"])
+
+        # 외부 IP + 다수 행위자 = 의심
+        if stats["type"] == "Public" and len(stats["actors"]) > 3:
+            ws_ip.cell(row=ip_row, column=1).fill = warning_fill
+        if stats["critical"] > 0:
+            ws_ip.cell(row=ip_row, column=5).fill = critical_fill
+
+    # ========== Timeline 시트 (시간대별 분석) ==========
+    ws_time = wb.create_sheet("Timeline")
+    time_headers = ["시간대 (UTC)", "이벤트 수", "Critical", "High", "주요 이벤트"]
+    for col, h in enumerate(time_headers, 1):
+        ws_time.cell(row=1, column=col, value=h).fill = header_fill
+        ws_time.cell(row=1, column=col).font = header_font
+>>>>>>> origin/master
 
     # 시간대별 집계 (0-23시)
     hourly_stats: dict[int, dict] = {
@@ -587,10 +696,15 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
         elif e.severity == EventSeverity.HIGH:
             hourly_stats[hour]["high"] += 1
 
+<<<<<<< HEAD
+=======
+    time_row = 1
+>>>>>>> origin/master
     for hour in range(24):
         stats = hourly_stats[hour]
         if stats["count"] == 0:
             continue
+<<<<<<< HEAD
         top_events = sorted(stats["events"].items(), key=lambda x: -x[1])[:3]
         top_events_str = ", ".join(f"{k}({v})" for k, v in top_events)
 
@@ -653,6 +767,79 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
             ws.cell(row=row_num, column=7).fill = medium_fill
 
     return str(wb.save_as(output_dir, "CloudTrail_Security"))
+=======
+        time_row += 1
+        top_events = sorted(stats["events"].items(), key=lambda x: -x[1])[:3]
+        top_events_str = ", ".join(f"{k}({v})" for k, v in top_events)
+
+        ws_time.cell(row=time_row, column=1, value=f"{hour:02d}:00 - {hour:02d}:59")
+        ws_time.cell(row=time_row, column=2, value=stats["count"])
+        ws_time.cell(row=time_row, column=3, value=stats["critical"])
+        ws_time.cell(row=time_row, column=4, value=stats["high"])
+        ws_time.cell(row=time_row, column=5, value=top_events_str)
+
+        if stats["critical"] > 0:
+            ws_time.cell(row=time_row, column=3).fill = critical_fill
+
+    # ========== Events 시트 ==========
+    ws_events = wb.create_sheet("Events")
+    event_headers = [
+        "Account",
+        "Region",
+        "시간",
+        "카테고리",
+        "이벤트",
+        "설명",
+        "심각도",
+        "사용자",
+        "유형",
+        "IP",
+        "오류",
+        "리소스",
+    ]
+    for col, h in enumerate(event_headers, 1):
+        ws_events.cell(row=1, column=col, value=h).fill = header_fill
+        ws_events.cell(row=1, column=col).font = header_font
+
+    event_row = 1
+    for e in all_events:
+        event_row += 1
+        ws_events.cell(row=event_row, column=1, value=e.account_name)
+        ws_events.cell(row=event_row, column=2, value=e.region)
+        ws_events.cell(row=event_row, column=3, value=e.event_time.strftime("%Y-%m-%d %H:%M:%S"))
+        ws_events.cell(row=event_row, column=4, value=e.category)
+        ws_events.cell(row=event_row, column=5, value=e.event_name)
+        ws_events.cell(row=event_row, column=6, value=e.description)
+        ws_events.cell(row=event_row, column=7, value=e.severity.value)
+        ws_events.cell(row=event_row, column=8, value=e.user_identity)
+        ws_events.cell(row=event_row, column=9, value=e.user_type)
+        ws_events.cell(row=event_row, column=10, value=e.source_ip)
+        ws_events.cell(row=event_row, column=11, value=e.error_code or "-")
+        ws_events.cell(row=event_row, column=12, value=e.resources or "-")
+
+        # 심각도별 색상
+        if e.severity == EventSeverity.CRITICAL:
+            ws_events.cell(row=event_row, column=7).fill = critical_fill
+        elif e.severity == EventSeverity.HIGH:
+            ws_events.cell(row=event_row, column=7).fill = high_fill
+        elif e.severity == EventSeverity.MEDIUM:
+            ws_events.cell(row=event_row, column=7).fill = medium_fill
+
+    # 열 너비 조정
+    for sheet in wb.worksheets:
+        for col in sheet.columns:
+            max_len = max(len(str(c.value) if c.value else "") for c in col)
+            col_idx = col[0].column
+            if col_idx:
+                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
+        sheet.freeze_panes = "A2"
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(output_dir, f"CloudTrail_Security_{timestamp}.xlsx")
+    os.makedirs(output_dir, exist_ok=True)
+    wb.save(filepath)
+    return filepath
+>>>>>>> origin/master
 
 
 def run(ctx) -> None:

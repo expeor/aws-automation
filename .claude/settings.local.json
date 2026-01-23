@@ -33,7 +33,10 @@
       "Bash(while read svc)",
       "Bash(do echo \"=== $svc ===\")",
       "Bash(done)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
