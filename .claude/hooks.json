@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "event": "Edit",
+        "command": "echo 'Editing file...'"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "event": "Edit",
+        "matcher": "*.py",
+        "command": "ruff check --fix %FILE% && ruff format %FILE%"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "ruff check cli core plugins"
+      },
+      {
+        "command": "echo '[Version Check] Current: '$(cat version.txt)' | feat→MINOR, fix→PATCH'"
+      }
+    ]
+  }
+}
