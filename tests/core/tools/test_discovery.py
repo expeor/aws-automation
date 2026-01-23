@@ -178,7 +178,7 @@ class TestLoadTool:
 
     def test_load_existing_tool(self):
         """존재하는 도구 로드"""
-        tool = load_tool("ec2", "EBS 미사용 분석")
+        tool = load_tool("ec2", "미사용 EBS 볼륨 탐지")
 
         assert tool is not None
         assert "run" in tool
@@ -187,10 +187,10 @@ class TestLoadTool:
 
     def test_load_tool_returns_meta(self):
         """도구 메타데이터 반환 확인"""
-        tool = load_tool("ec2", "EBS 미사용 분석")
+        tool = load_tool("ec2", "미사용 EBS 볼륨 탐지")
 
         assert tool is not None
-        assert tool["meta"]["name"] == "EBS 미사용 분석"
+        assert tool["meta"]["name"] == "미사용 EBS 볼륨 탐지"
         assert tool["meta"]["permission"] == "read"
 
     def test_nonexistent_category_returns_none(self):
@@ -207,7 +207,7 @@ class TestLoadTool:
 
     def test_collect_options_is_optional(self):
         """collect_options는 선택적"""
-        tool = load_tool("ec2", "EBS 미사용 분석")
+        tool = load_tool("ec2", "미사용 EBS 볼륨 탐지")
 
         assert tool is not None
         # collect_options가 없으면 None
@@ -275,8 +275,8 @@ class TestListTools:
         """EC2 도구 목록 확인 (ebs 별칭으로 조회)"""
         tools = list_tools("ebs")  # ebs는 ec2의 별칭
 
-        assert "EBS 미사용 분석" in tools
-        assert "EIP 미사용 분석" in tools
+        assert "미사용 EBS 볼륨 탐지" in tools
+        assert "미사용 EIP 탐지" in tools
 
     def test_nonexistent_category_returns_empty(self):
         """존재하지 않는 카테고리는 빈 리스트 반환"""
@@ -354,25 +354,25 @@ class TestServiceToolsLoadable:
     """서비스별 도구 로드 테스트"""
 
     def test_ebs_unused_tool_loadable(self):
-        """EBS 미사용 분석 도구 로드 가능"""
-        tool = load_tool("ec2", "EBS 미사용 분석")
+        """미사용 EBS 볼륨 탐지 도구 로드 가능"""
+        tool = load_tool("ec2", "미사용 EBS 볼륨 탐지")
         assert tool is not None
         assert callable(tool["run"])
 
     def test_eip_unused_tool_loadable(self):
-        """EIP 미사용 분석 도구 로드 가능"""
-        tool = load_tool("ec2", "EIP 미사용 분석")
+        """미사용 EIP 탐지 도구 로드 가능"""
+        tool = load_tool("ec2", "미사용 EIP 탐지")
         assert tool is not None
         assert callable(tool["run"])
 
     def test_snapshot_unused_tool_loadable(self):
-        """EBS Snapshot 미사용 분석 도구 로드 가능"""
-        tool = load_tool("ec2", "EBS Snapshot 미사용 분석")
+        """미사용 EBS Snapshot 탐지 도구 로드 가능"""
+        tool = load_tool("ec2", "미사용 EBS Snapshot 탐지")
         assert tool is not None
         assert callable(tool["run"])
 
     def test_ami_unused_tool_loadable(self):
-        """AMI 미사용 분석 도구 로드 가능"""
-        tool = load_tool("ec2", "AMI 미사용 분석")
+        """미사용 AMI 탐지 도구 로드 가능"""
+        tool = load_tool("ec2", "미사용 AMI 탐지")
         assert tool is not None
         assert callable(tool["run"])
