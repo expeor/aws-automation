@@ -7,7 +7,6 @@ plugins/eventbridge/unused.py - EventBridge 미사용 규칙 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -257,99 +256,90 @@ def analyze_rules(rules: list[RuleInfo], account_id: str, account_name: str, reg
 
 def generate_report(results: list[EventBridgeAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     gray_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "EventBridge 미사용 규칙 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = ["Account", "Region", "전체", "비활성화", "타겟없음", "미사용", "정상"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="비활성화", width=10, style="number"),
+        ColumnDef(header="타겟없음", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_rules)
-        ws.cell(row=row, column=4, value=r.disabled_rules)
-        ws.cell(row=row, column=5, value=r.no_targets)
-        ws.cell(row=row, column=6, value=r.unused_rules)
-        ws.cell(row=row, column=7, value=r.normal_rules)
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_rules,
+            r.disabled_rules,
+            r.no_targets,
+            r.unused_rules,
+            r.normal_rules,
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.disabled_rules > 0:
-            ws.cell(row=row, column=4).fill = gray_fill
+            ws.cell(row=row_num, column=4).fill = gray_fill
         if r.no_targets > 0:
-            ws.cell(row=row, column=5).fill = red_fill
+            ws.cell(row=row_num, column=5).fill = red_fill
         if r.unused_rules > 0:
-            ws.cell(row=row, column=6).fill = yellow_fill
+            ws.cell(row=row_num, column=6).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Rules")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Rule Name",
-        "Event Bus",
-        "State",
-        "Schedule",
-        "Targets",
-        "Triggers",
-        "상태",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Rule Name", width=30),
+        ColumnDef(header="Event Bus", width=15),
+        ColumnDef(header="State", width=12),
+        ColumnDef(header="Schedule", width=20),
+        ColumnDef(header="Targets", width=10, style="number"),
+        ColumnDef(header="Triggers", width=10, style="number"),
+        ColumnDef(header="상태", width=12),
+        ColumnDef(header="권장 조치", width=25),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Rules", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != RuleStatus.NORMAL:
-                detail_row += 1
                 rule = f.rule
-                ws_detail.cell(row=detail_row, column=1, value=rule.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=rule.region)
-                ws_detail.cell(row=detail_row, column=3, value=rule.rule_name)
-                ws_detail.cell(row=detail_row, column=4, value=rule.event_bus_name)
-                ws_detail.cell(row=detail_row, column=5, value=rule.state)
-                ws_detail.cell(
-                    row=detail_row,
-                    column=6,
-                    value=rule.schedule_expression or "-",
+                style = None
+                if f.status == RuleStatus.NO_TARGETS:
+                    style = Styles.danger()
+                elif f.status in (RuleStatus.UNUSED, RuleStatus.DISABLED):
+                    style = Styles.warning()
+
+                detail_sheet.add_row(
+                    [
+                        rule.account_name,
+                        rule.region,
+                        rule.rule_name,
+                        rule.event_bus_name,
+                        rule.state,
+                        rule.schedule_expression or "-",
+                        rule.target_count,
+                        int(rule.triggered_rules),
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=style,
                 )
-                ws_detail.cell(row=detail_row, column=7, value=rule.target_count)
-                ws_detail.cell(row=detail_row, column=8, value=int(rule.triggered_rules))
-                ws_detail.cell(row=detail_row, column=9, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"EventBridge_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "EventBridge_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EventBridgeAnalysisResult | None:

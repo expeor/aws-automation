@@ -11,7 +11,6 @@ Lambda Version/Alias 관리:
 """
 
 import contextlib
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -287,117 +286,94 @@ def analyze_versions(
 
 def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "Lambda Version/Alias 감사"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    wb = Workbook()
 
-    headers = ["Account", "Region", "전체 함수", "총 버전", "총 Alias", "오래된 버전", "미사용 버전"]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("Lambda Version/Alias 감사")
+    summary.add_item("생성", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    summary.add_blank_row()
 
+    # Summary 테이블 헤더
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체 함수", width=12, style="number"),
+        ColumnDef(header="총 버전", width=10, style="number"),
+        ColumnDef(header="총 Alias", width=10, style="number"),
+        ColumnDef(header="오래된 버전", width=12, style="number"),
+        ColumnDef(header="미사용 버전", width=12, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_functions)
-        ws.cell(row=row, column=4, value=r.total_versions)
-        ws.cell(row=row, column=5, value=r.total_aliases)
-        ws.cell(row=row, column=6, value=r.old_version_count)
-        ws.cell(row=row, column=7, value=r.unused_version_count)
-        if r.old_version_count > 0:
-            ws.cell(row=row, column=6).fill = yellow_fill
+        row_style = Styles.warning() if r.old_version_count > 0 else None
+        summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_functions,
+                r.total_versions,
+                r.total_aliases,
+                r.old_version_count,
+                r.unused_version_count,
+            ],
+            style=row_style,
+        )
 
     # 총계
     total_versions = sum(r.total_versions for r in results)
     total_old = sum(r.old_version_count for r in results)
     total_unused = sum(r.unused_version_count for r in results)
+    summary_sheet.add_summary_row(["합계", "-", "-", total_versions, "-", total_old, total_unused])
 
-    row += 2
-    ws.cell(row=row, column=1, value="합계").font = Font(bold=True)
-    ws.cell(row=row, column=4, value=total_versions).font = Font(bold=True)
-    ws.cell(row=row, column=6, value=total_old).font = Font(bold=True)
-    ws.cell(row=row, column=7, value=total_unused).font = Font(bold=True)
-
-    row += 2
-    ws.cell(row=row, column=1, value="참고").font = Font(bold=True)
-    row += 1
-    ws.cell(row=row, column=1, value="- 오래된 버전: 90일 이상 지난 버전 (Alias 미지정)")
-    row += 1
-    ws.cell(row=row, column=1, value="- 미사용 버전: Alias 미지정 버전 (최신 3개 제외)")
-    row += 1
-    ws.cell(row=row, column=1, value="- 삭제 시 코드 복구 불가하므로 신중히 결정하세요")
-
-    # Functions with Issues
-    ws_issues = wb.create_sheet("Cleanup Candidates")
-    issue_headers = [
-        "Account",
-        "Region",
-        "Function",
-        "Runtime",
-        "총 버전",
-        "오래된 버전",
-        "미사용 버전",
-        "Alias 수",
-        "정리 대상 버전",
+    # Cleanup Candidates Sheet
+    issue_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function", width=30),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="총 버전", width=10, style="number"),
+        ColumnDef(header="오래된 버전", width=12, style="number"),
+        ColumnDef(header="미사용 버전", width=12, style="number"),
+        ColumnDef(header="Alias 수", width=10, style="number"),
+        ColumnDef(header="정리 대상 버전", width=40),
     ]
-    for col, h in enumerate(issue_headers, 1):
-        ws_issues.cell(row=1, column=col, value=h).fill = header_fill
-        ws_issues.cell(row=1, column=col).font = header_font
-
-    issue_row = 1
+    issues_sheet = wb.new_sheet("Cleanup Candidates", issue_columns)
     for r in results:
         for func in r.functions:
             if func.issue_count > 0:
-                issue_row += 1
                 cleanup_versions = func.old_versions + func.unused_versions
-                ws_issues.cell(row=issue_row, column=1, value=func.account_name)
-                ws_issues.cell(row=issue_row, column=2, value=func.region)
-                ws_issues.cell(row=issue_row, column=3, value=func.function_name)
-                ws_issues.cell(row=issue_row, column=4, value=func.runtime)
-                ws_issues.cell(row=issue_row, column=5, value=func.version_count)
-                ws_issues.cell(row=issue_row, column=6, value=len(func.old_versions))
-                ws_issues.cell(row=issue_row, column=7, value=len(func.unused_versions))
-                ws_issues.cell(row=issue_row, column=8, value=func.alias_count)
-                ws_issues.cell(
-                    row=issue_row,
-                    column=9,
-                    value=", ".join(cleanup_versions[:10]) + ("..." if len(cleanup_versions) > 10 else ""),
-                )
+                issues_sheet.add_row([
+                    func.account_name,
+                    func.region,
+                    func.function_name,
+                    func.runtime,
+                    func.version_count,
+                    len(func.old_versions),
+                    len(func.unused_versions),
+                    func.alias_count,
+                    ", ".join(cleanup_versions[:10]) + ("..." if len(cleanup_versions) > 10 else ""),
+                ])
 
-    # All Versions
-    ws_all = wb.create_sheet("All Versions")
-    all_headers = [
-        "Account",
-        "Region",
-        "Function",
-        "Version",
-        "Description",
-        "Runtime",
-        "Code Size",
-        "Last Modified",
-        "상태",
+    # All Versions Sheet
+    all_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function", width=30),
+        ColumnDef(header="Version", width=10),
+        ColumnDef(header="Description", width=30),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="Code Size", width=12),
+        ColumnDef(header="Last Modified", width=15),
+        ColumnDef(header="상태", width=12, style="center"),
     ]
-    for col, h in enumerate(all_headers, 1):
-        ws_all.cell(row=1, column=col, value=h).fill = header_fill
-        ws_all.cell(row=1, column=col).font = header_font
-
-    all_row = 1
+    all_sheet = wb.new_sheet("All Versions", all_columns)
     for r in results:
         for func in r.functions:
             # Alias가 가리키는 버전
@@ -412,91 +388,65 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
             )
 
             for i, v in enumerate(sorted_versions):
-                all_row += 1
-                ws_all.cell(row=all_row, column=1, value=func.account_name)
-                ws_all.cell(row=all_row, column=2, value=func.region)
-                ws_all.cell(row=all_row, column=3, value=func.function_name)
-                ws_all.cell(row=all_row, column=4, value=v.version)
-                ws_all.cell(
-                    row=all_row,
-                    column=5,
-                    value=v.description[:50] if v.description else "-",
-                )
-                ws_all.cell(row=all_row, column=6, value=v.runtime)
-                ws_all.cell(
-                    row=all_row,
-                    column=7,
-                    value=f"{v.code_size_bytes / 1024 / 1024:.2f} MB",
-                )
-                ws_all.cell(
-                    row=all_row,
-                    column=8,
-                    value=v.last_modified.strftime("%Y-%m-%d") if v.last_modified else "-",
-                )
-
-                # 상태
+                # 상태 결정
                 if v.version in aliased_versions:
                     status = "alias_target"
                 elif v.version in func.old_versions:
                     status = "old"
-                    ws_all.cell(row=all_row, column=9).fill = yellow_fill
                 elif v.version in func.unused_versions:
                     status = "unused"
                 elif i < 3:
                     status = "current"
                 else:
                     status = "unused"
-                ws_all.cell(row=all_row, column=9, value=status)
 
-    # Aliases
-    ws_alias = wb.create_sheet("Aliases")
-    alias_headers = [
-        "Account",
-        "Region",
-        "Function",
-        "Alias",
-        "Target Version",
-        "Description",
-        "Routing",
+                row_num = all_sheet.add_row([
+                    func.account_name,
+                    func.region,
+                    func.function_name,
+                    v.version,
+                    v.description[:50] if v.description else "-",
+                    v.runtime,
+                    f"{v.code_size_bytes / 1024 / 1024:.2f} MB",
+                    v.last_modified.strftime("%Y-%m-%d") if v.last_modified else "-",
+                    status,
+                ])
+
+                # old 상태인 경우 노란색 하이라이트
+                if status == "old":
+                    ws = all_sheet._ws
+                    ws.cell(row=row_num, column=9).fill = yellow_fill
+
+    # Aliases Sheet
+    alias_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function", width=30),
+        ColumnDef(header="Alias", width=20),
+        ColumnDef(header="Target Version", width=15),
+        ColumnDef(header="Description", width=30),
+        ColumnDef(header="Routing", width=25),
     ]
-    for col, h in enumerate(alias_headers, 1):
-        ws_alias.cell(row=1, column=col, value=h).fill = header_fill
-        ws_alias.cell(row=1, column=col).font = header_font
-
-    alias_row = 1
+    alias_sheet = wb.new_sheet("Aliases", alias_columns)
     for r in results:
         for func in r.functions:
             for alias in func.aliases:
-                alias_row += 1
-                ws_alias.cell(row=alias_row, column=1, value=func.account_name)
-                ws_alias.cell(row=alias_row, column=2, value=func.region)
-                ws_alias.cell(row=alias_row, column=3, value=func.function_name)
-                ws_alias.cell(row=alias_row, column=4, value=alias.alias_name)
-                ws_alias.cell(row=alias_row, column=5, value=alias.function_version)
-                ws_alias.cell(row=alias_row, column=6, value=alias.description or "-")
                 routing = "-"
                 if alias.routing_config:
                     weights = alias.routing_config.get("AdditionalVersionWeights", {})
                     if weights:
                         routing = ", ".join(f"v{k}: {v * 100:.0f}%" for k, v in weights.items())
-                ws_alias.cell(row=alias_row, column=7, value=routing)
+                alias_sheet.add_row([
+                    func.account_name,
+                    func.region,
+                    func.function_name,
+                    alias.alias_name,
+                    alias.function_version,
+                    alias.description or "-",
+                    routing,
+                ])
 
-    # 열 너비
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        if sheet.title != "Summary":
-            sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Lambda_Version_Audit_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "Lambda_Version_Audit"))
 
 
 # =============================================================================

@@ -7,7 +7,6 @@ plugins/cloudwatch/loggroup_audit.py - CloudWatch Log Group 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -244,120 +243,79 @@ def analyze_log_groups(
 
 def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
+    wb = Workbook()
+
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "CloudWatch Log Group 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-    headers = ["Account", "Region", "전체", "빈 로그", "오래된", "무기한 보존", "저장 (GB)", "월간 비용"]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
-
-    total_empty = 0
-    total_old = 0
-    total_no_retention = 0
-    total_cost = 0.0
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="빈 로그", width=10, style="number"),
+        ColumnDef(header="오래된", width=10, style="number"),
+        ColumnDef(header="무기한 보존", width=12, style="number"),
+        ColumnDef(header="저장 (GB)", width=12, style="number"),
+        ColumnDef(header="월간 비용", width=12),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_count)
-        ws.cell(row=row, column=4, value=r.empty_count)
-        ws.cell(row=row, column=5, value=r.old_count)
-        ws.cell(row=row, column=6, value=r.no_retention_count)
-        ws.cell(row=row, column=7, value=round(r.total_stored_gb, 2))
-        ws.cell(
-            row=row,
-            column=8,
-            value=f"${r.empty_monthly_cost + r.old_monthly_cost:,.2f}",
-        )
-
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_count,
+            r.empty_count,
+            r.old_count,
+            r.no_retention_count,
+            round(r.total_stored_gb, 2),
+            f"${r.empty_monthly_cost + r.old_monthly_cost:,.2f}",
+        ])
+        ws = summary_sheet._ws
         if r.empty_count > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.old_count > 0:
-            ws.cell(row=row, column=5).fill = red_fill
+            ws.cell(row=row_num, column=5).fill = red_fill
         if r.no_retention_count > 0:
-            ws.cell(row=row, column=6).fill = yellow_fill
-
-        total_empty += r.empty_count
-        total_old += r.old_count
-        total_no_retention += r.no_retention_count
-        total_cost += r.empty_monthly_cost + r.old_monthly_cost
+            ws.cell(row=row_num, column=6).fill = yellow_fill
 
     # 상세 시트
-    ws_detail = wb.create_sheet("Log Groups")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Log Group",
-        "상태",
-        "저장 (GB)",
-        "보존 기간",
-        "마지막 Ingestion",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Log Group", width=40),
+        ColumnDef(header="상태", width=15),
+        ColumnDef(header="저장 (GB)", width=12, style="number"),
+        ColumnDef(header="보존 기간", width=12),
+        ColumnDef(header="마지막 Ingestion", width=15),
+        ColumnDef(header="월간 비용", width=12, style="number"),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Log Groups", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != LogGroupStatus.NORMAL:
-                detail_row += 1
                 lg = f.log_group
-                ws_detail.cell(row=detail_row, column=1, value=lg.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=lg.region)
-                ws_detail.cell(row=detail_row, column=3, value=lg.name)
-                ws_detail.cell(row=detail_row, column=4, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=5, value=round(lg.stored_gb, 4))
-                ws_detail.cell(
-                    row=detail_row,
-                    column=6,
-                    value=f"{lg.retention_days}일" if lg.retention_days else "무기한",
-                )
-                ws_detail.cell(
-                    row=detail_row,
-                    column=7,
-                    value=lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-",
-                )
-                ws_detail.cell(row=detail_row, column=8, value=round(lg.monthly_cost, 4))
-                ws_detail.cell(row=detail_row, column=9, value=f.recommendation)
+                style = Styles.danger() if f.status in (LogGroupStatus.EMPTY, LogGroupStatus.OLD) else Styles.warning()
+                detail_sheet.add_row([
+                    lg.account_name,
+                    lg.region,
+                    lg.name,
+                    f.status.value,
+                    round(lg.stored_gb, 4),
+                    f"{lg.retention_days}일" if lg.retention_days else "무기한",
+                    lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-",
+                    round(lg.monthly_cost, 4),
+                    f.recommendation,
+                ], style=style)
 
-    # 열 너비 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"LogGroup_Audit_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "LogGroup_Audit"))
 
 
 # =============================================================================

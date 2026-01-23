@@ -25,7 +25,6 @@ AWS Backup + 각 서비스별 자체 자동 백업 현황을 통합 조회합니
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -1410,34 +1409,18 @@ def _collect_comprehensive_backup_data(
 
 def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     green_fill = PatternFill(start_color="69DB7C", end_color="69DB7C", fill_type="solid")
 
-    def apply_headers(ws, headers: list[str], row: int = 1) -> None:
-        for col, h in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col, value=h)
-            cell.fill = header_fill
-            cell.font = header_font
-
     # ========== Summary 시트 ==========
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "통합 백업 현황 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성일: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    ws["A2"].font = Font(size=10, italic=True)
-
     # 서비스별 요약
     all_summaries: dict[str, ServiceBackupSummary] = {}
     for r in results:
@@ -1458,10 +1441,12 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
             ss.failed_count += s.failed_count
             ss.warning_count += s.warning_count
 
-    headers = ["서비스", "총 리소스", "보호됨", "미보호", "미보호율(%)"]
-    apply_headers(ws, headers, row=4)
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("통합 백업 현황 보고서")
+    summary.add_item("생성일", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    summary.add_blank_row()
+    summary.add_section("서비스별 요약")
 
-    row = 4
     for service in [
         "RDS",
         "Aurora",
@@ -1479,26 +1464,19 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
     ]:
         if service in all_summaries:
             s = all_summaries[service]
-            row += 1
-            ws.cell(row=row, column=1, value=s.service)
-            ws.cell(row=row, column=2, value=s.total_resources)
-            ws.cell(row=row, column=3, value=s.backup_enabled)
-            ws.cell(row=row, column=4, value=s.backup_disabled)
-
             disabled_rate = (s.backup_disabled / s.total_resources * 100) if s.total_resources > 0 else 0
-            ws.cell(row=row, column=5, value=f"{disabled_rate:.1f}%")
-
-            if s.backup_disabled > 0:
-                ws.cell(row=row, column=4).fill = yellow_fill
+            highlight = "warning" if s.backup_disabled > 0 else None
+            summary.add_item(
+                f"{s.service} (총 {s.total_resources}개)",
+                f"보호: {s.backup_enabled}, 미보호: {s.backup_disabled} ({disabled_rate:.1f}%)",
+                highlight=highlight,
+            )
 
     # 전체 통계
     total_failed_jobs = sum(len(r.failed_jobs) for r in results)
-
-    row += 2
-    ws.cell(row=row, column=1, value="실패한 Backup 작업 (최근 30일):")
-    ws.cell(row=row, column=2, value=total_failed_jobs)
-    if total_failed_jobs > 0:
-        ws.cell(row=row, column=2).fill = red_fill
+    summary.add_blank_row()
+    highlight = "danger" if total_failed_jobs > 0 else None
+    summary.add_item("실패한 Backup 작업 (최근 30일)", total_failed_jobs, highlight=highlight)
 
     # ========== Backup Status 시트 (서비스별) ==========
     all_statuses: list[BackupStatus] = []
@@ -1526,62 +1504,34 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
                 )
 
     if all_statuses:
-        ws_status = wb.create_sheet("Backup Status")
-        headers = [
-            "Account",
-            "Region",
-            "서비스",
-            "리소스 타입",
-            "리소스 ID",
-            "리소스 이름",
-            "자체 백업",
-            "AWS Backup",
-            "보호 상태",
-            "백업 방식",
-            "보존 기간(일)",
-            "자체 백업 시간",
-            "AWS Backup 시간",
-            "백업 지연",
-            "실패 횟수",
-            "최근 실패",
-            "Backup Plan",
-            "상태",
-            "메시지",
+        status_columns = [
+            ColumnDef(header="Account", width=15),
+            ColumnDef(header="Region", width=15),
+            ColumnDef(header="서비스", width=15),
+            ColumnDef(header="리소스 타입", width=20),
+            ColumnDef(header="리소스 ID", width=25),
+            ColumnDef(header="리소스 이름", width=25),
+            ColumnDef(header="자체 백업", width=10, style="center"),
+            ColumnDef(header="AWS Backup", width=10, style="center"),
+            ColumnDef(header="보호 상태", width=15, style="center"),
+            ColumnDef(header="백업 방식", width=18),
+            ColumnDef(header="보존 기간(일)", width=12, style="number"),
+            ColumnDef(header="자체 백업 시간", width=18),
+            ColumnDef(header="AWS Backup 시간", width=18),
+            ColumnDef(header="백업 지연", width=12),
+            ColumnDef(header="실패 횟수", width=10, style="number"),
+            ColumnDef(header="최근 실패", width=18),
+            ColumnDef(header="Backup Plan", width=25),
+            ColumnDef(header="상태", width=12, style="center"),
+            ColumnDef(header="메시지", width=40),
         ]
-        apply_headers(ws_status, headers)
+        status_sheet = wb.new_sheet("Backup Status", status_columns)
 
         now = datetime.now(timezone.utc)
         two_days_ago = now - timedelta(days=2)
 
-        for i, s in enumerate(all_statuses, start=2):
-            ws_status.cell(row=i, column=1, value=s.account_name)
-            ws_status.cell(row=i, column=2, value=s.region)
-            ws_status.cell(row=i, column=3, value=s.service)
-            ws_status.cell(row=i, column=4, value=s.resource_type)
-            ws_status.cell(row=i, column=5, value=s.resource_id)
-            ws_status.cell(row=i, column=6, value=s.resource_name)
-            ws_status.cell(row=i, column=7, value="Yes" if s.backup_enabled else "No")
-            ws_status.cell(row=i, column=8, value="Yes" if s.aws_backup_protected else "No")
-            ws_status.cell(row=i, column=9, value=s.protection_summary)
-            ws_status.cell(row=i, column=10, value=s.backup_method)
-            ws_status.cell(row=i, column=11, value=s.backup_retention_days)
-
-            # 자체 백업 시간
-            ws_status.cell(
-                row=i,
-                column=12,
-                value=s.last_backup_time.strftime("%Y-%m-%d %H:%M") if s.last_backup_time else "-",
-            )
-
-            # AWS Backup 시간
-            ws_status.cell(
-                row=i,
-                column=13,
-                value=s.aws_backup_last_time.strftime("%Y-%m-%d %H:%M") if s.aws_backup_last_time else "-",
-            )
-
+        for s in all_statuses:
             # 백업 지연 체크 (보호 중인데 마지막 백업이 2일 이상 전이면 지연)
-            # 자체 백업과 AWS Backup 중 더 최신 시간 기준으로 체크
             latest_backup = None
             if s.last_backup_time and s.aws_backup_last_time:
                 latest_backup = max(s.last_backup_time, s.aws_backup_last_time)
@@ -1595,51 +1545,62 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
                 if latest_backup < two_days_ago:
                     days_delayed = (now - latest_backup).days
                     backup_delayed = f"{days_delayed}일 지연"
-            ws_status.cell(row=i, column=14, value=backup_delayed)
-            if backup_delayed:
-                ws_status.cell(row=i, column=14).fill = yellow_fill
 
             # 실패 이력 (최근 30일)
             failure_info = failure_by_resource.get(s.resource_arn, {"count": 0, "last_failure": None})
             failure_count = failure_info["count"]
             last_failure = failure_info["last_failure"]
 
-            ws_status.cell(row=i, column=15, value=failure_count if failure_count > 0 else "-")
-            if failure_count > 0:
-                ws_status.cell(row=i, column=15).fill = red_fill
-
-            ws_status.cell(
-                row=i,
-                column=16,
-                value=last_failure.strftime("%Y-%m-%d %H:%M") if last_failure else "-",
-            )
-            if last_failure:
-                ws_status.cell(row=i, column=16).fill = red_fill
-
             # Backup Plan 표시
             backup_plan_str = ", ".join(s.backup_plan_names) if s.backup_plan_names else "-"
-            ws_status.cell(row=i, column=17, value=backup_plan_str)
 
-            ws_status.cell(row=i, column=18, value=s.status)
-            ws_status.cell(row=i, column=19, value=s.message)
+            row_num = status_sheet.add_row([
+                s.account_name,
+                s.region,
+                s.service,
+                s.resource_type,
+                s.resource_id,
+                s.resource_name,
+                "Yes" if s.backup_enabled else "No",
+                "Yes" if s.aws_backup_protected else "No",
+                s.protection_summary,
+                s.backup_method,
+                s.backup_retention_days,
+                s.last_backup_time.strftime("%Y-%m-%d %H:%M") if s.last_backup_time else "-",
+                s.aws_backup_last_time.strftime("%Y-%m-%d %H:%M") if s.aws_backup_last_time else "-",
+                backup_delayed,
+                failure_count if failure_count > 0 else "-",
+                last_failure.strftime("%Y-%m-%d %H:%M") if last_failure else "-",
+                backup_plan_str,
+                s.status,
+                s.message,
+            ])
+
+            ws = status_sheet._ws
+
+            if backup_delayed:
+                ws.cell(row=row_num, column=14).fill = yellow_fill
+
+            if failure_count > 0:
+                ws.cell(row=row_num, column=15).fill = red_fill
+            if last_failure:
+                ws.cell(row=row_num, column=16).fill = red_fill
 
             # 보호 상태별 색상 (서비스 특성 고려)
             if s.protection_summary == "미보호":
-                ws_status.cell(row=i, column=9).fill = red_fill
+                ws.cell(row=row_num, column=9).fill = red_fill
             elif s.is_fully_protected:
-                # 완전 보호: 자체 백업 없는 서비스는 AWS Backup만으로 충분
-                ws_status.cell(row=i, column=9).fill = green_fill
+                ws.cell(row=row_num, column=9).fill = green_fill
             else:
-                # 부분 보호: 자체 백업만 또는 AWS Backup만 (자체 백업 가능 서비스)
-                ws_status.cell(row=i, column=9).fill = yellow_fill
+                ws.cell(row=row_num, column=9).fill = yellow_fill
 
             # 상태별 색상
             if s.status == "DISABLED" and not s.aws_backup_protected:
-                ws_status.cell(row=i, column=18).fill = yellow_fill
+                ws.cell(row=row_num, column=18).fill = yellow_fill
             elif s.status == "FAILED":
-                ws_status.cell(row=i, column=18).fill = red_fill
+                ws.cell(row=row_num, column=18).fill = red_fill
             elif s.status == "OK":
-                ws_status.cell(row=i, column=18).fill = green_fill
+                ws.cell(row=row_num, column=18).fill = green_fill
 
     # ========== Backup Plan Tags 시트 ==========
     all_tag_conditions: list[BackupPlanTagCondition] = []
@@ -1647,99 +1608,73 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
         all_tag_conditions.extend(r.tag_conditions)
 
     if all_tag_conditions:
-        ws_tags = wb.create_sheet("Backup Plan Tags")
-        headers = [
-            "Account",
-            "Region",
-            "Plan ID",
-            "Plan 이름",
-            "Selection ID",
-            "Selection 이름",
-            "조건 타입",
-            "태그 키",
-            "태그 값",
-            "대상 리소스 타입",
+        tag_columns = [
+            ColumnDef(header="Account", width=15),
+            ColumnDef(header="Region", width=15),
+            ColumnDef(header="Plan ID", width=40),
+            ColumnDef(header="Plan 이름", width=25),
+            ColumnDef(header="Selection ID", width=40),
+            ColumnDef(header="Selection 이름", width=25),
+            ColumnDef(header="조건 타입", width=15),
+            ColumnDef(header="태그 키", width=20),
+            ColumnDef(header="태그 값", width=20),
+            ColumnDef(header="대상 리소스 타입", width=20),
         ]
-        apply_headers(ws_tags, headers)
+        tag_sheet = wb.new_sheet("Backup Plan Tags", tag_columns)
 
-        for i, t in enumerate(all_tag_conditions, start=2):
-            ws_tags.cell(row=i, column=1, value=t.account_name)
-            ws_tags.cell(row=i, column=2, value=t.region)
-            ws_tags.cell(row=i, column=3, value=t.plan_id)
-            ws_tags.cell(row=i, column=4, value=t.plan_name)
-            ws_tags.cell(row=i, column=5, value=t.selection_id)
-            ws_tags.cell(row=i, column=6, value=t.selection_name)
-            ws_tags.cell(row=i, column=7, value=t.condition_type)
-            ws_tags.cell(row=i, column=8, value=t.tag_key)
-            ws_tags.cell(row=i, column=9, value=t.tag_value)
-            ws_tags.cell(row=i, column=10, value=", ".join(t.resource_types) if t.resource_types else "*")
+        for t in all_tag_conditions:
+            tag_sheet.add_row([
+                t.account_name,
+                t.region,
+                t.plan_id,
+                t.plan_name,
+                t.selection_id,
+                t.selection_name,
+                t.condition_type,
+                t.tag_key,
+                t.tag_value,
+                ", ".join(t.resource_types) if t.resource_types else "*",
+            ])
 
     # ========== Failed Jobs 시트 ==========
-    all_failed_jobs: list[FailedBackupJob] = []
+    all_failed_jobs = []
     for r in results:
         all_failed_jobs.extend(r.failed_jobs)
 
     if all_failed_jobs:
-        ws_failed = wb.create_sheet("Failed Jobs")
-        headers = [
-            "Account",
-            "Region",
-            "Job ID",
-            "상태",
-            "리소스 타입",
-            "리소스 ARN",
-            "Vault",
-            "생성일",
-            "완료일",
-            "메시지",
+        failed_columns = [
+            ColumnDef(header="Account", width=15),
+            ColumnDef(header="Region", width=15),
+            ColumnDef(header="Job ID", width=40),
+            ColumnDef(header="상태", width=12, style="center"),
+            ColumnDef(header="리소스 타입", width=15),
+            ColumnDef(header="리소스 ARN", width=50),
+            ColumnDef(header="Vault", width=25),
+            ColumnDef(header="생성일", width=18),
+            ColumnDef(header="완료일", width=18),
+            ColumnDef(header="메시지", width=40),
         ]
-        apply_headers(ws_failed, headers)
+        failed_sheet = wb.new_sheet("Failed Jobs", failed_columns)
 
         # 최신순 정렬
         all_failed_jobs.sort(key=lambda j: j.creation_date or datetime.min, reverse=True)
 
-        for i, j in enumerate(all_failed_jobs, start=2):
-            ws_failed.cell(row=i, column=1, value=j.account_name)
-            ws_failed.cell(row=i, column=2, value=j.region)
-            ws_failed.cell(row=i, column=3, value=j.job_id)
-            ws_failed.cell(row=i, column=4, value=j.status)
-            ws_failed.cell(row=i, column=5, value=j.resource_type)
-            ws_failed.cell(row=i, column=6, value=j.resource_arn)
-            ws_failed.cell(row=i, column=7, value=j.vault_name)
-            ws_failed.cell(
-                row=i,
-                column=8,
-                value=j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
-            )
-            ws_failed.cell(
-                row=i,
-                column=9,
-                value=j.completion_date.strftime("%Y-%m-%d %H:%M") if j.completion_date else "-",
-            )
-            ws_failed.cell(row=i, column=10, value=j.status_message or "-")
-            ws_failed.cell(row=i, column=4).fill = red_fill
+        for j in all_failed_jobs:
+            row_num = failed_sheet.add_row([
+                j.account_name,
+                j.region,
+                j.job_id,
+                j.status,
+                j.resource_type,
+                j.resource_arn,
+                j.vault_name,
+                j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
+                j.completion_date.strftime("%Y-%m-%d %H:%M") if j.completion_date else "-",
+                j.status_message or "-",
+            ], style=Styles.danger())
+            failed_sheet._ws.cell(row=row_num, column=4).fill = red_fill
 
-    # 열 너비 조정 및 공통 설정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-        # Auto filter 적용 (Summary 제외)
-        if sheet.title != "Summary" and sheet.max_row > 1:
-            sheet.auto_filter.ref = sheet.dimensions
-
-        # Zoom 설정
-        sheet.sheet_view.zoomScale = 85
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Comprehensive_Backup_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "Comprehensive_Backup"))
 
 
 # ============================================================================

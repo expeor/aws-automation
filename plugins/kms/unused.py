@@ -7,7 +7,6 @@ plugins/kms/unused.py - KMS 키 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -194,84 +193,84 @@ def analyze_kms_keys(keys: list[KMSKeyInfo], account_id: str, account_name: str,
 
 def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "KMS 키 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = ["Account", "Region", "전체", "CMK", "AWS관리", "비활성화", "삭제예정", "비활성화 비용"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="CMK", width=10, style="number"),
+        ColumnDef(header="AWS관리", width=10, style="number"),
+        ColumnDef(header="비활성화", width=10, style="number"),
+        ColumnDef(header="삭제예정", width=10, style="number"),
+        ColumnDef(header="비활성화 비용", width=15),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_count)
-        ws.cell(row=row, column=4, value=r.customer_managed_count)
-        ws.cell(row=row, column=5, value=r.aws_managed_count)
-        ws.cell(row=row, column=6, value=r.disabled_count)
-        ws.cell(row=row, column=7, value=r.pending_delete_count)
-        ws.cell(row=row, column=8, value=f"${r.disabled_monthly_cost:,.2f}")
+        row_style = Styles.warning() if r.disabled_count > 0 else None
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.customer_managed_count,
+                r.aws_managed_count,
+                r.disabled_count,
+                r.pending_delete_count,
+                f"${r.disabled_monthly_cost:,.2f}",
+            ],
+            style=row_style,
+        )
+        # Cell-level highlighting for disabled count
         if r.disabled_count > 0:
-            ws.cell(row=row, column=6).fill = yellow_fill
+            ws = summary_sheet._ws
+            ws.cell(row=row_num, column=6).fill = yellow_fill
 
-    ws_detail = wb.create_sheet("KMS Keys")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Key ID",
-        "Alias",
-        "Type",
-        "상태",
-        "월간 비용",
-        "권장 조치",
+    # Detail 시트
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Key ID", width=25),
+        ColumnDef(header="Alias", width=25),
+        ColumnDef(header="Type", width=12, style="center"),
+        ColumnDef(header="상태", width=15, style="center"),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=30),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("KMS Keys", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.key.is_customer_managed:
-                detail_row += 1
                 k = f.key
-                ws_detail.cell(row=detail_row, column=1, value=k.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=k.region)
-                ws_detail.cell(row=detail_row, column=3, value=k.key_id[:20] + "...")
-                ws_detail.cell(row=detail_row, column=4, value=k.alias or "-")
-                ws_detail.cell(row=detail_row, column=5, value=k.key_manager)
-                ws_detail.cell(row=detail_row, column=6, value=k.key_state)
-                ws_detail.cell(row=detail_row, column=7, value=f"${k.monthly_cost:,.2f}")
-                ws_detail.cell(row=detail_row, column=8, value=f.recommendation)
+                row_style = None
+                if f.status == KMSKeyStatus.DISABLED:
+                    row_style = Styles.warning()
+                elif f.status == KMSKeyStatus.PENDING_DELETE:
+                    row_style = Styles.danger()
+                detail_sheet.add_row(
+                    [
+                        k.account_name,
+                        k.region,
+                        k.key_id[:20] + "...",
+                        k.alias or "-",
+                        k.key_manager,
+                        k.key_state,
+                        f"${k.monthly_cost:,.2f}",
+                        f.recommendation,
+                    ],
+                    style=row_style,
+                )
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"KMS_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "KMS_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> KMSKeyAnalysisResult | None:

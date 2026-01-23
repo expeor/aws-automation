@@ -67,8 +67,9 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
-    from core.data.inventory import InventoryCollector
     from core.filter import AccountFilter
+    from core.tools.io.config import OutputConfig
+    from plugins.resource_explorer.common import InventoryCollector
 
 # core.exceptions에서 BackToMenuError 재사용
 from core.exceptions import BackToMenuError
@@ -260,10 +261,14 @@ class ExecutionContext:
         options: 도구별 추가 옵션
         target_filter: 계정 필터 (Headless CLI용, glob 패턴 매칭)
         lang: 언어 설정 ("ko" 또는 "en", 기본값: "ko")
+        output_config: 출력 설정 (형식, 자동 열기 등)
     """
 
     # Language setting (for i18n support)
     lang: str = "ko"
+
+    # Output configuration
+    output_config: "OutputConfig | None" = None
 
     # Step 1: 카테고리/도구 선택
     category: str | None = None
@@ -396,10 +401,39 @@ class ExecutionContext:
             security_groups = inventory.collect_security_groups()
         """
         # Lazy import to avoid circular dependencies
-        from core.data.inventory import InventoryCollector
+        from plugins.resource_explorer.common import InventoryCollector
 
         # Create a new collector that uses the global cache
         return InventoryCollector(self)
+
+    def should_output_excel(self) -> bool:
+        """Excel 출력 여부 확인
+
+        output_config가 설정되지 않은 경우 기본값 True (하위 호환성)
+        """
+        if self.output_config is None:
+            return True  # 기본값: Excel 출력
+
+        return self.output_config.should_output_excel()
+
+    def should_output_html(self) -> bool:
+        """HTML 출력 여부 확인
+
+        output_config가 설정되지 않은 경우 기본값 True (하위 호환성)
+        """
+        if self.output_config is None:
+            return True  # 기본값: HTML 출력
+
+        return self.output_config.should_output_html()
+
+    def get_output_config(self) -> "OutputConfig":
+        """출력 설정 반환 (없으면 기본값 생성)"""
+        if self.output_config is None:
+            from core.tools.io.config import OutputConfig
+
+            return OutputConfig(lang=self.lang)
+
+        return self.output_config
 
 
 @dataclass

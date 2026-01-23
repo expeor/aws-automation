@@ -289,94 +289,77 @@ def generate_unused_report(
     engine_name: str = "ElastiCache",
 ) -> str:
     """미사용 분석 Excel 보고서 생성"""
-    import os
+    from openpyxl.styles import PatternFill
 
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = f"{engine_name} 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = ["Account", "Region", "전체", "미사용", "저사용", "정상", "미사용 비용", "저사용 비용"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=15),
+        ColumnDef(header="저사용 비용", width=15),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_clusters)
-        ws.cell(row=row, column=4, value=r.unused_clusters)
-        ws.cell(row=row, column=5, value=r.low_usage_clusters)
-        ws.cell(row=row, column=6, value=r.normal_clusters)
-        ws.cell(row=row, column=7, value=f"${r.unused_monthly_cost:,.2f}")
-        ws.cell(row=row, column=8, value=f"${r.low_usage_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_clusters,
+            r.unused_clusters,
+            r.low_usage_clusters,
+            r.normal_clusters,
+            f"${r.unused_monthly_cost:,.2f}",
+            f"${r.low_usage_monthly_cost:,.2f}",
+        ])
         if r.unused_clusters > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            summary_sheet._ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_clusters > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            summary_sheet._ws.cell(row=row_num, column=5).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Clusters")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Cluster ID",
-        "Engine",
-        "Node Type",
-        "Nodes",
-        "상태",
-        "Avg Conn",
-        "Avg CPU",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Cluster ID", width=25),
+        ColumnDef(header="Engine", width=12),
+        ColumnDef(header="Node Type", width=18),
+        ColumnDef(header="Nodes", width=8, style="number"),
+        ColumnDef(header="상태", width=12, style="center"),
+        ColumnDef(header="Avg Conn", width=12),
+        ColumnDef(header="Avg CPU", width=10),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=35),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Clusters", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != ClusterStatus.NORMAL:
-                detail_row += 1
                 c = f.cluster
-                ws_detail.cell(row=detail_row, column=1, value=c.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=c.region)
-                ws_detail.cell(row=detail_row, column=3, value=c.cluster_id)
-                ws_detail.cell(row=detail_row, column=4, value=c.engine)
-                ws_detail.cell(row=detail_row, column=5, value=c.node_type)
-                ws_detail.cell(row=detail_row, column=6, value=c.num_nodes)
-                ws_detail.cell(row=detail_row, column=7, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=8, value=f"{c.avg_connections:.1f}")
-                ws_detail.cell(row=detail_row, column=9, value=f"{c.avg_cpu:.1f}%")
-                ws_detail.cell(row=detail_row, column=10, value=f"${c.estimated_monthly_cost:.2f}")
-                ws_detail.cell(row=detail_row, column=11, value=f.recommendation)
+                style = Styles.danger() if f.status == ClusterStatus.UNUSED else Styles.warning()
+                detail_sheet.add_row([
+                    c.account_name,
+                    c.region,
+                    c.cluster_id,
+                    c.engine,
+                    c.node_type,
+                    c.num_nodes,
+                    f.status.value,
+                    f"{c.avg_connections:.1f}",
+                    f"{c.avg_cpu:.1f}%",
+                    f"${c.estimated_monthly_cost:.2f}",
+                    f.recommendation,
+                ], style=style)
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"{engine_name}_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, f"{engine_name}_Unused"))

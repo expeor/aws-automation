@@ -1,0 +1,66 @@
+name: Update AWS Regions
+
+on:
+  schedule:
+    # 매월 1일 00:00 UTC
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    # 수동 실행 지원
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-regions:
+    name: Update Region List
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install boto3
+        run: pip install boto3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update regions
+        id: update
+        run: |
+          python core/region/update_regions.py
+
+          # 변경 사항 확인
+          if git diff --quiet core/region/data.py; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update AWS region list"
+          title: "chore: Update AWS region list"
+          body: |
+            AWS 리전 목록 자동 업데이트
+
+            - `core/region/update_regions.py` 스크립트로 생성
+            - AWS EC2 DescribeRegions API 기준
+
+            자동 생성된 PR입니다.
+          branch: chore/update-regions
+          delete-branch: true
+          labels: |
+            automated
+            maintenance

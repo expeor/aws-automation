@@ -7,7 +7,6 @@ plugins/s3/empty_bucket.py - 빈 S3 버킷 탐지
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -306,100 +305,85 @@ def analyze_buckets(buckets: list[BucketInfo], account_id: str, account_name: st
 
 def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "S3 빈 버킷 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = ["Account", "전체 버킷", "빈 버킷", "버전만", "소형", "총 크기"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="전체 버킷", width=12, style="number"),
+        ColumnDef(header="빈 버킷", width=10, style="number"),
+        ColumnDef(header="버전만", width=10, style="number"),
+        ColumnDef(header="소형", width=10, style="number"),
+        ColumnDef(header="총 크기", width=15),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.total_buckets)
-        ws.cell(row=row, column=3, value=r.empty_buckets)
-        ws.cell(row=row, column=4, value=r.versioning_only_buckets)
-        ws.cell(row=row, column=5, value=r.small_buckets)
-        ws.cell(row=row, column=6, value=f"{r.total_size_gb:.2f} GB")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.total_buckets,
+            r.empty_buckets,
+            r.versioning_only_buckets,
+            r.small_buckets,
+            f"{r.total_size_gb:.2f} GB",
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.empty_buckets > 0:
-            ws.cell(row=row, column=3).fill = red_fill
+            ws.cell(row=row_num, column=3).fill = red_fill
         if r.versioning_only_buckets > 0:
-            ws.cell(row=row, column=4).fill = yellow_fill
+            ws.cell(row=row_num, column=4).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Buckets")
-    detail_headers = [
-        "Account",
-        "Bucket",
-        "Region",
-        "상태",
-        "객체수",
-        "크기",
-        "버전관리",
-        "Lifecycle",
-        "암호화",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Bucket", width=40),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="상태", width=15),
+        ColumnDef(header="객체수", width=10, style="number"),
+        ColumnDef(header="크기", width=15),
+        ColumnDef(header="버전관리", width=12),
+        ColumnDef(header="Lifecycle", width=10),
+        ColumnDef(header="암호화", width=15),
+        ColumnDef(header="권장 조치", width=30),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Buckets", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != BucketStatus.NORMAL:
-                detail_row += 1
                 bucket = f.bucket
-                ws_detail.cell(row=detail_row, column=1, value=bucket.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=bucket.name)
-                ws_detail.cell(row=detail_row, column=3, value=bucket.region)
-                ws_detail.cell(row=detail_row, column=4, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=5, value=bucket.object_count)
-                ws_detail.cell(row=detail_row, column=6, value=f"{bucket.total_size_mb:.2f} MB")
-                ws_detail.cell(
-                    row=detail_row,
-                    column=7,
-                    value="Enabled" if bucket.versioning_enabled else "Disabled",
-                )
-                ws_detail.cell(
-                    row=detail_row,
-                    column=8,
-                    value="있음" if bucket.has_lifecycle else "없음",
-                )
-                ws_detail.cell(row=detail_row, column=9, value=bucket.encryption_type)
-                ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
+                style = None
+                if f.status == BucketStatus.EMPTY:
+                    style = Styles.danger()
+                elif f.status in (BucketStatus.VERSIONING_ONLY, BucketStatus.SMALL):
+                    style = Styles.warning()
 
-    # 컬럼 너비 자동 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        bucket.account_name,
+                        bucket.name,
+                        bucket.region,
+                        f.status.value,
+                        bucket.object_count,
+                        f"{bucket.total_size_mb:.2f} MB",
+                        "Enabled" if bucket.versioning_enabled else "Disabled",
+                        "있음" if bucket.has_lifecycle else "없음",
+                        bucket.encryption_type,
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"S3_EmptyBucket_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "S3_EmptyBucket"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> S3AnalysisResult | None:

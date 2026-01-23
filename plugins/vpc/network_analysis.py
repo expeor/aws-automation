@@ -14,37 +14,19 @@ Consolidates: nat_audit + endpoint_audit + eni_audit
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from rich.console import Console
-from rich.table import Table
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
-# Import sub-modules for NAT analysis
+from .endpoint_audit import EndpointAnalysisResult, analyze_endpoints, collect_endpoints
+from .endpoint_audit import generate_report as generate_endpoint_report
+from .eni_audit import ENIAnalysisResult, analyze_enis, collect_enis
+from .eni_audit import generate_report as generate_eni_report
 from .nat_audit_analysis import NATAnalyzer, NATCollector, NATExcelReporter
-
-# Import types and functions from endpoint_audit
-from .endpoint_audit import (
-    EndpointAnalysisResult,
-    EndpointStatus,
-    analyze_endpoints,
-    collect_endpoints,
-    generate_report as generate_endpoint_report,
-)
-
-# Import types and functions from eni_audit
-from .eni_audit import (
-    ENIAnalysisResult,
-    UsageStatus as ENIUsageStatus,
-    analyze_enis,
-    collect_enis,
-    generate_report as generate_eni_report,
-)
 
 console = Console()
 
@@ -147,35 +129,15 @@ def _collect_all(session, account_id: str, account_name: str, region: str) -> di
 
 def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> str:
     """Generate combined Excel report for all network resources"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
-
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
-    # Summary Sheet
-    ws_summary = wb.create_sheet("Summary")
-    ws_summary["A1"] = "Network Resource Analysis Report"
-    ws_summary["A1"].font = Font(bold=True, size=14)
-    ws_summary["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
     # Summary statistics
     total_nat = sum(s.nat_total for s in result.summaries)
     total_nat_unused = sum(s.nat_unused for s in result.summaries)
     total_nat_waste = sum(s.nat_monthly_waste for s in result.summaries)
 
-    total_endpoint = sum(s.endpoint_total for s in result.summaries)
     total_endpoint_interface = sum(s.endpoint_interface for s in result.summaries)
     total_endpoint_unused = sum(s.endpoint_unused for s in result.summaries)
     total_endpoint_waste = sum(s.endpoint_monthly_waste for s in result.summaries)
@@ -183,52 +145,46 @@ def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> 
     total_eni = sum(s.eni_total for s in result.summaries)
     total_eni_unused = sum(s.eni_unused for s in result.summaries)
 
-    summary_data = [
-        ("Resource", "Total", "Unused/Issue", "Monthly Waste ($)"),
-        ("NAT Gateway", total_nat, total_nat_unused, f"${total_nat_waste:,.2f}"),
-        ("VPC Endpoint (Interface)", total_endpoint_interface, total_endpoint_unused, f"${total_endpoint_waste:,.2f}"),
-        ("ENI", total_eni, total_eni_unused, "-"),
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("Network Resource Analysis Report")
+    summary.add_section("Resource Summary")
+    summary.add_item("NAT Gateway Total", total_nat)
+    summary.add_item("NAT Gateway Unused", total_nat_unused, highlight="danger" if total_nat_unused > 0 else None)
+    summary.add_item("NAT Gateway Waste", f"${total_nat_waste:,.2f}", highlight="warning" if total_nat_waste > 0 else None)
+    summary.add_blank_row()
+    summary.add_item("VPC Endpoint (Interface)", total_endpoint_interface)
+    summary.add_item("VPC Endpoint Unused", total_endpoint_unused, highlight="danger" if total_endpoint_unused > 0 else None)
+    summary.add_item("VPC Endpoint Waste", f"${total_endpoint_waste:,.2f}", highlight="warning" if total_endpoint_waste > 0 else None)
+    summary.add_blank_row()
+    summary.add_item("ENI Total", total_eni)
+    summary.add_item("ENI Unused", total_eni_unused, highlight="danger" if total_eni_unused > 0 else None)
+
+    # Per-region breakdown sheet
+    region_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="NAT Unused", width=12, style="number"),
+        ColumnDef(header="Endpoint Unused", width=15, style="number"),
+        ColumnDef(header="ENI Unused", width=12, style="number"),
     ]
+    region_sheet = wb.new_sheet("By Region", region_columns)
 
-    for i, row_data in enumerate(summary_data):
-        row = 4 + i
-        for col, value in enumerate(row_data, 1):
-            cell = ws_summary.cell(row=row, column=col, value=value)
-            if i == 0:
-                cell.fill = header_fill
-                cell.font = header_font
-
-    # Per-region breakdown
-    ws_summary["A10"] = "Per-Region Summary"
-    ws_summary["A10"].font = Font(bold=True, size=12)
-
-    region_headers = ["Account", "Region", "NAT Unused", "Endpoint Unused", "ENI Unused"]
-    for col, h in enumerate(region_headers, 1):
-        cell = ws_summary.cell(row=11, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-
-    row = 12
     for s in result.summaries:
-        ws_summary.cell(row=row, column=1, value=s.account_name)
-        ws_summary.cell(row=row, column=2, value=s.region)
-        ws_summary.cell(row=row, column=3, value=s.nat_unused)
-        ws_summary.cell(row=row, column=4, value=s.endpoint_unused)
-        ws_summary.cell(row=row, column=5, value=s.eni_unused)
-        row += 1
+        has_issues = s.nat_unused > 0 or s.endpoint_unused > 0 or s.eni_unused > 0
+        style = Styles.warning() if has_issues else None
+        region_sheet.add_row(
+            [
+                s.account_name,
+                s.region,
+                s.nat_unused,
+                s.endpoint_unused,
+                s.eni_unused,
+            ],
+            style=style,
+        )
 
-    # Column widths
-    for col in ws_summary.columns:
-        max_len = max(len(str(c.value) if c.value else "") for c in col)
-        ws_summary.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 40)
-
-    # Save
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Network_Analysis_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "Network_Analysis"))
 
 
 def run(ctx) -> None:

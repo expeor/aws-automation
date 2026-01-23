@@ -77,4 +77,14 @@ TOOLS = [
         "single_region_only": True,
         "sub_service": "alb",
     },
+    # Inventory
+    {
+        "name": "ELB 인벤토리",
+        "name_en": "ELB Inventory",
+        "description": "모든 유형의 로드밸런서 및 Target Group 현황 조회",
+        "description_en": "List all load balancers and target groups",
+        "permission": "read",
+        "module": "inventory",
+        "area": "inventory",
+    },
 ]

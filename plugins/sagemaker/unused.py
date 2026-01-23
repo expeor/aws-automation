@@ -17,14 +17,13 @@ plugins/sagemaker/unused.py - SageMaker Endpoint 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from rich.console import Console
 
-from core.cloudwatch import MetricQuery, batch_get_metrics, sanitize_metric_id
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_sagemaker_monthly_cost
@@ -307,106 +306,89 @@ def analyze_endpoints(
 
 def generate_report(results: list[SageMakerAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "SageMaker Endpoint 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "미사용",
-        "저사용",
-        "정상",
-        "미사용 비용",
-        "저사용 비용",
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=15),
+        ColumnDef(header="저사용 비용", width=15),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_endpoints)
-        ws.cell(row=row, column=4, value=r.unused_endpoints)
-        ws.cell(row=row, column=5, value=r.low_usage_endpoints)
-        ws.cell(row=row, column=6, value=r.normal_endpoints)
-        ws.cell(row=row, column=7, value=f"${r.unused_monthly_cost:,.2f}")
-        ws.cell(row=row, column=8, value=f"${r.low_usage_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_endpoints,
+            r.unused_endpoints,
+            r.low_usage_endpoints,
+            r.normal_endpoints,
+            f"${r.unused_monthly_cost:,.2f}",
+            f"${r.low_usage_monthly_cost:,.2f}",
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.unused_endpoints > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_endpoints > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Endpoints")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Endpoint Name",
-        "Status",
-        "Instance Type",
-        "Count",
-        "Total Invocations",
-        "Avg/Day",
-        "Latency (ms)",
-        "Age (days)",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Endpoint Name", width=35),
+        ColumnDef(header="Status", width=12),
+        ColumnDef(header="Instance Type", width=18),
+        ColumnDef(header="Count", width=8, style="number"),
+        ColumnDef(header="Total Invocations", width=15, style="number"),
+        ColumnDef(header="Avg/Day", width=10),
+        ColumnDef(header="Latency (ms)", width=12),
+        ColumnDef(header="Age (days)", width=12, style="number"),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=45),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Endpoints", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != EndpointStatus.NORMAL:
-                detail_row += 1
                 ep = f.endpoint
-                ws_detail.cell(row=detail_row, column=1, value=ep.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=ep.region)
-                ws_detail.cell(row=detail_row, column=3, value=ep.endpoint_name)
-                ws_detail.cell(row=detail_row, column=4, value=ep.status)
-                ws_detail.cell(row=detail_row, column=5, value=ep.instance_type)
-                ws_detail.cell(row=detail_row, column=6, value=ep.instance_count)
-                ws_detail.cell(row=detail_row, column=7, value=ep.total_invocations)
-                ws_detail.cell(row=detail_row, column=8, value=f"{ep.avg_invocations_per_day:.1f}")
-                ws_detail.cell(row=detail_row, column=9, value=f"{ep.model_latency_avg_ms:.2f}")
-                ws_detail.cell(row=detail_row, column=10, value=ep.age_days)
-                ws_detail.cell(row=detail_row, column=11, value=f"${ep.estimated_monthly_cost:.2f}")
-                ws_detail.cell(row=detail_row, column=12, value=f.recommendation)
+                style = Styles.danger() if f.status == EndpointStatus.UNUSED else Styles.warning()
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        ep.account_name,
+                        ep.region,
+                        ep.endpoint_name,
+                        ep.status,
+                        ep.instance_type,
+                        ep.instance_count,
+                        ep.total_invocations,
+                        f"{ep.avg_invocations_per_day:.1f}",
+                        f"{ep.model_latency_avg_ms:.2f}",
+                        ep.age_days,
+                        f"${ep.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"SageMaker_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "SageMaker_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SageMakerAnalysisResult | None:

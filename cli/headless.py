@@ -51,7 +51,7 @@ class HeadlessConfig:
     regions: list[str] = field(default_factory=list)
 
     # 출력
-    format: str = "console"  # console, json, csv
+    format: str = "both"  # excel, html, both, console, json, csv
     output: str | None = None
     quiet: bool = False
 
@@ -120,11 +120,15 @@ class HeadlessRunner:
                     if tool_meta.get("module") == self.config.tool_module:
                         return tool_meta
 
-        console.print(f"[red]{t('flow.tool_not_found', category=self.config.category, tool=self.config.tool_module)}[/red]")
+        console.print(
+            f"[red]{t('flow.tool_not_found', category=self.config.category, tool=self.config.tool_module)}[/red]"
+        )
         return None
 
     def _build_context(self, tool_meta: dict) -> ExecutionContext:
         """ExecutionContext 구성"""
+        from core.tools.io.config import OutputConfig
+
         ctx = ExecutionContext()
         ctx.category = self.config.category
         ctx.tool = ToolInfo(
@@ -136,6 +140,13 @@ class HeadlessRunner:
             supports_single_account_only=tool_meta.get("supports_single_account_only", False),
             is_global=tool_meta.get("is_global", False),
         )
+
+        # 출력 설정 (format 옵션에 따라 OutputConfig 생성)
+        ctx.output_config = OutputConfig.from_string(self.config.format)
+
+        # quiet 모드이면 자동 열기 비활성화
+        if self.config.quiet:
+            ctx.output_config.auto_open = False
 
         return ctx
 
@@ -227,7 +238,9 @@ class HeadlessRunner:
             if len(unique_regions) == 1:
                 console.print(f"[dim]{t('flow.region_label')} {unique_regions[0]}[/dim]")
             else:
-                console.print(f"[dim]{t('flow.region_label')} {t('flow.regions_count', count=len(unique_regions))}[/dim]")
+                console.print(
+                    f"[dim]{t('flow.region_label')} {t('flow.regions_count', count=len(unique_regions))}[/dim]"
+                )
 
         return True
 
@@ -240,7 +253,9 @@ class HeadlessRunner:
 
         tool = load_tool(self._ctx.category, self._ctx.tool.name)
         if tool is None:
-            console.print(f"[red]{t('flow.tool_load_failed', category=self._ctx.category, tool=self._ctx.tool.name)}[/red]")
+            console.print(
+                f"[red]{t('flow.tool_load_failed', category=self._ctx.category, tool=self._ctx.tool.name)}[/red]"
+            )
             return 1
 
         if not self.config.quiet:

@@ -162,8 +162,8 @@ class TestRun:
     """run() 통합 테스트"""
 
     @patch("plugins.{service}.{module}.parallel_collect")
-    @patch("plugins.{service}.{module}.generate_report")
-    def test_run_success(self, mock_report, mock_parallel, mock_context):
+    @patch("plugins.{service}.{module}.generate_reports")
+    def test_run_success(self, mock_reports, mock_parallel, mock_context):
         """정상 실행"""
         from plugins.{service}.{module} import run
 
@@ -172,14 +172,17 @@ class TestRun:
         mock_result.get_data.return_value = [MagicMock()]
         mock_result.error_count = 0
         mock_parallel.return_value = mock_result
-        mock_report.return_value = "/tmp/test_report.xlsx"
+        mock_reports.return_value = {
+            "excel": "/tmp/test_report.xlsx",
+            "html": "/tmp/test_report.html",
+        }
 
         # Act
         run(mock_context)
 
         # Assert
         mock_parallel.assert_called_once()
-        mock_report.assert_called_once()
+        mock_reports.assert_called_once()
 
     @patch("plugins.{service}.{module}.parallel_collect")
     def test_run_no_results(self, mock_parallel, mock_context):

@@ -1,5 +1,5 @@
 """
-core/cloudwatch/batch_metrics.py - CloudWatch Batch Metrics Utility
+plugins/cloudwatch/common/batch_metrics.py - CloudWatch Batch Metrics Utility
 
 GetMetricData API를 사용한 배치 메트릭 조회 (85% API 호출 감소)
 

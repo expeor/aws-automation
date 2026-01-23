@@ -15,6 +15,7 @@ AWS 리소스의 map-migrated 태그 현황을 분석하고 리포트 생성
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
@@ -30,6 +31,8 @@ from .types import (
     ResourceTagInfo,
     ResourceTypeStats,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -109,7 +112,7 @@ def collect_resources_with_tags(
     try:
         client = get_client(session, "resourcegroupstaggingapi", region_name=region)
     except Exception as e:
-        console.print(f"[dim]  {account_name}/{region}: API 접근 오류 - {e}[/dim]")
+        logger.warning(f"{account_name}/{region}: API 접근 오류 - {e}")
         return result
 
     # 리소스 타입별 통계
@@ -166,7 +169,7 @@ def collect_resources_with_tags(
                 result.total_resources += 1
 
     except Exception as e:
-        console.print(f"[yellow]  {account_name}/{region}: 리소스 조회 오류 - {e}[/yellow]")
+        logger.warning(f"{account_name}/{region}: 리소스 조회 오류 - {e}")
         return result
 
     # 리소스 타입별 통계 객체 생성

@@ -7,7 +7,6 @@ plugins/dynamodb/unused.py - DynamoDB 미사용 테이블 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -271,108 +270,97 @@ def analyze_tables(tables: list[TableInfo], account_id: str, account_name: str, 
 
 def generate_report(results: list[DynamoDBAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
-    # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "DynamoDB 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "미사용",
-        "저사용",
-        "정상",
-        "미사용 비용",
-        "저사용 비용",
+    # Summary 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=15),
+        ColumnDef(header="저사용 비용", width=15),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_tables)
-        ws.cell(row=row, column=4, value=r.unused_tables)
-        ws.cell(row=row, column=5, value=r.low_usage_tables)
-        ws.cell(row=row, column=6, value=r.normal_tables)
-        ws.cell(row=row, column=7, value=f"${r.unused_monthly_cost:,.2f}")
-        ws.cell(row=row, column=8, value=f"${r.low_usage_monthly_cost:,.2f}")
+        row_style = None
         if r.unused_tables > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            row_style = Styles.danger()
+        elif r.low_usage_tables > 0:
+            row_style = Styles.warning()
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_tables,
+                r.unused_tables,
+                r.low_usage_tables,
+                r.normal_tables,
+                f"${r.unused_monthly_cost:,.2f}",
+                f"${r.low_usage_monthly_cost:,.2f}",
+            ],
+            style=row_style,
+        )
+        # Cell-level highlighting
+        ws = summary_sheet._ws
+        if r.unused_tables > 0:
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_tables > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Tables")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Table Name",
-        "Status",
-        "Billing Mode",
-        "Items",
-        "Size (MB)",
-        "Prov. RCU",
-        "Prov. WCU",
-        "Consumed R",
-        "Consumed W",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Table Name", width=30),
+        ColumnDef(header="Status", width=12, style="center"),
+        ColumnDef(header="Billing Mode", width=15),
+        ColumnDef(header="Items", width=12, style="number"),
+        ColumnDef(header="Size (MB)", width=12),
+        ColumnDef(header="Prov. RCU", width=12, style="number"),
+        ColumnDef(header="Prov. WCU", width=12, style="number"),
+        ColumnDef(header="Consumed R", width=12),
+        ColumnDef(header="Consumed W", width=12),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Tables", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != TableStatus.NORMAL:
-                detail_row += 1
                 t = f.table
-                ws_detail.cell(row=detail_row, column=1, value=t.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=t.region)
-                ws_detail.cell(row=detail_row, column=3, value=t.table_name)
-                ws_detail.cell(row=detail_row, column=4, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=5, value=t.billing_mode)
-                ws_detail.cell(row=detail_row, column=6, value=t.item_count)
-                ws_detail.cell(row=detail_row, column=7, value=f"{t.size_mb:.2f}")
-                ws_detail.cell(row=detail_row, column=8, value=t.provisioned_read)
-                ws_detail.cell(row=detail_row, column=9, value=t.provisioned_write)
-                ws_detail.cell(row=detail_row, column=10, value=f"{t.consumed_read:.1f}")
-                ws_detail.cell(row=detail_row, column=11, value=f"{t.consumed_write:.1f}")
-                ws_detail.cell(row=detail_row, column=12, value=f"${t.estimated_monthly_cost:.2f}")
-                ws_detail.cell(row=detail_row, column=13, value=f.recommendation)
+                row_style = Styles.danger() if f.status == TableStatus.UNUSED else Styles.warning()
+                detail_sheet.add_row(
+                    [
+                        t.account_name,
+                        t.region,
+                        t.table_name,
+                        f.status.value,
+                        t.billing_mode,
+                        t.item_count,
+                        f"{t.size_mb:.2f}",
+                        t.provisioned_read,
+                        t.provisioned_write,
+                        f"{t.consumed_read:.1f}",
+                        f"{t.consumed_write:.1f}",
+                        f"${t.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=row_style,
+                )
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"DynamoDB_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "DynamoDB_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> DynamoDBAnalysisResult | None:

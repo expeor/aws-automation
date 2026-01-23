@@ -15,6 +15,7 @@ AWS 리소스에 map-migrated 태그 일괄 적용
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -33,6 +34,8 @@ from .types import (
     TagOperationLog,
     TagOperationResult,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -79,7 +82,7 @@ def apply_map_tag(
     try:
         client = get_client(session, "resourcegroupstaggingapi", region_name=region)
     except Exception as e:
-        console.print(f"[red]  {account_name}/{region}: API 접근 오류 - {e}[/red]")
+        logger.warning(f"{account_name}/{region}: API 접근 오류 - {e}")
         for res in resources:
             result.operation_logs.append(
                 TagOperationLog(

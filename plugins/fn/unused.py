@@ -11,7 +11,6 @@ plugins/fn/unused.py - 미사용 Lambda 함수 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -185,75 +184,75 @@ def _analyze_single_function(func: LambdaFunctionInfo, region: str) -> LambdaFin
 
 def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "Lambda 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    wb = Workbook()
 
-    headers = ["Account", "Region", "전체", "미사용", "저사용", "정상", "월간 낭비"]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("Lambda 미사용 분석 보고서")
+    summary.add_item("생성", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="월간 낭비", width=15),
+    ]
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_count)
-        ws.cell(row=row, column=4, value=r.unused_count)
-        ws.cell(row=row, column=5, value=r.low_usage_count)
-        ws.cell(row=row, column=6, value=r.normal_count)
-        ws.cell(row=row, column=7, value=f"${r.unused_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_count,
+            r.unused_count,
+            r.low_usage_count,
+            r.normal_count,
+            f"${r.unused_monthly_cost:,.2f}",
+        ])
         if r.unused_count > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            summary_sheet._ws.cell(row=row_num, column=4).fill = red_fill
 
     # 총계
     total_functions = sum(r.total_count for r in results)
     total_unused = sum(r.unused_count for r in results)
     total_waste = sum(r.unused_monthly_cost for r in results)
+    summary_sheet.add_summary_row([
+        "합계",
+        "-",
+        total_functions,
+        total_unused,
+        "-",
+        "-",
+        f"${total_waste:,.2f}",
+    ])
 
-    row += 2
-    ws.cell(row=row, column=1, value="합계").font = Font(bold=True)
-    ws.cell(row=row, column=3, value=total_functions).font = Font(bold=True)
-    ws.cell(row=row, column=4, value=total_unused).font = Font(bold=True)
-    ws.cell(row=row, column=7, value=f"${total_waste:,.2f}").font = Font(bold=True, color="FF0000")
-
-    # Unused Functions
-    ws_unused = wb.create_sheet("Unused")
-    unused_headers = [
-        "Account",
-        "Region",
-        "Function Name",
-        "Runtime",
-        "Memory (MB)",
-        "Timeout (s)",
-        "Code Size (MB)",
-        "Last Modified",
-        "Provisioned Concurrency",
-        "상태",
-        "월간 낭비",
-        "권장 조치",
+    # Unused Functions Sheet
+    unused_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function Name", width=40),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="Memory (MB)", width=12, style="number"),
+        ColumnDef(header="Timeout (s)", width=12, style="number"),
+        ColumnDef(header="Code Size (MB)", width=14, style="number"),
+        ColumnDef(header="Last Modified", width=15),
+        ColumnDef(header="Provisioned Concurrency", width=20, style="number"),
+        ColumnDef(header="상태", width=20),
+        ColumnDef(header="월간 낭비", width=15),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(unused_headers, 1):
-        ws_unused.cell(row=1, column=col, value=h).fill = header_fill
-        ws_unused.cell(row=1, column=col).font = header_font
+    unused_sheet = wb.new_sheet("Unused", unused_columns)
 
-    unused_row = 1
     for r in results:
         for f in r.findings:
             if f.status in (
@@ -261,109 +260,73 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
                 UsageStatus.UNUSED_PROVISIONED,
                 UsageStatus.LOW_USAGE,
             ):
-                unused_row += 1
                 fn = f.function
-                ws_unused.cell(row=unused_row, column=1, value=fn.account_name)
-                ws_unused.cell(row=unused_row, column=2, value=fn.region)
-                ws_unused.cell(row=unused_row, column=3, value=fn.function_name)
-                ws_unused.cell(row=unused_row, column=4, value=fn.runtime)
-                ws_unused.cell(row=unused_row, column=5, value=fn.memory_mb)
-                ws_unused.cell(row=unused_row, column=6, value=fn.timeout_seconds)
-                ws_unused.cell(row=unused_row, column=7, value=round(fn.code_size_mb, 2))
-                ws_unused.cell(
-                    row=unused_row,
-                    column=8,
-                    value=fn.last_modified.strftime("%Y-%m-%d") if fn.last_modified else "-",
-                )
-                ws_unused.cell(row=unused_row, column=9, value=fn.provisioned_concurrency or "-")
-                ws_unused.cell(row=unused_row, column=10, value=f.status.value)
-                ws_unused.cell(
-                    row=unused_row,
-                    column=11,
-                    value=f"${f.monthly_waste:,.2f}" if f.monthly_waste > 0 else "-",
-                )
-                ws_unused.cell(row=unused_row, column=12, value=f.recommendation)
+                row_num = unused_sheet.add_row([
+                    fn.account_name,
+                    fn.region,
+                    fn.function_name,
+                    fn.runtime,
+                    fn.memory_mb,
+                    fn.timeout_seconds,
+                    round(fn.code_size_mb, 2),
+                    fn.last_modified.strftime("%Y-%m-%d") if fn.last_modified else "-",
+                    fn.provisioned_concurrency or "-",
+                    f.status.value,
+                    f"${f.monthly_waste:,.2f}" if f.monthly_waste > 0 else "-",
+                    f.recommendation,
+                ])
 
                 # 상태별 색상
+                ws = unused_sheet._ws
                 if f.status == UsageStatus.UNUSED_PROVISIONED or f.status == UsageStatus.UNUSED:
-                    ws_unused.cell(row=unused_row, column=10).fill = red_fill
+                    ws.cell(row=row_num, column=10).fill = red_fill
                 elif f.status == UsageStatus.LOW_USAGE:
-                    ws_unused.cell(row=unused_row, column=10).fill = yellow_fill
+                    ws.cell(row=row_num, column=10).fill = yellow_fill
 
-    # All Functions
-    ws_all = wb.create_sheet("All Functions")
-    all_headers = [
-        "Account",
-        "Region",
-        "Function Name",
-        "Runtime",
-        "Memory (MB)",
-        "Timeout (s)",
-        "Code Size (MB)",
-        "Invocations (30d)",
-        "Avg Duration (ms)",
-        "Errors",
-        "Throttles",
-        "PC",
-        "Reserved",
-        "상태",
-        "추정 월 비용",
+    # All Functions Sheet
+    all_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function Name", width=40),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="Memory (MB)", width=12, style="number"),
+        ColumnDef(header="Timeout (s)", width=12, style="number"),
+        ColumnDef(header="Code Size (MB)", width=14, style="number"),
+        ColumnDef(header="Invocations (30d)", width=16, style="number"),
+        ColumnDef(header="Avg Duration (ms)", width=16, style="number"),
+        ColumnDef(header="Errors", width=10, style="number"),
+        ColumnDef(header="Throttles", width=10, style="number"),
+        ColumnDef(header="PC", width=10, style="number"),
+        ColumnDef(header="Reserved", width=10, style="number"),
+        ColumnDef(header="상태", width=20),
+        ColumnDef(header="추정 월 비용", width=15),
     ]
-    for col, h in enumerate(all_headers, 1):
-        ws_all.cell(row=1, column=col, value=h).fill = header_fill
-        ws_all.cell(row=1, column=col).font = header_font
+    all_sheet = wb.new_sheet("All Functions", all_columns)
 
-    all_row = 1
     for r in results:
         for f in r.findings:
-            all_row += 1
             fn = f.function
             metrics = fn.metrics
 
-            ws_all.cell(row=all_row, column=1, value=fn.account_name)
-            ws_all.cell(row=all_row, column=2, value=fn.region)
-            ws_all.cell(row=all_row, column=3, value=fn.function_name)
-            ws_all.cell(row=all_row, column=4, value=fn.runtime)
-            ws_all.cell(row=all_row, column=5, value=fn.memory_mb)
-            ws_all.cell(row=all_row, column=6, value=fn.timeout_seconds)
-            ws_all.cell(row=all_row, column=7, value=round(fn.code_size_mb, 2))
-            ws_all.cell(row=all_row, column=8, value=metrics.invocations if metrics else 0)
-            ws_all.cell(
-                row=all_row,
-                column=9,
-                value=round(metrics.duration_avg_ms, 2) if metrics else 0,
-            )
-            ws_all.cell(row=all_row, column=10, value=metrics.errors if metrics else 0)
-            ws_all.cell(row=all_row, column=11, value=metrics.throttles if metrics else 0)
-            ws_all.cell(row=all_row, column=12, value=fn.provisioned_concurrency or "-")
-            ws_all.cell(
-                row=all_row,
-                column=13,
-                value=fn.reserved_concurrency if fn.reserved_concurrency is not None else "-",
-            )
-            ws_all.cell(row=all_row, column=14, value=f.status.value)
-            ws_all.cell(
-                row=all_row,
-                column=15,
-                value=f"${fn.estimated_monthly_cost:,.4f}" if fn.estimated_monthly_cost > 0 else "-",
-            )
+            all_sheet.add_row([
+                fn.account_name,
+                fn.region,
+                fn.function_name,
+                fn.runtime,
+                fn.memory_mb,
+                fn.timeout_seconds,
+                round(fn.code_size_mb, 2),
+                metrics.invocations if metrics else 0,
+                round(metrics.duration_avg_ms, 2) if metrics else 0,
+                metrics.errors if metrics else 0,
+                metrics.throttles if metrics else 0,
+                fn.provisioned_concurrency or "-",
+                fn.reserved_concurrency if fn.reserved_concurrency is not None else "-",
+                f.status.value,
+                f"${fn.estimated_monthly_cost:,.4f}" if fn.estimated_monthly_cost > 0 else "-",
+            ])
 
-    # 열 너비
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        if sheet.title != "Summary":
-            sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Lambda_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "Lambda_Unused"))
 
 
 # =============================================================================

@@ -51,7 +51,7 @@ if str(_project_root) not in sys.path:
 import click  # noqa: E402
 from click import Context, HelpFormatter  # noqa: E402
 
-from cli.i18n import get_lang, t  # noqa: E402
+from cli.i18n import t  # noqa: E402
 
 # Keep lightweight, centralized logging config
 # WARNING 레벨로 설정하여 INFO 로그가 도구 출력에 섞이지 않도록 함
@@ -244,9 +244,9 @@ cli.help = _build_help_text()
 @click.option(
     "-f",
     "--format",
-    type=click.Choice(["console", "json", "csv"]),
-    default="console",
-    help="출력 형식 (기본: console)",
+    type=click.Choice(["excel", "html", "both", "console", "json", "csv"]),
+    default="both",
+    help="출력 형식 (기본: both = Excel + HTML)",
 )
 @click.option(
     "-o",

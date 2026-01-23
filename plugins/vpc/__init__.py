@@ -54,4 +54,14 @@ TOOLS = [
         "module": "network_analysis",
         "area": "unused",
     },
+    # Inventory
+    {
+        "name": "VPC 리소스 인벤토리",
+        "name_en": "VPC Resource Inventory",
+        "description": "ENI, NAT Gateway, VPC Endpoint 현황 조회",
+        "description_en": "List ENIs, NAT Gateways, VPC Endpoints",
+        "permission": "read",
+        "module": "inventory",
+        "area": "inventory",
+    },
 ]

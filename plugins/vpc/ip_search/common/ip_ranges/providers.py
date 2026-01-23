@@ -1,13 +1,13 @@
 """
-core/data/ip_ranges/providers.py - Cloud Provider IP Range Services
+plugins/vpc/ip_search/common/ip_ranges/providers.py - Cloud Provider IP Range Services
 
-Centralized IP range data service for cloud providers:
+클라우드 프로바이더별 IP 대역 데이터 서비스:
 - AWS, GCP, Azure, Oracle Cloud
 
 Features:
-- 24-hour cache for fast responses
-- Parallel data loading
-- CIDR and single IP search
+- 24시간 캐시로 빠른 응답
+- 병렬 데이터 로딩
+- CIDR 및 단일 IP 검색
 """
 
 import ipaddress
@@ -43,9 +43,13 @@ class PublicIPResult:
 
 def _get_cache_dir() -> str:
     """Get cache directory path (project root's temp folder)"""
-    # core/data/ip_ranges -> data -> core -> project_root
+    # plugins/vpc/ip_search/common/ip_ranges -> ip_ranges -> common -> ip_search -> vpc -> plugins -> project_root
     project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        os.path.dirname(
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            )
+        )
     )
     cache_dir = os.path.join(project_root, "temp", "ip_ranges")
     os.makedirs(cache_dir, exist_ok=True)
@@ -113,12 +117,8 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
 
     # Download each provider's data
     loaders = {
-        "aws": lambda: _fetch_and_cache(
-            "aws", "https://ip-ranges.amazonaws.com/ip-ranges.json"
-        ),
-        "gcp": lambda: _fetch_and_cache(
-            "gcp", "https://www.gstatic.com/ipranges/cloud.json"
-        ),
+        "aws": lambda: _fetch_and_cache("aws", "https://ip-ranges.amazonaws.com/ip-ranges.json"),
+        "gcp": lambda: _fetch_and_cache("gcp", "https://www.gstatic.com/ipranges/cloud.json"),
         "azure": _fetch_azure_fresh,
         "oracle": lambda: _fetch_and_cache(
             "oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"
@@ -138,9 +138,7 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
                 elif provider == "azure":
                     count = len(data.get("values", []))
                 elif provider == "oracle":
-                    count = sum(
-                        len(r.get("cidrs", [])) for r in data.get("regions", [])
-                    )
+                    count = sum(len(r.get("cidrs", [])) for r in data.get("regions", []))
                 else:
                     count = 0
 
@@ -216,9 +214,7 @@ def get_public_cache_status() -> dict[str, Any]:
                     elif name == "azure":
                         count = len(data.get("values", []))
                     elif name == "oracle":
-                        count = sum(
-                            len(r.get("cidrs", [])) for r in data.get("regions", [])
-                        )
+                        count = sum(len(r.get("cidrs", [])) for r in data.get("regions", []))
                     else:
                         count = 0
 
@@ -249,9 +245,7 @@ def get_aws_ip_ranges() -> dict[str, Any]:
         return cached
 
     try:
-        response = requests.get(
-            "https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5
-        )
+        response = requests.get("https://ip-ranges.amazonaws.com/ip-ranges.json", timeout=5)
         data: dict[str, Any] = response.json()
         _save_to_cache("aws", data)
         return data
@@ -266,9 +260,7 @@ def get_gcp_ip_ranges() -> dict[str, Any]:
         return cached
 
     try:
-        response = requests.get(
-            "https://www.gstatic.com/ipranges/cloud.json", timeout=10
-        )
+        response = requests.get("https://www.gstatic.com/ipranges/cloud.json", timeout=10)
         data: dict[str, Any] = response.json()
         _save_to_cache("gcp", data)
         return data
@@ -334,11 +326,7 @@ def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
     except ValueError:
         return results
 
-    prefixes = (
-        data.get("prefixes", [])
-        if ip_obj.version == 4
-        else data.get("ipv6_prefixes", [])
-    )
+    prefixes = data.get("prefixes", []) if ip_obj.version == 4 else data.get("ipv6_prefixes", [])
     prefix_key = "ip_prefix" if ip_obj.version == 4 else "ipv6_prefix"
 
     for prefix in prefixes:
@@ -352,11 +340,7 @@ def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
                         service=prefix.get("service", ""),
                         ip_prefix=prefix[prefix_key],
                         region=prefix.get("region", ""),
-                        extra={
-                            "network_border_group": prefix.get(
-                                "network_border_group", ""
-                            )
-                        },
+                        extra={"network_border_group": prefix.get("network_border_group", "")},
                     )
                 )
         except (ValueError, KeyError):
@@ -480,9 +464,7 @@ def load_ip_ranges_parallel(target_providers: set[str]) -> dict[str, dict[str, A
     data_sources: dict[str, dict[str, Any]] = {}
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(loaders[p]): p for p in target_providers if p in loaders
-        }
+        futures = {executor.submit(loaders[p]): p for p in target_providers if p in loaders}
 
         for future in as_completed(futures):
             provider = futures[future]
@@ -509,9 +491,7 @@ def search_public_ip(
         List of search results
     """
     all_providers = {"aws", "gcp", "azure", "oracle"}
-    target_providers = (
-        {p.lower() for p in providers} & all_providers if providers else all_providers
-    )
+    target_providers = {p.lower() for p in providers} & all_providers if providers else all_providers
 
     data_sources = load_ip_ranges_parallel(target_providers)
 
@@ -633,9 +613,7 @@ def search_by_filter(
                     service=p_service,
                     ip_prefix=ip_prefix,
                     region=p_region,
-                    extra={
-                        "network_border_group": prefix.get("network_border_group", "")
-                    },
+                    extra={"network_border_group": prefix.get("network_border_group", "")},
                 )
             )
 

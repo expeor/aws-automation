@@ -96,13 +96,25 @@ def get_logger(name: str = "rich") -> logging.Logger:
 logger = get_logger()
 
 
+# =============================================================================
+# 표준 출력 스타일 (이모지 없이 Rich 스타일만 사용)
+# =============================================================================
+
+# 상태 심볼
+SYMBOL_SUCCESS = "✓"  # 완료
+SYMBOL_ERROR = "✗"  # 에러
+SYMBOL_WARNING = "!"  # 경고
+SYMBOL_INFO = "•"  # 정보
+SYMBOL_PROGRESS = "•"  # 진행 중
+
+
 def print_success(message: str) -> None:
     """성공 메시지 출력 (초록색 체크마크)
 
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[green]✅ {message}[/green]")
+    console.print(f"[green]{SYMBOL_SUCCESS} {message}[/green]")
 
 
 def print_error(message: str) -> None:
@@ -111,7 +123,7 @@ def print_error(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[red]❌ {message}[/red]")
+    console.print(f"[red]{SYMBOL_ERROR} {message}[/red]")
 
 
 def print_warning(message: str) -> None:
@@ -120,7 +132,7 @@ def print_warning(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[yellow]⚠️  {message}[/yellow]")
+    console.print(f"[yellow]{SYMBOL_WARNING} {message}[/yellow]")
 
 
 def print_info(message: str) -> None:
@@ -129,7 +141,7 @@ def print_info(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[blue]ℹ️  {message}[/blue]")
+    console.print(f"[blue]{SYMBOL_INFO} {message}[/blue]")
 
 
 def print_header(title: str) -> None:
@@ -152,6 +164,34 @@ def print_step(step: int, total: int, message: str) -> None:
         message: 단계 설명
     """
     console.print(f"[dim]({step}/{total})[/dim] {message}")
+
+
+def print_step_header(step: int, message: str) -> None:
+    """Step 헤더 출력 (예: Step 1: 데이터 수집 중...)
+
+    Args:
+        step: Step 번호
+        message: Step 설명
+    """
+    console.print(f"[bold cyan]Step {step}: {message}[/bold cyan]")
+
+
+def print_sub_task(message: str) -> None:
+    """하위 작업 진행 중 출력 (들여쓰기)
+
+    Args:
+        message: 작업 설명
+    """
+    console.print(f"{message}")
+
+
+def print_sub_task_done(message: str) -> None:
+    """하위 작업 완료 출력 (들여쓰기 + 체크마크)
+
+    Args:
+        message: 완료 메시지
+    """
+    console.print(f"[green]{SYMBOL_SUCCESS} {message}[/green]")
 
 
 def print_panel_header(title: str, subtitle: str | None = None) -> None:

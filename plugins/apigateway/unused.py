@@ -7,7 +7,6 @@ plugins/apigateway/unused.py - API Gateway 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -313,90 +312,75 @@ def analyze_apis(apis: list[APIInfo], account_id: str, account_name: str, region
 
 def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
-    # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "API Gateway 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = ["Account", "Region", "전체", "미사용", "스테이지없음", "저사용", "정상"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="스테이지없음", width=12, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_apis)
-        ws.cell(row=row, column=4, value=r.unused_apis)
-        ws.cell(row=row, column=5, value=r.no_stages)
-        ws.cell(row=row, column=6, value=r.low_usage)
-        ws.cell(row=row, column=7, value=r.normal_apis)
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_apis,
+            r.unused_apis,
+            r.no_stages,
+            r.low_usage,
+            r.normal_apis,
+        ])
+        ws = summary_sheet._ws
         if r.unused_apis > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.no_stages > 0 or r.low_usage > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("APIs")
-    detail_headers = [
-        "Account",
-        "Region",
-        "API Name",
-        "Type",
-        "Endpoint",
-        "Stages",
-        "Requests",
-        "상태",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="API Name", width=30),
+        ColumnDef(header="Type", width=12),
+        ColumnDef(header="Endpoint", width=15),
+        ColumnDef(header="Stages", width=10, style="number"),
+        ColumnDef(header="Requests", width=12, style="number"),
+        ColumnDef(header="상태", width=12),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("APIs", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != APIStatus.NORMAL:
-                detail_row += 1
                 a = f.api
-                ws_detail.cell(row=detail_row, column=1, value=a.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=a.region)
-                ws_detail.cell(row=detail_row, column=3, value=a.api_name)
-                ws_detail.cell(row=detail_row, column=4, value=a.api_type)
-                ws_detail.cell(row=detail_row, column=5, value=a.endpoint_type)
-                ws_detail.cell(row=detail_row, column=6, value=a.stage_count)
-                ws_detail.cell(row=detail_row, column=7, value=int(a.total_requests))
-                ws_detail.cell(row=detail_row, column=8, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=9, value=f.recommendation)
+                style = Styles.danger() if f.status == APIStatus.UNUSED else Styles.warning()
+                detail_sheet.add_row([
+                    a.account_name,
+                    a.region,
+                    a.api_name,
+                    a.api_type,
+                    a.endpoint_type,
+                    a.stage_count,
+                    int(a.total_requests),
+                    f.status.value,
+                    f.recommendation,
+                ], style=style)
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"APIGateway_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "APIGateway_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> APIGatewayAnalysisResult | None:

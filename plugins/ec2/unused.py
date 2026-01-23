@@ -16,16 +16,15 @@ plugins/ec2/unused.py - EC2 인스턴스 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from rich.console import Console
 
-from core.cloudwatch import MetricQuery, batch_get_metrics, sanitize_metric_id
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from core.tools.output import OutputPath
 from plugins.cost.pricing import get_ec2_monthly_cost
 
 console = Console()
@@ -337,119 +336,170 @@ def analyze_instances(
     return result
 
 
-def generate_report(results: list[EC2AnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+def generate_report(results: list[EC2AnalysisResult], output_dir: str, ctx=None) -> dict[str, str]:
+    """Excel + HTML 보고서 생성
+
+    Args:
+        results: 분석 결과 리스트
+        output_dir: 출력 디렉토리
+        ctx: 실행 컨텍스트 (출력 설정 및 HTML 생성용)
+
+    Returns:
+        생성된 파일 경로 딕셔너리 {"excel": "...", "html": "..."}
+    """
+    from core.tools.io.compat import generate_reports
+
+    # HTML 생성용 flat 데이터
+    flat_data = []
+    for r in results:
+        for f in r.findings:
+            if f.status != InstanceStatus.NORMAL:
+                inst = f.instance
+                flat_data.append(
+                    {
+                        "account_id": inst.account_id,
+                        "account_name": inst.account_name,
+                        "region": inst.region,
+                        "resource_id": inst.instance_id,
+                        "resource_name": inst.name,
+                        "resource_type": inst.instance_type,
+                        "status": f.status.value,
+                        "reason": f.recommendation,
+                        "cost": inst.estimated_monthly_cost,
+                        # Extra fields
+                        "state": inst.state,
+                        "platform": inst.platform,
+                        "avg_cpu": f"{inst.avg_cpu:.1f}%",
+                        "max_cpu": f"{inst.max_cpu:.1f}%",
+                        "age_days": inst.age_days,
+                    }
+                )
+
+    # 집계
+    total_instances = sum(r.total_instances for r in results)
+    total_unused = sum(r.unused_instances for r in results)
+    total_low = sum(r.low_usage_instances for r in results)
+    total_stopped = sum(r.stopped_instances for r in results)
+    total_savings = sum(r.unused_monthly_cost + r.low_usage_monthly_cost for r in results)
+
+    return generate_reports(
+        ctx,
+        data=flat_data,
+        excel_generator=lambda d: _save_excel(results, d),
+        html_config={
+            "title": "EC2 미사용 인스턴스 분석",
+            "service": "EC2",
+            "tool_name": "unused",
+            "total": total_instances,
+            "found": total_unused + total_low + total_stopped,
+            "savings": total_savings,
+        },
+        output_dir=output_dir,
+    )
+
+
+def _save_excel(results: list[EC2AnalysisResult], output_dir: str) -> str:
+    """Excel 보고서 생성 (내부 함수)"""
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     gray_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "EC2 인스턴스 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "미사용",
-        "저사용",
-        "정지",
-        "정상",
-        "미사용 비용",
-        "저사용 비용",
-        "정지 비용",
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정지", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=15),
+        ColumnDef(header="저사용 비용", width=15),
+        ColumnDef(header="정지 비용", width=15),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_instances)
-        ws.cell(row=row, column=4, value=r.unused_instances)
-        ws.cell(row=row, column=5, value=r.low_usage_instances)
-        ws.cell(row=row, column=6, value=r.stopped_instances)
-        ws.cell(row=row, column=7, value=r.normal_instances)
-        ws.cell(row=row, column=8, value=f"${r.unused_monthly_cost:,.2f}")
-        ws.cell(row=row, column=9, value=f"${r.low_usage_monthly_cost:,.2f}")
-        ws.cell(row=row, column=10, value=f"${r.stopped_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_instances,
+                r.unused_instances,
+                r.low_usage_instances,
+                r.stopped_instances,
+                r.normal_instances,
+                f"${r.unused_monthly_cost:,.2f}",
+                f"${r.low_usage_monthly_cost:,.2f}",
+                f"${r.stopped_monthly_cost:,.2f}",
+            ]
+        )
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.unused_instances > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_instances > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
         if r.stopped_instances > 0:
-            ws.cell(row=row, column=6).fill = gray_fill
+            ws.cell(row=row_num, column=6).fill = gray_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Instances")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Instance ID",
-        "Name",
-        "Type",
-        "State",
-        "Platform",
-        "Avg CPU",
-        "Max CPU",
-        "Network In",
-        "Network Out",
-        "Age (days)",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Instance ID", width=22),
+        ColumnDef(header="Name", width=25),
+        ColumnDef(header="Type", width=15),
+        ColumnDef(header="State", width=12),
+        ColumnDef(header="Platform", width=10),
+        ColumnDef(header="Avg CPU", width=10),
+        ColumnDef(header="Max CPU", width=10),
+        ColumnDef(header="Network In", width=15),
+        ColumnDef(header="Network Out", width=15),
+        ColumnDef(header="Age (days)", width=12, style="number"),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Instances", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != InstanceStatus.NORMAL:
-                detail_row += 1
                 inst = f.instance
-                ws_detail.cell(row=detail_row, column=1, value=inst.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=inst.region)
-                ws_detail.cell(row=detail_row, column=3, value=inst.instance_id)
-                ws_detail.cell(row=detail_row, column=4, value=inst.name)
-                ws_detail.cell(row=detail_row, column=5, value=inst.instance_type)
-                ws_detail.cell(row=detail_row, column=6, value=inst.state)
-                ws_detail.cell(row=detail_row, column=7, value=inst.platform)
-                ws_detail.cell(row=detail_row, column=8, value=f"{inst.avg_cpu:.1f}%")
-                ws_detail.cell(row=detail_row, column=9, value=f"{inst.max_cpu:.1f}%")
-                ws_detail.cell(row=detail_row, column=10, value=f"{inst.total_network_in / (1024 * 1024):.2f} MB")
-                ws_detail.cell(row=detail_row, column=11, value=f"{inst.total_network_out / (1024 * 1024):.2f} MB")
-                ws_detail.cell(row=detail_row, column=12, value=inst.age_days)
-                ws_detail.cell(row=detail_row, column=13, value=f"${inst.estimated_monthly_cost:.2f}")
-                ws_detail.cell(row=detail_row, column=14, value=f.recommendation)
+                style = None
+                if f.status == InstanceStatus.UNUSED:
+                    style = Styles.danger()
+                elif f.status == InstanceStatus.LOW_USAGE:
+                    style = Styles.warning()
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        inst.account_name,
+                        inst.region,
+                        inst.instance_id,
+                        inst.name,
+                        inst.instance_type,
+                        inst.state,
+                        inst.platform,
+                        f"{inst.avg_cpu:.1f}%",
+                        f"{inst.max_cpu:.1f}%",
+                        f"{inst.total_network_in / (1024 * 1024):.2f} MB",
+                        f"{inst.total_network_out / (1024 * 1024):.2f} MB",
+                        inst.age_days,
+                        f"${inst.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"EC2_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "EC2_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EC2AnalysisResult | None:
@@ -496,7 +546,12 @@ def run(ctx) -> None:
         identifier = "default"
 
     output_path = OutputPath(identifier).sub("ec2", "unused").with_date().build()
-    filepath = generate_report(results, output_path)
 
-    console.print(f"\n[bold green]완료![/bold green] {filepath}")
-    open_in_explorer(output_path)
+    # Excel + HTML 동시 생성 (ctx.output_config 설정에 따라)
+    report_paths = generate_report(results, output_path, ctx)
+
+    console.print("\n[bold green]완료![/bold green]")
+    if report_paths.get("excel"):
+        console.print(f"  Excel: {report_paths['excel']}")
+    if report_paths.get("html"):
+        console.print(f"  HTML: {report_paths['html']}")

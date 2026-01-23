@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from core.cloudwatch import MetricQuery, batch_get_metrics, sanitize_metric_id
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import ErrorSeverity, get_client, try_or_default
 
 logger = logging.getLogger(__name__)

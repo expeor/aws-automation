@@ -200,22 +200,38 @@ def analyze_{resources}(resources: list[{Resource}Info], account_id: str, accoun
     return result
 
 
-def generate_report(results: list[{Resource}AnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
+def _save_excel(results: list[{Resource}AnalysisResult], output_dir: str) -> str:
+    """Excel 보고서 생성 (내부 함수)"""
+    from core.tools.io.excel import Workbook, ColumnDef, Styles
 
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Summary"
 
-    # TODO: 보고서 작성
+    # Summary 시트
+    summary = wb.new_summary_sheet()
+    summary.add_title("{display_name} 분석 보고서")
+    summary.add_section("요약")
+    summary.add_item("전체 리소스", sum(r.total_count for r in results))
+    summary.add_item("미사용", sum(r.unused_count for r in results), highlight="danger")
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"{Service}_{Type}_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    # Detail 시트
+    columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Resource ID", width=25),
+        # TODO: 리소스별 컬럼 추가
+    ]
+    sheet = wb.new_sheet("Details", columns)
+
+    for r in results:
+        for finding in r.findings:
+            sheet.add_row([
+                r.account_name,
+                r.region,
+                finding.id,
+                # TODO: 리소스별 데이터
+            ])
+
+    return str(wb.save_as(output_dir, "{Service}_{Type}"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> {Resource}AnalysisResult | None:
@@ -228,6 +244,8 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 def run(ctx) -> None:
     """{tool_name}"""
+    from core.tools.io.compat import generate_reports
+
     console.print("[bold]{display_name} 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="{aws_service}")
@@ -242,13 +260,43 @@ def run(ctx) -> None:
     unused = sum(r.unused_count for r in results)
     console.print(f"전체: {total}개, 미사용: [red]{unused}개[/red]")
 
-    # 보고서 생성 - 경로 형식: output/{identifier}/{service}/{type}/{date}/
+    # HTML용 flat 데이터 준비
+    flat_data = [
+        {
+            "account_id": r.account_id,
+            "account_name": r.account_name,
+            "region": r.region,
+            "resource_id": f.id,
+            "status": f.status,
+            "reason": f.reason,
+            # TODO: 리소스별 추가 필드
+        }
+        for r in results
+        for f in r.findings
+    ]
+
+    # 보고서 경로 - 형식: output/{identifier}/{service}/{type}/{date}/
     identifier = ctx.accounts[0].id if ctx.accounts else ctx.profile_name or "default"
     output_path = OutputPath(identifier).sub("{service}", "{type}").with_date().build()
 
-    filepath = generate_report(results, output_path)
-    console.print(f"\n[bold green]완료![/bold green] {filepath}")
-    open_in_explorer(output_path)
+    # Excel + HTML 동시 생성 (ctx.output_config에 따라)
+    report_paths = generate_reports(
+        ctx,
+        data=flat_data,
+        excel_generator=lambda d: _save_excel(results, d),
+        html_config={
+            "title": "{tool_name}",
+            "service": "{display_name}",
+            "tool_name": "{type}",
+            "total": total,
+            "found": unused,
+        },
+        output_dir=output_path,
+    )
+
+    console.print("\n[bold green]완료![/bold green]")
+    for fmt, path in report_paths.items():
+        console.print(f"  {fmt.upper()}: {path}")
 ```
 
 ---
@@ -375,16 +423,25 @@ from core.parallel import get_client, parallel_collect
 
 # Output 경로 (필수)
 from core.tools.output import OutputPath, open_in_explorer
+
+# 리포트 출력 - Excel + HTML 동시 생성 (권장)
+from core.tools.io.compat import generate_reports
 ```
 
 ### 선택 import
 
 ```python
+# 출력 설정
+from core.tools.io import OutputConfig, OutputFormat
+
 # Quiet 모드 체크 (진행 표시 제어)
 from core.parallel import is_quiet, quiet_mode, set_quiet
 
 # Excel 유틸리티 (openpyxl 래퍼 - 더 간단한 API)
 from core.tools.io.excel import Workbook, ColumnDef, Styles
+
+# HTML 유틸리티
+from core.tools.io.html import AWSReport, ResourceItem, create_aws_report
 
 # 타입 체계 상수
 from core.tools.output import ReportType, ToolType
@@ -397,7 +454,11 @@ from core.tools.output import ReportType, ToolType
 생성 전 반드시 확인:
 - `plugins/efs/__init__.py` - 메타데이터 예시
 - `plugins/efs/unused.py` - 전체 구현 예시
+- `plugins/ec2/unused.py` - Excel + HTML 통합 출력 예시
 - `core/tools/output/report_types.py` - 타입 정의
+- `core/tools/io/config.py` - OutputConfig, OutputFormat
+- `core/tools/io/compat.py` - generate_reports 헬퍼
+- `.claude/skills/output-patterns.md` - 리포트 출력 패턴 가이드
 
 ---
 

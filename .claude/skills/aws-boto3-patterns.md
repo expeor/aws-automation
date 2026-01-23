@@ -120,6 +120,74 @@ def get_enabled_regions(session) -> list[str]:
     return [r['RegionName'] for r in response['Regions']]
 ```
 
+## CloudWatch 메트릭 배치 수집
+
+미사용 리소스 탐지 시 CloudWatch 메트릭을 효율적으로 조회:
+
+```python
+from plugins.cloudwatch.common import (
+    batch_get_metrics,
+    build_ec2_metric_queries,
+    build_lambda_metric_queries,
+)
+
+# EC2 인스턴스 메트릭 조회 (14일)
+queries = build_ec2_metric_queries(
+    instance_ids=["i-123", "i-456"],
+    days=14,
+)
+metrics = batch_get_metrics(session, queries, region)
+
+# Lambda 함수 메트릭 조회
+queries = build_lambda_metric_queries(
+    function_names=["my-func-1", "my-func-2"],
+    days=14,
+)
+metrics = batch_get_metrics(session, queries, region)
+```
+
+**지원 함수:**
+- `build_ec2_metric_queries()` - EC2 CPUUtilization
+- `build_lambda_metric_queries()` - Lambda Invocations
+- `build_rds_metric_queries()` - RDS DatabaseConnections
+- `build_elasticache_metric_queries()` - ElastiCache CurrConnections
+- `build_nat_metric_queries()` - NAT Gateway BytesOutToDestination
+
+**특징:**
+- GetMetricData API로 500개 메트릭/호출 (85% API 감소)
+- 자동 배치 처리
+- Rate limiting 적용
+
+## 리소스 인벤토리 수집
+
+서비스별 인벤토리 도구에서 공통 컬렉터 사용:
+
+```python
+from plugins.resource_explorer.common import InventoryCollector
+
+def run(ctx) -> None:
+    collector = InventoryCollector(ctx)
+
+    # EC2 인스턴스 수집
+    instances = collector.collect_ec2()
+
+    # Security Group 수집
+    security_groups = collector.collect_security_groups()
+
+    # VPC 리소스 수집
+    enis = collector.collect_enis()
+    nat_gateways = collector.collect_nat_gateways()
+    vpc_endpoints = collector.collect_vpc_endpoints()
+
+    # ELB 리소스 수집
+    load_balancers = collector.collect_load_balancers()
+    target_groups = collector.collect_target_groups()
+```
+
+**캐싱:**
+- TTL 기반 글로벌 캐시 (기본 5분)
+- 동일 세션 내 중복 API 호출 방지
+
 ## 자격 증명 Best Practices
 
 - 하드코딩 금지

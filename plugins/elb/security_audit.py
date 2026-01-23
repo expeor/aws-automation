@@ -29,7 +29,6 @@ ELB의 보안 설정을 종합 분석하여 취약점을 탐지합니다.
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -861,24 +860,13 @@ def analyze_all(
 
 def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    # 스타일
-    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
+    # 셀 수준 조건부 스타일링용 Fill 및 Font
     risk_fills = {
         RiskLevel.CRITICAL: PatternFill(start_color="C0392B", end_color="C0392B", fill_type="solid"),
         RiskLevel.HIGH: PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid"),
@@ -886,7 +874,6 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
         RiskLevel.LOW: PatternFill(start_color="3498DB", end_color="3498DB", fill_type="solid"),
         RiskLevel.INFO: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
     }
-
     risk_fonts = {
         RiskLevel.CRITICAL: Font(bold=True, color="FFFFFF"),
         RiskLevel.HIGH: Font(bold=True, color="FFFFFF"),
@@ -896,64 +883,50 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
     }
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "ELB Security Audit Report"
-    ws["A1"].font = Font(bold=True, size=16)
-    ws["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-    # 전체 통계
-    totals = {
-        "total": sum(r.total_count for r in results),
-        "critical": sum(r.critical_count for r in results),
-        "high": sum(r.high_count for r in results),
-        "medium": sum(r.medium_count for r in results),
-        "low": sum(r.low_count for r in results),
-    }
-
-    stats = [
-        ("Metric", "Count"),
-        ("Total Load Balancers", totals["total"]),
-        ("CRITICAL Findings", totals["critical"]),
-        ("HIGH Findings", totals["high"]),
-        ("MEDIUM Findings", totals["medium"]),
-        ("LOW Findings", totals["low"]),
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Total LBs", width=12, style="number"),
+        ColumnDef(header="CRITICAL", width=12, style="number"),
+        ColumnDef(header="HIGH", width=12, style="number"),
+        ColumnDef(header="MEDIUM", width=12, style="number"),
+        ColumnDef(header="LOW", width=12, style="number"),
     ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
-    for i, (metric, value) in enumerate(stats):
-        row = 4 + i
-        ws.cell(row=row, column=1, value=metric).border = thin_border
-        ws.cell(row=row, column=2, value=value).border = thin_border
-        if i == 0:
-            ws.cell(row=row, column=1).fill = header_fill
-            ws.cell(row=row, column=1).font = header_font
-            ws.cell(row=row, column=2).fill = header_fill
-            ws.cell(row=row, column=2).font = header_font
-        elif i == 2:  # CRITICAL
-            ws.cell(row=row, column=2).fill = risk_fills[RiskLevel.CRITICAL]
-            ws.cell(row=row, column=2).font = risk_fonts[RiskLevel.CRITICAL]
-        elif i == 3:  # HIGH
-            ws.cell(row=row, column=2).fill = risk_fills[RiskLevel.HIGH]
-            ws.cell(row=row, column=2).font = risk_fonts[RiskLevel.HIGH]
+    for r in results:
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_count,
+            r.critical_count,
+            r.high_count,
+            r.medium_count,
+            r.low_count,
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
+        if r.critical_count > 0:
+            ws.cell(row=row_num, column=4).fill = risk_fills[RiskLevel.CRITICAL]
+            ws.cell(row=row_num, column=4).font = risk_fonts[RiskLevel.CRITICAL]
+        if r.high_count > 0:
+            ws.cell(row=row_num, column=5).fill = risk_fills[RiskLevel.HIGH]
+            ws.cell(row=row_num, column=5).font = risk_fonts[RiskLevel.HIGH]
 
     # Findings 시트
-    ws2 = wb.create_sheet("Findings")
-    headers = [
-        "Account",
-        "Region",
-        "LB Name",
-        "Type",
-        "Scheme",
-        "Category",
-        "Risk",
-        "Title",
-        "Description",
-        "Recommendation",
+    findings_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="LB Name", width=25),
+        ColumnDef(header="Type", width=10, style="center"),
+        ColumnDef(header="Scheme", width=15),
+        ColumnDef(header="Category", width=18),
+        ColumnDef(header="Risk", width=12, style="center"),
+        ColumnDef(header="Title", width=30),
+        ColumnDef(header="Description", width=40),
+        ColumnDef(header="Recommendation", width=40),
     ]
-    for col, h in enumerate(headers, 1):
-        cell = ws2.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = thin_border
+    findings_sheet = wb.new_sheet("Findings", findings_columns)
 
     # 모든 Findings 수집 및 정렬
     all_findings = []
@@ -973,78 +946,70 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
     all_findings.sort(key=lambda x: risk_order.get(x[1].risk_level, 99))
 
     for lb, finding in all_findings:
-        row = ws2.max_row + 1
-        ws2.cell(row=row, column=1, value=lb.account_name).border = thin_border
-        ws2.cell(row=row, column=2, value=lb.region).border = thin_border
-        ws2.cell(row=row, column=3, value=lb.name).border = thin_border
-        ws2.cell(row=row, column=4, value=lb.lb_type.upper()).border = thin_border
-        ws2.cell(row=row, column=5, value=lb.scheme).border = thin_border
-        ws2.cell(row=row, column=6, value=finding.category.value).border = thin_border
+        style = None
+        if finding.risk_level == RiskLevel.CRITICAL:
+            style = Styles.danger()
+        elif finding.risk_level == RiskLevel.HIGH:
+            style = Styles.error()
+        elif finding.risk_level == RiskLevel.MEDIUM:
+            style = Styles.warning()
 
-        risk_cell = ws2.cell(row=row, column=7, value=finding.risk_level.value.upper())
-        risk_cell.border = thin_border
+        row_num = findings_sheet.add_row(
+            [
+                lb.account_name,
+                lb.region,
+                lb.name,
+                lb.lb_type.upper(),
+                lb.scheme,
+                finding.category.value,
+                finding.risk_level.value.upper(),
+                finding.title,
+                finding.description,
+                finding.recommendation,
+            ],
+            style=style,
+        )
+        # Risk 셀에 색상 적용
+        ws = findings_sheet._ws
         if finding.risk_level in risk_fills:
-            risk_cell.fill = risk_fills[finding.risk_level]
-            risk_cell.font = risk_fonts[finding.risk_level]
-
-        ws2.cell(row=row, column=8, value=finding.title).border = thin_border
-        ws2.cell(row=row, column=9, value=finding.description).border = thin_border
-        ws2.cell(row=row, column=10, value=finding.recommendation).border = thin_border
+            ws.cell(row=row_num, column=7).fill = risk_fills[finding.risk_level]
+            ws.cell(row=row_num, column=7).font = risk_fonts[finding.risk_level]
 
     # Load Balancers 시트
-    ws3 = wb.create_sheet("Load Balancers")
-    lb_headers = [
-        "Account",
-        "Region",
-        "Name",
-        "Type",
-        "Scheme",
-        "State",
-        "Risk Score",
-        "Findings",
-        "Access Logs",
-        "Deletion Protection",
-        "WAF",
-        "HTTPS",
+    lb_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Name", width=25),
+        ColumnDef(header="Type", width=10, style="center"),
+        ColumnDef(header="Scheme", width=15),
+        ColumnDef(header="State", width=12),
+        ColumnDef(header="Risk Score", width=12, style="number"),
+        ColumnDef(header="Findings", width=10, style="number"),
+        ColumnDef(header="Access Logs", width=12, style="center"),
+        ColumnDef(header="Deletion Protection", width=18, style="center"),
+        ColumnDef(header="WAF", width=10, style="center"),
+        ColumnDef(header="HTTPS", width=10, style="center"),
     ]
-    for col, h in enumerate(lb_headers, 1):
-        cell = ws3.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = thin_border
+    lb_sheet = wb.new_sheet("Load Balancers", lb_columns)
 
     for result in results:
         for lb in result.load_balancers:
-            row = ws3.max_row + 1
-            ws3.cell(row=row, column=1, value=lb.account_name).border = thin_border
-            ws3.cell(row=row, column=2, value=lb.region).border = thin_border
-            ws3.cell(row=row, column=3, value=lb.name).border = thin_border
-            ws3.cell(row=row, column=4, value=lb.lb_type.upper()).border = thin_border
-            ws3.cell(row=row, column=5, value=lb.scheme).border = thin_border
-            ws3.cell(row=row, column=6, value=lb.state).border = thin_border
-            ws3.cell(row=row, column=7, value=lb.risk_score).border = thin_border
-            ws3.cell(row=row, column=8, value=len(lb.findings)).border = thin_border
-            ws3.cell(row=row, column=9, value="Yes" if lb.access_logs_enabled else "No").border = thin_border
-            ws3.cell(row=row, column=10, value="Yes" if lb.deletion_protection else "No").border = thin_border
-            ws3.cell(row=row, column=11, value="Yes" if lb.waf_web_acl_arn else "No").border = thin_border
-            ws3.cell(row=row, column=12, value="Yes" if lb.has_https_listener else "No").border = thin_border
+            lb_sheet.add_row([
+                lb.account_name,
+                lb.region,
+                lb.name,
+                lb.lb_type.upper(),
+                lb.scheme,
+                lb.state,
+                lb.risk_score,
+                len(lb.findings),
+                "Yes" if lb.access_logs_enabled else "No",
+                "Yes" if lb.deletion_protection else "No",
+                "Yes" if lb.waf_web_acl_arn else "No",
+                "Yes" if lb.has_https_listener else "No",
+            ])
 
-    # 열 너비 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"ELB_Security_Audit_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "ELB_Security_Audit"))
 
 
 # =============================================================================

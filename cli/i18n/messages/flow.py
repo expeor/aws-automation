@@ -271,14 +271,6 @@ FLOW_MESSAGES = {
         "ko": "리전 ({count}개)",
         "en": "Region ({count})",
     },
-    "number_comma_all": {
-        "ko": "번호 (쉼표 구분) | a: 전체",
-        "en": "Number (comma separated) | a: all",
-    },
-    "select_2_or_more": {
-        "ko": "2개 이상 선택해주세요",
-        "en": "Please select 2 or more",
-    },
     "all_regions_count": {
         "ko": "전체 {count}개",
         "en": "All {count}",
@@ -299,14 +291,6 @@ FLOW_MESSAGES = {
         "ko": "다른 리전 선택",
         "en": "Select other region",
     },
-    "select_other_region_single": {
-        "ko": "다른 리전 1개 선택",
-        "en": "Select one other region",
-    },
-    "select_multiple_regions": {
-        "ko": "여러 리전 선택 (2개 이상)",
-        "en": "Select multiple regions (2+)",
-    },
     "all_regions": {
         "ko": "모든 리전 ({count}개)",
         "en": "All regions ({count})",
@@ -321,6 +305,10 @@ FLOW_MESSAGES = {
     "number_range_hint": {
         "ko": "1-{max} 범위",
         "en": "Range: 1-{max}",
+    },
+    "number_comma_hint": {
+        "ko": "번호 입력 (예: 1 또는 1,2,3)",
+        "en": "Enter numbers (e.g., 1 or 1,2,3)",
     },
     "back": {
         "ko": "뒤로",

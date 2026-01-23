@@ -6,6 +6,7 @@ Supports multi-profile/multi-account cache management.
 """
 
 import ipaddress
+import logging
 from datetime import datetime
 
 from rich.console import Console
@@ -27,6 +28,8 @@ from .cache import (
 )
 from .export import copy_to_clipboard, copy_to_clipboard_simple, export_csv, export_excel
 from .i18n import t
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -181,6 +184,7 @@ def _create_cache(ctx) -> ENICache | None:
         console.print(f"\n[dim]{t('exit_message')}[/dim]")
         return None
     except Exception as e:
+        logger.error(f"Cache creation failed: {e}")
         console.print(f"[red]{t('cache_create_failed')}: {e}[/red]")
         return None
 
@@ -459,6 +463,7 @@ def _run_search_loop(
                     try:
                         session = get_session(profile_name, region)
                     except Exception as e:
+                        logger.warning(f"Failed to create session: {e}")
                         console.print(f"[yellow]{t('error')}: {e}[/yellow]")
                         detail_mode = False
             continue

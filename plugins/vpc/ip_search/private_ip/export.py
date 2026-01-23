@@ -142,45 +142,42 @@ def export_excel(
         Filepath of created Excel file, or empty string on failure
     """
     try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill
+        from core.tools.io.excel import ColumnDef, Workbook
     except ImportError:
         return ""
 
     if not results:
         return ""
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"private_ip_{timestamp}.xlsx"
-    filepath = os.path.join(_get_output_dir(session_name), filename)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Private IP Search"
-
-    # Header styling
     headers = get_headers(lang)
-    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
+    columns = [
+        ColumnDef(header=headers[0], width=18),   # IP Address
+        ColumnDef(header=headers[1], width=15),   # Profile
+        ColumnDef(header=headers[2], width=15),   # Account ID
+        ColumnDef(header=headers[3], width=20),   # Account Name
+        ColumnDef(header=headers[4], width=15),   # Region
+        ColumnDef(header=headers[5], width=25),   # Resource
+        ColumnDef(header=headers[6], width=25),   # ENI ID
+        ColumnDef(header=headers[7], width=25),   # VPC ID
+        ColumnDef(header=headers[8], width=28),   # Subnet ID
+        ColumnDef(header=headers[9], width=18),   # Private IP
+        ColumnDef(header=headers[10], width=18),  # Public IP
+        ColumnDef(header=headers[11], width=18),  # Interface Type
+        ColumnDef(header=headers[12], width=12),  # Status
+        ColumnDef(header=headers[13], width=30),  # Description
+        ColumnDef(header=headers[14], width=30),  # Security Groups
+        ColumnDef(header=headers[15], width=20),  # Name
+        ColumnDef(header=headers[16], width=10),  # Managed
+        ColumnDef(header=headers[17], width=15),  # Managed By
+    ]
 
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
+    wb = Workbook(lang=lang)
+    sheet = wb.new_sheet("Private IP Search", columns)
 
-    # Data rows
-    for row_idx, r in enumerate(results, 2):
-        row_values = result_to_row(r)
-        for col_idx, value in enumerate(row_values, 1):
-            ws.cell(row=row_idx, column=col_idx, value=value)
+    for r in results:
+        sheet.add_row(result_to_row(r))
 
-    # Auto-width columns
-    for col in ws.columns:
-        max_length = max(len(str(cell.value or "")) for cell in col)
-        ws.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
-
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(_get_output_dir(session_name), "private_ip"))
 
 
 def copy_to_clipboard(

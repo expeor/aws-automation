@@ -198,6 +198,8 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 def run(ctx) -> None:
     """{tool_name}"""
+    from core.tools.io.compat import generate_reports
+
     console.print("[bold]분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="{aws_service}")
@@ -210,13 +212,39 @@ def run(ctx) -> None:
     total = sum(r.total_count for r in results)
     console.print(f"전체: {total}개")
 
+    # HTML용 flat 데이터 준비
+    flat_data = [
+        {
+            "account_id": r.account_id,
+            "account_name": r.account_name,
+            "region": r.region,
+            # TODO: 리소스별 필드 추가
+        }
+        for r in results
+    ]
+
     # 보고서 경로 - 형식: output/{identifier}/{service}/{type}/{date}/
     identifier = ctx.accounts[0].id if ctx.accounts else ctx.profile_name or "default"
     output_path = OutputPath(identifier).sub("{service}", "{type}").with_date().build()
 
-    # TODO: 보고서 생성
-    console.print(f"\n[bold green]완료![/bold green]")
-    open_in_explorer(output_path)
+    # Excel + HTML 동시 생성 (ctx.output_config에 따라)
+    report_paths = generate_reports(
+        ctx,
+        data=flat_data,
+        excel_generator=lambda d: _save_excel(results, d),  # TODO: Excel 생성 함수 구현
+        html_config={
+            "title": "{tool_name}",
+            "service": "{Service}",
+            "tool_name": "{type}",
+            "total": total,
+            "found": len(flat_data),
+        },
+        output_dir=output_path,
+    )
+
+    console.print("\n[bold green]완료![/bold green]")
+    for fmt, path in report_paths.items():
+        console.print(f"  {fmt.upper()}: {path}")
 ```
 
 ---
@@ -243,6 +271,12 @@ output_path = OutputPath(identifier).sub("{service}", "{type}").with_date().buil
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
+# 리포트 출력 (Excel + HTML 동시 생성)
+from core.tools.io.compat import generate_reports
+
+# 선택 (출력 설정)
+from core.tools.io import OutputConfig, OutputFormat
+
 # 선택 (Quiet 모드)
 from core.parallel import is_quiet
 
@@ -251,6 +285,9 @@ from core.tools.output import ReportType, ToolType
 
 # 선택 (Excel 유틸리티)
 from core.tools.io.excel import Workbook, ColumnDef, Styles
+
+# 선택 (HTML 유틸리티)
+from core.tools.io.html import AWSReport, ResourceItem, create_aws_report
 ```
 
 ---
@@ -309,6 +346,8 @@ TOOLS = [
 
 - 기존 도구 확인: `plugins/{service}/` 폴더의 다른 `.py` 파일들
 - 타입 정의: `core/tools/output/report_types.py`
+- 리포트 출력: `.claude/skills/output-patterns.md`
+- Excel + HTML 통합: `plugins/ec2/unused.py` (참고 구현)
 
 ---
 

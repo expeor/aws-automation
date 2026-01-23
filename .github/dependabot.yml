@@ -28,10 +28,9 @@ updates:
       # 개발 도구 그룹화
       dev-tools:
         patterns:
-          - "black"
-          - "flake8"
+          - "ruff"
           - "mypy"
-          - "isort"
+          - "bandit"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"

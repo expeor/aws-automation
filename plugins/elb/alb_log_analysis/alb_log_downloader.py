@@ -165,7 +165,7 @@ class ALBLogDownloader:
         self.output_dir = _create_report_directory("alb_log", self.session_name)
         self.report_filename = self._generate_report_filename()
 
-        self.console.print(f"⏰ 분석 기간: {self.start_datetime} ~ {self.end_datetime} ({timezone})")
+        self.console.print(f"분석 기간: {self.start_datetime} ~ {self.end_datetime} ({timezone})")
 
     def _generate_report_filename(self) -> str:
         """보고서 파일 이름을 생성합니다."""
@@ -651,13 +651,13 @@ class ALBLogDownloader:
                     gc.collect()
 
             if not downloaded_files:
-                raise LogDownloadError("❌ 다운로드된 파일이 없습니다.")
+                raise LogDownloadError("다운로드된 파일이 없습니다.")
 
-            self.console.print(f"[green]✅ 다운로드 완료: {len(downloaded_files)}개 파일[/green]")
+            self.console.print(f"[green]✓ 다운로드 완료: {len(downloaded_files)}개 파일[/green]")
             return downloaded_files
 
         except Exception as e:
-            logger.error(f"❌ 로그 다운로드 중 오류 발생: {str(e)}")
+            logger.error(f"로그 다운로드 중 오류 발생: {str(e)}")
             raise LogDownloadError(f"로그 다운로드 중 오류 발생: {str(e)}") from e
 
     def _download_single_file(self, key: str, progress: Progress, task_id: Any) -> str | None:
@@ -848,7 +848,7 @@ class ALBLogDownloader:
 
     def _get_log_files_from_s3(self, date_prefixes: list[str]) -> list[S3LogFile]:
         """S3에서 로그 파일 목록을 간단하게 가져옵니다."""
-        self.console.print("[blue]📋 S3에서 로그 파일 검색 중...[/blue]")
+        self.console.print("[blue]S3에서 로그 파일 검색 중...[/blue]")
 
         all_log_files = []
 

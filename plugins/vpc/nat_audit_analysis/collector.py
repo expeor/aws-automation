@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 from botocore.exceptions import ClientError
 
-from core.cloudwatch import MetricQuery, batch_get_metrics, sanitize_metric_id
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client
 
 logger = logging.getLogger(__name__)

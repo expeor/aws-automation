@@ -1,11 +1,11 @@
 """
-core/data/ip_ranges - Cloud Provider Public IP Ranges
+plugins/vpc/ip_search/common/ip_ranges - Cloud Provider Public IP Ranges
 
-Centralized data service for cloud provider IP ranges.
-Supports AWS, GCP, Azure, and Oracle Cloud.
+클라우드 프로바이더별 공용 IP 대역 검색 서비스.
+AWS, GCP, Azure, Oracle Cloud 지원.
 
 Usage:
-    from core.data.ip_ranges import (
+    from plugins.vpc.ip_search.common.ip_ranges import (
         search_public_ip,
         search_by_filter,
         get_available_filters,
@@ -26,14 +26,18 @@ from .providers import (
     PublicIPResult,
     # Cache management
     clear_public_cache,
-    get_public_cache_status,
-    refresh_public_cache,
+    # Filter helpers
+    get_available_filters,
     # Provider data loaders
     get_aws_ip_ranges,
     get_azure_ip_ranges,
     get_gcp_ip_ranges,
     get_oracle_ip_ranges,
+    get_public_cache_status,
+    list_aws_regions,
+    list_aws_services,
     load_ip_ranges_parallel,
+    refresh_public_cache,
     # Search functions
     search_by_filter,
     search_in_aws,
@@ -41,10 +45,6 @@ from .providers import (
     search_in_gcp,
     search_in_oracle,
     search_public_ip,
-    # Filter helpers
-    get_available_filters,
-    list_aws_regions,
-    list_aws_services,
 )
 
 __all__ = [

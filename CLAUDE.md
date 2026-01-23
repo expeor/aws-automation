@@ -1,22 +1,59 @@
 # AWS Automation (aa)
 
-AWS 운영 자동화 CLI 도구. 미사용 리소스 탐지, 보안 점검, IAM 감사 등 40개+ 도구 제공.
+AWS 운영 자동화 CLI 도구. 미사용 리소스 탐지, 보안 점검, 비용 분석, IAM 감사 등 65개+ 도구 제공.
 
 ## 아키텍처
 
 ```
 aws-automation/
-├── cli/            # Click 기반 CLI, 대화형 메뉴
-├── core/           # 인증, 병렬처리, 도구 관리, Excel 출력
-├── plugins/        # AWS 서비스별 분석 도구 (40개+)
+├── cli/            # Click 기반 CLI, 대화형 메뉴, i18n
+├── core/           # 인증, 병렬처리, 도구 관리, 파일 I/O
+├── plugins/        # AWS 서비스별 분석 도구 (30개 카테고리, 70+ 도구)
 └── tests/          # pytest 테스트
 ```
 
 ### 주요 디렉토리
 
-- **cli/**: 메인 앱 진입점 (`app.py`), 플로우 관리, 프롬프트
-- **core/**: 인증 프로바이더, 병렬 처리, 도구 레지스트리, Excel 출력
-- **plugins/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam 등)
+- **cli/**: 메인 앱 진입점 (`app.py`), 플로우 관리, 프롬프트, 국제화(i18n)
+- **core/**: 인증 프로바이더, 병렬 처리, 도구 레지스트리, 파일 I/O
+- **plugins/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam, cost 등)
+
+### Core 모듈 구조
+
+```
+core/
+├── auth/           # 인증 (SSO Session, SSO Profile, Static)
+├── parallel/       # 병렬 실행 (Map-Reduce, Rate Limiting)
+├── tools/          # 도구 관리, 캐시, 히스토리
+│   ├── io/         # 파일 입출력
+│   │   ├── csv/    # CSV 읽기 (인코딩 감지)
+│   │   ├── excel/  # Excel 쓰기 (openpyxl)
+│   │   ├── html/   # HTML 리포트 (ECharts)
+│   │   └── file/   # 기본 파일 I/O
+│   ├── output/     # 출력 빌더
+│   └── history/    # 사용 기록, 즐겨찾기
+├── cloudwatch/     # CloudWatch re-export (→ plugins/cloudwatch/common)
+├── region/         # 리전 데이터
+└── filter.py       # 리전 필터링
+```
+
+### 플러그인 공유 모듈
+
+데이터 수집/처리 로직은 사용하는 플러그인에 위치:
+
+```
+plugins/
+├── cloudwatch/common/          # CloudWatch 메트릭 배치 수집
+│   └── batch_metrics.py        # GetMetricData 배치 API (500개/호출)
+├── resource_explorer/common/   # 리소스 인벤토리 수집/캐싱
+│   ├── collector.py            # InventoryCollector
+│   ├── cache.py                # TTL 기반 캐싱
+│   ├── types.py                # 리소스 타입 정의
+│   └── services/               # 서비스별 수집기 (ec2, vpc, elb)
+├── vpc/ip_search/common/       # IP 대역 검색
+│   └── ip_ranges/              # AWS, GCP, Azure, Oracle IP 범위
+└── cost/pricing/               # AWS 가격 정보
+```
 
 ## 코딩 스타일
 
@@ -25,8 +62,15 @@ aws-automation/
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+exclude = [".git", "__pycache__", "build", "dist", ".eggs", "output", "temp"]
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = ["E501"]  # Line length handled by formatter
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 ```
 
 ### Mypy 설정
@@ -34,6 +78,9 @@ ignore = ["E501"]  # Line length handled by formatter
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true
 ```
 
 ### 스타일 규칙
@@ -42,6 +89,7 @@ ignore_missing_imports = true
 - Import 정렬: isort 스타일 (ruff I 규칙)
 - 한글 docstring 허용
 - 타입 힌트: Python 3.10+ 스타일 (`list[str]` not `List[str]`)
+- Python 지원 버전: 3.10, 3.11, 3.12, 3.13, 3.14
 
 ## 플러그인 작성 패턴
 
@@ -66,38 +114,106 @@ TOOLS = [
         "description": "도구 설명 (한글)",
         "description_en": "Tool description (English)",
         "permission": "read",  # read, write
-        "module": "{type}",    # 파일명 (unused, security, cost 등)
-        "area": "{type}",      # unused, security, cost, operation
+        "module": "{module_name}",  # 파일명 (.py 제외)
+        "area": "{area}",  # 아래 area 종류 참조
     },
 ]
 ```
 
-### 도구 모듈
+### Area 종류
+
+| Area | 설명 | 예시 |
+|------|------|------|
+| `unused` | 미사용/유휴 리소스 탐지 | EC2, EBS, Lambda |
+| `cost` | 비용 분석/최적화 | Reserved Instance, Savings Plan |
+| `inventory` | 리소스 인벤토리/현황 | Lambda 종합 분석, Backup 현황 |
+| `security` | 보안 감사/점검 | IAM, CloudTrail, Security Group |
+| `search` | 리소스 검색 | CloudFormation 스택, KMS 키 |
+| `log` | 로그 분석 | ALB 액세스 로그 |
+| `tag` | 태그 관리 | Tag Editor |
+| `sync` | 리소스 동기화 | Route 53 레코드 |
+
+### 도구 모듈 패턴
 
 ```python
-# plugins/{service}/{type}.py
-from core.parallel import parallel_collect
-
-def run(ctx) -> None:
-    """도구 실행 함수 (필수)"""
-    result = parallel_collect(ctx, _collect_and_analyze, service="{aws_service}")
-    # ... 결과 처리 및 보고서 생성
-```
-
-### 병렬 처리
-
-멀티 계정/리전 병렬 실행:
-```python
-from core.parallel import get_client, parallel_collect
+# plugins/{service}/{module}.py
+from core.parallel import parallel_collect, get_client
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str):
     """병렬 실행 콜백 (단일 계정/리전)"""
     client = get_client(session, "service-name", region_name=region)
     # ... 분석 로직
+    return results
 
 def run(ctx) -> None:
-    result = parallel_collect(ctx, _collect_and_analyze, service="service-name")
-    data = result.get_data()
+    """도구 실행 함수 (필수)"""
+    result = parallel_collect(ctx, _collect_and_analyze, service="{aws_service}")
+    data = result.get_flat_data()
+
+    # 에러 처리
+    if result.error_count > 0:
+        print(result.get_error_summary())
+
+    # 보고서 생성
+    from core.tools.io import generate_reports
+    generate_reports(ctx, data, columns=[...])
+```
+
+### 병렬 처리 (core.parallel)
+
+```python
+from core.parallel import (
+    parallel_collect,       # 간편한 병렬 수집
+    get_client,             # Rate limiting 적용 클라이언트
+    safe_aws_call,          # 재시도 + Rate limiting 데코레이터
+    quiet_mode,             # 로그 출력 억제
+    ErrorCollector,         # 에러 수집/분류
+)
+
+# 기본 사용
+result = parallel_collect(ctx, callback_func, service="ec2", max_workers=20)
+
+# Progress tracking
+from cli.ui import parallel_progress
+with parallel_progress("수집 중") as tracker:
+    with quiet_mode():
+        result = parallel_collect(ctx, callback_func, progress_tracker=tracker)
+
+# 데코레이터
+@safe_aws_call(service="ec2", operation="describe_instances")
+def get_instances(session, region):
+    ec2 = session.client("ec2", region_name=region)
+    return ec2.describe_instances()["Reservations"]
+```
+
+### 파일 출력 (core.tools.io)
+
+```python
+# Excel 출력
+from core.tools.io.excel import Workbook, ColumnDef
+
+wb = Workbook()
+ws = wb.add_sheet("Results")
+ws.add_headers([ColumnDef("리소스", width=30), ColumnDef("상태", width=15)])
+ws.add_rows(data)
+wb.save("output.xlsx")
+
+# HTML 보고서 (ECharts 시각화)
+from core.tools.io.html import AWSReport, create_aws_report
+
+report = create_aws_report(
+    title="EC2 미사용",
+    service="EC2",
+    tool_name="unused",
+    ctx=ctx,
+    resources=results,
+)
+report.save("output.html")
+
+# 듀얼 출력 (Excel + HTML)
+from core.tools.io import generate_reports
+
+generate_reports(ctx, data, columns=[...], charts=[...])
 ```
 
 ## AWS 관련 주의사항
@@ -106,13 +222,13 @@ def run(ctx) -> None:
 
 - SSO Session, SSO Profile, Static Credentials 지원
 - `ctx.provider.get_session(region=region)` 사용 권장
-- 하위 호환: `self.get_session(region)` 메서드 사용 가능
+- 멀티 계정: Organization 또는 Profile 그룹 지원
 
 ### API 호출
 
 - Paginator 사용 필수 (대량 리소스)
 - `botocore.exceptions` 에러 핸들링
-- Rate limit 고려 (병렬 처리 시)
+- Rate limit: `get_client()` 사용 시 자동 Rate limiting 적용
 
 ### 보안
 
@@ -128,9 +244,22 @@ pytest tests/ -v
 
 # 특정 모듈
 pytest tests/core/ -v
+pytest tests/plugins/ec2/ -v
 
 # 커버리지
 pytest tests/ --cov=core --cov=cli --cov=plugins
+```
+
+### 테스트 구조
+```
+tests/
+├── cli/            # CLI 테스트
+├── core/           # Core 모듈 테스트
+│   ├── auth/       # 인증 테스트
+│   ├── parallel/   # 병렬 처리 테스트
+│   └── tools/      # 도구 테스트
+└── plugins/        # 플러그인 테스트
+    └── cloudwatch/ # CloudWatch batch_metrics 테스트
 ```
 
 ### Mocking
@@ -167,24 +296,60 @@ aa
 aa ec2
 aa vpc
 
-# Headless 모드
+# Headless 모드 (CI/CD용)
 aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
+
+# 다중 리전
+aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
+
+# 전체 리전
+aa run ec2/ebs_audit -p my-profile -r all
+
+# 출력 형식 지정
+aa run ec2/ebs_audit -p my-profile -f json -o result.json
 
 # IP 검색
 aa ip 10.0.1.50
 
 # 도구 목록
 aa list-tools
+
+# 프로파일 그룹 관리
+aa group
 ```
+
+### Headless 모드 옵션
+
+| 옵션 | 설명 |
+|------|------|
+| `-p, --profile` | SSO Profile 또는 Access Key 프로파일 (필수) |
+| `-r, --region` | 리전 또는 리전 패턴 (기본: ap-northeast-2) |
+| `-f, --format` | 출력 형식: console, json, csv |
+| `-o, --output` | 출력 파일 경로 |
+| `-q, --quiet` | 최소 출력 모드 |
 
 ## 디펜던시
 
+### Runtime
 - **boto3/botocore**: AWS SDK
 - **click**: CLI 프레임워크
 - **rich**: 터미널 UI
 - **questionary**: 대화형 프롬프트
 - **openpyxl**: Excel 출력
 - **duckdb**: 대용량 로그 분석 (ALB 로그 등)
+- **msgpack**: 바이너리 직렬화 (캐시)
+- **chardet**: 파일 인코딩 감지
+- **requests**: HTTP 클라이언트
+- **pytz**: 타임존 처리
+- **filelock**: 파일 잠금
+- **cryptography**: 암호화
+
+### Development
+- **pytest**: 테스트 프레임워크
+- **moto**: AWS 모킹
+- **ruff**: 린터/포매터
+- **mypy**: 타입 체커
+- **bandit**: 보안 스캐너
 
 ## 버전 관리
 
@@ -217,8 +382,25 @@ CHANGELOG.md     # 변경 이력
 
 ```toml
 [tool.bandit]
+exclude_dirs = ["tests"]
 skips = ["B101", "B311", "B608"]
 # B101: assert (테스트에서 사용)
 # B311: random (보안 목적 아님)
 # B608: DuckDB 쿼리 (내부 AWS 데이터, 사용자 입력 아님)
+```
+
+## Coverage 설정
+
+```toml
+[tool.coverage.run]
+source = ["cli", "core", "plugins"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
 ```

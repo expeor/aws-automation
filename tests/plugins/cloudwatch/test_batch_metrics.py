@@ -1,5 +1,5 @@
 """
-tests/core/cloudwatch/test_batch_metrics.py - batch_metrics.py 테스트
+tests/plugins/cloudwatch/test_batch_metrics.py - batch_metrics.py 테스트
 
 CloudWatch Batch Metrics Utility 테스트
 """
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.cloudwatch.batch_metrics import (
+from plugins.cloudwatch.common.batch_metrics import (
     MetricQuery,
     _chunks,
     batch_get_metrics,

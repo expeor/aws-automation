@@ -10,7 +10,6 @@ Lambda Provisioned Concurrency 최적화 분석:
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -373,16 +372,9 @@ def _analyze_single_pc(func: LambdaPCInfo, region: str) -> PCFinding:
 
 def generate_report(results: list[PCAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
-
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     status_fills = {
         PCStatus.UNUSED: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
@@ -391,112 +383,91 @@ def generate_report(results: list[PCAnalysisResult], output_dir: str) -> str:
         PCStatus.OPTIMAL: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
     }
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "Lambda Provisioned Concurrency 분석"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    wb = Workbook()
 
-    headers = [
-        "Account",
-        "Region",
-        "전체 함수",
-        "PC 설정",
-        "미사용 PC",
-        "과다 설정",
-        "부족",
-        "PC 월 비용",
-        "절감 가능",
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("Lambda Provisioned Concurrency 분석")
+    summary.add_item("생성", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    summary.add_blank_row()
+
+    # Summary Data Sheet
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체 함수", width=12, style="number"),
+        ColumnDef(header="PC 설정", width=10, style="number"),
+        ColumnDef(header="미사용 PC", width=12, style="number"),
+        ColumnDef(header="과다 설정", width=12, style="number"),
+        ColumnDef(header="부족", width=10, style="number"),
+        ColumnDef(header="PC 월 비용", width=15),
+        ColumnDef(header="절감 가능", width=15),
     ]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
-
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_functions)
-        ws.cell(row=row, column=4, value=r.functions_with_pc)
-        ws.cell(row=row, column=5, value=r.unused_pc_count)
-        ws.cell(row=row, column=6, value=r.oversized_pc_count)
-        ws.cell(row=row, column=7, value=r.undersized_pc_count)
-        ws.cell(row=row, column=8, value=f"${r.total_pc_cost:,.2f}")
-        ws.cell(row=row, column=9, value=f"${r.potential_savings:,.2f}")
+        row_style = Styles.warning() if r.unused_pc_count > 0 or r.oversized_pc_count > 0 else None
+        summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_functions,
+                r.functions_with_pc,
+                r.unused_pc_count,
+                r.oversized_pc_count,
+                r.undersized_pc_count,
+                f"${r.total_pc_cost:,.2f}",
+                f"${r.potential_savings:,.2f}",
+            ],
+            style=row_style,
+        )
 
-    # PC Functions
-    ws_pc = wb.create_sheet("PC Functions")
-    pc_headers = [
-        "Account",
-        "Region",
-        "Function",
-        "Runtime",
-        "Memory",
-        "PC 설정",
-        "최대 동시성",
-        "활용률",
-        "Throttles",
-        "월 비용",
-        "상태",
-        "권장 PC",
-        "절감 가능",
-        "권장 조치",
+    # PC Functions Sheet
+    pc_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function", width=30),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="Memory", width=10, style="number"),
+        ColumnDef(header="PC 설정", width=10, style="number"),
+        ColumnDef(header="최대 동시성", width=12, style="number"),
+        ColumnDef(header="활용률", width=10),
+        ColumnDef(header="Throttles", width=10, style="number"),
+        ColumnDef(header="월 비용", width=12),
+        ColumnDef(header="상태", width=12, style="center"),
+        ColumnDef(header="권장 PC", width=10),
+        ColumnDef(header="절감 가능", width=12),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(pc_headers, 1):
-        ws_pc.cell(row=1, column=col, value=h).fill = header_fill
-        ws_pc.cell(row=1, column=col).font = header_font
-
-    pc_row = 1
+    pc_sheet = wb.new_sheet("PC Functions", pc_columns)
     for r in results:
         for f in r.findings:
             if f.function.has_pc or f.status == PCStatus.UNDERSIZED:
-                pc_row += 1
                 fn = f.function
-                ws_pc.cell(row=pc_row, column=1, value=fn.account_name)
-                ws_pc.cell(row=pc_row, column=2, value=fn.region)
-                ws_pc.cell(row=pc_row, column=3, value=fn.function_name)
-                ws_pc.cell(row=pc_row, column=4, value=fn.runtime)
-                ws_pc.cell(row=pc_row, column=5, value=fn.memory_mb)
-                ws_pc.cell(row=pc_row, column=6, value=fn.total_provisioned)
-                ws_pc.cell(row=pc_row, column=7, value=fn.max_concurrent)
-                ws_pc.cell(row=pc_row, column=8, value=f"{fn.utilization_pct:.0f}%")
-                ws_pc.cell(row=pc_row, column=9, value=fn.throttles_30d)
-                ws_pc.cell(row=pc_row, column=10, value=f"${fn.monthly_cost:,.2f}")
-                ws_pc.cell(row=pc_row, column=11, value=f.status.value)
-                ws_pc.cell(
-                    row=pc_row,
-                    column=12,
-                    value=f.recommended_pc if f.recommended_pc else "-",
-                )
                 savings = f.monthly_waste + f.monthly_savings
-                ws_pc.cell(
-                    row=pc_row,
-                    column=13,
-                    value=f"${savings:,.2f}" if savings > 0 else "-",
-                )
-                ws_pc.cell(row=pc_row, column=14, value=f.recommendation)
+                row_num = pc_sheet.add_row([
+                    fn.account_name,
+                    fn.region,
+                    fn.function_name,
+                    fn.runtime,
+                    fn.memory_mb,
+                    fn.total_provisioned,
+                    fn.max_concurrent,
+                    f"{fn.utilization_pct:.0f}%",
+                    fn.throttles_30d,
+                    f"${fn.monthly_cost:,.2f}",
+                    f.status.value,
+                    f.recommended_pc if f.recommended_pc else "-",
+                    f"${savings:,.2f}" if savings > 0 else "-",
+                    f.recommendation,
+                ])
 
+                # 상태에 따른 셀 하이라이트
                 fill = status_fills.get(f.status)
                 if fill:
-                    ws_pc.cell(row=pc_row, column=11).fill = fill
+                    ws = pc_sheet._ws
+                    ws.cell(row=row_num, column=11).fill = fill
 
-    # 열 너비
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        if sheet.title != "Summary":
-            sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Lambda_PC_Analysis_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "Lambda_PC_Analysis"))
 
 
 # =============================================================================

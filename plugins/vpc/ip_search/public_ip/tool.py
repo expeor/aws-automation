@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-from core.data.ip_ranges import (
+from plugins.vpc.ip_search.common.ip_ranges import (
     PublicIPResult,
     get_available_filters,
     get_public_cache_status,
@@ -67,48 +67,29 @@ def _export_csv(results: list[PublicIPResult], session_name: str) -> str:
 def _export_excel(results: list[PublicIPResult], session_name: str) -> str:
     """Export results to Excel file."""
     try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill
+        from core.tools.io.excel import ColumnDef, Workbook
     except ImportError:
-        console.print("[red]openpyxl not installed. Use: pip install openpyxl[/red]")
+        console.print("[red]core.tools.io.excel not available[/red]")
         return ""
 
     if not results:
         return ""
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"public_ip_{timestamp}.xlsx"
-    filepath = os.path.join(_get_output_dir(session_name), filename)
+    columns = [
+        ColumnDef(header=t("header_ip"), width=18),
+        ColumnDef(header=t("header_provider"), width=12),
+        ColumnDef(header=t("header_service"), width=20),
+        ColumnDef(header=t("header_ip_range"), width=22),
+        ColumnDef(header=t("header_region"), width=18),
+    ]
 
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Public IP Search"
+    sheet = wb.new_sheet("Public IP Search", columns)
 
-    # Header
-    headers = [t("header_ip"), t("header_provider"), t("header_service"), t("header_ip_range"), t("header_region")]
-    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
+    for r in results:
+        sheet.add_row([r.ip_address, r.provider, r.service, r.ip_prefix, r.region])
 
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
-
-    # Data
-    for row_idx, r in enumerate(results, 2):
-        ws.cell(row=row_idx, column=1, value=r.ip_address)
-        ws.cell(row=row_idx, column=2, value=r.provider)
-        ws.cell(row=row_idx, column=3, value=r.service)
-        ws.cell(row=row_idx, column=4, value=r.ip_prefix)
-        ws.cell(row=row_idx, column=5, value=r.region)
-
-    # Auto-width
-    for col in ws.columns:
-        max_length = max(len(str(cell.value or "")) for cell in col)
-        ws.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
-
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(_get_output_dir(session_name), "public_ip"))
 
 
 def _copy_to_clipboard(results: list[PublicIPResult]) -> bool:

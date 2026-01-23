@@ -45,7 +45,6 @@ class SGExcelReporter:
 
     def generate(self, output_dir: str) -> str:
         """Excel 보고서 생성"""
-        os.makedirs(output_dir, exist_ok=True)
 
         wb = Workbook()
 

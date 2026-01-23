@@ -58,4 +58,13 @@ TOOLS = [
         "module": "ami_audit",
         "area": "unused",
     },
+    {
+        "name": "EC2 인벤토리",
+        "name_en": "EC2 Inventory",
+        "description": "EC2 인스턴스 및 Security Group 인벤토리 조회",
+        "description_en": "List EC2 instances and Security Groups",
+        "permission": "read",
+        "module": "inventory",
+        "area": "inventory",
+    },
 ]

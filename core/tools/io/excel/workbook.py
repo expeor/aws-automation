@@ -24,6 +24,8 @@ if TYPE_CHECKING:
     from openpyxl.worksheet.worksheet import Worksheet
 
 # 문자열 상수와 함수만 모듈 레벨에서 import (openpyxl 필요 없음)
+from core.tools.output import open_in_explorer
+
 from .styles import (
     NUMBER_FORMAT_CURRENCY,
     NUMBER_FORMAT_INTEGER,
@@ -560,6 +562,7 @@ class Workbook:
         path = Path(filepath)
         path.parent.mkdir(parents=True, exist_ok=True)
         self._wb.save(str(path))
+        open_in_explorer(str(path.parent))
         return path
 
     def save_as(
@@ -839,6 +842,7 @@ def save_to_csv(
                 list_writer.writerows(list_data)
 
         logger.info(f"CSV 저장 완료: {output_file}")
+        open_in_explorer(str(Path(output_file).parent))
     except Exception as e:
         logger.error(f"CSV 저장 실패: {e}")
 
@@ -908,6 +912,7 @@ def save_dict_list_to_excel(
 
     wb.save(output_file)
     logger.info(f"Excel 저장 완료: {output_file}")
+    open_in_explorer(str(Path(output_file).parent))
 
 
 def add_sheet_from_dict_list(

@@ -7,7 +7,6 @@ Provisioned vs On-Demand 용량 모드 최적화 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -368,134 +367,110 @@ def analyze_capacity(
 
 def generate_report(results: list[CapacityAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     green_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
 
-    # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "DynamoDB 용량 모드 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "Provisioned",
-        "On-Demand",
-        "최적화 대상",
-        "예상 절감액",
+    # Summary 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="Provisioned", width=12, style="number"),
+        ColumnDef(header="On-Demand", width=12, style="number"),
+        ColumnDef(header="최적화 대상", width=12, style="number"),
+        ColumnDef(header="예상 절감액", width=15),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_tables)
-        ws.cell(row=row, column=4, value=r.provisioned_tables)
-        ws.cell(row=row, column=5, value=r.ondemand_tables)
-        ws.cell(row=row, column=6, value=r.optimization_candidates)
-        ws.cell(row=row, column=7, value=f"${r.potential_savings:,.2f}")
+        row_style = Styles.success() if r.potential_savings > 0 else None
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_tables,
+                r.provisioned_tables,
+                r.ondemand_tables,
+                r.optimization_candidates,
+                f"${r.potential_savings:,.2f}",
+            ],
+            style=row_style,
+        )
+        # Cell-level highlighting for savings
         if r.potential_savings > 0:
-            ws.cell(row=row, column=7).fill = green_fill
+            ws = summary_sheet._ws
+            ws.cell(row=row_num, column=7).fill = green_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Tables")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Table Name",
-        "Billing Mode",
-        "Prov. RCU",
-        "Prov. WCU",
-        "Avg R",
-        "Avg W",
-        "R Util%",
-        "W Util%",
-        "Prov 비용",
-        "OD 비용",
-        "권장 사항",
-        "사유",
-        "절감액",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Table Name", width=30),
+        ColumnDef(header="Billing Mode", width=15),
+        ColumnDef(header="Prov. RCU", width=12, style="number"),
+        ColumnDef(header="Prov. WCU", width=12, style="number"),
+        ColumnDef(header="Avg R", width=10),
+        ColumnDef(header="Avg W", width=10),
+        ColumnDef(header="R Util%", width=10),
+        ColumnDef(header="W Util%", width=10),
+        ColumnDef(header="Prov 비용", width=12),
+        ColumnDef(header="OD 비용", width=12),
+        ColumnDef(header="권장 사항", width=18, style="center"),
+        ColumnDef(header="사유", width=40),
+        ColumnDef(header="절감액", width=12),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Tables", detail_columns)
 
-    detail_row = 1
+    rec_labels = {
+        CapacityRecommendation.SWITCH_TO_ONDEMAND: "On-Demand 전환",
+        CapacityRecommendation.SWITCH_TO_PROVISIONED: "Provisioned 전환",
+        CapacityRecommendation.REDUCE_CAPACITY: "용량 축소",
+        CapacityRecommendation.INCREASE_CAPACITY: "용량 증가",
+        CapacityRecommendation.OPTIMAL: "최적",
+    }
+
     for r in results:
         for f in r.findings:
-            detail_row += 1
             t = f.table
-            rec_labels = {
-                CapacityRecommendation.SWITCH_TO_ONDEMAND: "On-Demand 전환",
-                CapacityRecommendation.SWITCH_TO_PROVISIONED: "Provisioned 전환",
-                CapacityRecommendation.REDUCE_CAPACITY: "용량 축소",
-                CapacityRecommendation.INCREASE_CAPACITY: "용량 증가",
-                CapacityRecommendation.OPTIMAL: "최적",
-            }
-            ws_detail.cell(row=detail_row, column=1, value=t.account_name)
-            ws_detail.cell(row=detail_row, column=2, value=t.region)
-            ws_detail.cell(row=detail_row, column=3, value=t.table_name)
-            ws_detail.cell(row=detail_row, column=4, value=t.billing_mode)
-            ws_detail.cell(row=detail_row, column=5, value=t.provisioned_read)
-            ws_detail.cell(row=detail_row, column=6, value=t.provisioned_write)
-            ws_detail.cell(row=detail_row, column=7, value=f"{t.avg_consumed_read:.1f}")
-            ws_detail.cell(row=detail_row, column=8, value=f"{t.avg_consumed_write:.1f}")
-            ws_detail.cell(row=detail_row, column=9, value=f"{t.read_utilization:.1f}")
-            ws_detail.cell(row=detail_row, column=10, value=f"{t.write_utilization:.1f}")
-            ws_detail.cell(
-                row=detail_row,
-                column=11,
-                value=f"${t.estimated_provisioned_cost:.2f}",
+            row_num = detail_sheet.add_row(
+                [
+                    t.account_name,
+                    t.region,
+                    t.table_name,
+                    t.billing_mode,
+                    t.provisioned_read,
+                    t.provisioned_write,
+                    f"{t.avg_consumed_read:.1f}",
+                    f"{t.avg_consumed_write:.1f}",
+                    f"{t.read_utilization:.1f}",
+                    f"{t.write_utilization:.1f}",
+                    f"${t.estimated_provisioned_cost:.2f}",
+                    f"${t.estimated_ondemand_cost:.2f}",
+                    rec_labels.get(f.recommendation, f.recommendation.value),
+                    f.reason,
+                    f"${f.potential_savings:.2f}",
+                ],
             )
-            ws_detail.cell(row=detail_row, column=12, value=f"${t.estimated_ondemand_cost:.2f}")
-            ws_detail.cell(
-                row=detail_row,
-                column=13,
-                value=rec_labels.get(f.recommendation, f.recommendation.value),
-            )
-            ws_detail.cell(row=detail_row, column=14, value=f.reason)
-            ws_detail.cell(row=detail_row, column=15, value=f"${f.potential_savings:.2f}")
-
-            # 색상 적용
+            # Cell-level highlighting for recommendation
+            ws = detail_sheet._ws
             if f.recommendation in (
                 CapacityRecommendation.SWITCH_TO_ONDEMAND,
                 CapacityRecommendation.SWITCH_TO_PROVISIONED,
             ):
-                ws_detail.cell(row=detail_row, column=13).fill = green_fill
+                ws.cell(row=row_num, column=13).fill = green_fill
             elif f.recommendation == CapacityRecommendation.INCREASE_CAPACITY:
-                ws_detail.cell(row=detail_row, column=13).fill = red_fill
+                ws.cell(row=row_num, column=13).fill = red_fill
             elif f.recommendation == CapacityRecommendation.REDUCE_CAPACITY:
-                ws_detail.cell(row=detail_row, column=13).fill = yellow_fill
+                ws.cell(row=row_num, column=13).fill = yellow_fill
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"DynamoDB_Capacity_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "DynamoDB_Capacity"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> CapacityAnalysisResult | None:

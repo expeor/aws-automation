@@ -7,7 +7,6 @@ plugins/efs/unused.py - EFS 미사용 파일시스템 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -245,114 +244,89 @@ def analyze_filesystems(
 
 def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "EFS 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "마운트없음",
-        "I/O없음",
-        "빈FS",
-        "정상",
-        "미사용 비용",
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="마운트없음", width=12, style="number"),
+        ColumnDef(header="I/O없음", width=10, style="number"),
+        ColumnDef(header="빈FS", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=12),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_filesystems)
-        ws.cell(row=row, column=4, value=r.no_mount_target)
-        ws.cell(row=row, column=5, value=r.no_io)
-        ws.cell(row=row, column=6, value=r.empty)
-        ws.cell(row=row, column=7, value=r.normal)
-        ws.cell(row=row, column=8, value=f"${r.unused_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_filesystems,
+            r.no_mount_target,
+            r.no_io,
+            r.empty,
+            r.normal,
+            f"${r.unused_monthly_cost:,.2f}",
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.no_mount_target > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.no_io > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("FileSystems")
-    detail_headers = [
-        "Account",
-        "Region",
-        "ID",
-        "Name",
-        "Size",
-        "Mount Targets",
-        "Mode",
-        "상태",
-        "Avg Conn",
-        "Total I/O",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="ID", width=22),
+        ColumnDef(header="Name", width=25),
+        ColumnDef(header="Size", width=12),
+        ColumnDef(header="Mount Targets", width=12, style="number"),
+        ColumnDef(header="Mode", width=12),
+        ColumnDef(header="상태", width=15),
+        ColumnDef(header="Avg Conn", width=10),
+        ColumnDef(header="Total I/O", width=12),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=35),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("FileSystems", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != FileSystemStatus.NORMAL:
-                detail_row += 1
                 fs = f.efs
-                ws_detail.cell(row=detail_row, column=1, value=fs.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=fs.region)
-                ws_detail.cell(row=detail_row, column=3, value=fs.file_system_id)
-                ws_detail.cell(row=detail_row, column=4, value=fs.name or "-")
-                ws_detail.cell(row=detail_row, column=5, value=f"{fs.size_gb:.2f} GB")
-                ws_detail.cell(row=detail_row, column=6, value=fs.mount_target_count)
-                ws_detail.cell(row=detail_row, column=7, value=fs.throughput_mode)
-                ws_detail.cell(row=detail_row, column=8, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=9, value=f"{fs.avg_client_connections:.1f}")
-                ws_detail.cell(
-                    row=detail_row,
-                    column=10,
-                    value=f"{fs.total_io_bytes / (1024**2):.1f} MB",
-                )
-                ws_detail.cell(
-                    row=detail_row,
-                    column=11,
-                    value=f"${fs.estimated_monthly_cost:.2f}",
-                )
-                ws_detail.cell(row=detail_row, column=12, value=f.recommendation)
+                style = Styles.danger() if f.status == FileSystemStatus.NO_MOUNT_TARGET else Styles.warning()
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        fs.account_name,
+                        fs.region,
+                        fs.file_system_id,
+                        fs.name or "-",
+                        f"{fs.size_gb:.2f} GB",
+                        fs.mount_target_count,
+                        fs.throughput_mode,
+                        f.status.value,
+                        f"{fs.avg_client_connections:.1f}",
+                        f"{fs.total_io_bytes / (1024**2):.1f} MB",
+                        f"${fs.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"EFS_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "EFS_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EFSAnalysisResult | None:
