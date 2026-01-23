@@ -5,6 +5,10 @@ plugins/cost/pricing/cache.py - 가격 정보 로컬 캐시
 기본 만료: 7일 (가격 변동이 자주 없음)
 
 캐시 경로: {project_root}/temp/pricing/
+
+동시성 보호:
+- 파일 락(filelock)으로 멀티 프로세스 환경에서 안전한 캐시 쓰기
+- 읽기는 락 없이 수행 (성능 최적화)
 """
 
 import json
@@ -13,12 +17,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from filelock import FileLock, Timeout
+
 from core.tools.cache.path import get_cache_dir
 
 logger = logging.getLogger(__name__)
 
 # 기본 캐시 만료 (7일)
 DEFAULT_TTL_DAYS = 7
+
+# 파일 락 타임아웃 (초)
+FILE_LOCK_TIMEOUT = 10
 
 
 def _get_pricing_cache_dir() -> Path:
@@ -27,7 +36,11 @@ def _get_pricing_cache_dir() -> Path:
 
 
 class PriceCache:
-    """가격 정보 캐시 관리자"""
+    """가격 정보 캐시 관리자
+
+    멀티 프로세스 환경에서 안전한 파일 기반 캐시입니다.
+    filelock 라이브러리를 사용하여 동시 쓰기를 방지합니다.
+    """
 
     def __init__(self, ttl_days: int = DEFAULT_TTL_DAYS):
         """
@@ -41,8 +54,12 @@ class PriceCache:
         """캐시 파일 경로 반환"""
         return self.cache_dir / f"{service}_{region}.json"
 
+    def _get_lock_path(self, service: str, region: str) -> Path:
+        """락 파일 경로 반환"""
+        return self.cache_dir / f"{service}_{region}.json.lock"
+
     def get(self, service: str, region: str) -> dict[str, Any] | None:
-        """캐시된 가격 데이터 조회
+        """캐시된 가격 데이터 조회 (락 없이 읽기)
 
         Args:
             service: 서비스 코드 (ec2, ebs, rds 등)
@@ -74,7 +91,7 @@ class PriceCache:
             return None
 
     def set(self, service: str, region: str, prices: dict[str, Any]) -> None:
-        """가격 데이터 캐싱
+        """가격 데이터 캐싱 (파일 락으로 동시 쓰기 방지)
 
         Args:
             service: 서비스 코드
@@ -82,6 +99,7 @@ class PriceCache:
             prices: 가격 데이터 딕셔너리
         """
         cache_path = self._get_cache_path(service, region)
+        lock_path = self._get_lock_path(service, region)
 
         data = {
             "cached_at": datetime.now().isoformat(),
@@ -91,9 +109,12 @@ class PriceCache:
         }
 
         try:
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            logger.debug(f"캐시 저장: {service}/{region} ({len(prices)} items)")
+            with FileLock(lock_path, timeout=FILE_LOCK_TIMEOUT):
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                logger.debug(f"캐시 저장: {service}/{region} ({len(prices)} items)")
+        except Timeout:
+            logger.warning(f"캐시 저장 타임아웃: {service}/{region} (락 획득 실패)")
         except Exception as e:
             logger.warning(f"캐시 저장 오류: {e}")
 

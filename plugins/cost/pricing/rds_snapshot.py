@@ -5,6 +5,8 @@ RDS Snapshot 비용 계산:
 - RDS: ~$0.02/GB/월 (리전별 상이)
 - Aurora: ~$0.021/GB/월 (리전별 상이)
 
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+
 사용법:
     from plugins.cost.pricing import get_rds_snapshot_price, get_rds_snapshot_monthly_cost
 
@@ -17,13 +19,9 @@ RDS Snapshot 비용 계산:
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
 
 
 def get_rds_snapshot_prices(
@@ -39,7 +37,7 @@ def get_rds_snapshot_prices(
     Returns:
         {"rds_per_gb_monthly": float, "aurora_per_gb_monthly": float}
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("rds_snapshot", region, refresh)
 
 
 def get_rds_snapshot_price(
@@ -78,26 +76,3 @@ def get_rds_snapshot_monthly_cost(
     """
     per_gb = get_rds_snapshot_price(region, is_aurora)
     return round(per_gb * size_gb, 2)
-
-
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("rds_snapshot", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_rds_snapshot_prices(region)
-
-        if prices and prices.get("rds_per_gb_monthly", 0) > 0:
-            _cache.set("rds_snapshot", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"RDS Snapshot 가격 조회 실패: {e}")
-
-    # 기본값 반환
-    return {"rds_per_gb_monthly": 0.02, "aurora_per_gb_monthly": 0.021}

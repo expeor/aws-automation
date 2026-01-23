@@ -3,17 +3,22 @@ plugins/elasticache/unused.py - ElastiCache 미사용 클러스터 분석
 
 유휴/저사용 ElastiCache 클러스터 탐지 (CloudWatch 지표 기반)
 
+최적화:
+- CloudWatch GetMetricData API 사용 (배치 조회)
+- 기존: 클러스터당 2 API 호출 → 최적화: 전체 1 API 호출
+- 예: 30개 클러스터 × 2 메트릭 = 60 API → 1 API
+
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from rich.console import Console
 
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
@@ -106,17 +111,24 @@ class ElastiCacheAnalysisResult:
 
 
 def collect_elasticache_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
-    """ElastiCache 클러스터 수집"""
+    """ElastiCache 클러스터 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 클러스터당 2 API 호출 → 최적화: 전체 1-2 API 호출
+    - 예: 30개 클러스터 × 2 메트릭 = 60 API → 1 API
+    """
     from botocore.exceptions import ClientError
 
     elasticache = get_client(session, "elasticache", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    clusters = []
+
+    redis_clusters: list[ClusterInfo] = []
+    memcached_clusters: list[ClusterInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
 
-    # Redis 클러스터 (Replication Groups)
+    # 1단계: Redis 클러스터 (Replication Groups) 수집
     try:
         paginator = elasticache.get_paginator("describe_replication_groups")
         for page in paginator.paginate():
@@ -136,47 +148,11 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                     status=rg.get("Status", ""),
                     created_at=None,
                 )
-
-                # CloudWatch 지표 조회
-                try:
-                    # CurrConnections (현재 연결 수)
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CurrConnections",
-                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    # CPUUtilization
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "ReplicationGroupId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
-                clusters.append(cluster)
+                redis_clusters.append(cluster)
     except ClientError:
         pass
 
-    # Memcached 클러스터
+    # 2단계: Memcached 클러스터 수집
     try:
         paginator = elasticache.get_paginator("describe_cache_clusters")
         for page in paginator.paginate(ShowCacheNodeInfo=True):
@@ -197,45 +173,75 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                     status=cc.get("CacheClusterStatus", ""),
                     created_at=cc.get("CacheClusterCreateTime"),
                 )
-
-                # CloudWatch 지표 조회
-                try:
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CurrConnections",
-                        Dimensions=[{"Name": "CacheClusterId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        cluster.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/ElastiCache",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "CacheClusterId", "Value": cluster_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        cluster.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
-                clusters.append(cluster)
+                memcached_clusters.append(cluster)
     except ClientError:
         pass
 
-    return clusters
+    # 3단계: 배치 메트릭 조회
+    if redis_clusters:
+        _collect_elasticache_metrics_batch(
+            cloudwatch, redis_clusters, "ReplicationGroupId", start_time, now
+        )
+
+    if memcached_clusters:
+        _collect_elasticache_metrics_batch(
+            cloudwatch, memcached_clusters, "CacheClusterId", start_time, now
+        )
+
+    return redis_clusters + memcached_clusters
+
+
+def _collect_elasticache_metrics_batch(
+    cloudwatch,
+    clusters: list[ClusterInfo],
+    dimension_name: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """ElastiCache 클러스터 메트릭 배치 수집 (내부 함수)"""
+    from botocore.exceptions import ClientError
+
+    metrics_to_fetch = [
+        ("CurrConnections", "avg_connections"),
+        ("CPUUtilization", "avg_cpu"),
+    ]
+
+    # 쿼리 생성
+    queries = []
+    for cluster in clusters:
+        safe_id = sanitize_metric_id(cluster.cluster_id)
+        for metric_name, _ in metrics_to_fetch:
+            metric_key = metric_name.lower()
+            queries.append(
+                MetricQuery(
+                    id=f"{safe_id}_{metric_key}",
+                    namespace="AWS/ElastiCache",
+                    metric_name=metric_name,
+                    dimensions={dimension_name: cluster.cluster_id},
+                    stat="Average",
+                )
+            )
+
+    try:
+        # 배치 조회
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        # 결과 매핑
+        days = (end_time - start_time).days
+        if days <= 0:
+            days = 1
+
+        for cluster in clusters:
+            safe_id = sanitize_metric_id(cluster.cluster_id)
+            for metric_name, attr_name in metrics_to_fetch:
+                metric_key = metric_name.lower()
+                # GetMetricData with Average stat returns sum of averages
+                value = results.get(f"{safe_id}_{metric_key}", 0.0) / days
+                setattr(cluster, attr_name, value)
+
+    except ClientError:
+        # 실패 시 무시 (기본값 0 유지)
+        pass
 
 
 def analyze_clusters(
@@ -290,104 +296,87 @@ def analyze_clusters(
 
 def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "ElastiCache 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "미사용",
-        "저사용",
-        "정상",
-        "미사용 비용",
-        "저사용 비용",
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=15),
+        ColumnDef(header="저사용 비용", width=15),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_clusters)
-        ws.cell(row=row, column=4, value=r.unused_clusters)
-        ws.cell(row=row, column=5, value=r.low_usage_clusters)
-        ws.cell(row=row, column=6, value=r.normal_clusters)
-        ws.cell(row=row, column=7, value=f"${r.unused_monthly_cost:,.2f}")
-        ws.cell(row=row, column=8, value=f"${r.low_usage_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_clusters,
+            r.unused_clusters,
+            r.low_usage_clusters,
+            r.normal_clusters,
+            f"${r.unused_monthly_cost:,.2f}",
+            f"${r.low_usage_monthly_cost:,.2f}",
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.unused_clusters > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_clusters > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Clusters")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Cluster ID",
-        "Engine",
-        "Node Type",
-        "Nodes",
-        "상태",
-        "Avg Conn",
-        "Avg CPU",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Cluster ID", width=30),
+        ColumnDef(header="Engine", width=12),
+        ColumnDef(header="Node Type", width=18),
+        ColumnDef(header="Nodes", width=8, style="number"),
+        ColumnDef(header="상태", width=12),
+        ColumnDef(header="Avg Conn", width=10),
+        ColumnDef(header="Avg CPU", width=10),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=35),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Clusters", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != ClusterStatus.NORMAL:
-                detail_row += 1
                 c = f.cluster
-                ws_detail.cell(row=detail_row, column=1, value=c.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=c.region)
-                ws_detail.cell(row=detail_row, column=3, value=c.cluster_id)
-                ws_detail.cell(row=detail_row, column=4, value=c.engine)
-                ws_detail.cell(row=detail_row, column=5, value=c.node_type)
-                ws_detail.cell(row=detail_row, column=6, value=c.num_nodes)
-                ws_detail.cell(row=detail_row, column=7, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=8, value=f"{c.avg_connections:.1f}")
-                ws_detail.cell(row=detail_row, column=9, value=f"{c.avg_cpu:.1f}%")
-                ws_detail.cell(row=detail_row, column=10, value=f"${c.estimated_monthly_cost:.2f}")
-                ws_detail.cell(row=detail_row, column=11, value=f.recommendation)
+                style = Styles.danger() if f.status == ClusterStatus.UNUSED else Styles.warning()
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        c.account_name,
+                        c.region,
+                        c.cluster_id,
+                        c.engine,
+                        c.node_type,
+                        c.num_nodes,
+                        f.status.value,
+                        f"{c.avg_connections:.1f}",
+                        f"{c.avg_cpu:.1f}%",
+                        f"${c.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"ElastiCache_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "ElastiCache_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ElastiCacheAnalysisResult | None:

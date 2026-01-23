@@ -7,6 +7,7 @@ SSO 멀티계정 환경에서 작업할 계정을 선택.
 
 from rich.console import Console
 
+from cli.i18n import get_lang, t
 from cli.ui.console import print_box_end, print_box_line, print_box_start
 
 from ..context import ExecutionContext
@@ -36,14 +37,14 @@ class AccountStep:
             업데이트된 컨텍스트 (accounts가 선택된 계정만 포함)
         """
         if not ctx.accounts:
-            console.print("[yellow]* 계정 목록이 없습니다.[/yellow]")
+            console.print(f"[yellow]* {t('flow.no_accounts')}[/yellow]")
             return ctx
 
         # 계정이 1개면 자동 선택
         if len(ctx.accounts) == 1:
             account = ctx.accounts[0]
             console.print()
-            console.print(f"[dim]계정:[/dim] {account.name} ({account.id})")
+            console.print(f"[dim]{t('flow.account_label')}[/dim] {account.name} ({account.id})")
             return ctx
 
         # 단일 계정만 지원하는 도구인지 확인
@@ -69,10 +70,10 @@ class AccountStep:
         sorted_accounts = sorted(accounts, key=lambda x: x.name.lower())
 
         # 박스로 계정 목록 표시
-        print_box_start(f"계정 선택 ({len(sorted_accounts)}개)")
+        print_box_start(t('flow.account_selection', count=len(sorted_accounts)))
 
         if single_only:
-            print_box_line("[yellow]단일 계정만 지원[/yellow]")
+            print_box_line(f"[yellow]{t('flow.single_account_only')}[/yellow]")
             print_box_line()
 
         # 2열 레이아웃
@@ -92,9 +93,9 @@ class AccountStep:
 
         print_box_line()
         if single_only:
-            print_box_line(f"[dim]번호 입력 (1-{len(sorted_accounts)})[/dim]")
+            print_box_line(f"[dim]{t('flow.enter_number_range', max=len(sorted_accounts))}[/dim]")
         else:
-            print_box_line("[dim]번호 (1,2,3 / 1-5) | all: 전체[/dim]")
+            print_box_line(f"[dim]{t('flow.number_range_all')}[/dim]")
         print_box_end()
 
         while True:
@@ -107,19 +108,19 @@ class AccountStep:
 
             # 단일 계정 모드에서 all 입력 방지
             if single_only and selection == "all":
-                console.print("[dim]단일 계정만 지원[/dim]")
+                console.print(f"[dim]{t('flow.single_account_only')}[/dim]")
                 continue
 
             # 전체 선택 (다중 모드에서만)
             if selection == "all":
-                console.print(f"[dim]{len(sorted_accounts)}개 전체 선택[/dim]")
+                console.print(f"[dim]{t('flow.all_selected', count=len(sorted_accounts))}[/dim]")
                 return sorted_accounts
 
             # 번호 파싱
             try:
                 indices = self._parse_selection(selection, len(sorted_accounts), single_only=single_only)
                 if not indices:
-                    console.print("[dim]올바른 번호 입력[/dim]")
+                    console.print(f"[dim]{t('flow.enter_valid_number')}[/dim]")
                     continue
 
                 selected = [sorted_accounts[i - 1] for i in indices]
@@ -128,9 +129,9 @@ class AccountStep:
                 console.print()
                 if len(selected) == 1:
                     acc = selected[0]
-                    console.print(f"[dim]계정:[/dim] {acc.name} ({acc.id})")
+                    console.print(f"[dim]{t('flow.account_label')}[/dim] {acc.name} ({acc.id})")
                 else:
-                    console.print(f"[dim]{len(selected)}개 계정 선택[/dim]")
+                    console.print(f"[dim]{t('flow.accounts_selected', count=len(selected))}[/dim]")
 
                 return selected
 
@@ -155,8 +156,9 @@ class AccountStep:
         parts = [p.strip() for p in selection.split(",")]
 
         # 단일 모드에서 여러 입력 방지
+        single_only_msg = "Single account only" if get_lang() == "en" else "단일 계정만 선택 가능합니다"
         if single_only and len(parts) > 1:
-            raise ValueError("단일 계정만 선택 가능합니다")
+            raise ValueError(single_only_msg)
 
         for part in parts:
             if not part:
@@ -166,17 +168,19 @@ class AccountStep:
             if "-" in part:
                 # 단일 모드에서 범위 입력 방지
                 if single_only:
-                    raise ValueError("단일 계정만 선택 가능합니다")
+                    raise ValueError(single_only_msg)
 
                 range_parts = part.split("-")
                 if len(range_parts) != 2:
-                    raise ValueError(f"잘못된 범위 형식: {part}")
+                    err = f"Invalid range: {part}" if get_lang() == "en" else f"잘못된 범위 형식: {part}"
+                    raise ValueError(err)
 
                 try:
                     start = int(range_parts[0].strip())
                     end = int(range_parts[1].strip())
                 except ValueError:
-                    raise ValueError(f"잘못된 숫자: {part}") from None
+                    err = f"Invalid number: {part}" if get_lang() == "en" else f"잘못된 숫자: {part}"
+                    raise ValueError(err) from None
 
                 if start > end:
                     start, end = end, start
@@ -185,21 +189,24 @@ class AccountStep:
                     if 1 <= i <= max_num:
                         indices.add(i)
                     else:
-                        raise ValueError(f"범위 벗어남: {i} (1-{max_num})")
+                        err = f"Out of range: {i} (1-{max_num})" if get_lang() == "en" else f"범위 벗어남: {i} (1-{max_num})"
+                        raise ValueError(err)
             else:
                 # 단일 번호
                 try:
                     num = int(part)
                 except ValueError:
-                    raise ValueError(f"잘못된 숫자: {part}") from None
+                    err = f"Invalid number: {part}" if get_lang() == "en" else f"잘못된 숫자: {part}"
+                    raise ValueError(err) from None
 
                 if 1 <= num <= max_num:
                     indices.add(num)
                 else:
-                    raise ValueError(f"범위 벗어남: {num} (1-{max_num})")
+                    err = f"Out of range: {num} (1-{max_num})" if get_lang() == "en" else f"범위 벗어남: {num} (1-{max_num})"
+                    raise ValueError(err)
 
         # 단일 모드에서 여러 결과 방지 (안전장치)
         if single_only and len(indices) > 1:
-            raise ValueError("단일 계정만 선택 가능합니다")
+            raise ValueError(single_only_msg)
 
         return sorted(indices)

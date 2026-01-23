@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-24
+
+### Added
+- feat(html): add time series chart with CloudWatch-style adaptive resolution
+- feat(html): add dynamic chart sizing based on data complexity
+- feat: add Claude Code commands for plugin development workflow
+- feat: add automation hooks for test, mypy, and metadata validation
+- feat: add agents for doc-generator, migration, and performance
+- feat: add pattern skills for Excel, error handling, and parallel execution
+- feat: add brave-search MCP and update all agents with MCP guidance
+- feat: add context7 and semgrep MCP for code review
+- feat: add MCP tool guidance to aws-expert agent
+
+### Changed
+- refactor: standardize area field and relocate core/data to plugins
+- refactor: remove MCPs requiring API keys
+
+## [0.2.0] - 2026-01-23
+
+### Added
+- feat: complete i18n implementation for all UI components
+- feat: add i18n support with --lang option for English UI
+
+### Changed
+- refactor: increase tool name display length in CategoryStep
+- refactor: remove permission and area legend printing from CategoryStep
+- refactor: standardize tool naming conventions across all plugins
+- refactor: improve IP search with parser consolidation and parallel enrichment
+- refactor: implement core/data architecture with inventory caching layer
+- refactor: adjust column widths in category and main menu tables for better display
+- refactor: pricing 모듈 개선 및 버그 수정
+- refactor: simplify principal handling and optimize Athena work group retrieval
+- refactor: area 분류 체계 표준화 (15개 영역)
+
+### Fixed
+- fix: restore VPC audit modules used by network_analysis and unused_all
+- fix: use ASCII-compatible characters in banner for Windows cp949 encoding
+
 ## [0.1.1] - 2026-01-05
 
 ### Changed
@@ -72,5 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD 파이프라인 보안 강화
 - ruff, mypy, bandit 린팅/타입 체크
 
+[0.3.0]: https://github.com/expeor/aws-automation/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/expeor/aws-automation/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/expeor/aws-automation/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/expeor/aws-automation/releases/tag/v0.1.0

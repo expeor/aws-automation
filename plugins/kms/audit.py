@@ -11,7 +11,6 @@ KMS 키 보안 감사:
 """
 
 import json
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -331,6 +330,12 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
+<<<<<<< HEAD
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
+
+=======
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -341,10 +346,138 @@ def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
 
     header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=11)
+>>>>>>> origin/master
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     orange_fill = PatternFill(start_color="FFA94D", end_color="FFA94D", fill_type="solid")
 
+<<<<<<< HEAD
+    wb = Workbook()
+
+    # Summary 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="CMK 수", width=10, style="number"),
+        ColumnDef(header="로테이션 미설정", width=15, style="number"),
+        ColumnDef(header="High Risk", width=12, style="number"),
+        ColumnDef(header="Medium Risk", width=12, style="number"),
+        ColumnDef(header="Grants", width=10, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
+
+    for r in results:
+        row_style = None
+        if r.high_risk > 0:
+            row_style = Styles.danger()
+        elif r.medium_risk > 0 or r.rotation_disabled > 0:
+            row_style = Styles.warning()
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_cmk,
+                r.rotation_disabled,
+                r.high_risk,
+                r.medium_risk,
+                r.total_grants,
+            ],
+            style=row_style,
+        )
+        # Cell-level highlighting
+        ws = summary_sheet._ws
+        if r.rotation_disabled > 0:
+            ws.cell(row=row_num, column=4).fill = yellow_fill
+        if r.high_risk > 0:
+            ws.cell(row=row_num, column=5).fill = red_fill
+        if r.medium_risk > 0:
+            ws.cell(row=row_num, column=6).fill = orange_fill
+
+    # Rotation 시트
+    rotation_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Key ID", width=25),
+        ColumnDef(header="Alias", width=25),
+        ColumnDef(header="로테이션", width=12, style="center"),
+        ColumnDef(header="생성일", width=15, style="center"),
+    ]
+    rotation_sheet = wb.new_sheet("Rotation", rotation_columns)
+
+    for r in results:
+        for audit in r.audits:
+            row_style = Styles.warning() if not audit.rotation_enabled else None
+            row_num = rotation_sheet.add_row(
+                [
+                    r.account_name,
+                    r.region,
+                    audit.key_id[:20] + "...",
+                    audit.alias or "-",
+                    "활성화" if audit.rotation_enabled else "비활성화",
+                    audit.creation_date.strftime("%Y-%m-%d") if audit.creation_date else "-",
+                ],
+                style=row_style,
+            )
+            # Cell-level highlighting for rotation status
+            if not audit.rotation_enabled:
+                ws = rotation_sheet._ws
+                ws.cell(row=row_num, column=5).fill = yellow_fill
+
+    # Policy Findings 시트
+    policy_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Key ID", width=25),
+        ColumnDef(header="Alias", width=25),
+        ColumnDef(header="Risk", width=12, style="center"),
+        ColumnDef(header="Issue", width=25),
+        ColumnDef(header="Detail", width=50),
+    ]
+    policy_sheet = wb.new_sheet("Policy Issues", policy_columns)
+
+    for r in results:
+        for audit in r.audits:
+            for finding in audit.policy_findings:
+                row_style = None
+                if finding.risk_level == RiskLevel.HIGH:
+                    row_style = Styles.danger()
+                elif finding.risk_level == RiskLevel.MEDIUM:
+                    row_style = Styles.warning()
+                row_num = policy_sheet.add_row(
+                    [
+                        r.account_name,
+                        r.region,
+                        audit.key_id[:20] + "...",
+                        audit.alias or "-",
+                        finding.risk_level.value.upper(),
+                        finding.issue,
+                        finding.detail,
+                    ],
+                    style=row_style,
+                )
+                # Cell-level highlighting for risk level
+                ws = policy_sheet._ws
+                if finding.risk_level == RiskLevel.HIGH:
+                    ws.cell(row=row_num, column=5).fill = red_fill
+                elif finding.risk_level == RiskLevel.MEDIUM:
+                    ws.cell(row=row_num, column=5).fill = orange_fill
+
+    # Grants 시트
+    grants_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Key ID", width=25),
+        ColumnDef(header="Alias", width=25),
+        ColumnDef(header="Grantee", width=60),
+        ColumnDef(header="Operations", width=40),
+        ColumnDef(header="Constraints", width=30),
+    ]
+    grants_sheet = wb.new_sheet("Grants", grants_columns)
+
+    for r in results:
+        for audit in r.audits:
+            for grant in audit.grants:
+=======
     # Summary 시트
     ws = wb.create_sheet("Summary")
     ws["A1"] = "KMS 감사 보고서"
@@ -436,10 +569,26 @@ def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
                 ws_grants.cell(row=grants_row, column=2, value=r.region)
                 ws_grants.cell(row=grants_row, column=3, value=audit.key_id[:20] + "...")
                 ws_grants.cell(row=grants_row, column=4, value=audit.alias or "-")
+>>>>>>> origin/master
                 # Grantee ARN 줄이기
                 grantee = grant.grantee_principal
                 if len(grantee) > 60:
                     grantee = "..." + grantee[-57:]
+<<<<<<< HEAD
+                grants_sheet.add_row(
+                    [
+                        r.account_name,
+                        r.region,
+                        audit.key_id[:20] + "...",
+                        audit.alias or "-",
+                        grantee,
+                        ", ".join(grant.operations),
+                        grant.constraints or "-",
+                    ],
+                )
+
+    return str(wb.save_as(output_dir, "KMS_Audit"))
+=======
                 ws_grants.cell(row=grants_row, column=5, value=grantee)
                 ws_grants.cell(row=grants_row, column=6, value=", ".join(grant.operations))
                 ws_grants.cell(row=grants_row, column=7, value=grant.constraints or "-")
@@ -458,6 +607,7 @@ def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
     os.makedirs(output_dir, exist_ok=True)
     wb.save(filepath)
     return filepath
+>>>>>>> origin/master
 
 
 def run(ctx) -> None:

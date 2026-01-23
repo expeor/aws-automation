@@ -14,6 +14,7 @@ Usage:
     run(ctx)
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -23,6 +24,8 @@ from core.parallel import get_client
 from core.tools.base import BaseToolRunner
 from core.tools.io.excel import save_dict_list_to_excel
 from core.tools.output import OutputPath
+
+logger = logging.getLogger(__name__)
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -631,6 +634,7 @@ class ToolRunner(BaseToolRunner):
                             all_findings.append(finding_row)
 
             except Exception as e:
+                logger.warning(f"오류 ({region}): {e}")
                 console.print(f"[red]오류 ({region}): {e}[/red]")
 
         # 요약 출력

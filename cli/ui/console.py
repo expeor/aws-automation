@@ -9,6 +9,8 @@ import platform
 import sys
 
 from rich.console import Console
+
+from cli.i18n import t
 from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.progress import (
@@ -46,6 +48,11 @@ def get_console() -> Console:
 
 # 전역 콘솔 인스턴스
 console = get_console()
+
+
+def clear_screen() -> None:
+    """화면을 클리어합니다."""
+    console.clear()
 
 
 def get_progress() -> Progress:
@@ -89,13 +96,25 @@ def get_logger(name: str = "rich") -> logging.Logger:
 logger = get_logger()
 
 
+# =============================================================================
+# 표준 출력 스타일 (이모지 없이 Rich 스타일만 사용)
+# =============================================================================
+
+# 상태 심볼
+SYMBOL_SUCCESS = "✓"  # 완료
+SYMBOL_ERROR = "✗"  # 에러
+SYMBOL_WARNING = "!"  # 경고
+SYMBOL_INFO = "•"  # 정보
+SYMBOL_PROGRESS = "•"  # 진행 중
+
+
 def print_success(message: str) -> None:
     """성공 메시지 출력 (초록색 체크마크)
 
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[green]✅ {message}[/green]")
+    console.print(f"[green]{SYMBOL_SUCCESS} {message}[/green]")
 
 
 def print_error(message: str) -> None:
@@ -104,7 +123,7 @@ def print_error(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[red]❌ {message}[/red]")
+    console.print(f"[red]{SYMBOL_ERROR} {message}[/red]")
 
 
 def print_warning(message: str) -> None:
@@ -113,7 +132,7 @@ def print_warning(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[yellow]⚠️  {message}[/yellow]")
+    console.print(f"[yellow]{SYMBOL_WARNING} {message}[/yellow]")
 
 
 def print_info(message: str) -> None:
@@ -122,7 +141,7 @@ def print_info(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[blue]ℹ️  {message}[/blue]")
+    console.print(f"[blue]{SYMBOL_INFO} {message}[/blue]")
 
 
 def print_header(title: str) -> None:
@@ -145,6 +164,34 @@ def print_step(step: int, total: int, message: str) -> None:
         message: 단계 설명
     """
     console.print(f"[dim]({step}/{total})[/dim] {message}")
+
+
+def print_step_header(step: int, message: str) -> None:
+    """Step 헤더 출력 (예: Step 1: 데이터 수집 중...)
+
+    Args:
+        step: Step 번호
+        message: Step 설명
+    """
+    console.print(f"[bold cyan]Step {step}: {message}[/bold cyan]")
+
+
+def print_sub_task(message: str) -> None:
+    """하위 작업 진행 중 출력 (들여쓰기)
+
+    Args:
+        message: 작업 설명
+    """
+    console.print(f"{message}")
+
+
+def print_sub_task_done(message: str) -> None:
+    """하위 작업 완료 출력 (들여쓰기 + 체크마크)
+
+    Args:
+        message: 완료 메시지
+    """
+    console.print(f"[green]{SYMBOL_SUCCESS} {message}[/green]")
 
 
 def print_panel_header(title: str, subtitle: str | None = None) -> None:
@@ -210,15 +257,15 @@ def print_legend(items: list[tuple]) -> None:
         # 출력: 색상 범례: 노란색 = 사용 중(in-use), 빨간색 = 암호화 안됨
     """
     color_names = {
-        "yellow": "노란색",
-        "red": "빨간색",
-        "green": "초록색",
-        "blue": "파란색",
-        "cyan": "청록색",
-        "magenta": "보라색",
-        "orange": "주황색",
-        "gray": "회색",
-        "dim": "회색",
+        "yellow": t("common.color_yellow"),
+        "red": t("common.color_red"),
+        "green": t("common.color_green"),
+        "blue": t("common.color_blue"),
+        "cyan": t("common.color_cyan"),
+        "magenta": t("common.color_magenta"),
+        "orange": t("common.color_orange"),
+        "gray": t("common.color_gray"),
+        "dim": t("common.color_gray"),
     }
 
     legend_parts = []
@@ -227,7 +274,7 @@ def print_legend(items: list[tuple]) -> None:
         legend_parts.append(f"[{color}]{color_name}[/{color}] = {description}")
 
     legend_text = ", ".join(legend_parts)
-    console.print(f"[dim]색상 범례: {legend_text}[/dim]")
+    console.print(f"[dim]{t('common.color_legend')} {legend_text}[/dim]")
 
 
 # =============================================================================
@@ -325,19 +372,21 @@ def print_tool_start(tool_name: str, description: str = "") -> None:
     console.print("[dim]" + "─" * 50 + "[/]")
 
 
-def print_tool_complete(message: str = "완료", elapsed: float | None = None) -> None:
+def print_tool_complete(message: str | None = None, elapsed: float | None = None) -> None:
     """도구 실행 완료 표시
 
     Args:
         message: 완료 메시지
         elapsed: 소요 시간 (초)
     """
+    if message is None:
+        message = t("common.completed")
     console.print()
     console.print("[dim]" + "─" * 50 + "[/]")
     if elapsed:
-        console.print(f"[green]✓ {message}[/] [dim]({elapsed:.1f}s)[/]")
+        console.print(f"[green]* {message}[/] [dim]({elapsed:.1f}s)[/]")
     else:
-        console.print(f"[green]✓ {message}[/]")
+        console.print(f"[green]* {message}[/]")
 
 
 # =============================================================================
@@ -345,7 +394,7 @@ def print_tool_complete(message: str = "완료", elapsed: float | None = None) -
 # =============================================================================
 
 
-def wait_for_any_key(prompt: str = "[dim]아무 키나 눌러 돌아가기...[/dim]") -> None:
+def wait_for_any_key(prompt: str | None = None) -> None:
     """아무 키나 누르면 진행 (Enter 불필요)
 
     크로스 플랫폼 지원:
@@ -359,6 +408,8 @@ def wait_for_any_key(prompt: str = "[dim]아무 키나 눌러 돌아가기...[/d
         입력된 키 값은 사용되지 않고 즉시 버려집니다.
         보안상 입력 인젝션이나 버퍼 오버플로우 위험이 없습니다.
     """
+    if prompt is None:
+        prompt = f"[dim]{t('common.press_any_key_to_return')}[/dim]"
     console.print(prompt, end="")
 
     try:

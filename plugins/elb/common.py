@@ -480,39 +480,20 @@ def generate_unused_report(
         output_dir: 출력 디렉토리
         lb_type_name: 보고서 제목에 사용할 LB 타입 이름 (ELB, ALB, NLB, CLB)
     """
-    import os
+    from openpyxl.styles import PatternFill
 
-    from openpyxl import Workbook
-    from openpyxl.styles import Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    active_sheet = wb.active
-    if active_sheet is not None:
-        wb.remove(active_sheet)
 
-    # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
+    # 상태별 색상 정의 (cell-level 적용용)
     status_fills = {
         UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
         UsageStatus.UNHEALTHY: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
         UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = f"{lb_type_name} 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
+    # Summary 시트
     totals = {
         "total": sum(r.total_count for r in results),
         "unused": sum(r.unused_count for r in results),
@@ -521,48 +502,32 @@ def generate_unused_report(
         "unused_cost": sum(r.unused_monthly_cost for r in results),
     }
 
-    stats = [
-        ("항목", "값"),
-        (f"전체 {lb_type_name}", totals["total"]),
-        ("미사용", totals["unused"]),
-        ("Unhealthy", totals["unhealthy"]),
-        ("정상", totals["normal"]),
-        ("미사용 월 비용 ($)", f"${totals['unused_cost']:.2f}"),
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title(f"{lb_type_name} 미사용 분석 보고서")
+    summary.add_section("분석 결과")
+    summary.add_item(f"전체 {lb_type_name}", totals["total"])
+    summary.add_item("미사용", totals["unused"], highlight="danger" if totals["unused"] > 0 else None)
+    summary.add_item("Unhealthy", totals["unhealthy"], highlight="warning" if totals["unhealthy"] > 0 else None)
+    summary.add_item("정상", totals["normal"])
+    summary.add_item("미사용 월 비용", f"${totals['unused_cost']:.2f}", highlight="danger" if totals["unused_cost"] > 0 else None)
+
+    # Findings 시트
+    columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Name", width=30),
+        ColumnDef(header="Type", width=10, style="center"),
+        ColumnDef(header="Scheme", width=15, style="center"),
+        ColumnDef(header="Usage", width=12, style="center"),
+        ColumnDef(header="Severity", width=10, style="center"),
+        ColumnDef(header="Targets", width=10, style="number"),
+        ColumnDef(header="Healthy", width=10, style="number"),
+        ColumnDef(header="Monthly Cost ($)", width=15, style="currency"),
+        ColumnDef(header="DNS Name", width=50),
+        ColumnDef(header="Description", width=30),
+        ColumnDef(header="Recommendation", width=25),
     ]
-
-    for i, (item, value) in enumerate(stats):
-        row = 4 + i
-        ws.cell(row=row, column=1, value=item)
-        ws.cell(row=row, column=2, value=value)
-        if i == 0:
-            ws.cell(row=row, column=1).fill = header_fill
-            ws.cell(row=row, column=1).font = header_font
-            ws.cell(row=row, column=2).fill = header_fill
-            ws.cell(row=row, column=2).font = header_font
-
-    # Findings
-    ws2 = wb.create_sheet("Findings")
-    headers = [
-        "Account",
-        "Region",
-        "Name",
-        "Type",
-        "Scheme",
-        "Usage",
-        "Severity",
-        "Targets",
-        "Healthy",
-        "Monthly Cost ($)",
-        "DNS Name",
-        "Description",
-        "Recommendation",
-    ]
-    ws2.append(headers)
-
-    for cell in ws2[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = thin_border
+    sheet = wb.new_sheet("Findings", columns)
 
     # 미사용/unhealthy만 표시
     all_findings = []
@@ -576,7 +541,10 @@ def generate_unused_report(
 
     for f in all_findings:
         lb = f.lb
-        ws2.append(
+        # 행 스타일 결정
+        style = Styles.danger() if f.usage_status == UsageStatus.UNUSED else Styles.warning()
+
+        row_num = sheet.add_row(
             [
                 lb.account_name,
                 lb.region,
@@ -591,25 +559,13 @@ def generate_unused_report(
                 lb.dns_name,
                 f.description,
                 f.recommendation,
-            ]
+            ],
+            style=style,
         )
 
+        # Usage 컬럼에 상태별 색상 적용
         fill = status_fills.get(f.usage_status)
         if fill:
-            ws2.cell(row=ws2.max_row, column=6).fill = fill
+            sheet._ws.cell(row=row_num, column=6).fill = fill
 
-    # 열 너비
-    for sheet in [ws, ws2]:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
-
-    ws2.freeze_panes = "A2"
-
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"{lb_type_name}_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, f"{lb_type_name}_Unused"))

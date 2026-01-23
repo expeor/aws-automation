@@ -302,9 +302,9 @@ class ALBLogAnalyzer:
         return self.downloader.decompress_logs(gz_directory)
 
     def analyze_logs(self, log_directory: str) -> dict[str, Any]:
-        """🚀 DuckDB 기반 로그 파일들을 분석합니다."""
+        """DuckDB 기반 로그 파일들을 분석합니다."""
         try:
-            self.console.print("[bold blue]🚀 ALB 로그 분석을 시작합니다...[/bold blue]")
+            self.console.print("[bold blue]ALB 로그 분석을 시작합니다...[/bold blue]")
 
             # 단일 진행 바로 전체 파이프라인 진행 상황 표시
             with Progress(
@@ -348,12 +348,12 @@ class ALBLogAnalyzer:
             analysis_results["abuse_ips_list"] = abuse_ips_list
             analysis_results["abuse_ip_details"] = abuse_ip_details
 
-            progress.update(task, description="[green]✅ 분석 완료!")
-            self.console.print("[bold green]✅ ALB 로그 분석이 완료되었습니다![/bold green]")
+            progress.update(task, description="[green]✓ 분석 완료!")
+            self.console.print("[bold green]✓ ALB 로그 분석이 완료되었습니다![/bold green]")
             return analysis_results
 
         except Exception as e:
-            logger.error(f"❌ 로그 분석 중 오류 발생: {str(e)}")
+            logger.error(f"로그 분석 중 오류 발생: {str(e)}")
             raise Exception(f"로그 분석 중 오류 발생: {str(e)}") from e
 
     def _load_logs_to_duckdb(self, log_directory: str) -> str | None:

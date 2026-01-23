@@ -15,7 +15,6 @@ plugins/rds/snapshot_audit.py - RDS Snapshot 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -342,29 +341,19 @@ def _analyze_single_snapshot(snapshot: RDSSnapshotInfo) -> RDSSnapshotFinding:
 
 def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
     # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-
     status_fills = {
         UsageStatus.OLD: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
         UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
     # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "RDS Snapshot 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
     totals = {
         "total": sum(r.total_count for r in results),
         "old": sum(r.old_count for r in results),
@@ -374,48 +363,35 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
         "old_cost": sum(r.old_monthly_cost for r in results),
     }
 
-    stats = [
-        ("항목", "값"),
-        ("전체 스냅샷", totals["total"]),
-        ("오래된 스냅샷", totals["old"]),
-        ("최근 스냅샷", totals["normal"]),
-        ("전체 용량 (GB)", totals["total_size"]),
-        ("오래된 용량 (GB)", totals["old_size"]),
-        ("오래된 월 비용 ($)", f"${totals['old_cost']:.2f}"),
-    ]
-
-    for i, (item, value) in enumerate(stats):
-        row = 4 + i
-        ws.cell(row=row, column=1, value=item)
-        ws.cell(row=row, column=2, value=value)
-        if i == 0:
-            ws.cell(row=row, column=1).fill = header_fill
-            ws.cell(row=row, column=1).font = header_font
-            ws.cell(row=row, column=2).fill = header_fill
-            ws.cell(row=row, column=2).font = header_font
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("RDS Snapshot 미사용 분석 보고서")
+    summary.add_item("생성일", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    summary.add_blank_row()
+    summary.add_section("분석 결과")
+    summary.add_item("전체 스냅샷", totals["total"])
+    summary.add_item("오래된 스냅샷", totals["old"], highlight="warning" if totals["old"] > 0 else None)
+    summary.add_item("최근 스냅샷", totals["normal"])
+    summary.add_item("전체 용량 (GB)", totals["total_size"])
+    summary.add_item("오래된 용량 (GB)", totals["old_size"], highlight="warning" if totals["old_size"] > 0 else None)
+    summary.add_item("오래된 월 비용 ($)", f"${totals['old_cost']:.2f}", highlight="danger" if totals["old_cost"] > 0 else None)
 
     # Findings
-    ws2 = wb.create_sheet("Findings")
-    headers = [
-        "Account",
-        "Region",
-        "Snapshot ID",
-        "DB Identifier",
-        "Type",
-        "Usage",
-        "Engine",
-        "Size (GB)",
-        "Age (days)",
-        "Monthly Cost ($)",
-        "Encrypted",
-        "Created",
-        "Recommendation",
+    finding_columns = [
+        ColumnDef(header="Account", width=15),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Snapshot ID", width=35),
+        ColumnDef(header="DB Identifier", width=25),
+        ColumnDef(header="Type", width=10, style="center"),
+        ColumnDef(header="Usage", width=10, style="center"),
+        ColumnDef(header="Engine", width=20),
+        ColumnDef(header="Size (GB)", width=12, style="number"),
+        ColumnDef(header="Age (days)", width=12, style="number"),
+        ColumnDef(header="Monthly Cost ($)", width=15, style="currency"),
+        ColumnDef(header="Encrypted", width=10, style="center"),
+        ColumnDef(header="Created", width=12),
+        ColumnDef(header="Recommendation", width=25),
     ]
-    ws2.append(headers)
-
-    for cell in ws2[1]:
-        cell.fill = header_fill
-        cell.font = header_font
+    finding_sheet = wb.new_sheet("Findings", finding_columns)
 
     # 오래된 것만 표시
     all_findings = []
@@ -429,43 +405,27 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
 
     for f in all_findings:
         snap = f.snapshot
-        ws2.append(
-            [
-                snap.account_name,
-                snap.region,
-                snap.id,
-                snap.db_identifier,
-                snap.snapshot_type.value.upper(),
-                f.usage_status.value,
-                f"{snap.engine} {snap.engine_version}",
-                snap.allocated_storage_gb,
-                snap.age_days,
-                round(snap.monthly_cost, 2),
-                "Yes" if snap.encrypted else "No",
-                snap.create_time.strftime("%Y-%m-%d") if snap.create_time else "",
-                f.recommendation,
-            ]
-        )
+        row_num = finding_sheet.add_row([
+            snap.account_name,
+            snap.region,
+            snap.id,
+            snap.db_identifier,
+            snap.snapshot_type.value.upper(),
+            f.usage_status.value,
+            f"{snap.engine} {snap.engine_version}",
+            snap.allocated_storage_gb,
+            snap.age_days,
+            round(snap.monthly_cost, 2),
+            "Yes" if snap.encrypted else "No",
+            snap.create_time.strftime("%Y-%m-%d") if snap.create_time else "",
+            f.recommendation,
+        ], style=Styles.warning())
 
         fill = status_fills.get(f.usage_status)
         if fill:
-            ws2.cell(row=ws2.max_row, column=6).fill = fill
+            finding_sheet._ws.cell(row=row_num, column=6).fill = fill
 
-    # 열 너비
-    for sheet in [ws, ws2]:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 50)
-
-    ws2.freeze_panes = "A2"
-
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"RDS_Snapshot_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "RDS_Snapshot_Unused"))
 
 
 # =============================================================================

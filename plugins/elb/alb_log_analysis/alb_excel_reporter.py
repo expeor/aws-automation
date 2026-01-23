@@ -7,29 +7,22 @@ Designed for large-scale data processing with memory efficiency.
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable
+from pathlib import Path
 from secrets import token_hex
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    Progress,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 
 if TYPE_CHECKING:
-    from openpyxl.workbook import Workbook
+    from openpyxl.workbook import Workbook as OpenpyxlWorkbook
 
 try:
-    from cli.ui import console, logger
+    from cli.ui import console, logger, step_progress
 except ImportError:
     console = Console()
     logger = logging.getLogger(__name__)
+    step_progress = None  # type: ignore[assignment]
 
 
 class ExcelReportError(Exception):
@@ -51,7 +44,6 @@ class ALBExcelReporter:
     ) -> None:
         self.output_dir = output_dir
         self.data: dict[str, Any] = data or {}
-        os.makedirs(output_dir, exist_ok=True)
 
         from .reporter.styles import get_style_cache
 
@@ -67,31 +59,18 @@ class ALBExcelReporter:
         report_name: str | None = None,
     ) -> str:
         """Create Excel report from data."""
-        from openpyxl import Workbook
+        from openpyxl import Workbook as OpenpyxlWorkbook
 
-        wb = Workbook()
+        wb = OpenpyxlWorkbook()
         if wb.active is not None:
             wb.remove(wb.active)
 
         self._style_cache.register_named_styles(wb)
 
-        if console.is_terminal:
-            with Progress(
-                TextColumn("[bold blue]{task.description}", justify="right"),
-                BarColumn(bar_width=40, complete_style="green", finished_style="green"),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                TimeRemainingColumn(),
-                console=console,
-            ) as progress:
-                task = progress.add_task("[bold]Excel 보고서 생성중...", total=10)
-
-                def update(msg: str, done: bool = False) -> None:
-                    if done:
-                        progress.update(task, advance=1)
-                    progress.update(task, description=msg)
-
-                output_path = self._build_sheets(wb, data, report_name, update)
+        if console.is_terminal and step_progress is not None:
+            with step_progress("Excel 보고서 생성", total_steps=10, console=console) as tracker:
+                callback = tracker.as_callback(include_status=True)
+                output_path = self._build_sheets(wb, data, report_name, callback)
         else:
             output_path = self._build_sheets(wb, data, report_name, None)
 
@@ -99,7 +78,7 @@ class ALBExcelReporter:
 
     def _build_sheets(
         self,
-        wb: Workbook,
+        wb: OpenpyxlWorkbook,
         data: dict[str, Any],
         report_name: str | None,
         progress: Callable[[str, bool], None] | None,
@@ -189,19 +168,21 @@ class ALBExcelReporter:
 
     def _save(
         self,
-        wb: Workbook,
+        wb: OpenpyxlWorkbook,
         data: dict[str, Any],
         report_name: str | None,
     ) -> str:
         """Save workbook."""
         if report_name:
-            if os.path.isabs(report_name) or "/" in report_name or "\\" in report_name:
-                path = report_name if report_name.endswith(".xlsx") else f"{report_name}.xlsx"
+            report_path = Path(report_name)
+            if report_path.is_absolute() or "/" in report_name or "\\" in report_name:
+                path = str(report_path if report_name.endswith(".xlsx") else Path(f"{report_name}.xlsx"))
             else:
-                path = os.path.join(self.output_dir, f"{report_name}.xlsx")
+                path = str(Path(self.output_dir) / f"{report_name}.xlsx")
         else:
             path = self._generate_filename(data)
 
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
         wb.save(path)
         return path
 
@@ -220,10 +201,7 @@ class ALBExcelReporter:
                 pass
 
         alb_name = str(data.get("alb_name") or "alb").strip().replace("/", "-").replace("\\", "-")
-        return os.path.join(
-            self.output_dir,
-            f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx",
-        )
+        return str(Path(self.output_dir) / f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx")
 
     def _get_matching_abuse_ips(self, data: dict[str, Any]) -> set[str]:
         """Get abuse IPs matching actual client IPs."""

@@ -12,6 +12,7 @@ IAM Identity Center(SSO) 보안 감사:
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
+import logging
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -22,6 +23,8 @@ from core.parallel import get_client
 from core.tools.output import OutputPath, open_in_explorer
 
 from .sso_audit_analysis import SSOAnalyzer, SSOCollector, SSOExcelReporter
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -94,12 +97,15 @@ def run(ctx) -> None:
                 error_msg = e.response.get("Error", {}).get("Message", str(e))
 
                 if error_code == "AccessDeniedException":
+                    logger.info(f"SSO 접근 권한 부족: {error_code} - {error_msg}")
                     console.print(f"[yellow]접근 권한 부족: {error_msg}[/yellow]")
                     console.print("[dim]sso-admin:* 및 identitystore:* 권한이 필요합니다.[/dim]")
                 else:
+                    logger.warning(f"SSO 오류: {error_code} - {error_msg}")
                     console.print(f"[red]오류: {error_code} - {error_msg}[/red]")
                 continue
             except Exception as e:
+                logger.error(f"{account_name} 수집 오류: {type(e).__name__} - {e}")
                 console.print(f"[red]{account_name} 수집 오류: {type(e).__name__} - {e}[/red]")
                 continue
 

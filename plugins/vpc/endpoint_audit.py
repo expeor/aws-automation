@@ -7,7 +7,6 @@ plugins/vpc/endpoint_audit.py - VPC Endpoint 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -251,88 +250,91 @@ def analyze_endpoints(
 
 def generate_report(results: list[EndpointAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # Summary 시트
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("VPC Endpoint 분석 보고서")
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "VPC Endpoint 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    # 전체 합계 계산
+    total_count = sum(r.total_count for r in results)
+    total_interface = sum(r.interface_count for r in results)
+    total_gateway = sum(r.gateway_count for r in results)
+    total_unused = sum(r.unused_count for r in results)
+    total_cost = sum(r.unused_monthly_cost for r in results)
 
-    headers = ["Account", "Region", "전체", "Interface", "Gateway", "미사용", "월간 비용"]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary.add_section("전체 요약")
+    summary.add_item("전체 Endpoint", total_count)
+    summary.add_item("Interface", total_interface)
+    summary.add_item("Gateway", total_gateway)
+    summary.add_item("미사용", total_unused, highlight="danger" if total_unused > 0 else None)
+    summary.add_item("미사용 월간 비용", f"${total_cost:,.2f}", highlight="warning" if total_cost > 0 else None)
+
+    # 계정/리전별 요약 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="Interface", width=10, style="number"),
+        ColumnDef(header="Gateway", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="월간 비용", width=15),
+    ]
+    summary_sheet = wb.new_sheet("By Region", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_count)
-        ws.cell(row=row, column=4, value=r.interface_count)
-        ws.cell(row=row, column=5, value=r.gateway_count)
-        ws.cell(row=row, column=6, value=r.unused_count)
-        ws.cell(row=row, column=7, value=f"${r.unused_monthly_cost:,.2f}")
+        style = Styles.danger() if r.unused_count > 0 else None
+        summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.interface_count,
+                r.gateway_count,
+                r.unused_count,
+                f"${r.unused_monthly_cost:,.2f}",
+            ],
+            style=style,
+        )
 
-    # 상세
-    ws_detail = wb.create_sheet("Endpoints")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Endpoint ID",
-        "Name",
-        "Type",
-        "Service",
-        "VPC",
-        "State",
-        "월간 비용",
-        "상태",
+    # 상세 Endpoints 시트
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Endpoint ID", width=25),
+        ColumnDef(header="Name", width=20),
+        ColumnDef(header="Type", width=12, style="center"),
+        ColumnDef(header="Service", width=20),
+        ColumnDef(header="VPC", width=22),
+        ColumnDef(header="State", width=12, style="center"),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="상태", width=25),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Endpoints", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
-            detail_row += 1
             ep = f.endpoint
-            ws_detail.cell(row=detail_row, column=1, value=ep.account_name)
-            ws_detail.cell(row=detail_row, column=2, value=ep.region)
-            ws_detail.cell(row=detail_row, column=3, value=ep.endpoint_id)
-            ws_detail.cell(row=detail_row, column=4, value=ep.name or "-")
-            ws_detail.cell(row=detail_row, column=5, value=ep.endpoint_type)
-            ws_detail.cell(row=detail_row, column=6, value=ep.service_name.split(".")[-1])
-            ws_detail.cell(row=detail_row, column=7, value=ep.vpc_id)
-            ws_detail.cell(row=detail_row, column=8, value=ep.state)
-            ws_detail.cell(row=detail_row, column=9, value=f"${ep.monthly_cost:,.2f}")
-            ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
+            style = Styles.danger() if f.status == EndpointStatus.UNUSED else None
+            detail_sheet.add_row(
+                [
+                    ep.account_name,
+                    ep.region,
+                    ep.endpoint_id,
+                    ep.name or "-",
+                    ep.endpoint_type,
+                    ep.service_name.split(".")[-1],
+                    ep.vpc_id,
+                    ep.state,
+                    f"${ep.monthly_cost:,.2f}",
+                    f.recommendation,
+                ],
+                style=style,
+            )
 
-    # 열 너비
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"VPC_Endpoint_Audit_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "VPC_Endpoint_Audit"))
 
 
 # =============================================================================

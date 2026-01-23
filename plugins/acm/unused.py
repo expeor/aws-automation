@@ -7,7 +7,6 @@ plugins/acm/unused.py - ACM 미사용 인증서 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -224,104 +223,92 @@ def analyze_certificates(certs: list[CertInfo], account_id: str, account_name: s
 
 def generate_report(results: list[ACMAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     orange_fill = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "ACM 인증서 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = ["Account", "Region", "전체", "미사용", "만료임박", "만료됨", "대기중", "정상"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="만료임박", width=10, style="number"),
+        ColumnDef(header="만료됨", width=10, style="number"),
+        ColumnDef(header="대기중", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_certs)
-        ws.cell(row=row, column=4, value=r.unused_certs)
-        ws.cell(row=row, column=5, value=r.expiring_certs)
-        ws.cell(row=row, column=6, value=r.expired_certs)
-        ws.cell(row=row, column=7, value=r.pending_certs)
-        ws.cell(row=row, column=8, value=r.normal_certs)
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_certs,
+            r.unused_certs,
+            r.expiring_certs,
+            r.expired_certs,
+            r.pending_certs,
+            r.normal_certs,
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.unused_certs > 0:
-            ws.cell(row=row, column=4).fill = yellow_fill
+            ws.cell(row=row_num, column=4).fill = yellow_fill
         if r.expiring_certs > 0:
-            ws.cell(row=row, column=5).fill = orange_fill
+            ws.cell(row=row_num, column=5).fill = orange_fill
         if r.expired_certs > 0:
-            ws.cell(row=row, column=6).fill = red_fill
+            ws.cell(row=row_num, column=6).fill = red_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Certificates")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Domain",
-        "Type",
-        "Status",
-        "Expiry",
-        "Days Left",
-        "In Use",
-        "분석상태",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Domain", width=30),
+        ColumnDef(header="Type", width=15),
+        ColumnDef(header="Status", width=15),
+        ColumnDef(header="Expiry", width=12),
+        ColumnDef(header="Days Left", width=10, style="number"),
+        ColumnDef(header="In Use", width=10, style="number"),
+        ColumnDef(header="분석상태", width=12),
+        ColumnDef(header="권장 조치", width=25),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Certificates", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != CertStatus.NORMAL:
-                detail_row += 1
                 c = f.cert
-                ws_detail.cell(row=detail_row, column=1, value=c.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=c.region)
-                ws_detail.cell(row=detail_row, column=3, value=c.domain_name)
-                ws_detail.cell(row=detail_row, column=4, value=c.cert_type)
-                ws_detail.cell(row=detail_row, column=5, value=c.status)
-                ws_detail.cell(
-                    row=detail_row,
-                    column=6,
-                    value=c.not_after.strftime("%Y-%m-%d") if c.not_after else "-",
-                )
-                ws_detail.cell(
-                    row=detail_row,
-                    column=7,
-                    value=c.days_until_expiry if c.days_until_expiry else "-",
-                )
-                ws_detail.cell(row=detail_row, column=8, value=len(c.in_use_by))
-                ws_detail.cell(row=detail_row, column=9, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
+                style = None
+                if f.status == CertStatus.EXPIRED:
+                    style = Styles.danger()
+                elif f.status == CertStatus.EXPIRING:
+                    style = Styles.warning()
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        c.account_name,
+                        c.region,
+                        c.domain_name,
+                        c.cert_type,
+                        c.status,
+                        c.not_after.strftime("%Y-%m-%d") if c.not_after else "-",
+                        c.days_until_expiry if c.days_until_expiry else "-",
+                        len(c.in_use_by),
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"ACM_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "ACM_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ACMAnalysisResult | None:

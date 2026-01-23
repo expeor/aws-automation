@@ -12,8 +12,6 @@ IAM Audit Excel 보고서 생성기
 8. User Changes - IAM User 변경 이력 (AWS Config History)
 """
 
-import os
-from datetime import datetime
 from typing import Any
 
 from core.tools.io.excel import ColumnDef, Workbook
@@ -37,7 +35,6 @@ class IAMExcelReporter:
 
     def generate(self, output_dir: str) -> str:
         """Excel 보고서 생성"""
-        os.makedirs(output_dir, exist_ok=True)
 
         wb = Workbook()
 
@@ -65,13 +62,7 @@ class IAMExcelReporter:
         # 7. User Changes 시트 (변경 이력이 있는 경우만)
         self._add_user_changes_sheet(wb)
 
-        # 저장
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"IAM_Audit_Report_{timestamp}.xlsx"
-        filepath = os.path.join(output_dir, filename)
-        wb.save(filepath)
-
-        return filepath
+        return str(wb.save_as(output_dir, "IAM_Audit_Report"))
 
     def _add_summary_sheet(self, wb: Workbook) -> None:
         """Summary 시트 추가"""

@@ -7,9 +7,7 @@ ELB에 연결되지 않은 Target Group 탐지
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 
 from rich.console import Console
@@ -202,101 +200,93 @@ def analyze_target_groups(
 
 def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 셀 수준 조건부 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "Target Group 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-    headers = ["Account", "Region", "전체", "미연결", "타겟 없음", "비정상", "정상"]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미연결", width=10, style="number"),
+        ColumnDef(header="타겟 없음", width=12, style="number"),
+        ColumnDef(header="비정상", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_count)
-        ws.cell(row=row, column=4, value=r.unattached_count)
-        ws.cell(row=row, column=5, value=r.no_targets_count)
-        ws.cell(row=row, column=6, value=r.unhealthy_count)
-        ws.cell(row=row, column=7, value=r.normal_count)
-
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_count,
+            r.unattached_count,
+            r.no_targets_count,
+            r.unhealthy_count,
+            r.normal_count,
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.unattached_count > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.no_targets_count > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
         if r.unhealthy_count > 0:
-            ws.cell(row=row, column=6).fill = red_fill
+            ws.cell(row=row_num, column=6).fill = red_fill
 
-    # 상세 시트
-    ws_detail = wb.create_sheet("Target Groups")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Name",
-        "상태",
-        "Type",
-        "Protocol",
-        "Port",
-        "LB 연결",
-        "Total Targets",
-        "Healthy",
-        "권장 조치",
+    # Target Groups 시트
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Name", width=25),
+        ColumnDef(header="상태", width=15, style="center"),
+        ColumnDef(header="Type", width=12),
+        ColumnDef(header="Protocol", width=10, style="center"),
+        ColumnDef(header="Port", width=10, style="number"),
+        ColumnDef(header="LB 연결", width=10, style="number"),
+        ColumnDef(header="Total Targets", width=14, style="number"),
+        ColumnDef(header="Healthy", width=10, style="number"),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Target Groups", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != TargetGroupStatus.NORMAL:
-                detail_row += 1
                 tg = f.tg
-                ws_detail.cell(row=detail_row, column=1, value=tg.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=tg.region)
-                ws_detail.cell(row=detail_row, column=3, value=tg.name)
-                ws_detail.cell(row=detail_row, column=4, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=5, value=tg.target_type)
-                ws_detail.cell(row=detail_row, column=6, value=tg.protocol or "-")
-                ws_detail.cell(row=detail_row, column=7, value=tg.port or "-")
-                ws_detail.cell(row=detail_row, column=8, value=len(tg.load_balancer_arns))
-                ws_detail.cell(row=detail_row, column=9, value=tg.total_targets)
-                ws_detail.cell(row=detail_row, column=10, value=tg.healthy_targets)
-                ws_detail.cell(row=detail_row, column=11, value=f.recommendation)
+                style = None
+                if f.status == TargetGroupStatus.UNATTACHED:
+                    style = Styles.danger()
+                elif f.status == TargetGroupStatus.NO_TARGETS:
+                    style = Styles.warning()
+                elif f.status == TargetGroupStatus.ALL_UNHEALTHY:
+                    style = Styles.danger()
 
-    # 열 너비 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
+                detail_sheet.add_row(
+                    [
+                        tg.account_name,
+                        tg.region,
+                        tg.name,
+                        f.status.value,
+                        tg.target_type,
+                        tg.protocol or "-",
+                        tg.port or "-",
+                        len(tg.load_balancer_arns),
+                        tg.total_targets,
+                        tg.healthy_targets,
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"TargetGroup_Audit_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "TargetGroup_Audit"))
 
 
 # =============================================================================

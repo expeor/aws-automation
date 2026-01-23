@@ -30,7 +30,6 @@ AWS 공식 마이그레이션 가이드:
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -617,161 +616,129 @@ def analyze_all(clbs: list[CLBInfo], region: str, account_id: str, account_name:
 
 def generate_report(results: list[MigrationAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    # 스타일
-    header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
+    # 셀 수준 조건부 스타일링용 Fill
     target_fills = {
         RecommendedTarget.ALB: PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid"),
         RecommendedTarget.NLB: PatternFill(start_color="2196F3", end_color="2196F3", fill_type="solid"),
         RecommendedTarget.SPLIT: PatternFill(start_color="FF9800", end_color="FF9800", fill_type="solid"),
         RecommendedTarget.KEEP: PatternFill(start_color="9E9E9E", end_color="9E9E9E", fill_type="solid"),
     }
+    target_font = Font(bold=True, color="FFFFFF")
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "CLB Migration Advisor Report"
-    ws["A1"].font = Font(bold=True, size=16)
-    ws["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-    totals = {
-        "total": sum(r.total_clbs for r in results),
-        "alb": sum(r.alb_recommended for r in results),
-        "nlb": sum(r.nlb_recommended for r in results),
-        "split": sum(r.split_recommended for r in results),
-        "keep": sum(r.keep_recommended for r in results),
-        "current_cost": sum(r.total_current_cost for r in results),
-        "estimated_cost": sum(r.total_estimated_cost for r in results),
-    }
-
-    stats = [
-        ("Metric", "Value"),
-        ("Total CLBs", totals["total"]),
-        ("ALB 추천", totals["alb"]),
-        ("NLB 추천", totals["nlb"]),
-        ("분리 추천", totals["split"]),
-        ("유지 추천", totals["keep"]),
-        ("현재 월 비용 ($)", f"${totals['current_cost']:.2f}"),
-        ("예상 월 비용 ($)", f"${totals['estimated_cost']:.2f}"),
-        ("비용 차이 ($)", f"${totals['estimated_cost'] - totals['current_cost']:.2f}"),
+    # Summary 시트
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Total CLBs", width=12, style="number"),
+        ColumnDef(header="ALB 추천", width=12, style="number"),
+        ColumnDef(header="NLB 추천", width=12, style="number"),
+        ColumnDef(header="분리 추천", width=12, style="number"),
+        ColumnDef(header="유지 추천", width=12, style="number"),
+        ColumnDef(header="현재 월 비용", width=15),
+        ColumnDef(header="예상 월 비용", width=15),
     ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
-    for i, (metric, value) in enumerate(stats):
-        row = 4 + i
-        ws.cell(row=row, column=1, value=metric).border = thin_border
-        ws.cell(row=row, column=2, value=value).border = thin_border
-        if i == 0:
-            ws.cell(row=row, column=1).fill = header_fill
-            ws.cell(row=row, column=1).font = header_font
-            ws.cell(row=row, column=2).fill = header_fill
-            ws.cell(row=row, column=2).font = header_font
+    for r in results:
+        summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_clbs,
+            r.alb_recommended,
+            r.nlb_recommended,
+            r.split_recommended,
+            r.keep_recommended,
+            f"${r.total_current_cost:.2f}",
+            f"${r.total_estimated_cost:.2f}",
+        ])
 
-    # Recommendations
-    ws2 = wb.create_sheet("Recommendations")
-    headers = [
-        "Account",
-        "Region",
-        "CLB Name",
-        "Scheme",
-        "Listeners",
-        "Instances",
-        "추천 타겟",
-        "복잡도",
-        "호환성",
-        "현재 비용($)",
-        "예상 비용($)",
-        "차이($)",
-        "요약",
+    # Recommendations 시트
+    rec_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="CLB Name", width=25),
+        ColumnDef(header="Scheme", width=15),
+        ColumnDef(header="Listeners", width=20),
+        ColumnDef(header="Instances", width=12, style="number"),
+        ColumnDef(header="추천 타겟", width=12, style="center"),
+        ColumnDef(header="복잡도", width=12, style="center"),
+        ColumnDef(header="호환성", width=12, style="center"),
+        ColumnDef(header="현재 비용($)", width=14, style="number"),
+        ColumnDef(header="예상 비용($)", width=14, style="number"),
+        ColumnDef(header="차이($)", width=12, style="number"),
+        ColumnDef(header="요약", width=50),
     ]
-    for col, h in enumerate(headers, 1):
-        cell = ws2.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = thin_border
+    rec_sheet = wb.new_sheet("Recommendations", rec_columns)
 
     for result in results:
         for rec in result.recommendations:
-            row = ws2.max_row + 1
             clb = rec.clb
-
             listener_str = ", ".join(f"{listener.protocol}:{listener.port}" for listener in clb.listeners)
 
-            ws2.cell(row=row, column=1, value=clb.account_name).border = thin_border
-            ws2.cell(row=row, column=2, value=clb.region).border = thin_border
-            ws2.cell(row=row, column=3, value=clb.name).border = thin_border
-            ws2.cell(row=row, column=4, value=clb.scheme).border = thin_border
-            ws2.cell(row=row, column=5, value=listener_str).border = thin_border
-            ws2.cell(row=row, column=6, value=len(clb.instances)).border = thin_border
+            style = None
+            if rec.target == RecommendedTarget.SPLIT:
+                style = Styles.warning()
 
-            target_cell = ws2.cell(row=row, column=7, value=rec.target.value)
-            target_cell.border = thin_border
+            row_num = rec_sheet.add_row(
+                [
+                    clb.account_name,
+                    clb.region,
+                    clb.name,
+                    clb.scheme,
+                    listener_str,
+                    len(clb.instances),
+                    rec.target.value,
+                    rec.complexity.value,
+                    rec.overall_status.value,
+                    round(rec.current_monthly_cost, 2),
+                    round(rec.estimated_monthly_cost, 2),
+                    round(rec.cost_difference, 2),
+                    rec.summary,
+                ],
+                style=style,
+            )
+            # 추천 타겟 셀에 색상 적용
+            ws = rec_sheet._ws
             if rec.target in target_fills:
-                target_cell.fill = target_fills[rec.target]
-                target_cell.font = Font(bold=True, color="FFFFFF")
+                ws.cell(row=row_num, column=7).fill = target_fills[rec.target]
+                ws.cell(row=row_num, column=7).font = target_font
 
-            ws2.cell(row=row, column=8, value=rec.complexity.value).border = thin_border
-            ws2.cell(row=row, column=9, value=rec.overall_status.value).border = thin_border
-            ws2.cell(row=row, column=10, value=round(rec.current_monthly_cost, 2)).border = thin_border
-            ws2.cell(row=row, column=11, value=round(rec.estimated_monthly_cost, 2)).border = thin_border
-            ws2.cell(row=row, column=12, value=round(rec.cost_difference, 2)).border = thin_border
-            ws2.cell(row=row, column=13, value=rec.summary).border = thin_border
-
-    # Checklist
-    ws3 = wb.create_sheet("Checklists")
-    checklist_headers = ["Account", "Region", "CLB Name", "타겟", "체크리스트", "경고사항"]
-    for col, h in enumerate(checklist_headers, 1):
-        cell = ws3.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = thin_border
+    # Checklists 시트
+    checklist_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="CLB Name", width=25),
+        ColumnDef(header="타겟", width=12, style="center"),
+        ColumnDef(header="체크리스트", width=60, style="wrap"),
+        ColumnDef(header="경고사항", width=50, style="wrap"),
+    ]
+    checklist_sheet = wb.new_sheet("Checklists", checklist_columns)
 
     for result in results:
         for rec in result.recommendations:
-            row = ws3.max_row + 1
-            ws3.cell(row=row, column=1, value=rec.clb.account_name).border = thin_border
-            ws3.cell(row=row, column=2, value=rec.clb.region).border = thin_border
-            ws3.cell(row=row, column=3, value=rec.clb.name).border = thin_border
-            ws3.cell(row=row, column=4, value=rec.target.value).border = thin_border
-            ws3.cell(row=row, column=5, value="\n".join(rec.checklist)).border = thin_border
-            ws3.cell(
-                row=row,
-                column=6,
-                value="\n".join(rec.warnings) if rec.warnings else "-",
-            ).border = thin_border
+            style = None
+            if rec.warnings:
+                style = Styles.warning()
 
-    # 열 너비 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(
-                len(str(c.value).split("\n")[0] if c.value else "")
-                for c in col  # type: ignore
+            checklist_sheet.add_row(
+                [
+                    rec.clb.account_name,
+                    rec.clb.region,
+                    rec.clb.name,
+                    rec.target.value,
+                    "\n".join(rec.checklist),
+                    "\n".join(rec.warnings) if rec.warnings else "-",
+                ],
+                style=style,
             )
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
 
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"CLB_Migration_Advisor_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "CLB_Migration_Advisor"))
 
 
 # =============================================================================

@@ -1,50 +1,67 @@
 """
-plugins/vpc - VPC 관련 분석 도구
+plugins/vpc - VPC Analysis Tools
 
-Security Group, VPC, Subnet, NAT Gateway 등 네트워크 리소스 분석
+Security Group, VPC, Subnet, NAT Gateway and network resource analysis
 """
 
 CATEGORY = {
     "name": "vpc",
     "display_name": "VPC",
     "description": "VPC 및 네트워크 리소스 관리",
+    "description_en": "VPC and Network Resource Management",
     "aliases": ["network", "sg", "security-group", "nat"],
 }
 
 TOOLS = [
+    # Search tools
     {
-        "name": "IP 검색",
-        "description": "공인/사설 IP 검색 (AWS, GCP, Azure, Oracle + ENI 캐시)",
+        "name": "클라우드 IP 대역 조회",
+        "name_en": "Cloud IP Range Lookup",
+        "description": "IP가 어느 클라우드(AWS, GCP, Azure, Oracle) 소속인지 확인",
+        "description_en": "Check which cloud provider owns an IP (AWS, GCP, Azure, Oracle)",
         "permission": "read",
-        "module": "ip_search",  # ip_search/ 폴더
-        "area": "security",
+        "module": "ip_search.public_ip",
+        "area": "search",
+        "require_session": False,
     },
     {
-        "name": "Security Group 감사",
-        "description": "SG 현황 및 미사용 SG/규칙 분석",
+        "name": "내부 IP 리소스 조회",
+        "name_en": "Internal IP Resource Lookup",
+        "description": "내부 IP가 어떤 AWS 리소스(EC2, Lambda, ECS 등)에 할당되어 있는지 확인",
+        "description_en": "Find which AWS resource (EC2, Lambda, ECS, etc.) an internal IP belongs to",
+        "permission": "read",
+        "module": "ip_search.private_ip",
+        "area": "search",
+        "require_session": False,
+    },
+    # Security tools
+    {
+        "name": "Security Group 보안 점검",
+        "name_en": "Security Group Security Check",
+        "description": "위험한 인바운드 규칙, 미사용 SG/규칙 탐지",
+        "description_en": "Detect risky inbound rules, unused SGs/rules",
         "permission": "read",
         "module": "sg_audit",
         "area": "security",
     },
+    # Unused resource detection
     {
-        "name": "NAT Gateway 미사용 분석",
-        "description": "미사용/저사용 NAT Gateway 탐지 및 비용 절감 기회 식별",
+        "name": "미사용 네트워크 리소스 탐지",
+        "name_en": "Unused Network Resource Detection",
+        "description": "미사용 NAT Gateway, VPC Endpoint, ENI 통합 탐지",
+        "description_en": "Detect unused NAT Gateway, VPC Endpoint, ENI",
         "permission": "read",
-        "module": "nat_audit",
+        "module": "network_analysis",
         "area": "unused",
     },
+    # Inventory
     {
-        "name": "ENI 미사용 분석",
-        "description": "미사용 ENI (Elastic Network Interface) 탐지",
+        "name": "VPC 리소스 인벤토리",
+        "name_en": "VPC Resource Inventory",
+        "description": "ENI, NAT Gateway, VPC Endpoint 현황 조회",
+        "description_en": "List ENIs, NAT Gateways, VPC Endpoints",
         "permission": "read",
-        "module": "eni_audit",
-        "area": "unused",
-    },
-    {
-        "name": "VPC Endpoint 분석",
-        "description": "VPC Endpoint 현황 및 비용 분석",
-        "permission": "read",
-        "module": "endpoint_audit",
-        "area": "cost",
+        "module": "inventory",
+        "area": "inventory",
     },
 ]

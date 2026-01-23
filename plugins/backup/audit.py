@@ -7,7 +7,6 @@ Backup Vault, Plan, 최근 작업 현황을 분석합니다.
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -20,7 +19,7 @@ from core.tools.output import OutputPath, open_in_explorer
 console = Console()
 
 # 최근 작업 조회 기간
-JOB_DAYS = 7
+JOB_DAYS = 30
 
 REQUIRED_PERMISSIONS = {
     "read": [
@@ -261,90 +260,90 @@ def _collect_backup_data(session, account_id: str, account_name: str, region: st
 
 def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
     # ========== Summary 시트 ==========
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "AWS Backup 현황 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = ["Account", "Region", "Vault 수", "복구지점 수", "Plan 수", "실패 작업"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Vault 수", width=12, style="number"),
+        ColumnDef(header="복구지점 수", width=12, style="number"),
+        ColumnDef(header="Plan 수", width=12, style="number"),
+        ColumnDef(header="실패 작업", width=12, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_vaults)
-        ws.cell(row=row, column=4, value=r.total_recovery_points)
-        ws.cell(row=row, column=5, value=r.total_plans)
-        ws.cell(row=row, column=6, value=r.job_failed_count)
-
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_vaults,
+            r.total_recovery_points,
+            r.total_plans,
+            r.job_failed_count,
+        ])
         if r.job_failed_count > 0:
-            ws.cell(row=row, column=6).fill = red_fill
+            summary_sheet._ws.cell(row=row_num, column=6).fill = red_fill
 
     # ========== Vaults 시트 ==========
-    ws_vaults = wb.create_sheet("Vaults")
-    vault_headers = ["Account", "Region", "Vault 이름", "복구지점 수", "총 크기", "암호화", "잠금"]
-    for col, h in enumerate(vault_headers, 1):
-        ws_vaults.cell(row=1, column=col, value=h).fill = header_fill
-        ws_vaults.cell(row=1, column=col).font = header_font
+    vault_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Vault 이름", width=30),
+        ColumnDef(header="복구지점 수", width=12, style="number"),
+        ColumnDef(header="총 크기", width=15),
+        ColumnDef(header="암호화", width=10, style="center"),
+        ColumnDef(header="잠금", width=10, style="center"),
+    ]
+    vault_sheet = wb.new_sheet("Vaults", vault_columns)
 
-    vault_row = 1
     for r in results:
         for v in r.vaults:
-            vault_row += 1
-            ws_vaults.cell(row=vault_row, column=1, value=v.account_name)
-            ws_vaults.cell(row=vault_row, column=2, value=v.region)
-            ws_vaults.cell(row=vault_row, column=3, value=v.vault_name)
-            ws_vaults.cell(row=vault_row, column=4, value=v.recovery_point_count)
-            ws_vaults.cell(row=vault_row, column=5, value=f"{v.size_gb:.2f} GB")
-            ws_vaults.cell(row=vault_row, column=6, value="Yes" if v.is_encrypted else "No")
-            ws_vaults.cell(row=vault_row, column=7, value="Yes" if v.locked else "No")
-
+            row_num = vault_sheet.add_row([
+                v.account_name,
+                v.region,
+                v.vault_name,
+                v.recovery_point_count,
+                f"{v.size_gb:.2f} GB",
+                "Yes" if v.is_encrypted else "No",
+                "Yes" if v.locked else "No",
+            ])
             if not v.is_encrypted:
-                ws_vaults.cell(row=vault_row, column=6).fill = yellow_fill
+                vault_sheet._ws.cell(row=row_num, column=6).fill = yellow_fill
 
     # ========== Plans 시트 ==========
-    ws_plans = wb.create_sheet("Plans")
-    plan_headers = ["Account", "Region", "Plan 이름", "ID", "규칙 수", "리소스 선택 수", "생성일"]
-    for col, h in enumerate(plan_headers, 1):
-        ws_plans.cell(row=1, column=col, value=h).fill = header_fill
-        ws_plans.cell(row=1, column=col).font = header_font
+    plan_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Plan 이름", width=30),
+        ColumnDef(header="ID", width=40),
+        ColumnDef(header="규칙 수", width=10, style="number"),
+        ColumnDef(header="리소스 선택 수", width=15, style="number"),
+        ColumnDef(header="생성일", width=12),
+    ]
+    plan_sheet = wb.new_sheet("Plans", plan_columns)
 
-    plan_row = 1
     for r in results:
         for p in r.plans:
-            plan_row += 1
-            ws_plans.cell(row=plan_row, column=1, value=p.account_name)
-            ws_plans.cell(row=plan_row, column=2, value=p.region)
-            ws_plans.cell(row=plan_row, column=3, value=p.plan_name)
-            ws_plans.cell(row=plan_row, column=4, value=p.plan_id)
-            ws_plans.cell(row=plan_row, column=5, value=p.rule_count)
-            ws_plans.cell(row=plan_row, column=6, value=p.resource_count)
-            ws_plans.cell(
-                row=plan_row,
-                column=7,
-                value=p.creation_date.strftime("%Y-%m-%d") if p.creation_date else "-",
-            )
-
+            row_num = plan_sheet.add_row([
+                p.account_name,
+                p.region,
+                p.plan_name,
+                p.plan_id,
+                p.rule_count,
+                p.resource_count,
+                p.creation_date.strftime("%Y-%m-%d") if p.creation_date else "-",
+            ])
             # 리소스 없는 플랜 경고
             if p.resource_count == 0:
-                ws_plans.cell(row=plan_row, column=6).fill = yellow_fill
+                plan_sheet._ws.cell(row=row_num, column=6).fill = yellow_fill
 
     # ========== Failed Jobs 시트 (실패 작업만) ==========
     failed_jobs: list[JobInfo] = []
@@ -352,45 +351,34 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
         failed_jobs.extend(r.failed_jobs)
 
     if failed_jobs:
-        ws_jobs = wb.create_sheet("Failed Jobs")
-        job_headers = ["Account", "Region", "상태", "리소스 타입", "리소스 ARN", "Vault", "생성일", "메시지"]
-        for col, h in enumerate(job_headers, 1):
-            ws_jobs.cell(row=1, column=col, value=h).fill = header_fill
-            ws_jobs.cell(row=1, column=col).font = header_font
+        job_columns = [
+            ColumnDef(header="Account", width=20),
+            ColumnDef(header="Region", width=15),
+            ColumnDef(header="상태", width=12, style="center"),
+            ColumnDef(header="리소스 타입", width=15),
+            ColumnDef(header="리소스 ARN", width=50),
+            ColumnDef(header="Vault", width=25),
+            ColumnDef(header="생성일", width=18),
+            ColumnDef(header="메시지", width=40),
+        ]
+        job_sheet = wb.new_sheet("Failed Jobs", job_columns)
 
         failed_jobs.sort(key=lambda j: j.creation_date or datetime.min, reverse=True)
 
-        job_row = 1
         for j in failed_jobs:
-            job_row += 1
-            ws_jobs.cell(row=job_row, column=1, value=j.account_name)
-            ws_jobs.cell(row=job_row, column=2, value=j.region)
-            ws_jobs.cell(row=job_row, column=3, value=j.status)
-            ws_jobs.cell(row=job_row, column=4, value=j.resource_type)
-            ws_jobs.cell(row=job_row, column=5, value=j.resource_arn)
-            ws_jobs.cell(row=job_row, column=6, value=j.vault_name)
-            ws_jobs.cell(
-                row=job_row,
-                column=7,
-                value=j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
-            )
-            ws_jobs.cell(row=job_row, column=8, value=j.status_message or "-")
-            ws_jobs.cell(row=job_row, column=3).fill = red_fill
+            row_num = job_sheet.add_row([
+                j.account_name,
+                j.region,
+                j.status,
+                j.resource_type,
+                j.resource_arn,
+                j.vault_name,
+                j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
+                j.status_message or "-",
+            ], style=Styles.danger())
+            job_sheet._ws.cell(row=row_num, column=3).fill = red_fill
 
-    # 열 너비 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"AWS_Backup_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "AWS_Backup"))
 
 
 def run(ctx) -> None:

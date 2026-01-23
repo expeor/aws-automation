@@ -1,12 +1,13 @@
 """
-plugins/vpc/ip_search/public.py - 공인 IP 검색기
+plugins/vpc/ip_search/common/ip_ranges/providers.py - Cloud Provider IP Range Services
 
-클라우드 제공자(AWS, GCP, Azure, Oracle)의 공인 IP 범위에서 IP 검색
+클라우드 프로바이더별 IP 대역 데이터 서비스:
+- AWS, GCP, Azure, Oracle Cloud
 
-특징:
-- AWS, GCP, Azure, Oracle Cloud IP 범위 지원
-- CIDR 및 단일 IP 검색
+Features:
 - 24시간 캐시로 빠른 응답
+- 병렬 데이터 로딩
+- CIDR 및 단일 IP 검색
 """
 
 import ipaddress
@@ -19,13 +20,13 @@ from typing import Any
 import requests
 
 # =============================================================================
-# 데이터 구조
+# Data Structures
 # =============================================================================
 
 
 @dataclass
 class PublicIPResult:
-    """공인 IP 검색 결과"""
+    """Public IP search result"""
 
     ip_address: str
     provider: str  # AWS, GCP, Azure, Oracle, Unknown
@@ -36,21 +37,27 @@ class PublicIPResult:
 
 
 # =============================================================================
-# 캐시 관리
+# Cache Management
 # =============================================================================
 
 
 def _get_cache_dir() -> str:
-    """캐시 디렉토리 경로 (프로젝트 루트의 temp 폴더)"""
-    # plugins/vpc/ip_search -> vpc -> plugins -> project_root
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    """Get cache directory path (project root's temp folder)"""
+    # plugins/vpc/ip_search/common/ip_ranges -> ip_ranges -> common -> ip_search -> vpc -> plugins -> project_root
+    project_root = os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            )
+        )
+    )
     cache_dir = os.path.join(project_root, "temp", "ip_ranges")
     os.makedirs(cache_dir, exist_ok=True)
     return cache_dir
 
 
 def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:
-    """캐시에서 데이터 로드"""
+    """Load data from cache"""
     cache_file = os.path.join(_get_cache_dir(), f"{name}.json")
     if not os.path.exists(cache_file):
         return None
@@ -68,7 +75,7 @@ def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:
 
 
 def _save_to_cache(name: str, data: dict) -> None:
-    """캐시에 데이터 저장"""
+    """Save data to cache"""
     cache_file = os.path.join(_get_cache_dir(), f"{name}.json")
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
@@ -78,7 +85,7 @@ def _save_to_cache(name: str, data: dict) -> None:
 
 
 def clear_public_cache() -> int:
-    """Public IP 캐시 전체 삭제 (삭제된 파일 수 반환)"""
+    """Clear all public IP caches (returns deleted file count)"""
     cache_dir = _get_cache_dir()
     count = 0
     for name in ["aws", "gcp", "azure", "oracle"]:
@@ -94,10 +101,10 @@ def clear_public_cache() -> int:
 
 def refresh_public_cache(callback=None) -> dict[str, Any]:
     """
-    Public IP 캐시 새로고침 (삭제 후 재다운로드)
+    Refresh public IP cache (delete and re-download)
 
     Args:
-        callback: 진행 상황 콜백 함수 (provider, status)
+        callback: Progress callback function (provider, status)
 
     Returns:
         {"success": [...], "failed": [...], "counts": {...}}
@@ -105,15 +112,17 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
     providers = ["aws", "gcp", "azure", "oracle"]
     result: dict[str, Any] = {"success": [], "failed": [], "counts": {}}
 
-    # 먼저 캐시 삭제
+    # Clear cache first
     clear_public_cache()
 
-    # 각 provider 데이터 다운로드
+    # Download each provider's data
     loaders = {
         "aws": lambda: _fetch_and_cache("aws", "https://ip-ranges.amazonaws.com/ip-ranges.json"),
         "gcp": lambda: _fetch_and_cache("gcp", "https://www.gstatic.com/ipranges/cloud.json"),
         "azure": _fetch_azure_fresh,
-        "oracle": lambda: _fetch_and_cache("oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"),
+        "oracle": lambda: _fetch_and_cache(
+            "oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"
+        ),
     }
 
     for provider in providers:
@@ -123,7 +132,7 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
         try:
             data = loaders[provider]()
             if data:
-                # 카운트 계산
+                # Calculate count
                 if provider == "aws" or provider == "gcp":
                     count = len(data.get("prefixes", []))
                 elif provider == "azure":
@@ -144,7 +153,7 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
 
 
 def _fetch_and_cache(name: str, url: str) -> dict[Any, Any] | None:
-    """URL에서 데이터 다운로드 후 캐시 저장"""
+    """Download data from URL and save to cache"""
     try:
         response = requests.get(url, timeout=15)
         if response.status_code == 200:
@@ -157,12 +166,10 @@ def _fetch_and_cache(name: str, url: str) -> dict[Any, Any] | None:
 
 
 def _fetch_azure_fresh() -> dict[Any, Any] | None:
-    """Azure 데이터 새로 다운로드 (주간 업데이트 URL 탐색)"""
+    """Download Azure data (weekly update URL search)"""
     from datetime import datetime, timedelta
 
-    base_url = (
-        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
-    )
+    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -183,7 +190,7 @@ def _fetch_azure_fresh() -> dict[Any, Any] | None:
 
 
 def get_public_cache_status() -> dict[str, Any]:
-    """Public IP 캐시 상태 반환"""
+    """Get public IP cache status"""
     from datetime import datetime
 
     cache_dir = _get_cache_dir()
@@ -227,12 +234,12 @@ def get_public_cache_status() -> dict[str, Any]:
 
 
 # =============================================================================
-# 클라우드 제공자 IP 범위 가져오기
+# Cloud Provider IP Range Loaders
 # =============================================================================
 
 
 def get_aws_ip_ranges() -> dict[str, Any]:
-    """AWS IP 범위 가져오기"""
+    """Get AWS IP ranges"""
     cached = _load_from_cache("aws")
     if cached:
         return cached
@@ -247,7 +254,7 @@ def get_aws_ip_ranges() -> dict[str, Any]:
 
 
 def get_gcp_ip_ranges() -> dict[str, Any]:
-    """GCP IP 범위 가져오기"""
+    """Get GCP IP ranges"""
     cached = _load_from_cache("gcp")
     if cached:
         return cached
@@ -262,16 +269,14 @@ def get_gcp_ip_ranges() -> dict[str, Any]:
 
 
 def get_azure_ip_ranges() -> dict[str, Any]:
-    """Azure IP 범위 가져오기 (주간 업데이트)"""
+    """Get Azure IP ranges (weekly update)"""
     cached = _load_from_cache("azure")
     if cached and cached.get("values"):
         return cached
 
     from datetime import datetime, timedelta
 
-    base_url = (
-        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
-    )
+    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -292,13 +297,15 @@ def get_azure_ip_ranges() -> dict[str, Any]:
 
 
 def get_oracle_ip_ranges() -> dict[str, Any]:
-    """Oracle Cloud IP 범위 가져오기"""
+    """Get Oracle Cloud IP ranges"""
     cached = _load_from_cache("oracle")
     if cached:
         return cached
 
     try:
-        response = requests.get("https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10)
+        response = requests.get(
+            "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10
+        )
         data: dict[str, Any] = response.json()
         _save_to_cache("oracle", data)
         return data
@@ -307,12 +314,12 @@ def get_oracle_ip_ranges() -> dict[str, Any]:
 
 
 # =============================================================================
-# IP 검색 함수
+# IP Search Functions
 # =============================================================================
 
 
 def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
-    """AWS IP 범위에서 검색"""
+    """Search in AWS IP ranges"""
     results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
@@ -343,7 +350,7 @@ def search_in_aws(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
 
 
 def search_in_gcp(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
-    """GCP IP 범위에서 검색"""
+    """Search in GCP IP ranges"""
     results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
@@ -374,7 +381,7 @@ def search_in_gcp(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
 
 
 def search_in_azure(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
-    """Azure IP 범위에서 검색"""
+    """Search in Azure IP ranges"""
     results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
@@ -405,7 +412,7 @@ def search_in_azure(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
 
 
 def search_in_oracle(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
-    """Oracle Cloud IP 범위에서 검색"""
+    """Search in Oracle Cloud IP ranges"""
     results: list[PublicIPResult] = []
     try:
         ip_obj = ipaddress.ip_address(ip)
@@ -439,12 +446,12 @@ def search_in_oracle(ip: str, data: dict[str, Any]) -> list[PublicIPResult]:
 
 
 # =============================================================================
-# 메인 검색 함수
+# Main Search Functions
 # =============================================================================
 
 
 def load_ip_ranges_parallel(target_providers: set[str]) -> dict[str, dict[str, Any]]:
-    """병렬로 IP 범위 데이터 로드"""
+    """Load IP range data in parallel"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     loaders = {
@@ -474,14 +481,14 @@ def search_public_ip(
     providers: list[str] | None = None,
 ) -> list[PublicIPResult]:
     """
-    공인 IP 범위에서 검색
+    Search public IP ranges
 
     Args:
-        ip_list: 검색할 IP 주소 목록
-        providers: 검색할 제공자 목록 (None이면 전체)
+        ip_list: List of IP addresses to search
+        providers: List of providers to search (None for all)
 
     Returns:
-        검색 결과 목록
+        List of search results
     """
     all_providers = {"aws", "gcp", "azure", "oracle"}
     target_providers = {p.lower() for p in providers} & all_providers if providers else all_providers
@@ -536,7 +543,7 @@ def search_public_ip(
 
 
 def list_aws_regions(data: dict) -> list[str]:
-    """AWS IP 범위에서 고유 리전 목록 반환"""
+    """Get unique region list from AWS IP ranges"""
     regions = set()
     for prefix in data.get("prefixes", []):
         region = prefix.get("region", "")
@@ -546,7 +553,7 @@ def list_aws_regions(data: dict) -> list[str]:
 
 
 def list_aws_services(data: dict) -> list[str]:
-    """AWS IP 범위에서 고유 서비스 목록 반환"""
+    """Get unique service list from AWS IP ranges"""
     services = set()
     for prefix in data.get("prefixes", []):
         service = prefix.get("service", "")
@@ -561,19 +568,19 @@ def search_by_filter(
     service: str | None = None,
 ) -> list[PublicIPResult]:
     """
-    리전 또는 서비스로 IP 범위 검색
+    Search IP ranges by region or service
 
     Args:
-        provider: 클라우드 제공자 (aws, gcp, azure, oracle)
-        region: 리전 필터 (부분 일치)
-        service: 서비스 필터 (부분 일치)
+        provider: Cloud provider (aws, gcp, azure, oracle)
+        region: Region filter (partial match)
+        service: Service filter (partial match)
 
     Returns:
-        매칭되는 IP 범위 목록
+        List of matching IP ranges
     """
     provider = provider.lower()
 
-    # 데이터 로드
+    # Load data
     loaders = {
         "aws": get_aws_ip_ranges,
         "gcp": get_gcp_ip_ranges,
@@ -593,7 +600,7 @@ def search_by_filter(
             p_service = prefix.get("service", "")
             ip_prefix = prefix.get("ip_prefix", "")
 
-            # 필터 조건 확인
+            # Check filter conditions
             if region and region.lower() not in p_region.lower():
                 continue
             if service and service.lower() not in p_service.lower():
@@ -681,7 +688,7 @@ def search_by_filter(
 
 
 def get_available_filters(provider: str = "aws") -> dict[str, list[str]]:
-    """사용 가능한 리전/서비스 목록 반환"""
+    """Get available region/service lists"""
     provider = provider.lower()
 
     loaders = {

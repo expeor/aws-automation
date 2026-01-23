@@ -8,6 +8,8 @@ from pathlib import Path
 
 from rich.console import Console
 
+from cli.i18n import t
+
 
 def get_version() -> str:
     """버전 문자열 반환"""
@@ -26,22 +28,22 @@ def get_version() -> str:
     return "0.0.1"
 
 
-# 컴팩트한 배너 (ANSI Regular 스타일, AWS 오렌지 그라디언트)
+# 컴팩트한 배너 (ASCII 호환)
 COMPACT_LOGO = """
-[bold #FF9900] █████   █████[/]    [bold white]AWS Automation CLI[/] [dim]v{version}[/]
-[bold #FF9900]██   ██ ██   ██[/]   {context}
-[bold #CC7700]███████ ███████[/]
-[bold #CC7700]██   ██ ██   ██[/]   [dim]{hint}[/]
-[bold #995500]██   ██ ██   ██[/]
+[bold #FF9900]  AA   AA [/]    [bold white]AWS Automation CLI[/] [dim]v{version}[/]
+[bold #FF9900] A  A A  A[/]   {context}
+[bold #CC7700] AAAA AAAA[/]
+[bold #CC7700] A  A A  A[/]   [dim]{hint}[/]
+[bold #995500] A  A A  A[/]
 """
 
-# 풀 배너 (메인 메뉴용, ANSI Regular 스타일)
+# 풀 배너 (메인 메뉴용, ASCII 호환)
 FULL_LOGO = """
-[bold #FF9900] █████   █████[/]
-[bold #FF9900]██   ██ ██   ██[/]   [bold white]AWS Automation CLI[/]
-[bold #CC7700]███████ ███████[/]   [dim]v{version}[/]
-[bold #CC7700]██   ██ ██   ██[/]
-[bold #995500]██   ██ ██   ██[/]
+[bold #FF9900]  AA   AA [/]
+[bold #FF9900] A  A A  A[/]   [bold white]AWS Automation CLI[/]
+[bold #CC7700] AAAA AAAA[/]   [dim]v{version}[/]
+[bold #CC7700] A  A A  A[/]
+[bold #995500] A  A A  A[/]
 """
 
 
@@ -62,7 +64,7 @@ def get_current_context() -> str:
                 return f"[white]{profile}[/]"
     except Exception:
         pass
-    return "[dim]프로필 미설정[/]"
+    return f"[dim]{t('common.profile_not_set')}[/]"
 
 
 def print_banner(console: Console, compact: bool = False) -> None:
@@ -74,7 +76,7 @@ def print_banner(console: Console, compact: bool = False) -> None:
     """
     version = get_version()
     context = get_current_context()
-    hint = "h: 도움말 | q: 종료"
+    hint = t("common.help_quit_hint")
 
     if compact:
         logo = COMPACT_LOGO.format(version=version, context=context, hint=hint)

@@ -11,7 +11,6 @@ Lambda 함수 종합 분석:
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -482,16 +481,9 @@ def analyze_comprehensive(
 
 def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
-
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     severity_fills = {
         Severity.CRITICAL: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
@@ -500,156 +492,134 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
         Severity.LOW: PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid"),
     }
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "Lambda 종합 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    wb = Workbook()
 
-    headers = [
-        "Account",
-        "Region",
-        "전체 함수",
-        "이슈 함수",
-        "런타임 EOL",
-        "메모리 이슈",
-        "에러 이슈",
-        "월 비용",
-        "절감 가능",
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("Lambda 종합 분석 보고서")
+    summary.add_item("생성", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    summary.add_blank_row()
+
+    # Summary Data Sheet
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체 함수", width=12, style="number"),
+        ColumnDef(header="이슈 함수", width=12, style="number"),
+        ColumnDef(header="런타임 EOL", width=12, style="number"),
+        ColumnDef(header="메모리 이슈", width=12, style="number"),
+        ColumnDef(header="에러 이슈", width=12, style="number"),
+        ColumnDef(header="월 비용", width=15),
+        ColumnDef(header="절감 가능", width=15),
     ]
-    row = 4
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
-
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_functions)
-        ws.cell(row=row, column=4, value=r.functions_with_issues)
-        ws.cell(row=row, column=5, value=r.runtime_eol_count)
-        ws.cell(row=row, column=6, value=r.memory_issue_count)
-        ws.cell(row=row, column=7, value=r.error_issue_count)
-        ws.cell(row=row, column=8, value=f"${r.total_monthly_cost:,.2f}")
-        ws.cell(row=row, column=9, value=f"${r.potential_savings:,.2f}")
+        row_style = Styles.warning() if r.functions_with_issues > 0 else None
+        summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_functions,
+                r.functions_with_issues,
+                r.runtime_eol_count,
+                r.memory_issue_count,
+                r.error_issue_count,
+                f"${r.total_monthly_cost:,.2f}",
+                f"${r.potential_savings:,.2f}",
+            ],
+            style=row_style,
+        )
 
     # 총계
     total_functions = sum(r.total_functions for r in results)
     total_issues = sum(r.functions_with_issues for r in results)
     total_cost = sum(r.total_monthly_cost for r in results)
     total_savings = sum(r.potential_savings for r in results)
+    summary_sheet.add_summary_row([
+        "합계",
+        "-",
+        total_functions,
+        total_issues,
+        "-",
+        "-",
+        "-",
+        f"${total_cost:,.2f}",
+        f"${total_savings:,.2f}",
+    ])
 
-    row += 2
-    ws.cell(row=row, column=1, value="합계").font = Font(bold=True)
-    ws.cell(row=row, column=3, value=total_functions).font = Font(bold=True)
-    ws.cell(row=row, column=4, value=total_issues).font = Font(bold=True)
-    ws.cell(row=row, column=8, value=f"${total_cost:,.2f}").font = Font(bold=True)
-    ws.cell(row=row, column=9, value=f"${total_savings:,.2f}").font = Font(bold=True, color="FF0000")
-
-    # Issues
-    ws_issues = wb.create_sheet("Issues")
-    issue_headers = [
-        "Account",
-        "Region",
-        "Function",
-        "Runtime",
-        "Memory",
-        "이슈 유형",
-        "심각도",
-        "설명",
-        "권장 조치",
-        "절감 가능",
+    # Issues Sheet
+    issue_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function", width=30),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="Memory", width=10, style="number"),
+        ColumnDef(header="이슈 유형", width=15),
+        ColumnDef(header="심각도", width=12, style="center"),
+        ColumnDef(header="설명", width=40),
+        ColumnDef(header="권장 조치", width=40),
+        ColumnDef(header="절감 가능", width=15),
     ]
-    for col, h in enumerate(issue_headers, 1):
-        ws_issues.cell(row=1, column=col, value=h).fill = header_fill
-        ws_issues.cell(row=1, column=col).font = header_font
-
-    issue_row = 1
+    issues_sheet = wb.new_sheet("Issues", issue_columns)
     for r in results:
         for comp in r.results:
             for issue in comp.issues:
-                issue_row += 1
                 fn = comp.function
-                ws_issues.cell(row=issue_row, column=1, value=fn.account_name)
-                ws_issues.cell(row=issue_row, column=2, value=fn.region)
-                ws_issues.cell(row=issue_row, column=3, value=fn.function_name)
-                ws_issues.cell(row=issue_row, column=4, value=fn.runtime)
-                ws_issues.cell(row=issue_row, column=5, value=fn.memory_mb)
-                ws_issues.cell(row=issue_row, column=6, value=issue.issue_type.value)
-                ws_issues.cell(row=issue_row, column=7, value=issue.severity.value)
-                ws_issues.cell(row=issue_row, column=8, value=issue.description)
-                ws_issues.cell(row=issue_row, column=9, value=issue.recommendation)
-                ws_issues.cell(
-                    row=issue_row,
-                    column=10,
-                    value=f"${issue.potential_savings:,.2f}" if issue.potential_savings > 0 else "-",
-                )
+                row_num = issues_sheet.add_row([
+                    fn.account_name,
+                    fn.region,
+                    fn.function_name,
+                    fn.runtime,
+                    fn.memory_mb,
+                    issue.issue_type.value,
+                    issue.severity.value,
+                    issue.description,
+                    issue.recommendation,
+                    f"${issue.potential_savings:,.2f}" if issue.potential_savings > 0 else "-",
+                ])
 
+                # 심각도에 따른 셀 하이라이트
                 fill = severity_fills.get(issue.severity)
                 if fill:
-                    ws_issues.cell(row=issue_row, column=7).fill = fill
+                    ws = issues_sheet._ws
+                    ws.cell(row=row_num, column=7).fill = fill
 
-    # All Functions
-    ws_all = wb.create_sheet("All Functions")
-    all_headers = [
-        "Account",
-        "Region",
-        "Function",
-        "Runtime",
-        "Memory",
-        "Timeout",
-        "Invocations (30d)",
-        "Avg Duration",
-        "Errors",
-        "Throttles",
-        "이슈 수",
-        "월 비용",
+    # All Functions Sheet
+    all_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Function", width=30),
+        ColumnDef(header="Runtime", width=15),
+        ColumnDef(header="Memory", width=10, style="number"),
+        ColumnDef(header="Timeout", width=10, style="number"),
+        ColumnDef(header="Invocations (30d)", width=18, style="number"),
+        ColumnDef(header="Avg Duration", width=15),
+        ColumnDef(header="Errors", width=10, style="number"),
+        ColumnDef(header="Throttles", width=10, style="number"),
+        ColumnDef(header="이슈 수", width=10, style="number"),
+        ColumnDef(header="월 비용", width=15),
     ]
-    for col, h in enumerate(all_headers, 1):
-        ws_all.cell(row=1, column=col, value=h).fill = header_fill
-        ws_all.cell(row=1, column=col).font = header_font
-
-    all_row = 1
+    all_sheet = wb.new_sheet("All Functions", all_columns)
     for r in results:
         for comp in r.results:
-            all_row += 1
             fn = comp.function
             metrics = fn.metrics
+            all_sheet.add_row([
+                fn.account_name,
+                fn.region,
+                fn.function_name,
+                fn.runtime,
+                fn.memory_mb,
+                fn.timeout_seconds,
+                metrics.invocations if metrics else 0,
+                f"{metrics.duration_avg_ms:.1f}ms" if metrics else "-",
+                metrics.errors if metrics else 0,
+                metrics.throttles if metrics else 0,
+                comp.issue_count,
+                f"${comp.estimated_monthly_cost:,.4f}",
+            ])
 
-            ws_all.cell(row=all_row, column=1, value=fn.account_name)
-            ws_all.cell(row=all_row, column=2, value=fn.region)
-            ws_all.cell(row=all_row, column=3, value=fn.function_name)
-            ws_all.cell(row=all_row, column=4, value=fn.runtime)
-            ws_all.cell(row=all_row, column=5, value=fn.memory_mb)
-            ws_all.cell(row=all_row, column=6, value=fn.timeout_seconds)
-            ws_all.cell(row=all_row, column=7, value=metrics.invocations if metrics else 0)
-            ws_all.cell(
-                row=all_row,
-                column=8,
-                value=f"{metrics.duration_avg_ms:.1f}ms" if metrics else "-",
-            )
-            ws_all.cell(row=all_row, column=9, value=metrics.errors if metrics else 0)
-            ws_all.cell(row=all_row, column=10, value=metrics.throttles if metrics else 0)
-            ws_all.cell(row=all_row, column=11, value=comp.issue_count)
-            ws_all.cell(row=all_row, column=12, value=f"${comp.estimated_monthly_cost:,.4f}")
-
-    # 열 너비
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        if sheet.title != "Summary":
-            sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Lambda_Comprehensive_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "Lambda_Comprehensive"))
 
 
 # =============================================================================

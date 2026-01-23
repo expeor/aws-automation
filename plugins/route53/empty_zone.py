@@ -7,9 +7,7 @@ plugins/route53/empty_zone.py - 빈 Hosted Zone 탐지
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 
 from rich.console import Console
@@ -182,93 +180,75 @@ def analyze_hosted_zones(zones: list[HostedZoneInfo], account_id: str, account_n
 
 def generate_report(results: list[Route53AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
-    # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "Route53 빈 Hosted Zone 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = ["Account", "전체 Zone", "빈 Zone", "NS/SOA만", "Public", "Private", "낭비 비용"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("Route53 빈 Hosted Zone 보고서")
+
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="전체 Zone", width=12, style="number"),
+        ColumnDef(header="빈 Zone", width=10, style="number"),
+        ColumnDef(header="NS/SOA만", width=12, style="number"),
+        ColumnDef(header="Public", width=10, style="number"),
+        ColumnDef(header="Private", width=10, style="number"),
+        ColumnDef(header="낭비 비용", width=15),
+    ]
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.total_zones)
-        ws.cell(row=row, column=3, value=r.empty_zones)
-        ws.cell(row=row, column=4, value=r.ns_soa_only_zones)
-        ws.cell(row=row, column=5, value=r.public_zones)
-        ws.cell(row=row, column=6, value=r.private_zones)
-        ws.cell(row=row, column=7, value=f"${r.wasted_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.total_zones,
+            r.empty_zones,
+            r.ns_soa_only_zones,
+            r.public_zones,
+            r.private_zones,
+            f"${r.wasted_monthly_cost:,.2f}",
+        ])
+        ws = summary_sheet._ws
         if r.empty_zones > 0:
-            ws.cell(row=row, column=3).fill = red_fill
+            ws.cell(row=row_num, column=3).fill = red_fill
         if r.ns_soa_only_zones > 0:
-            ws.cell(row=row, column=4).fill = yellow_fill
+            ws.cell(row=row_num, column=4).fill = yellow_fill
 
-    # Detail 시트
-    ws_detail = wb.create_sheet("Hosted Zones")
-    detail_headers = [
-        "Account",
-        "Zone ID",
-        "Domain",
-        "Type",
-        "레코드수",
-        "상태",
-        "Comment",
-        "권장 조치",
+    # Detail Sheet
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Zone ID", width=25),
+        ColumnDef(header="Domain", width=40),
+        ColumnDef(header="Type", width=10),
+        ColumnDef(header="레코드수", width=10, style="number"),
+        ColumnDef(header="상태", width=15),
+        ColumnDef(header="Comment", width=40),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Hosted Zones", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != ZoneStatus.NORMAL:
-                detail_row += 1
                 zone = f.zone
-                ws_detail.cell(row=detail_row, column=1, value=zone.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=zone.zone_id)
-                ws_detail.cell(row=detail_row, column=3, value=zone.name)
-                ws_detail.cell(
-                    row=detail_row,
-                    column=4,
-                    value="Private" if zone.is_private else "Public",
-                )
-                ws_detail.cell(row=detail_row, column=5, value=zone.record_count)
-                ws_detail.cell(row=detail_row, column=6, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=7, value=zone.comment)
-                ws_detail.cell(row=detail_row, column=8, value=f.recommendation)
+                detail_sheet.add_row([
+                    zone.account_name,
+                    zone.zone_id,
+                    zone.name,
+                    "Private" if zone.is_private else "Public",
+                    zone.record_count,
+                    f.status.value,
+                    zone.comment,
+                    f.recommendation,
+                ])
 
-    # 컬럼 너비 자동 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"Route53_EmptyZone_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "Route53_EmptyZone"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> Route53AnalysisResult | None:

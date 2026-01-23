@@ -3,17 +3,22 @@ plugins/rds/unused.py - RDS 유휴 인스턴스 분석
 
 유휴/저사용 RDS 인스턴스 탐지 (CloudWatch 지표 기반)
 
+최적화:
+- CloudWatch GetMetricData API 사용 (배치 조회)
+- 기존: 인스턴스당 4 API 호출 → 최적화: 전체 1 API 호출
+- 예: 20개 인스턴스 × 4 메트릭 = 80 API → 1 API
+
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from rich.console import Console
 
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
@@ -120,7 +125,12 @@ class RDSAnalysisResult:
 
 
 def collect_rds_instances(session, account_id: str, account_name: str, region: str) -> list[RDSInstanceInfo]:
-    """RDS 인스턴스 수집"""
+    """RDS 인스턴스 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 인스턴스당 4 API 호출 → 최적화: 전체 1-2 API 호출
+    - 예: 20개 인스턴스 × 4 메트릭 = 80 API → 1 API
+    """
     from botocore.exceptions import ClientError
 
     rds = get_client(session, "rds", region_name=region)
@@ -131,6 +141,7 @@ def collect_rds_instances(session, account_id: str, account_name: str, region: s
     start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
 
     try:
+        # 1단계: 인스턴스 목록 수집
         paginator = rds.get_paginator("describe_db_instances")
         for page in paginator.paginate():
             for db in page.get("DBInstances", []):
@@ -150,82 +161,76 @@ def collect_rds_instances(session, account_id: str, account_name: str, region: s
                     allocated_storage=db.get("AllocatedStorage", 0),
                     created_at=db.get("InstanceCreateTime"),
                 )
-
-                # 정지된 인스턴스는 CloudWatch 지표 조회 불필요
-                if instance.status == "stopped":
-                    instances.append(instance)
-                    continue
-
-                # CloudWatch 지표 조회
-                try:
-                    # DatabaseConnections
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/RDS",
-                        MetricName="DatabaseConnections",
-                        Dimensions=[{"Name": "DBInstanceIdentifier", "Value": db_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        instance.avg_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    # CPUUtilization
-                    cpu_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/RDS",
-                        MetricName="CPUUtilization",
-                        Dimensions=[{"Name": "DBInstanceIdentifier", "Value": db_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if cpu_resp.get("Datapoints"):
-                        instance.avg_cpu = sum(d["Average"] for d in cpu_resp["Datapoints"]) / len(
-                            cpu_resp["Datapoints"]
-                        )
-
-                    # ReadIOPS
-                    read_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/RDS",
-                        MetricName="ReadIOPS",
-                        Dimensions=[{"Name": "DBInstanceIdentifier", "Value": db_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if read_resp.get("Datapoints"):
-                        instance.avg_read_iops = sum(d["Average"] for d in read_resp["Datapoints"]) / len(
-                            read_resp["Datapoints"]
-                        )
-
-                    # WriteIOPS
-                    write_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/RDS",
-                        MetricName="WriteIOPS",
-                        Dimensions=[{"Name": "DBInstanceIdentifier", "Value": db_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if write_resp.get("Datapoints"):
-                        instance.avg_write_iops = sum(d["Average"] for d in write_resp["Datapoints"]) / len(
-                            write_resp["Datapoints"]
-                        )
-
-                except ClientError:
-                    pass
-
                 instances.append(instance)
+
+        # 2단계: 메트릭이 필요한 인스턴스 필터링 (stopped 제외)
+        active_instances = [i for i in instances if i.status != "stopped"]
+
+        if active_instances:
+            # 3단계: 배치 메트릭 조회
+            _collect_rds_metrics_batch(cloudwatch, active_instances, start_time, now)
+
     except ClientError:
         pass
 
     return instances
+
+
+def _collect_rds_metrics_batch(
+    cloudwatch,
+    instances: list[RDSInstanceInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """RDS 인스턴스 메트릭 배치 수집 (내부 함수)"""
+    from botocore.exceptions import ClientError
+
+    metrics_to_fetch = [
+        ("DatabaseConnections", "avg_connections"),
+        ("CPUUtilization", "avg_cpu"),
+        ("ReadIOPS", "avg_read_iops"),
+        ("WriteIOPS", "avg_write_iops"),
+    ]
+
+    # 모든 인스턴스에 대한 쿼리 생성
+    queries = []
+    for instance in instances:
+        safe_id = sanitize_metric_id(instance.db_instance_id)
+        for metric_name, _ in metrics_to_fetch:
+            metric_key = metric_name.lower()
+            queries.append(
+                MetricQuery(
+                    id=f"{safe_id}_{metric_key}",
+                    namespace="AWS/RDS",
+                    metric_name=metric_name,
+                    dimensions={"DBInstanceIdentifier": instance.db_instance_id},
+                    stat="Average",
+                )
+            )
+
+    try:
+        # 배치 조회
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        # 결과 매핑
+        # Note: GetMetricData는 평균값을 직접 반환하지 않고 datapoint 합계를 반환
+        # 따라서 기간 내 데이터포인트 수로 나눠 평균 계산
+        days = (end_time - start_time).days
+        if days <= 0:
+            days = 1
+
+        for instance in instances:
+            safe_id = sanitize_metric_id(instance.db_instance_id)
+            for metric_name, attr_name in metrics_to_fetch:
+                metric_key = metric_name.lower()
+                # GetMetricData with Average stat returns sum of averages
+                # We need to divide by number of periods to get true average
+                value = results.get(f"{safe_id}_{metric_key}", 0.0) / days
+                setattr(instance, attr_name, value)
+
+    except ClientError:
+        # 실패 시 무시 (기본값 0 유지)
+        pass
 
 
 def analyze_instances(
@@ -292,115 +297,98 @@ def analyze_instances(
 
 def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
+    # 조건부 셀 스타일링용 Fill
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     gray_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
     # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "RDS 유휴 인스턴스 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-
-    headers = [
-        "Account",
-        "Region",
-        "전체",
-        "미사용",
-        "저사용",
-        "정지",
-        "정상",
-        "미사용 비용",
-        "저사용 비용",
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="저사용", width=10, style="number"),
+        ColumnDef(header="정지", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+        ColumnDef(header="미사용 비용", width=15),
+        ColumnDef(header="저사용 비용", width=15),
     ]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_instances)
-        ws.cell(row=row, column=4, value=r.unused_instances)
-        ws.cell(row=row, column=5, value=r.low_usage_instances)
-        ws.cell(row=row, column=6, value=r.stopped_instances)
-        ws.cell(row=row, column=7, value=r.normal_instances)
-        ws.cell(row=row, column=8, value=f"${r.unused_monthly_cost:,.2f}")
-        ws.cell(row=row, column=9, value=f"${r.low_usage_monthly_cost:,.2f}")
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_instances,
+            r.unused_instances,
+            r.low_usage_instances,
+            r.stopped_instances,
+            r.normal_instances,
+            f"${r.unused_monthly_cost:,.2f}",
+            f"${r.low_usage_monthly_cost:,.2f}",
+        ])
+        # 셀 단위 조건부 스타일링
+        ws = summary_sheet._ws
         if r.unused_instances > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_instances > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
         if r.stopped_instances > 0:
-            ws.cell(row=row, column=6).fill = gray_fill
+            ws.cell(row=row_num, column=6).fill = gray_fill
 
     # Detail 시트
-    ws_detail = wb.create_sheet("Instances")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Instance ID",
-        "Engine",
-        "Class",
-        "Storage",
-        "Multi-AZ",
-        "상태",
-        "Avg Conn",
-        "Avg CPU",
-        "월간 비용",
-        "권장 조치",
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Instance ID", width=30),
+        ColumnDef(header="Engine", width=15),
+        ColumnDef(header="Class", width=18),
+        ColumnDef(header="Storage", width=12),
+        ColumnDef(header="Multi-AZ", width=10),
+        ColumnDef(header="상태", width=12),
+        ColumnDef(header="Avg Conn", width=10),
+        ColumnDef(header="Avg CPU", width=10),
+        ColumnDef(header="월간 비용", width=12),
+        ColumnDef(header="권장 조치", width=40),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Instances", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != InstanceStatus.NORMAL:
-                detail_row += 1
                 inst = f.instance
-                ws_detail.cell(row=detail_row, column=1, value=inst.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=inst.region)
-                ws_detail.cell(row=detail_row, column=3, value=inst.db_instance_id)
-                ws_detail.cell(row=detail_row, column=4, value=inst.engine)
-                ws_detail.cell(row=detail_row, column=5, value=inst.db_instance_class)
-                ws_detail.cell(row=detail_row, column=6, value=f"{inst.allocated_storage} GB")
-                ws_detail.cell(row=detail_row, column=7, value="Yes" if inst.multi_az else "No")
-                ws_detail.cell(row=detail_row, column=8, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=9, value=f"{inst.avg_connections:.1f}")
-                ws_detail.cell(row=detail_row, column=10, value=f"{inst.avg_cpu:.1f}%")
-                ws_detail.cell(
-                    row=detail_row,
-                    column=11,
-                    value=f"${inst.estimated_monthly_cost:.2f}",
+                style = None
+                if f.status == InstanceStatus.UNUSED:
+                    style = Styles.danger()
+                elif f.status == InstanceStatus.LOW_USAGE:
+                    style = Styles.warning()
+
+                detail_sheet.add_row(
+                    [
+                        inst.account_name,
+                        inst.region,
+                        inst.db_instance_id,
+                        inst.engine,
+                        inst.db_instance_class,
+                        f"{inst.allocated_storage} GB",
+                        "Yes" if inst.multi_az else "No",
+                        f.status.value,
+                        f"{inst.avg_connections:.1f}",
+                        f"{inst.avg_cpu:.1f}%",
+                        f"${inst.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=style,
                 )
-                ws_detail.cell(row=detail_row, column=12, value=f.recommendation)
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"RDS_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "RDS_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> RDSAnalysisResult | None:

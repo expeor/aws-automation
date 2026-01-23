@@ -7,7 +7,8 @@
 
 from rich.console import Console
 
-from cli.ui.console import print_box_end, print_box_line, print_box_start
+from cli.i18n import t
+from cli.ui.console import clear_screen, print_box_end, print_box_line, print_box_start
 from core.region.data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
 
 from ..context import ExecutionContext
@@ -41,7 +42,7 @@ class RegionStep:
             # Global 서비스는 us-east-1 사용 (IAM API 엔드포인트)
             ctx.regions = ["us-east-1"]
             console.print()
-            console.print("[dim]리전:[/dim] Global (us-east-1)")
+            console.print(f"[dim]{t('flow.region_label')}[/dim] {t('flow.region_global')}")
             return ctx
 
         # 단일 리전만 지원하는 도구인지 확인
@@ -50,20 +51,22 @@ class RegionStep:
         # 선택 모드 (번호 입력 방식)
         if is_single_region_only:
             modes = [
-                f"현재 리전 ({self.default_region})",
-                "다른 리전 선택",
+                t('flow.current_region', region=self.default_region),
+                t('flow.select_other_region'),
             ]
         else:
             modes = [
-                f"현재 리전 ({self.default_region})",
-                "다른 리전 1개 선택",
-                "여러 리전 선택 (2개 이상)",
-                f"모든 리전 ({len(ALL_REGIONS)}개)",
+                t('flow.current_region', region=self.default_region),
+                t('flow.select_other_region'),
+                t('flow.all_regions', count=len(ALL_REGIONS)),
             ]
 
-        print_box_start("리전 선택")
+        # 화면 클리어 (Global 서비스 제외)
+        clear_screen()
+
+        print_box_start(t('flow.region_selection'))
         if is_single_region_only:
-            print_box_line("[yellow]단일 리전만 지원[/yellow]")
+            print_box_line(f"[yellow]{t('flow.single_region_only')}[/yellow]")
             print_box_line()
 
         for i, mode_title in enumerate(modes, 1):
@@ -84,9 +87,9 @@ class RegionStep:
                     mode = num
                     break
                 else:
-                    console.print(f"[dim]1-{len(modes)} 범위[/dim]")
+                    console.print(f"[dim]{t('flow.number_range_hint', max=len(modes))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
         # 모드별 처리
         if is_single_region_only:
@@ -99,12 +102,10 @@ class RegionStep:
             # 다중 리전 지원하는 경우
             if mode == 1:  # 현재 리전
                 ctx.regions = [self.default_region]
-            elif mode == 2:  # 다른 리전 1개
-                ctx.regions = [self._select_single_region()]
-            elif mode == 4:  # 모든 리전
+            elif mode == 2:  # 다른 리전 선택 (1개 이상)
+                ctx.regions = self._select_regions()
+            else:  # 모든 리전
                 ctx.regions = ALL_REGIONS.copy()
-            else:  # 여러 리전 (2개 이상)
-                ctx.regions = self._select_multiple_regions()
 
         # 결과 출력
         self._print_summary(ctx.regions)
@@ -112,7 +113,7 @@ class RegionStep:
         return ctx
 
     def _select_single_region(self) -> str:
-        """단일 리전 선택 UI (번호 입력 방식)"""
+        """단일 리전 선택 UI (단일 리전만 지원하는 도구용)"""
         console.print()
 
         # 자주 사용하는 리전을 우선 표시
@@ -120,7 +121,7 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions_for_selection = common_region_codes + other_regions
 
-        print_box_start(f"리전 ({len(all_regions_for_selection)}개)")
+        print_box_start(t('flow.region_count', count=len(all_regions_for_selection)))
 
         # 3열 레이아웃 (리전 코드만)
         cols = 3
@@ -150,12 +151,12 @@ class RegionStep:
                 if 1 <= num <= len(all_regions_for_selection):
                     return all_regions_for_selection[num - 1]
                 else:
-                    console.print(f"[dim]1-{len(all_regions_for_selection)} 범위[/dim]")
+                    console.print(f"[dim]{t('flow.number_range_hint', max=len(all_regions_for_selection))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
-    def _select_multiple_regions(self) -> list[str]:
-        """복수 리전 선택 UI (2개 이상)"""
+    def _select_regions(self) -> list[str]:
+        """리전 선택 UI (1개 이상 선택 가능)"""
         console.print()
 
         # 자주 사용하는 리전 우선 표시
@@ -163,7 +164,7 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions = common_region_codes + other_regions
 
-        print_box_start(f"리전 ({len(all_regions)}개)")
+        print_box_start(t('flow.region_count', count=len(all_regions)))
 
         # 3열 레이아웃 (리전 코드만)
         cols = 3
@@ -175,23 +176,21 @@ class RegionStep:
                 if idx < len(all_regions):
                     num = idx + 1
                     region = all_regions[idx]
-                    line_parts.append(f"{num:>2}) {region:<16}")
+                    mark = "*" if region == self.default_region else " "
+                    line_parts.append(f"{num:>2}){mark}{region:<15}")
             print_box_line(" " + "".join(line_parts))
 
         print_box_line()
-        print_box_line("[dim]번호 (쉼표 구분) | a: 전체[/dim]")
+        print_box_line(f"[dim]{t('flow.number_comma_hint')}[/dim]")
         print_box_end()
 
         while True:
-            choice = console.input("> ").strip().lower()
+            choice = console.input("> ").strip()
 
             if not choice:
                 continue
 
-            if choice == "a":
-                return all_regions.copy()
-
-            # 번호 파싱 및 즉시 반환
+            # 번호 파싱
             try:
                 nums = [int(n) for n in choice.replace(",", " ").split()]
                 selected = []
@@ -201,13 +200,12 @@ class RegionStep:
                         if region not in selected:
                             selected.append(region)
 
-                if len(selected) < 2:
-                    console.print("[yellow]2개 이상 선택해주세요[/yellow]")
-                    continue
+                if selected:
+                    return selected
 
-                return selected
+                console.print(f"[dim]{t('flow.number_range_hint', max=len(all_regions))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
     def _print_summary(self, regions: list[str]) -> None:
         """선택 결과 출력"""
@@ -217,10 +215,10 @@ class RegionStep:
             region = regions[0]
             name = REGION_NAMES.get(region, "")
             if name:
-                console.print(f"[dim]리전:[/dim] {region} ({name})")
+                console.print(f"[dim]{t('flow.region_label')}[/dim] {region} ({name})")
             else:
-                console.print(f"[dim]리전:[/dim] {region}")
+                console.print(f"[dim]{t('flow.region_label')}[/dim] {region}")
         elif len(regions) == len(ALL_REGIONS):
-            console.print(f"[dim]리전:[/dim] 전체 {len(regions)}개")
+            console.print(f"[dim]{t('flow.region_label')}[/dim] {t('flow.all_regions_count', count=len(regions))}")
         else:
-            console.print(f"[dim]리전:[/dim] {len(regions)}개")
+            console.print(f"[dim]{t('flow.region_label')}[/dim] {t('flow.regions_count', count=len(regions))}")

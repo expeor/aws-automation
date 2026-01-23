@@ -1,10 +1,11 @@
 """
-core/pricing/ebs.py - EBS 가격 조회
+plugins/cost/pricing/ebs.py - EBS 가격 조회
 
 EBS 볼륨 GB당 월간 비용을 조회합니다.
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
 
 사용법:
-    from core.pricing import get_ebs_price, get_ebs_monthly_cost
+    from plugins.cost.pricing import get_ebs_price, get_ebs_monthly_cost
 
     # GB당 월 가격
     price_per_gb = get_ebs_price("gp3", "ap-northeast-2")
@@ -15,13 +16,9 @@ EBS 볼륨 GB당 월간 비용을 조회합니다.
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
 
 
 def get_ebs_price(
@@ -39,7 +36,7 @@ def get_ebs_price(
     Returns:
         GB당 월 USD 가격 (조회 실패 시 0.0)
     """
-    prices = _get_cached_prices(region, refresh)
+    prices = pricing_service.get_prices("ebs", region, refresh)
 
     if volume_type in prices:
         return prices[volume_type]
@@ -68,7 +65,7 @@ def get_ebs_monthly_cost(
     return round(price_per_gb * size_gb, 2)
 
 
-def get_ebs_prices_bulk(
+def get_ebs_prices(
     region: str = "ap-northeast-2",
     refresh: bool = False,
 ) -> dict[str, float]:
@@ -81,26 +78,8 @@ def get_ebs_prices_bulk(
     Returns:
         {volume_type: gb_monthly_price} 딕셔너리
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("ebs", region, refresh)
 
 
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("ebs", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_ebs_prices(region)
-
-        if prices:
-            _cache.set("ebs", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"EBS 가격 조회 실패: {e}")
-
-    return {}
+# 하위 호환성을 위한 alias
+get_ebs_prices_bulk = get_ebs_prices

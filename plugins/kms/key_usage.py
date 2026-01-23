@@ -15,9 +15,7 @@ plugins/kms/key_usage.py - CMK 사용처 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
-from datetime import datetime
 
 from rich.console import Console
 
@@ -1101,90 +1099,92 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 def generate_report(results: list[KMSUsageResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
 
-    # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "KMS 키 사용처 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = ["Account", "Region", "전체 키", "AWS 관리 키", "CMK", "미사용 CMK"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("KMS 키 사용처 분석 보고서")
+    summary.add_blank_row()
 
+    # Summary Data Sheet
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체 키", width=12, style="number"),
+        ColumnDef(header="AWS 관리 키", width=14, style="number"),
+        ColumnDef(header="CMK", width=10, style="number"),
+        ColumnDef(header="미사용 CMK", width=12, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
     for r in results:
-        row += 1
         aws_managed = r.total_keys - r.customer_keys
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_keys)
-        ws.cell(row=row, column=4, value=aws_managed)
-        ws.cell(row=row, column=5, value=r.customer_keys)
-        ws.cell(row=row, column=6, value=r.unused_keys)
+        row_style = Styles.warning() if r.unused_keys > 0 else None
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_keys,
+                aws_managed,
+                r.customer_keys,
+                r.unused_keys,
+            ],
+            style=row_style,
+        )
+        # 미사용 키가 있으면 해당 셀만 강조
         if r.unused_keys > 0:
-            ws.cell(row=row, column=6).fill = yellow_fill
+            ws = summary_sheet._ws
+            ws.cell(row=row_num, column=6).fill = yellow_fill
 
-    # Key Usage 시트
-    ws_usage = wb.create_sheet("Key Usage")
-    usage_headers = ["Account", "Region", "Key ID", "Alias", "사용 횟수", "Service", "Resource Type", "Resource Name"]
-    for col, h in enumerate(usage_headers, 1):
-        ws_usage.cell(row=1, column=col, value=h).fill = header_fill
-        ws_usage.cell(row=1, column=col).font = header_font
-
-    usage_row = 1
+    # Key Usage Sheet
+    usage_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Key ID", width=25),
+        ColumnDef(header="Alias", width=25),
+        ColumnDef(header="사용 횟수", width=12, style="number"),
+        ColumnDef(header="Service", width=18),
+        ColumnDef(header="Resource Type", width=18),
+        ColumnDef(header="Resource Name", width=30),
+    ]
+    usage_sheet = wb.new_sheet("Key Usage", usage_columns)
     for r in results:
         for ku in r.key_usages:
             if ku.usages:
                 for usage in ku.usages:
-                    usage_row += 1
-                    ws_usage.cell(row=usage_row, column=1, value=r.account_name)
-                    ws_usage.cell(row=usage_row, column=2, value=r.region)
-                    ws_usage.cell(row=usage_row, column=3, value=ku.key.key_id[:20] + "...")
-                    ws_usage.cell(row=usage_row, column=4, value=ku.key.alias or "-")
-                    ws_usage.cell(row=usage_row, column=5, value=ku.usage_count)
-                    ws_usage.cell(row=usage_row, column=6, value=usage.service)
-                    ws_usage.cell(row=usage_row, column=7, value=usage.resource_type)
-                    ws_usage.cell(row=usage_row, column=8, value=usage.resource_name)
+                    usage_sheet.add_row([
+                        r.account_name,
+                        r.region,
+                        ku.key.key_id[:20] + "...",
+                        ku.key.alias or "-",
+                        ku.usage_count,
+                        usage.service,
+                        usage.resource_type,
+                        usage.resource_name,
+                    ])
             else:
                 # 미사용 키
-                usage_row += 1
-                ws_usage.cell(row=usage_row, column=1, value=r.account_name)
-                ws_usage.cell(row=usage_row, column=2, value=r.region)
-                ws_usage.cell(row=usage_row, column=3, value=ku.key.key_id[:20] + "...")
-                ws_usage.cell(row=usage_row, column=4, value=ku.key.alias or "-")
-                cell = ws_usage.cell(row=usage_row, column=5, value=0)
-                cell.fill = red_fill
-                ws_usage.cell(row=usage_row, column=6, value="-")
-                ws_usage.cell(row=usage_row, column=7, value="-")
-                ws_usage.cell(row=usage_row, column=8, value="(미사용)")
+                row_num = usage_sheet.add_row([
+                    r.account_name,
+                    r.region,
+                    ku.key.key_id[:20] + "...",
+                    ku.key.alias or "-",
+                    0,
+                    "-",
+                    "-",
+                    "(미사용)",
+                ])
+                # 사용 횟수 0인 셀 강조
+                ws = usage_sheet._ws
+                ws.cell(row=row_num, column=5).fill = red_fill
 
-    # 열 너비 조정
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            col_idx = col[0].column
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 40)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"KMS_Usage_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "KMS_Usage"))
 
 
 def run(ctx) -> None:

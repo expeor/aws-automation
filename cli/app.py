@@ -51,6 +51,8 @@ if str(_project_root) not in sys.path:
 import click  # noqa: E402
 from click import Context, HelpFormatter  # noqa: E402
 
+from cli.i18n import t  # noqa: E402
+
 # Keep lightweight, centralized logging config
 # WARNING 레벨로 설정하여 INFO 로그가 도구 출력에 섞이지 않도록 함
 logging.basicConfig(
@@ -105,61 +107,107 @@ class GroupedCommandsGroup(click.Group):
 
         # 유틸리티 명령어
         if utility_cmds:
-            with formatter.section("유틸리티"):
+            with formatter.section(t("cli.section_utilities")):
                 formatter.write_dl(utility_cmds)
 
         # 서비스 명령어
         if service_cmds:
-            with formatter.section("AWS 서비스"):
+            with formatter.section(t("cli.section_aws_services")):
                 formatter.write_dl(service_cmds)
 
 
-def _build_help_text() -> str:
+def _build_help_text(lang: str = "ko") -> str:
     """help 텍스트 생성"""
-    lines = [
-        "AA - AWS Automation CLI",
-        "",
-        "AWS 리소스 분석, 비용 최적화, 보안 점검 등",
-        "AWS 운영 업무를 자동화하는 CLI 도구입니다.",
-        "",
-        "\b",  # Click 줄바꿈 유지 마커
-        "[기본 사용법]",
-        "  aa              대화형 메뉴 (검색/탐색/즐겨찾기)",
-        "  aa <서비스>     특정 서비스 도구 실행",
-        "",
-        "\b",
-        "[Headless 모드 (CI/CD용)]",
-        "  aa run <도구경로> [옵션]    도구 실행",
-        "  aa list-tools               도구 목록 조회",
-        "",
-        "  예시:",
-        "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
-        "    aa run ec2/ebs_audit -g 'Dev Team' -r all -f json",
-        "",
-        "\b",
-        "[프로파일 그룹]",
-        "  aa group list / create / show / delete",
-        "",
-        "\b",
-        "[예시]",
-        "  aa ec2          EC2 도구 실행",
-        "  aa iam          IAM 보안 감사",
-        "  aa cost         비용 최적화 분석",
-    ]
+    if lang == "en":
+        lines = [
+            "AA - AWS Automation CLI",
+            "",
+            t("cli.help_intro"),
+            "",
+            "\b",  # Click keeps line breaks
+            t("cli.help_basic_usage"),
+            f"  aa              {t('cli.help_interactive_menu')}",
+            f"  aa <service>    {t('cli.help_service_run')}",
+            "",
+            "\b",
+            t("cli.help_headless_mode"),
+            f"  aa run <tool_path> [options]    {t('cli.help_run_tool')}",
+            f"  aa list-tools                   {t('cli.help_list_tools')}",
+            "",
+            f"  {t('cli.help_examples')}",
+            "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
+            "    aa run ec2/ebs_audit -g 'Dev Team' -r all -f json",
+            "",
+            "\b",
+            t("cli.help_profile_groups"),
+            "  aa group list / create / show / delete",
+            "",
+            "\b",
+            t("cli.help_cli_examples"),
+            f"  aa ec2          {t('cli.help_ec2_tools')}",
+            f"  aa iam          {t('cli.help_iam_audit')}",
+            f"  aa cost         {t('cli.help_cost_analysis')}",
+        ]
+    else:
+        lines = [
+            "AA - AWS Automation CLI",
+            "",
+            "AWS 리소스 분석, 비용 최적화, 보안 점검 등",
+            "AWS 운영 업무를 자동화하는 CLI 도구입니다.",
+            "",
+            "\b",  # Click 줄바꿈 유지 마커
+            "[기본 사용법]",
+            "  aa              대화형 메뉴 (검색/탐색/즐겨찾기)",
+            "  aa <서비스>     특정 서비스 도구 실행",
+            "",
+            "\b",
+            "[Headless 모드 (CI/CD용)]",
+            "  aa run <도구경로> [옵션]    도구 실행",
+            "  aa list-tools               도구 목록 조회",
+            "",
+            "  예시:",
+            "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
+            "    aa run ec2/ebs_audit -g 'Dev Team' -r all -f json",
+            "",
+            "\b",
+            "[프로파일 그룹]",
+            "  aa group list / create / show / delete",
+            "",
+            "\b",
+            "[예시]",
+            "  aa ec2          EC2 도구 실행",
+            "  aa iam          IAM 보안 감사",
+            "  aa cost         비용 최적화 분석",
+        ]
 
     return "\n".join(lines)
 
 
 @click.group(cls=GroupedCommandsGroup, invoke_without_command=True)
 @click.version_option(VERSION, prog_name="aa")
+@click.option(
+    "--lang",
+    type=click.Choice(["ko", "en"]),
+    default="ko",
+    help="UI 언어 설정 / UI language (ko: 한국어, en: English)",
+)
 @click.pass_context
-def cli(ctx):
+def cli(ctx, lang):
     """AA - AWS Automation CLI"""
+    # Set language for i18n
+    from cli.i18n import set_lang
+
+    set_lang(lang)
+
+    # Store lang in click context for subcommands
+    ctx.ensure_object(dict)
+    ctx.obj["lang"] = lang
+
     if ctx.invoked_subcommand is None:
         # 서브 명령어 없이 실행된 경우 새로운 메인 메뉴 표시
         from cli.ui.main_menu import show_main_menu
 
-        show_main_menu()
+        show_main_menu(lang=lang)
 
 
 # help 텍스트 동적 설정
@@ -196,9 +244,9 @@ cli.help = _build_help_text()
 @click.option(
     "-f",
     "--format",
-    type=click.Choice(["console", "json", "csv"]),
-    default="console",
-    help="출력 형식 (기본: console)",
+    type=click.Choice(["excel", "html", "both", "console", "json", "csv"]),
+    default="both",
+    help="출력 형식 (기본: both = Excel + HTML)",
 )
 @click.option(
     "-o",
@@ -242,11 +290,11 @@ def run_command(tool_path, profile, profile_group, region, format, output, quiet
 
     # 프로파일 또는 그룹 둘 중 하나는 필수
     if not profile and not profile_group:
-        click.echo("오류: -p/--profile 또는 -g/--profile-group 중 하나를 지정하세요.", err=True)
+        click.echo(t("cli.run_profile_required"), err=True)
         raise SystemExit(1)
 
     if profile and profile_group:
-        click.echo("오류: -p/--profile과 -g/--profile-group은 동시에 사용할 수 없습니다.", err=True)
+        click.echo(t("cli.run_profile_conflict"), err=True)
         raise SystemExit(1)
 
     # 프로파일 그룹 처리
@@ -257,8 +305,8 @@ def run_command(tool_path, profile, profile_group, region, format, output, quiet
         manager = ProfileGroupsManager()
         group = manager.get_by_name(profile_group)
         if not group:
-            click.echo(f"오류: 그룹을 찾을 수 없습니다: {profile_group}", err=True)
-            click.echo("사용 가능한 그룹: aa group list", err=True)
+            click.echo(t("cli.run_group_not_found", name=profile_group), err=True)
+            click.echo(t("cli.run_group_list_hint"), err=True)
             raise SystemExit(1)
         profiles_to_run = group.profiles
     else:
@@ -314,7 +362,7 @@ def list_tools_command(category, as_json):
     if category:
         categories = [c for c in categories if c["name"] == category]
         if not categories:
-            click.echo(f"카테고리를 찾을 수 없습니다: {category}", err=True)
+            click.echo(t("cli.category_not_found", name=category), err=True)
             raise SystemExit(1)
 
     if as_json:
@@ -337,10 +385,10 @@ def list_tools_command(category, as_json):
 
         console = Console()
 
-        table = Table(title="사용 가능한 도구", show_header=True)
-        table.add_column("경로", style="cyan")
-        table.add_column("이름", style="white")
-        table.add_column("권한", style="yellow")
+        table = Table(title=t("cli.available_tools"), show_header=True)
+        table.add_column(t("cli.col_path"), style="cyan")
+        table.add_column(t("cli.col_name"), style="white")
+        table.add_column(t("cli.col_permission"), style="yellow")
 
         for cat in categories:
             for tool in cat.get("tools", []):
@@ -353,7 +401,7 @@ def list_tools_command(category, as_json):
 
         console.print(table)
         console.print()
-        console.print("[dim]사용법: aa run <경로> -p <프로파일> -r <리전>[/dim]")
+        console.print(f"[dim]{t('cli.usage_hint')}[/dim]")
 
 
 # =============================================================================
@@ -402,8 +450,8 @@ def group_list(as_json):
         if as_json:
             click.echo("[]")
         else:
-            console.print("[dim]저장된 프로파일 그룹이 없습니다.[/dim]")
-            console.print("[dim]aa group create 로 새 그룹을 만드세요.[/dim]")
+            console.print(f"[dim]{t('cli.no_groups_saved')}[/dim]")
+            console.print(f"[dim]{t('cli.group_create_hint')}[/dim]")
         return
 
     if as_json:
@@ -421,17 +469,17 @@ def group_list(as_json):
     else:
         kind_labels = {"sso_profile": "SSO", "static": "Key"}
 
-        table = Table(title="프로파일 그룹", show_header=True)
+        table = Table(title=t("cli.profile_groups_title"), show_header=True)
         table.add_column("#", style="dim", width=3)
-        table.add_column("이름", style="cyan")
-        table.add_column("타입", style="yellow", width=5)
-        table.add_column("프로파일", style="white")
+        table.add_column(t("cli.col_name"), style="cyan")
+        table.add_column(t("cli.col_type"), style="yellow", width=5)
+        table.add_column(t("cli.col_profiles"), style="white")
 
         for i, g in enumerate(groups, 1):
             kind_label = kind_labels.get(g.kind, g.kind)
             profiles_str = ", ".join(g.profiles[:3])
             if len(g.profiles) > 3:
-                profiles_str += f" 외 {len(g.profiles) - 3}개"
+                profiles_str += f" {t('cli.and_n_more', count=len(g.profiles) - 3)}"
             table.add_row(str(i), g.name, kind_label, profiles_str)
 
         console.print(table)
@@ -451,23 +499,23 @@ def group_show(name):
     group = manager.get_by_name(name)
 
     if not group:
-        console.print(f"[red]그룹을 찾을 수 없습니다: {name}[/red]")
+        console.print(f"[red]{t('cli.group_not_found', name=name)}[/red]")
         raise SystemExit(1)
 
-    kind_labels = {"sso_profile": "SSO 프로파일", "static": "IAM Access Key"}
+    kind_labels = {"sso_profile": t("cli.sso_profile"), "static": t("cli.iam_access_key")}
     kind_label = kind_labels.get(group.kind, group.kind)
 
     lines = [
-        f"[cyan]이름:[/cyan] {group.name}",
-        f"[cyan]타입:[/cyan] {kind_label}",
-        f"[cyan]생성:[/cyan] {group.added_at[:10]}",
+        f"[cyan]{t('cli.label_name')}[/cyan] {group.name}",
+        f"[cyan]{t('cli.label_type')}[/cyan] {kind_label}",
+        f"[cyan]{t('cli.label_created')}[/cyan] {group.added_at[:10]}",
         "",
-        "[cyan]프로파일:[/cyan]",
+        f"[cyan]{t('cli.label_profiles')}[/cyan]",
     ]
     for p in group.profiles:
-        lines.append(f"  • {p}")
+        lines.append(f"  - {p}")
 
-    console.print(Panel("\n".join(lines), title=f"그룹: {group.name}"))
+    console.print(Panel("\n".join(lines), title=t("cli.group_title", name=group.name)))
 
 
 @group_cmd.command("create")
@@ -480,49 +528,49 @@ def group_create():
     console = Console()
 
     # 1. 인증 타입 선택
-    console.print("\n[bold]프로파일 그룹 생성[/bold]\n")
-    console.print("그룹에 포함할 인증 타입을 선택하세요:")
-    console.print("  [cyan]1)[/cyan] SSO 프로파일")
-    console.print("  [cyan]2)[/cyan] IAM Access Key")
+    console.print(f"\n[bold]{t('cli.create_group_title')}[/bold]\n")
+    console.print(t("cli.select_auth_type"))
+    console.print(f"  [cyan]1)[/cyan] {t('cli.sso_profile')}")
+    console.print(f"  [cyan]2)[/cyan] {t('cli.iam_access_key')}")
     console.print()
 
-    choice = click.prompt("선택", type=click.IntRange(1, 2))
+    choice = click.prompt(t("cli.select_prompt"), type=click.IntRange(1, 2))
     kind = "sso_profile" if choice == 1 else "static"
 
     # 2. 해당 타입의 프로파일 목록 가져오기
     available = _get_profiles_by_kind(kind)
-    type_label = "SSO 프로파일" if kind == "sso_profile" else "IAM Access Key"
+    type_label = t("cli.sso_profile") if kind == "sso_profile" else t("cli.iam_access_key")
 
     if not available:
-        console.print(f"\n[red]사용 가능한 {type_label}이 없습니다.[/red]")
+        console.print(f"\n[red]{t('cli.no_profiles_available', type=type_label)}[/red]")
         raise SystemExit(1)
 
     # 3. 프로파일 선택 (멀티, 2개 이상)
-    console.print(f"\n[bold]{type_label} 선택[/bold] (2개 이상 선택)\n")
+    console.print(f"\n[bold]{t('cli.select_profiles_title', type=type_label)}[/bold] {t('cli.select_2_or_more')}\n")
     for i, p in enumerate(available, 1):
         console.print(f"  [cyan]{i:2})[/cyan] {p}")
     console.print()
-    console.print("[dim]예: 1 2 3 또는 1,2,3 또는 1-3[/dim]")
+    console.print(f"[dim]{t('cli.selection_hint')}[/dim]")
 
-    selection = click.prompt("선택")
+    selection = click.prompt(t("cli.select_prompt"))
     selected = _parse_selection(selection, len(available))
 
     if len(selected) < 2:
-        console.print("[red]그룹은 2개 이상 프로파일이 필요합니다. (1개면 단일 선택 사용)[/red]")
+        console.print(f"[red]{t('cli.min_2_profiles')}[/red]")
         raise SystemExit(1)
 
     selected_profiles = [available[i] for i in selected]
 
     # 4. 그룹 이름 입력
-    console.print(f"\n선택된 프로파일: {', '.join(selected_profiles)}\n")
-    name = click.prompt("그룹 이름")
+    console.print(f"\n{t('cli.selected_profiles')} {', '.join(selected_profiles)}\n")
+    name = click.prompt(t("cli.group_name_prompt"))
 
     # 5. 저장
     manager = ProfileGroupsManager()
     if manager.add(name, kind, selected_profiles):
-        console.print(f"\n[green]✓ 그룹 '{name}' 저장됨 ({len(selected_profiles)}개 프로파일)[/green]")
+        console.print(f"\n[green]* {t('cli.group_saved', name=name, count=len(selected_profiles))}[/green]")
     else:
-        console.print("\n[red]그룹 저장 실패 (이미 존재하거나 최대 개수 초과)[/red]")
+        console.print(f"\n[red]{t('cli.group_save_failed')}[/red]")
         raise SystemExit(1)
 
 
@@ -604,19 +652,19 @@ def group_delete(name, yes):
     group = manager.get_by_name(name)
 
     if not group:
-        console.print(f"[red]그룹을 찾을 수 없습니다: {name}[/red]")
+        console.print(f"[red]{t('cli.group_not_found', name=name)}[/red]")
         raise SystemExit(1)
 
     if not yes:
-        console.print(f"그룹 '{name}' ({len(group.profiles)}개 프로파일)을 삭제하시겠습니까?")
-        if not click.confirm("삭제"):
-            console.print("[dim]취소됨[/dim]")
+        console.print(t("cli.confirm_delete_group", name=name, count=len(group.profiles)))
+        if not click.confirm(t("cli.delete_prompt")):
+            console.print(f"[dim]{t('cli.cancelled')}[/dim]")
             return
 
     if manager.remove(name):
-        console.print(f"[green]✓ 그룹 '{name}' 삭제됨[/green]")
+        console.print(f"[green]* {t('cli.group_deleted', name=name)}[/green]")
     else:
-        console.print("[red]삭제 실패[/red]")
+        console.print(f"[red]{t('cli.delete_failed')}[/red]")
         raise SystemExit(1)
 
 
@@ -650,7 +698,7 @@ def _register_category_commands():
         sub_services = cat.get("sub_services", [])
 
         # 도구 목록으로 help 텍스트 생성 (\b로 줄바꿈 유지)
-        tool_lines = [desc, "", "\b", "도구 목록:"]
+        tool_lines = [desc, "", "\b", t("cli.tool_list")]
         for tool in tools:
             perm = tool.get("permission", "read")
             perm_marker = " [!]" if perm in ("write", "delete") else ""
@@ -692,8 +740,8 @@ def _register_category_commands():
                 continue  # 이미 등록된 명령어는 스킵
 
             # 해당 sub_service에 속하는 도구만 필터링하여 help 텍스트 생성
-            sub_tools = [t for t in tools if t.get("sub_service") == sub_svc]
-            sub_tool_lines = [f"{desc} ({sub_svc.upper()} only)", "", "\b", "도구 목록:"]
+            sub_tools = [tl for tl in tools if tl.get("sub_service") == sub_svc]
+            sub_tool_lines = [f"{desc} ({sub_svc.upper()} only)", "", "\b", t("cli.tool_list")]
             for tool in sub_tools:
                 perm = tool.get("permission", "read")
                 perm_marker = " [!]" if perm in ("write", "delete") else ""
@@ -718,147 +766,6 @@ def _register_category_commands():
 
 # 카테고리 명령어 자동 등록
 _register_category_commands()
-
-
-# =============================================================================
-# IP 검색 단축 명령어
-# =============================================================================
-
-
-@cli.command("ip")
-@click.argument("query", nargs=-1)
-@click.option("-p", "--profile", default=None, help="SSO 프로파일")
-@click.option("-c", "--csv", "save_csv", is_flag=True, help="결과를 CSV로 저장")
-@click.option("-d", "--detail", "detail_mode", is_flag=True, help="상세 모드 (API로 리소스 정보 조회)")
-@click.option("--no-public", "no_public", is_flag=True, help="Public 검색 비활성화")
-def ip_command(query, profile, save_csv, detail_mode, no_public):
-    """IP 검색 (Public + Private 통합)
-
-    \b
-    인자 없이 실행하면 대화형 모드로 진입합니다.
-    인자를 주면 바로 검색 후 종료합니다.
-
-    \b
-    검색 쿼리 형식:
-      IP        10.0.1.50, 13.124.199.1
-      CIDR      10.0.0.0/24
-      ENI ID    eni-04d867ef
-      VPC ID    vpc-0a6d4f22
-      텍스트    my-lambda, RDS
-
-    \b
-    Examples:
-      aa ip                          # 대화형 모드
-      aa ip 10.0.1.50                # 단일 IP 검색
-      aa ip 10.0.0.0/8               # CIDR 범위 검색
-      aa ip 10.0.1.50 -d             # 상세 모드 (API 조회)
-      aa ip 10.0.1.50 --no-public    # Private 검색만
-      aa ip vpc-0a6d4f22 -c          # VPC 검색 + CSV 저장
-      aa ip 10.0.1.50 -p my-profile  # 특정 프로파일 사용
-    """
-    from cli.flow import create_flow_runner
-
-    # 쿼리가 없으면 기존 대화형 모드
-    if not query:
-        runner = create_flow_runner()
-        runner.run_tool_directly("vpc", "ip_search")
-        return
-
-    # 쿼리가 있으면 바로 검색 모드
-    _run_ip_search_direct(list(query), profile, save_csv, detail_mode, not no_public)
-
-
-def _run_ip_search_direct(
-    queries: list,
-    profile: str,
-    save_csv: bool,
-    detail_mode: bool = False,
-    public_mode: bool = True,
-):
-    """IP 검색 직접 실행 (CLI 인자 모드)"""
-    from rich.console import Console
-
-    console = Console()
-
-    # 프로파일 결정
-    if not profile:
-        # 기본 프로파일 사용
-        from core.auth import list_profiles
-
-        profiles = list_profiles()
-        if profiles:
-            profile = profiles[0]
-        else:
-            console.print("[red]사용 가능한 프로파일이 없습니다. -p 옵션으로 지정하세요.[/red]")
-            raise SystemExit(1)
-
-    # 컨텍스트 구성
-    from cli.flow.context import ExecutionContext
-    from core.auth import get_session
-
-    ctx = ExecutionContext()
-    ctx.profile_name = profile
-
-    try:
-        # 세션 생성
-        session = get_session(profile)
-        ctx.session = session  # type: ignore[attr-defined]
-
-        # 캐시 확인
-        from plugins.vpc.ip_search.private import ENICache
-
-        eni_cache = ENICache(session_name=profile)
-        cache: ENICache | None = eni_cache if eni_cache.is_valid() else None
-        if cache is None:
-            console.print("[yellow]ENI 캐시가 없습니다. Private 검색이 제한됩니다.[/yellow]")
-            console.print("[dim]전체 검색을 원하면 'aa ip'로 대화형 모드 진입 후 'cache' 명령 사용[/dim]\n")
-
-        # 검색 실행
-        from plugins.vpc.ip_search.private import (
-            QueryType,
-            parse_query,
-            search_by_query,
-        )
-        from plugins.vpc.ip_search.public import search_public_ip
-
-        results: dict[str, list] = {"public": [], "private": []}
-
-        # Public 검색 (public_mode가 True일 때만)
-        if public_mode:
-            ip_queries = []
-            for query in queries:
-                query_type, value = parse_query(query)
-                if query_type == QueryType.IP and value:
-                    ip_queries.append(value)
-
-            if ip_queries:
-                with console.status("[bold yellow]Public IP 범위 검색 중..."):
-                    results["public"] = search_public_ip(ip_queries)
-
-        # Private 검색
-        if cache:
-            with console.status("[bold green]Private ENI 검색 중..."):
-                results["private"] = search_by_query(queries, cache)
-
-        # 상세 모드: API로 리소스 정보 enrichment
-        if detail_mode and results.get("private") and cache:
-            from plugins.vpc.ip_search.main import _enrich_with_detail
-
-            with console.status("[bold magenta]리소스 상세 정보 조회 중..."):
-                results["private"] = _enrich_with_detail(ctx, results["private"], cache, profile)
-
-        # 결과 출력
-        from plugins.vpc.ip_search.main import _display_results
-
-        _display_results(results, save_csv=save_csv)
-
-    except Exception as e:
-        console.print(f"[red]오류: {e}[/red]")
-        if "--debug" in sys.argv:
-            import traceback
-
-            traceback.print_exc()
-        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.aws.amazon.com)",
+      "WebFetch(domain:boto3.amazonaws.com)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(aa:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add brave-search MCP and update all agents with MCP guidance\n\nmcp.json:\n- Add brave-search for web search \\(Stack Overflow, blogs, troubleshooting\\)\n\nAgents updated with MCP guidance:\n- security-reviewer: semgrep, aws-knowledge, brave-search\n- test-writer: context7, brave-search\n- planner: sequential-thinking, github, aws-documentation\n- performance: aws-documentation, context7, brave-search\n- doc-generator: context7, aws-documentation\n- migration: context7, brave-search\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(python -c:*)",
+      "Bash(xargs:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(start outputtest_html_report.html)",
+      "Bash(start \"\" \"C:\\\\final\\\\aws-automation-toolkit\\\\output\\\\test_html_report.html\")",
+      "Bash(actionlint:*)",
+      "Bash(go install:*)",
+      "Bash(scoop install:*)",
+      "Bash(choco install:*)",
+      "Bash(winget install:*)",
+      "Bash(export PATH:*)",
+      "Bash(~/go/bin/actionlint:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(chcp 6500)",
+      "Bash(wc:*)",
+      "WebFetch(domain:duckdb.org)",
+      "Bash(ls:*)",
+      "Bash(sort:*)",
+      "Bash(while read svc)",
+      "Bash(do echo \"=== $svc ===\")",
+      "Bash(done)",
+      "Bash(findstr:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)"
+    ]
+  }
+}

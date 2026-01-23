@@ -7,7 +7,6 @@ plugins/sqs/unused.py - SQS 미사용 큐 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -238,94 +237,80 @@ def analyze_queues(queues: list[SQSQueueInfo], account_id: str, account_name: st
 
 def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
 
-    wb = Workbook()
-    if wb.active:
-        wb.remove(wb.active)
+    from core.tools.io.excel import ColumnDef, Workbook
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
 
-    # Summary 시트
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "SQS 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
+    wb = Workbook()
 
-    headers = ["Account", "Region", "전체", "미사용", "빈DLQ", "정상"]
-    row = 3
-    for col, h in enumerate(headers, 1):
-        ws.cell(row=row, column=col, value=h).fill = header_fill
-        ws.cell(row=row, column=col).font = header_font
+    # Summary Sheet
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("SQS 미사용 분석 보고서")
+
+    summary_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="전체", width=10, style="number"),
+        ColumnDef(header="미사용", width=10, style="number"),
+        ColumnDef(header="빈DLQ", width=10, style="number"),
+        ColumnDef(header="정상", width=10, style="number"),
+    ]
+    summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row += 1
-        ws.cell(row=row, column=1, value=r.account_name)
-        ws.cell(row=row, column=2, value=r.region)
-        ws.cell(row=row, column=3, value=r.total_queues)
-        ws.cell(row=row, column=4, value=r.unused_queues)
-        ws.cell(row=row, column=5, value=r.empty_dlqs)
-        ws.cell(row=row, column=6, value=r.normal_queues)
+        row_num = summary_sheet.add_row([
+            r.account_name,
+            r.region,
+            r.total_queues,
+            r.unused_queues,
+            r.empty_dlqs,
+            r.normal_queues,
+        ])
+        ws = summary_sheet._ws
         if r.unused_queues > 0:
-            ws.cell(row=row, column=4).fill = red_fill
+            ws.cell(row=row_num, column=4).fill = red_fill
         if r.empty_dlqs > 0:
-            ws.cell(row=row, column=5).fill = yellow_fill
+            ws.cell(row=row_num, column=5).fill = yellow_fill
 
-    # Detail 시트
-    ws_detail = wb.create_sheet("Queues")
-    detail_headers = [
-        "Account",
-        "Region",
-        "Queue Name",
-        "Type",
-        "Messages",
-        "상태",
-        "Sent",
-        "Received",
-        "Deleted",
-        "권장 조치",
+    # Detail Sheet
+    detail_columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="Queue Name", width=50),
+        ColumnDef(header="Type", width=15),
+        ColumnDef(header="Messages", width=12, style="number"),
+        ColumnDef(header="상태", width=15),
+        ColumnDef(header="Sent", width=12, style="number"),
+        ColumnDef(header="Received", width=12, style="number"),
+        ColumnDef(header="Deleted", width=12, style="number"),
+        ColumnDef(header="권장 조치", width=30),
     ]
-    for col, h in enumerate(detail_headers, 1):
-        ws_detail.cell(row=1, column=col, value=h).fill = header_fill
-        ws_detail.cell(row=1, column=col).font = header_font
+    detail_sheet = wb.new_sheet("Queues", detail_columns)
 
-    detail_row = 1
     for r in results:
         for f in r.findings:
             if f.status != QueueStatus.NORMAL:
-                detail_row += 1
                 q = f.queue
                 queue_type = "FIFO" if q.is_fifo else "Standard"
                 if q.is_dlq:
                     queue_type += " (DLQ)"
-                ws_detail.cell(row=detail_row, column=1, value=q.account_name)
-                ws_detail.cell(row=detail_row, column=2, value=q.region)
-                ws_detail.cell(row=detail_row, column=3, value=q.queue_name)
-                ws_detail.cell(row=detail_row, column=4, value=queue_type)
-                ws_detail.cell(row=detail_row, column=5, value=q.approximate_messages)
-                ws_detail.cell(row=detail_row, column=6, value=f.status.value)
-                ws_detail.cell(row=detail_row, column=7, value=int(q.messages_sent))
-                ws_detail.cell(row=detail_row, column=8, value=int(q.messages_received))
-                ws_detail.cell(row=detail_row, column=9, value=int(q.messages_deleted))
-                ws_detail.cell(row=detail_row, column=10, value=f.recommendation)
+                detail_sheet.add_row([
+                    q.account_name,
+                    q.region,
+                    q.queue_name,
+                    queue_type,
+                    q.approximate_messages,
+                    f.status.value,
+                    int(q.messages_sent),
+                    int(q.messages_received),
+                    int(q.messages_deleted),
+                    f.recommendation,
+                ])
 
-    for sheet in wb.worksheets:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)  # type: ignore
-            col_idx = col[0].column  # type: ignore
-            if col_idx:
-                sheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-        sheet.freeze_panes = "A2"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"SQS_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-    return filepath
+    return str(wb.save_as(output_dir, "SQS_Unused"))
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SQSAnalysisResult | None:

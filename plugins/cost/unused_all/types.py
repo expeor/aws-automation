@@ -19,6 +19,7 @@ from plugins.ec2.ami_audit import AMIAnalysisResult
 from plugins.ec2.ebs_audit import EBSAnalysisResult
 from plugins.ec2.eip_audit import EIPAnalysisResult
 from plugins.ec2.snapshot_audit import SnapshotAnalysisResult
+from plugins.ec2.unused import EC2AnalysisResult
 from plugins.ecr.unused import ECRAnalysisResult
 from plugins.efs.unused import EFSAnalysisResult
 from plugins.elasticache.unused import ElastiCacheAnalysisResult
@@ -31,6 +32,7 @@ from plugins.rds.snapshot_audit import RDSSnapshotAnalysisResult
 from plugins.rds.unused import RDSAnalysisResult as RDSInstanceAnalysisResult
 from plugins.route53.empty_zone import Route53AnalysisResult
 from plugins.s3.empty_bucket import S3AnalysisResult
+from plugins.sagemaker.unused import SageMakerAnalysisResult
 from plugins.secretsmanager.unused import SecretAnalysisResult
 from plugins.sns.unused import SNSAnalysisResult
 from plugins.sqs.unused import SQSAnalysisResult
@@ -101,6 +103,16 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "final": "eni_results",
         "data_key": "result",
     },
+    "ec2_instance": {
+        "display": "EC2 Instance",
+        "total": "ec2_instance_total",
+        "unused": "ec2_instance_unused",
+        "waste": "ec2_instance_monthly_waste",
+        "data_unused": "unused",
+        "session": "ec2_instance_result",
+        "final": "ec2_instance_results",
+        "data_key": "result",
+    },
     # =========================================================================
     # Networking (VPC)
     # =========================================================================
@@ -140,7 +152,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "target_group": {
         "display": "Target Group",
         "total": "tg_total",
-        "unused": "tg_issue",
+        "unused": "tg_unused",
         "waste": None,
         "data_unused": "issue",
         "session": "tg_result",
@@ -183,7 +195,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "rds_snapshot": {
         "display": "RDS Snapshot",
         "total": "rds_snap_total",
-        "unused": "rds_snap_old",
+        "unused": "rds_snap_unused",
         "waste": "rds_snap_monthly_waste",
         "data_unused": "old",
         "session": "rds_snap_result",
@@ -196,7 +208,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "ecr": {
         "display": "ECR",
         "total": "ecr_total",
-        "unused": "ecr_issue",
+        "unused": "ecr_unused",
         "waste": "ecr_monthly_waste",
         "data_unused": "issue",
         "session": "ecr_result",
@@ -216,7 +228,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "s3": {
         "display": "S3",
         "total": "s3_total",
-        "unused": "s3_empty",
+        "unused": "s3_unused",
         "waste": None,
         "data_unused": "empty",
         "session": "s3_result",
@@ -255,6 +267,19 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "data_unused": "unused",
         "session": "lambda_result",
         "final": "lambda_results",
+        "data_key": "result",
+    },
+    # =========================================================================
+    # ML
+    # =========================================================================
+    "sagemaker_endpoint": {
+        "display": "SageMaker Endpoint",
+        "total": "sagemaker_endpoint_total",
+        "unused": "sagemaker_endpoint_unused",
+        "waste": "sagemaker_endpoint_monthly_waste",
+        "data_unused": "unused",
+        "session": "sagemaker_endpoint_result",
+        "final": "sagemaker_endpoint_results",
         "data_key": "result",
     },
     # =========================================================================
@@ -319,7 +344,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "cw_alarm": {
         "display": "CloudWatch Alarm",
         "total": "cw_alarm_total",
-        "unused": "cw_alarm_orphan",
+        "unused": "cw_alarm_unused",
         "waste": None,
         "data_unused": "orphan",
         "session": "cw_alarm_result",
@@ -329,7 +354,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "loggroup": {
         "display": "Log Group",
         "total": "loggroup_total",
-        "unused": "loggroup_issue",
+        "unused": "loggroup_unused",
         "waste": "loggroup_monthly_waste",
         "data_unused": "issue",
         "session": "loggroup_result",
@@ -342,7 +367,7 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
     "route53": {
         "display": "Route53",
         "total": "route53_total",
-        "unused": "route53_empty",
+        "unused": "route53_unused",
         "waste": "route53_monthly_waste",
         "data_unused": "empty",
         "session": "route53_result",
@@ -389,6 +414,10 @@ class UnusedResourceSummary:
     eni_total: int = 0
     eni_unused: int = 0
 
+    ec2_instance_total: int = 0
+    ec2_instance_unused: int = 0
+    ec2_instance_monthly_waste: float = 0.0
+
     # Networking (VPC)
     nat_total: int = 0
     nat_unused: int = 0
@@ -404,7 +433,7 @@ class UnusedResourceSummary:
     elb_monthly_waste: float = 0.0
 
     tg_total: int = 0
-    tg_issue: int = 0
+    tg_unused: int = 0
 
     # Database
     dynamodb_total: int = 0
@@ -420,12 +449,12 @@ class UnusedResourceSummary:
     rds_instance_monthly_waste: float = 0.0
 
     rds_snap_total: int = 0
-    rds_snap_old: int = 0
+    rds_snap_unused: int = 0
     rds_snap_monthly_waste: float = 0.0
 
     # Storage
     ecr_total: int = 0
-    ecr_issue: int = 0
+    ecr_unused: int = 0
     ecr_monthly_waste: float = 0.0
 
     efs_total: int = 0
@@ -433,7 +462,7 @@ class UnusedResourceSummary:
     efs_monthly_waste: float = 0.0
 
     s3_total: int = 0
-    s3_empty: int = 0
+    s3_unused: int = 0
 
     # Serverless
     apigateway_total: int = 0
@@ -445,6 +474,11 @@ class UnusedResourceSummary:
     lambda_total: int = 0
     lambda_unused: int = 0
     lambda_monthly_waste: float = 0.0
+
+    # ML
+    sagemaker_endpoint_total: int = 0
+    sagemaker_endpoint_unused: int = 0
+    sagemaker_endpoint_monthly_waste: float = 0.0
 
     # Messaging
     sns_total: int = 0
@@ -467,15 +501,15 @@ class UnusedResourceSummary:
 
     # Monitoring
     cw_alarm_total: int = 0
-    cw_alarm_orphan: int = 0
+    cw_alarm_unused: int = 0
 
     loggroup_total: int = 0
-    loggroup_issue: int = 0
+    loggroup_unused: int = 0
     loggroup_monthly_waste: float = 0.0
 
     # DNS (Global)
     route53_total: int = 0
-    route53_empty: int = 0
+    route53_unused: int = 0
     route53_monthly_waste: float = 0.0
 
 
@@ -491,6 +525,7 @@ class SessionCollectionResult:
     snap_result: SnapshotAnalysisResult | None = None
     eip_result: EIPAnalysisResult | None = None
     eni_result: ENIAnalysisResult | None = None
+    ec2_instance_result: EC2AnalysisResult | None = None
 
     # Networking (VPC)
     nat_findings: list[Any] = field(default_factory=list)
@@ -515,6 +550,9 @@ class SessionCollectionResult:
     apigateway_result: APIGatewayAnalysisResult | None = None
     eventbridge_result: EventBridgeAnalysisResult | None = None
     lambda_result: LambdaAnalysisResult | None = None
+
+    # ML
+    sagemaker_endpoint_result: SageMakerAnalysisResult | None = None
 
     # Messaging
     sns_result: SNSAnalysisResult | None = None
@@ -548,6 +586,7 @@ class UnusedAllResult:
     snap_results: list[SnapshotAnalysisResult] = field(default_factory=list)
     eip_results: list[EIPAnalysisResult] = field(default_factory=list)
     eni_results: list[ENIAnalysisResult] = field(default_factory=list)
+    ec2_instance_results: list[EC2AnalysisResult] = field(default_factory=list)
 
     # Networking (VPC)
     nat_findings: list[Any] = field(default_factory=list)
@@ -572,6 +611,9 @@ class UnusedAllResult:
     apigateway_results: list[APIGatewayAnalysisResult] = field(default_factory=list)
     eventbridge_results: list[EventBridgeAnalysisResult] = field(default_factory=list)
     lambda_results: list[LambdaAnalysisResult] = field(default_factory=list)
+
+    # ML
+    sagemaker_endpoint_results: list[SageMakerAnalysisResult] = field(default_factory=list)
 
     # Messaging
     sns_results: list[SNSAnalysisResult] = field(default_factory=list)

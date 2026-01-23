@@ -57,6 +57,12 @@ from plugins.ec2.snapshot_audit import (
     collect_snapshots,
     get_ami_snapshot_mapping,
 )
+from plugins.ec2.unused import (
+    analyze_instances as analyze_ec2_instances,
+)
+from plugins.ec2.unused import (
+    collect_ec2_instances,
+)
 from plugins.ecr.unused import analyze_ecr_repos, collect_ecr_repos
 from plugins.efs.unused import (
     analyze_filesystems as analyze_efs_filesystems,
@@ -105,6 +111,12 @@ from plugins.route53.empty_zone import (
     collect_hosted_zones,
 )
 from plugins.s3.empty_bucket import analyze_buckets, collect_buckets
+from plugins.sagemaker.unused import (
+    analyze_endpoints as analyze_sagemaker_endpoints,
+)
+from plugins.sagemaker.unused import (
+    collect_sagemaker_endpoints,
+)
 from plugins.secretsmanager.unused import (
     analyze_secrets,
     collect_secrets,
@@ -601,6 +613,42 @@ def collect_codecommit(session, account_id: str, account_name: str, region: str)
         return {"error": f"CodeCommit: {e}"}
 
 
+def collect_ec2_instance(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """EC2 Instance 수집 및 분석"""
+    try:
+        instances = collect_ec2_instances(session, account_id, account_name, region)
+        if not instances:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_ec2_instances(instances, account_id, account_name, region)
+        return {
+            "total": result.total_instances,
+            "unused": result.unused_instances + result.low_usage_instances + result.stopped_instances,
+            "waste": result.unused_monthly_cost + result.low_usage_monthly_cost + result.stopped_monthly_cost,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"EC2 Instance: {e}"}
+
+
+def collect_sagemaker_endpoint(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """SageMaker Endpoint 수집 및 분석"""
+    try:
+        endpoints = collect_sagemaker_endpoints(session, account_id, account_name, region)
+        if not endpoints:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_sagemaker_endpoints(endpoints, account_id, account_name, region)
+        return {
+            "total": result.total_endpoints,
+            "unused": result.unused_endpoints + result.low_usage_endpoints,
+            "waste": result.unused_monthly_cost + result.low_usage_monthly_cost,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"SageMaker Endpoint: {e}"}
+
+
 def collect_route53(session, account_id: str, account_name: str) -> dict[str, Any]:
     """Route53 수집 및 분석 (글로벌 서비스)"""
     try:
@@ -647,6 +695,7 @@ REGIONAL_COLLECTORS: dict[str, Callable] = {
     "snapshot": collect_snapshot,
     "eip": collect_eip_addresses,
     "eni": collect_eni,
+    "ec2_instance": collect_ec2_instance,
     # Networking (VPC)
     "nat": collect_nat,
     "endpoint": collect_endpoint,
@@ -677,6 +726,8 @@ REGIONAL_COLLECTORS: dict[str, Callable] = {
     "loggroup": collect_loggroup,
     # Developer Tools
     "codecommit": collect_codecommit,
+    # ML
+    "sagemaker_endpoint": collect_sagemaker_endpoint,
 }
 
 # 글로벌 수집기 (DNS)

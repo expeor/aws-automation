@@ -16,8 +16,7 @@ Note:
 
 from __future__ import annotations
 
-import os
-from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -101,15 +100,17 @@ class SSOExcelReporter:
         results: list[SSOAnalysisResult],
         stats_list: list[dict[str, Any]],
     ):
-        from openpyxl import Workbook as _Workbook
+        from openpyxl import Workbook as OpenpyxlWorkbook
 
         self._init_styles()
         self.results = results
         self.stats_list = stats_list
-        self.wb = _Workbook()
+        self.wb = OpenpyxlWorkbook()
 
     def generate(self, output_dir: str) -> str:
         """Excel 보고서 생성"""
+        from datetime import datetime
+
         # 기본 시트 제거
         self.wb.remove(self.wb.active)
 
@@ -124,12 +125,12 @@ class SSOExcelReporter:
         # 파일 저장
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"SSO_Audit_Report_{timestamp}.xlsx"
-        filepath = os.path.join(output_dir, filename)
+        filepath = Path(output_dir) / filename
+        filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        os.makedirs(output_dir, exist_ok=True)
-        self.wb.save(filepath)
+        self.wb.save(str(filepath))
 
-        return filepath
+        return str(filepath)
 
     def _apply_header_style(self, ws, row: int = 1) -> None:
         """헤더 스타일 적용"""
@@ -151,6 +152,10 @@ class SSOExcelReporter:
 
     def _create_summary_sheet(self) -> None:
         """Summary 시트 생성"""
+        from datetime import datetime
+
+        from openpyxl.styles import Font
+
         ws = self.wb.create_sheet("Summary")
 
         # 제목
@@ -236,6 +241,8 @@ class SSOExcelReporter:
 
     def _create_permission_sets_sheet(self) -> None:
         """Permission Sets 시트 생성"""
+        from openpyxl.styles import PatternFill
+
         ws = self.wb.create_sheet("Permission Sets")
 
         headers = [
@@ -292,6 +299,8 @@ class SSOExcelReporter:
 
     def _create_users_sheet(self) -> None:
         """Users 시트 생성"""
+        from openpyxl.styles import PatternFill
+
         ws = self.wb.create_sheet("Users")
 
         headers = [
@@ -344,6 +353,8 @@ class SSOExcelReporter:
 
     def _create_groups_sheet(self) -> None:
         """Groups 시트 생성"""
+        from openpyxl.styles import PatternFill
+
         ws = self.wb.create_sheet("Groups")
 
         headers = [

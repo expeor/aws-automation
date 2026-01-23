@@ -11,9 +11,7 @@ plugins/cost/unused_eni.py - ENI 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
-import os
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 
 from rich.console import Console
@@ -290,23 +288,13 @@ def _analyze_single_eni(eni: ENIInfo) -> ENIFinding:
 
 def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill
+
+    from core.tools.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
-    wb.remove(wb.active)
 
-    # 스타일
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
+    # 상태별 색상 정의 (cell-level 적용용)
     status_fills = {
         UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
         UsageStatus.PENDING: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
@@ -314,12 +302,7 @@ def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
         UsageStatus.AWS_MANAGED: PatternFill(start_color="95A5A6", end_color="95A5A6", fill_type="solid"),
     }
 
-    # Summary
-    ws = wb.create_sheet("Summary")
-    ws["A1"] = "ENI 미사용 분석 보고서"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
+    # Summary 시트
     totals = {
         "total": sum(r.total_count for r in results),
         "unused": sum(r.unused_count for r in results),
@@ -328,48 +311,32 @@ def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
         "pending": sum(r.pending_count for r in results),
     }
 
-    stats = [
-        ("항목", "값"),
-        ("전체 ENI", totals["total"]),
-        ("미사용", totals["unused"]),
-        ("정상 사용", totals["normal"]),
-        ("AWS 관리형", totals["aws_managed"]),
-        ("확인 필요", totals["pending"]),
+    summary = wb.new_summary_sheet("Summary")
+    summary.add_title("ENI 미사용 분석 보고서")
+    summary.add_section("분석 결과")
+    summary.add_item("전체 ENI", totals["total"])
+    summary.add_item("미사용", totals["unused"], highlight="danger" if totals["unused"] > 0 else None)
+    summary.add_item("정상 사용", totals["normal"])
+    summary.add_item("AWS 관리형", totals["aws_managed"])
+    summary.add_item("확인 필요", totals["pending"], highlight="warning" if totals["pending"] > 0 else None)
+
+    # Findings 시트
+    columns = [
+        ColumnDef(header="Account", width=20),
+        ColumnDef(header="Region", width=15),
+        ColumnDef(header="ENI ID", width=25),
+        ColumnDef(header="Name", width=20),
+        ColumnDef(header="Status", width=12, style="center"),
+        ColumnDef(header="Usage", width=12, style="center"),
+        ColumnDef(header="Severity", width=10, style="center"),
+        ColumnDef(header="Description", width=30),
+        ColumnDef(header="Recommendation", width=20),
+        ColumnDef(header="VPC ID", width=22),
+        ColumnDef(header="Subnet ID", width=25),
+        ColumnDef(header="Private IP", width=15),
+        ColumnDef(header="Type", width=15),
     ]
-
-    for i, (item, value) in enumerate(stats):
-        row = 4 + i
-        ws.cell(row=row, column=1, value=item)
-        ws.cell(row=row, column=2, value=value)
-        if i == 0:
-            ws.cell(row=row, column=1).fill = header_fill
-            ws.cell(row=row, column=1).font = header_font
-            ws.cell(row=row, column=2).fill = header_fill
-            ws.cell(row=row, column=2).font = header_font
-
-    # Findings
-    ws2 = wb.create_sheet("Findings")
-    headers = [
-        "Account",
-        "Region",
-        "ENI ID",
-        "Name",
-        "Status",
-        "Usage",
-        "Severity",
-        "Description",
-        "Recommendation",
-        "VPC ID",
-        "Subnet ID",
-        "Private IP",
-        "Type",
-    ]
-    ws2.append(headers)
-
-    for cell in ws2[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = thin_border
+    sheet = wb.new_sheet("Findings", columns)
 
     # 미사용/확인필요만 표시
     all_findings = []
@@ -389,7 +356,10 @@ def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
 
     for f in all_findings:
         eni = f.eni
-        ws2.append(
+        # 행 스타일 결정
+        style = Styles.danger() if f.usage_status == UsageStatus.UNUSED else Styles.warning()
+
+        row_num = sheet.add_row(
             [
                 eni.account_name,
                 eni.region,
@@ -404,28 +374,16 @@ def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
                 eni.subnet_id,
                 eni.private_ip,
                 eni.interface_type,
-            ]
+            ],
+            style=style,
         )
 
+        # Usage 컬럼에 상태별 색상 적용
         fill = status_fills.get(f.usage_status)
         if fill:
-            ws2.cell(row=ws2.max_row, column=6).fill = fill
+            sheet._ws.cell(row=row_num, column=6).fill = fill
 
-    # 열 너비
-    for sheet in [ws, ws2]:
-        for col in sheet.columns:
-            max_len = max(len(str(c.value) if c.value else "") for c in col)
-            sheet.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 2, 10), 40)
-
-    ws2.freeze_panes = "A2"
-
-    # 저장
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(output_dir, f"ENI_Unused_{timestamp}.xlsx")
-    os.makedirs(output_dir, exist_ok=True)
-    wb.save(filepath)
-
-    return filepath
+    return str(wb.save_as(output_dir, "ENI_Unused"))
 
 
 # =============================================================================

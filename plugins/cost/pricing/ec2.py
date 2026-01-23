@@ -1,11 +1,11 @@
 """
-core/pricing/ec2.py - EC2 가격 조회
+plugins/cost/pricing/ec2.py - EC2 가격 조회
 
 EC2 인스턴스 시간당/월간 비용을 조회합니다.
-캐시를 사용하여 API 호출을 최소화합니다.
+PricingService를 사용하여 캐시와 API를 통합 관리합니다.
 
 사용법:
-    from core.pricing import get_ec2_price, get_ec2_monthly_cost
+    from plugins.cost.pricing import get_ec2_price, get_ec2_monthly_cost
 
     # 시간당 가격
     hourly = get_ec2_price("t3.medium", "ap-northeast-2")
@@ -16,16 +16,10 @@ EC2 인스턴스 시간당/월간 비용을 조회합니다.
 
 import logging
 
-from .cache import PriceCache
-from .fetcher import PricingFetcher
+from .constants import HOURS_PER_MONTH
+from .utils import pricing_service
 
 logger = logging.getLogger(__name__)
-
-# 모듈 레벨 캐시
-_cache = PriceCache()
-
-# 월간 시간 (평균)
-HOURS_PER_MONTH = 730
 
 
 def get_ec2_price(
@@ -43,7 +37,7 @@ def get_ec2_price(
     Returns:
         시간당 USD 가격 (조회 실패 시 0.0)
     """
-    prices = _get_cached_prices(region, refresh)
+    prices = pricing_service.get_prices("ec2", region, refresh)
 
     if instance_type in prices:
         return prices[instance_type]
@@ -72,7 +66,7 @@ def get_ec2_monthly_cost(
     return round(hourly * hours_per_month, 2)
 
 
-def get_ec2_prices_bulk(
+def get_ec2_prices(
     region: str = "ap-northeast-2",
     refresh: bool = False,
 ) -> dict[str, float]:
@@ -85,26 +79,8 @@ def get_ec2_prices_bulk(
     Returns:
         {instance_type: hourly_price} 딕셔너리
     """
-    return _get_cached_prices(region, refresh)
+    return pricing_service.get_prices("ec2", region, refresh)
 
 
-def _get_cached_prices(region: str, refresh: bool = False) -> dict[str, float]:
-    """캐시된 가격 조회 (없으면 API 호출)"""
-    if not refresh:
-        cached = _cache.get("ec2", region)
-        if cached:
-            return cached
-
-    # API로 가격 조회
-    try:
-        fetcher = PricingFetcher()
-        prices = fetcher.get_ec2_prices(region)
-
-        if prices:
-            _cache.set("ec2", region, prices)
-            return prices
-
-    except Exception as e:
-        logger.warning(f"EC2 가격 조회 실패: {e}")
-
-    return {}
+# 하위 호환성을 위한 alias
+get_ec2_prices_bulk = get_ec2_prices

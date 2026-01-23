@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from rich.console import Console
 
+from cli.i18n import t
 from cli.ui.console import print_box_end, print_box_line, print_box_start
 
 from ..context import ExecutionContext, FallbackStrategy, RoleSelection
@@ -41,15 +42,15 @@ class RoleStep:
             return ctx
 
         if not ctx.accounts:
-            console.print("[yellow]* 계정 목록이 없습니다.[/yellow]")
+            console.print(f"[yellow]* {t('flow.no_accounts')}[/yellow]")
             return ctx
 
         # 모든 계정에서 사용 가능한 Role 집계
         role_account_map = self._aggregate_roles(ctx)
 
         if not role_account_map:
-            console.print("[red]! 사용 가능한 Role이 없습니다.[/red]")
-            raise RuntimeError("Role 없음")
+            console.print(f"[red]! {t('flow.no_roles_available')}[/red]")
+            raise RuntimeError(t('flow.no_roles_error'))
 
         # Primary Role 선택
         primary_role = self._select_primary_role(role_account_map, len(ctx.accounts))
@@ -65,7 +66,7 @@ class RoleStep:
                 primary_role=primary_role,
                 role_account_map=role_account_map,
             )
-            console.print(f"[green]> 모든 계정에서 '{primary_role}' 사용[/green]")
+            console.print(f"[green]> {t('flow.all_accounts_use_role', role=primary_role)}[/green]")
             return ctx
 
         # Fallback 처리 필요
@@ -74,6 +75,7 @@ class RoleStep:
             missing_accounts=missing_accounts,
             role_account_map=role_account_map,
             total_accounts=len(ctx.accounts),
+            accounts=ctx.accounts,
         )
 
         # 스킵할 계정 결정
@@ -107,7 +109,7 @@ class RoleStep:
         """
         role_account_map: dict[str, list[str]] = defaultdict(list)
 
-        console.print("[dim]Role 수집 중...[/dim]")
+        console.print(f"[dim]{t('flow.collecting_roles')}[/dim]")
 
         for account in ctx.accounts:
             roles = getattr(account, "roles", [])
@@ -115,7 +117,7 @@ class RoleStep:
                 role_name = role if isinstance(role, str) else role.role_name
                 role_account_map[role_name].append(account.id)
 
-        console.print(f"[dim]{len(role_account_map)}개 Role[/dim]")
+        console.print(f"[dim]{t('flow.roles_count', count=len(role_account_map))}[/dim]")
 
         return dict(role_account_map)
 
@@ -131,24 +133,13 @@ class RoleStep:
             key=lambda x: x[0].lower(),
         )
 
-        print_box_start(f"Role 선택 ({len(sorted_roles)}개)")
+        print_box_start(t('flow.role_selection', count=len(sorted_roles)))
 
-        # 2열 레이아웃
-        half = (len(sorted_roles) + 1) // 2
-        for i in range(half):
-            left_idx = i + 1
-            left_name, left_ids = sorted_roles[i]
-            left_pct = len(left_ids) / total_accounts * 100
-            left_str = f"{left_idx:>2}) {left_name[:18]:<18} {left_pct:>3.0f}%"
-
-            if i + half < len(sorted_roles):
-                right_idx = i + half + 1
-                right_name, right_ids = sorted_roles[i + half]
-                right_pct = len(right_ids) / total_accounts * 100
-                right_str = f"{right_idx:>2}) {right_name[:18]:<18} {right_pct:>3.0f}%"
-                print_box_line(f" {left_str}  {right_str}")
-            else:
-                print_box_line(f" {left_str}")
+        # 1열 레이아웃 (Role 이름 전체 표시)
+        for idx, (role_name, account_ids) in enumerate(sorted_roles, 1):
+            pct = len(account_ids) / total_accounts * 100
+            account_count = len(account_ids)
+            print_box_line(f"  {idx:>2}) {role_name:<40} {t('flow.count_pct', count=account_count, pct=f'{pct:.0f}')}")
 
         print_box_end()
 
@@ -163,9 +154,9 @@ class RoleStep:
                 num = int(answer)
                 if 1 <= num <= len(sorted_roles):
                     return sorted_roles[num - 1][0]
-                console.print(f"[dim]1-{len(sorted_roles)} 범위[/dim]")
+                console.print(f"[dim]{t('flow.number_range_hint', max=len(sorted_roles))}[/dim]")
             except ValueError:
-                console.print("[dim]숫자 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
     def _handle_fallback(
         self,
@@ -173,6 +164,7 @@ class RoleStep:
         missing_accounts: set[str],
         role_account_map: dict[str, list[str]],
         total_accounts: int,
+        accounts: list | None = None,
     ) -> tuple:
         """Fallback 처리
 
@@ -181,7 +173,13 @@ class RoleStep:
         """
         missing_count = len(missing_accounts)
 
-        console.print(f"[yellow]{primary_role} 미지원 계정: {missing_count}개[/yellow]")
+        console.print(f"[yellow]{t('flow.role_unsupported_accounts', role=primary_role, count=missing_count)}[/yellow]")
+
+        # 미지원 계정 목록 표시
+        if accounts:
+            account_map = {acc.id: acc.name for acc in accounts}
+            missing_names = [account_map.get(acc_id, acc_id) for acc_id in sorted(missing_accounts)]
+            console.print(f"[dim]  → {', '.join(missing_names)}[/dim]")
 
         # Fallback 후보 찾기
         fallback_candidates = []
@@ -195,18 +193,20 @@ class RoleStep:
         fallback_candidates.sort(key=lambda x: x[1], reverse=True)
 
         if not fallback_candidates:
-            console.print("[dim]Fallback 없음 - 해당 계정 스킵[/dim]")
-            confirm = console.input(f"[dim]{missing_count}개 스킵? [y/N][/dim] > ").strip().lower()
+            console.print(f"[dim]{t('flow.no_fallback_skip')}[/dim]")
+            console.print(f"[dim]{t('flow.skip_accounts_confirm', count=missing_count)}[/dim]")
+            confirm = console.input("> ").strip().lower()
             if confirm != "y":
-                raise KeyboardInterrupt("사용자 취소")
+                console.print(f"[yellow]{t('flow.terminated')}[/yellow]")
+                raise KeyboardInterrupt(t('flow.user_cancelled'))
             return None, FallbackStrategy.SKIP_ACCOUNT
 
         best_fallback = fallback_candidates[0]
 
-        print_box_start("Fallback 설정")
-        print_box_line(f" 1) {best_fallback[0]} (권장, {best_fallback[1]}개 커버)")
-        print_box_line(" 2) 다른 Role 선택")
-        print_box_line(f" 3) {missing_count}개 계정 스킵")
+        print_box_start(t('flow.fallback_setup'))
+        print_box_line(f"  1) {best_fallback[0]:<40} ({t('flow.recommended_covers', count=best_fallback[1])})")
+        print_box_line(f"  2) {t('flow.select_other_role')}")
+        print_box_line(f"  3) {t('flow.skip_accounts', count=missing_count)}")
         print_box_end()
 
         while True:
@@ -218,9 +218,9 @@ class RoleStep:
                 return None, FallbackStrategy.SKIP_ACCOUNT
             elif action == "2":
                 # Fallback Role 선택
-                print_box_start("Fallback Role")
+                print_box_start(t('flow.select_fallback_role'))
                 for i, (role, covers, _) in enumerate(fallback_candidates, 1):
-                    print_box_line(f" {i}) {role} ({covers}개)")
+                    print_box_line(f"  {i:>2}) {role:<40} ({t('flow.covers_count', count=covers)})")
                 print_box_end()
 
                 while True:
@@ -232,19 +232,19 @@ class RoleStep:
                                 fallback_candidates[idx - 1][0],
                                 FallbackStrategy.USE_FALLBACK,
                             )
-                        console.print(f"[dim]1-{len(fallback_candidates)} 범위[/dim]")
+                        console.print(f"[dim]{t('flow.number_range_hint', max=len(fallback_candidates))}[/dim]")
                     except ValueError:
-                        console.print("[dim]숫자 입력[/dim]")
+                        console.print(f"[dim]{t('flow.enter_number')}[/dim]")
             elif action:
-                console.print("[dim]1-3 입력[/dim]")
+                console.print(f"[dim]{t('flow.enter_1_to_3')}[/dim]")
 
     def _print_summary(self, rs: RoleSelection, total: int) -> None:
         """선택 결과 요약 출력"""
         console.print()
         total - len(rs.skipped_accounts)
-        summary = f"[dim]Role:[/dim] {rs.primary_role}"
+        summary = f"[dim]{t('flow.role_label')}[/dim] {rs.primary_role}"
         if rs.fallback_role:
-            summary += f" / Fallback: {rs.fallback_role}"
+            summary += f" / {t('flow.fallback_label')} {rs.fallback_role}"
         if rs.skipped_accounts:
-            summary += f" / 스킵: {len(rs.skipped_accounts)}개"
+            summary += f" / {t('flow.skipped_count', count=len(rs.skipped_accounts))}"
         console.print(summary)
