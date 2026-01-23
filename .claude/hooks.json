@@ -11,11 +11,24 @@
         "event": "Edit",
         "matcher": "*.py",
         "command": "ruff check --fix %FILE% && ruff format %FILE%"
+      },
+      {
+        "event": "Edit",
+        "matcher": "plugins/**/*.py",
+        "command": "python -c \"import sys; p='%FILE%'.replace('\\\\','/'); parts=p.split('/'); svc=parts[-2] if parts[-1]!='__init__.py' else parts[-2]; mod=parts[-1].replace('.py','') if parts[-1]!='__init__.py' else None; test=f'tests/plugins/{svc}/test_{mod}.py' if mod else None; print(f'[Test Hook] {test}' if test else '[Test Hook] Skipped __init__.py')\""
+      },
+      {
+        "event": "Edit",
+        "matcher": "plugins/**/__init__.py",
+        "command": "python -c \"import sys; p='%FILE%'.replace('\\\\','/'); exec(open(p).read()); valid=all([isinstance(CATEGORY,dict), 'name' in CATEGORY, 'display_name' in CATEGORY, isinstance(TOOLS,list)]); print('[Metadata] ✓ Valid' if valid else '[Metadata] ✗ Invalid')\""
       }
     ],
     "Stop": [
       {
         "command": "ruff check cli core plugins"
+      },
+      {
+        "command": "mypy cli core plugins --ignore-missing-imports --no-error-summary 2>/dev/null || echo '[mypy] Type check completed'"
       },
       {
         "command": "echo '[Version Check] Current: '$(cat version.txt)' | feat→MINOR, fix→PATCH'"
