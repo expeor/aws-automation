@@ -26,7 +26,7 @@ class TestHeadlessConfig:
         assert config.tool_module == "ebs_audit"
         assert config.profile == "test-profile"
         assert config.regions == []
-        assert config.format == "console"
+        assert config.format == "both"
         assert config.output is None
         assert config.quiet is False
 
