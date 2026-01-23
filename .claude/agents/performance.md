@@ -18,19 +18,11 @@ mcp__context7__get_library_docs("concurrent.futures", "ThreadPoolExecutor")
 mcp__context7__get_library_docs("functools", "lru_cache")
 ```
 
-### brave-search
-성능 최적화 사례 검색:
-```
-mcp__brave-search__search("boto3 API throttling optimization")
-mcp__brave-search__search("Python async AWS performance")
-```
-
 | 분석 영역 | MCP 도구 |
 |----------|----------|
 | AWS API 제한/할당량 | aws-documentation |
 | 병렬 처리 패턴 | context7 |
 | 캐싱 전략 | context7 |
-| 최적화 사례 | brave-search |
 
 ## 역할
 

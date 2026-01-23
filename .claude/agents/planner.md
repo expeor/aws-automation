@@ -10,13 +10,6 @@
 mcp__sequential-thinking__think("플러그인 구현 단계 분석")
 ```
 
-### github
-이슈/PR 컨텍스트 확인:
-```
-mcp__github__get_issue("expeor/aws-automation", 15)
-mcp__github__list_commits("expeor/aws-automation", "main")
-```
-
 ### aws-documentation
 AWS 서비스 API 조사:
 ```
@@ -26,7 +19,6 @@ mcp__aws-documentation__search("EFS describe API")
 | 계획 단계 | MCP 도구 |
 |----------|----------|
 | 복잡한 문제 분해 | sequential-thinking |
-| 기존 이슈/PR 확인 | github |
 | AWS API 조사 | aws-documentation |
 
 ## 역할

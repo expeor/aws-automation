@@ -18,19 +18,11 @@ mcp__aws-knowledge__query("IAM least privilege best practices")
 mcp__aws-knowledge__query("S3 bucket security configuration")
 ```
 
-### brave-search
-보안 취약점 트러블슈팅:
-```
-mcp__brave-search__search("boto3 credential security best practices")
-mcp__brave-search__search("Python hardcoded secrets detection")
-```
-
 | 검토 항목 | MCP 도구 |
 |----------|----------|
 | 코드 취약점 스캔 | semgrep |
 | 하드코딩 시크릿 탐지 | semgrep |
 | AWS 보안 패턴 | aws-knowledge |
-| 취약점 조사 | brave-search |
 
 ## 검토 영역
 

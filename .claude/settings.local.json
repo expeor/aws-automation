@@ -8,7 +8,9 @@
       "Bash(pytest:*)",
       "Bash(ruff:*)",
       "Bash(mypy:*)",
-      "Bash(aa:*)"
+      "Bash(aa:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add brave-search MCP and update all agents with MCP guidance\n\nmcp.json:\n- Add brave-search for web search \\(Stack Overflow, blogs, troubleshooting\\)\n\nAgents updated with MCP guidance:\n- security-reviewer: semgrep, aws-knowledge, brave-search\n- test-writer: context7, brave-search\n- planner: sequential-thinking, github, aws-documentation\n- performance: aws-documentation, context7, brave-search\n- doc-generator: context7, aws-documentation\n- migration: context7, brave-search\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)"
     ]
   }
 }

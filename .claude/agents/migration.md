@@ -11,17 +11,15 @@ mcp__context7__get_library_docs("openpyxl", "Workbook")
 mcp__context7__get_library_docs("boto3", "paginator")
 ```
 
-### brave-search
-마이그레이션 가이드 검색:
+### aws-documentation
+AWS API 변경사항:
 ```
-mcp__brave-search__search("Python openpyxl migration guide")
-mcp__brave-search__search("boto3 deprecated API changes")
+mcp__aws-documentation__search("boto3 describe_instances changes")
 ```
 
 | 마이그레이션 유형 | MCP 도구 |
 |-----------------|----------|
 | 라이브러리 API 변경 | context7 |
-| 패턴 업데이트 가이드 | brave-search |
 | boto3 최신 패턴 | context7, aws-documentation |
 
 ## 역할
