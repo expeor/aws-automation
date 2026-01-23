@@ -31,7 +31,7 @@ import boto3
 from rich.console import Console
 
 # 3. 로컬
-from core.tools.base import BaseToolRunner
+from core.parallel import get_client, parallel_collect
 ```
 
 ## Docstring

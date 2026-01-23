@@ -41,15 +41,16 @@
 - [요구사항 2]
 
 ### 수정 파일
-1. `plugins/service/tool.py` - 메인 로직
-2. `cli/tools/menu.py` - 메뉴 등록
-3. `tests/plugins/service/test_tool.py` - 테스트
+1. `plugins/{service}/__init__.py` - CATEGORY, TOOLS 메타데이터
+2. `plugins/{service}/{type}.py` - run(ctx) 함수 구현
+3. `core/tools/discovery.py` - AWS_SERVICE_NAMES 등록 (신규 서비스)
+4. `tests/plugins/{service}/test_{type}.py` - 테스트
 
 ### 구현 단계
-1. [ ] BaseToolRunner 상속 클래스 생성
-2. [ ] get_tools() 메서드 구현
-3. [ ] 분석 로직 구현
-4. [ ] 메뉴 등록
+1. [ ] __init__.py 작성 (CATEGORY, TOOLS 정의)
+2. [ ] {type}.py 작성 (run(ctx) 함수)
+3. [ ] parallel_collect 콜백 함수 구현
+4. [ ] 보고서 생성 로직 구현
 5. [ ] 테스트 작성
 6. [ ] ruff/mypy 통과 확인
 
@@ -66,6 +67,7 @@
 ## 참고 사항
 
 - 이 프로젝트의 플러그인 패턴을 따를 것
-- BaseToolRunner 상속 필수
-- 메뉴 등록 (cli/tools/menu.py) 필수
+- `__init__.py`에 CATEGORY, TOOLS 메타데이터 정의 필수
+- `run(ctx)` 함수 필수 (진입점)
+- `parallel_collect` 사용하여 멀티 계정/리전 처리
 - moto를 사용한 AWS 모킹 테스트 권장

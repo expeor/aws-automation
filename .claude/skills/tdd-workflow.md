@@ -23,21 +23,23 @@ tests/
 ### 기본 테스트
 
 ```python
-# tests/plugins/ec2/test_ebs_audit.py
+# tests/plugins/ec2/test_unused.py
 import pytest
-from plugins.ec2.ebs_audit import ToolRunner
+from unittest.mock import MagicMock
+from plugins.ec2.unused import run, collect_volumes, analyze_volumes
 
 
-class TestEbsAudit:
-    def test_get_tools_returns_dict(self):
-        runner = ToolRunner(regions=['ap-northeast-2'])
-        tools = runner.get_tools()
-        assert isinstance(tools, dict)
-        assert len(tools) > 0
+class TestEbsUnused:
+    def test_run_completes_without_error(self, mock_ctx):
+        """run(ctx) 함수 정상 실행 테스트"""
+        run(mock_ctx)
+        # 에러 없이 완료되면 성공
 
-    def test_unused_volumes_detection(self, mock_ec2):
-        runner = ToolRunner(regions=['ap-northeast-2'])
-        results = runner._find_unused_volumes()
+    def test_collect_volumes_returns_list(self, mock_ec2_session):
+        """볼륨 수집 함수 테스트"""
+        results = collect_volumes(
+            mock_ec2_session, "123456789012", "test-account", "ap-northeast-2"
+        )
         assert isinstance(results, list)
 ```
 

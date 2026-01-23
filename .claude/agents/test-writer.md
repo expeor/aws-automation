@@ -20,15 +20,19 @@ tests/
 
 ```python
 import pytest
-from plugins.ec2.ebs_audit import ToolRunner
+from unittest.mock import MagicMock
+from plugins.ec2.unused import run, collect_volumes, analyze_volumes
 
 
-class TestEbsAudit:
-    def test_get_tools_returns_dict(self):
-        runner = ToolRunner(regions=['ap-northeast-2'])
-        tools = runner.get_tools()
-        assert isinstance(tools, dict)
-        assert len(tools) > 0
+class TestEbsUnused:
+    def test_run_completes(self, mock_ctx):
+        """run(ctx) 함수 정상 실행 테스트"""
+        run(mock_ctx)
+
+    def test_collect_volumes_returns_list(self, mock_session):
+        """볼륨 수집 함수 테스트"""
+        results = collect_volumes(mock_session, "123456789012", "test", "ap-northeast-2")
+        assert isinstance(results, list)
 ```
 
 ### AWS 모킹 (moto)

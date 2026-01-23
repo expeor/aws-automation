@@ -47,49 +47,57 @@ ignore_missing_imports = true
 
 ### 기본 구조
 
+플러그인은 `plugins/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:
+
 ```python
-# plugins/{service}/{tool_name}.py
-from core.tools.base import BaseToolRunner
+# plugins/{service}/__init__.py
+CATEGORY = {
+    "name": "{service}",
+    "display_name": "{Service}",
+    "description": "서비스 설명 (한글)",
+    "description_en": "Service description (English)",
+    "aliases": [],  # 별칭 목록 (검색용)
+}
 
-class ToolRunner(BaseToolRunner):
-    def get_tools(self) -> dict:
-        return {
-            "도구이름": self._run_tool,
-        }
-
-    def _run_tool(self) -> None:
-        for region, session in self.iterate_regions():
-            client = session.client("service-name")
-            # ... 분석 로직
+TOOLS = [
+    {
+        "name": "도구 이름 (한글)",
+        "name_en": "Tool Name (English)",
+        "description": "도구 설명 (한글)",
+        "description_en": "Tool description (English)",
+        "permission": "read",  # read, write
+        "module": "{type}",    # 파일명 (unused, security, cost 등)
+        "area": "{type}",      # unused, security, cost, operation
+    },
+]
 ```
 
-### 메뉴 등록
-
-도구 메타데이터는 `cli/tools/menu.py`의 `TOOLS` 딕셔너리에 등록:
+### 도구 모듈
 
 ```python
-TOOLS = {
-    "service/tool_name": ToolMetadata(
-        name="도구 이름",
-        service="EC2",
-        category="Compute",
-        area="Cost",  # Cost, Security, Operation, All
-        description="도구 설명",
-    ),
-}
+# plugins/{service}/{type}.py
+from core.parallel import parallel_collect
+
+def run(ctx) -> None:
+    """도구 실행 함수 (필수)"""
+    result = parallel_collect(ctx, _collect_and_analyze, service="{aws_service}")
+    # ... 결과 처리 및 보고서 생성
 ```
 
 ### 병렬 처리
 
 멀티 계정/리전 병렬 실행:
 ```python
-from core.parallel import run_parallel
+from core.parallel import get_client, parallel_collect
 
-results = run_parallel(
-    items=regions,
-    func=self._analyze_region,
-    desc="리전 분석 중",
-)
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str):
+    """병렬 실행 콜백 (단일 계정/리전)"""
+    client = get_client(session, "service-name", region_name=region)
+    # ... 분석 로직
+
+def run(ctx) -> None:
+    result = parallel_collect(ctx, _collect_and_analyze, service="service-name")
+    data = result.get_data()
 ```
 
 ## AWS 관련 주의사항

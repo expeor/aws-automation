@@ -21,23 +21,19 @@ def list_all_instances(client) -> list:
 
 ## 세션 관리
 
-ExecutionContext 사용 권장:
+`parallel_collect` 콜백에서 세션 사용:
 
 ```python
-class ToolRunner(BaseToolRunner):
-    def _run_tool(self):
-        for region, session in self.iterate_regions():
-            client = session.client('ec2')
-            # ...
-```
+from core.parallel import get_client, parallel_collect
 
-멀티 계정:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str):
+    """병렬 실행 콜백 (단일 계정/리전)"""
+    client = get_client(session, "ec2", region_name=region)
+    # ...
 
-```python
-def _run_tool(self):
-    for account_id, region, session in self.iterate_accounts_and_regions():
-        client = session.client('ec2')
-        # account_id가 None이면 단일 계정 모드
+def run(ctx) -> None:
+    result = parallel_collect(ctx, _collect_and_analyze, service="ec2")
+    data = result.get_data()
 ```
 
 ## 에러 핸들링
@@ -68,21 +64,25 @@ except BotoCoreError as e:
 core/parallel 모듈 사용:
 
 ```python
-from core.parallel import run_parallel
+from core.parallel import get_client, parallel_collect
 
-def _analyze_all_regions(self):
-    results = run_parallel(
-        items=self.regions,
-        func=self._analyze_region,
-        desc="리전 분석 중",
-        max_workers=10,
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str):
+    """병렬 실행 콜백 - 멀티 계정/리전 자동 처리"""
+    client = get_client(session, "ec2", region_name=region)
+    # ... 리소스 수집 및 분석
+    return result  # 또는 None
+
+def run(ctx) -> None:
+    result = parallel_collect(
+        ctx,
+        _collect_and_analyze,
+        max_workers=20,
+        service="ec2",  # 서비스명 (진행 표시용)
     )
-    return [r for r in results if r is not None]
+    results = [r for r in result.get_data() if r is not None]
 
-def _analyze_region(self, region: str) -> dict | None:
-    session = self.get_session(region)
-    client = session.client('ec2')
-    # ...
+    if result.error_count > 0:
+        console.print(f"[yellow]오류: {result.error_count}건[/yellow]")
 ```
 
 ## Waiter 사용
@@ -128,11 +128,14 @@ def get_enabled_regions(session) -> list[str]:
 - 세션 토큰 만료 처리
 
 ```python
-# SSO 세션 갱신 필요 시
-if self.ctx and self.ctx.provider:
+# SSO 세션 갱신은 parallel_collect 내부에서 자동 처리됨
+# 토큰 만료 시 자동으로 재인증 시도
+
+# ctx.provider 직접 사용 (특수한 경우):
+if ctx.provider:
     try:
-        session = self.ctx.provider.get_session(region=region)
-    except TokenExpiredError:
+        session = ctx.provider.get_session(region=region)
+    except Exception:
         console.print("[yellow]SSO 토큰 만료. 재인증 필요.[/yellow]")
         raise
 ```

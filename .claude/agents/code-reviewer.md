@@ -20,8 +20,9 @@
 
 ### 3. 프로젝트 패턴 준수
 
-- BaseToolRunner 상속 여부
-- get_tools() 구현 여부
+- `__init__.py`에 CATEGORY, TOOLS 정의 여부
+- `run(ctx)` 함수 구현 여부
+- `parallel_collect` 사용 여부
 - Paginator 사용 (대량 리소스)
 - 에러 핸들링 패턴
 
@@ -48,7 +49,9 @@
 - [ ] 적절한 주석/docstring
 
 ### 패턴
-- [ ] BaseToolRunner 상속
+- [ ] __init__.py에 CATEGORY, TOOLS 정의
+- [ ] run(ctx) 함수 구현
+- [ ] parallel_collect 사용
 - [ ] Paginator 사용
 - [ ] 에러 핸들링
 
