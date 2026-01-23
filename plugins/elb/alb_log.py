@@ -45,7 +45,7 @@ def collect_options(ctx) -> None:
     Args:
         ctx: ExecutionContext
     """
-    console.print("\n[bold cyan]📊 ALB 로그 분석 설정[/bold cyan]")
+    console.print("\n[bold cyan]ALB 로그 분석 설정[/bold cyan]")
 
     # 세션 획득 (첫 번째 리전 사용)
     region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
@@ -71,10 +71,9 @@ def run(ctx) -> None:
     Args:
         ctx: ExecutionContext (options에 bucket, start_time, end_time, timezone 포함)
     """
-    from .alb_log_analysis.alb_excel_reporter import ALBExcelReporter
     from .alb_log_analysis.alb_log_analyzer import ALBLogAnalyzer
 
-    console.print("[bold]🔍 ALB 로그 분석을 시작합니다...[/bold]")
+    console.print("[bold]ALB 로그 분석을 시작합니다...[/bold]")
 
     # 옵션 추출
     bucket = ctx.options.get("bucket")
@@ -146,27 +145,26 @@ def run(ctx) -> None:
             analysis_results["abuse_ips_list"] = list(analysis_results.get("abuse_ips", set()))
             analysis_results["abuse_ips"] = "AbuseIPDB IPs processed"
 
-        # Step 4: Excel 보고서 생성
-        console.print("[bold cyan]Step 4: Excel 보고서 생성 중...[/bold cyan]")
+        # Step 4: 보고서 생성
         total_logs = analysis_results.get("log_lines_count", 0)
-        console.print(f"[green]📊 데이터 크기: {total_logs:,}개 로그 라인[/green]")
+        console.print(f"[green]✓ 데이터 크기: {total_logs:,}개 로그 라인[/green]")
 
         # 출력 경로 생성
         output_dir = _create_output_directory(ctx)
-        report_filename = _generate_report_filename(analyzer, analysis_results)
-        report_path = os.path.join(output_dir, report_filename)
 
-        reporter = ALBExcelReporter(data=analysis_results, output_dir=output_dir)
+        # 리포트 생성 (ctx.output_config에 따라 Excel, HTML, 또는 둘 다)
+        report_paths = _generate_reports(ctx, analyzer, analysis_results, output_dir)
 
-        final_report_path = reporter.generate_report(report_path)
-
-        console.print(f"[bold green]✅ 보고서 생성 완료![/bold green]\n   경로: {final_report_path}")
+        console.print("\n[bold green]✓ 보고서 생성 완료![/bold green]")
+        for fmt, path in report_paths.items():
+            console.print(f"   {fmt.upper()}: {path}")
 
         # Step 5: 임시 파일 정리
         _cleanup_temp_files(analyzer, gz_directory, log_directory)
 
-        # 자동으로 보고서 폴더 열기
-        open_in_explorer(os.path.dirname(final_report_path))
+        # 자동으로 보고서 폴더 열기 (Excel이 있으면 Explorer로, HTML만 있으면 브라우저로)
+        if report_paths.get("excel"):
+            open_in_explorer(os.path.dirname(report_paths["excel"]))
 
     except Exception as e:
         console.print(f"[red]❌ ALB 로그 분석 중 오류 발생: {e}[/red]")
@@ -176,6 +174,317 @@ def run(ctx) -> None:
 # =============================================================================
 # 헬퍼 함수들
 # =============================================================================
+
+
+def _generate_reports(ctx, analyzer, analysis_results: dict[str, Any], output_dir: str) -> dict[str, str]:
+    """출력 설정에 따라 Excel/HTML 보고서 생성
+
+    Args:
+        ctx: ExecutionContext (output_config 포함)
+        analyzer: ALBLogAnalyzer 인스턴스
+        analysis_results: 분석 결과 딕셔너리
+        output_dir: 출력 디렉토리
+
+    Returns:
+        생성된 파일 경로 딕셔너리 {"excel": "...", "html": "..."}
+    """
+    from .alb_log_analysis.alb_excel_reporter import ALBExcelReporter
+
+    report_paths: dict[str, str] = {}
+
+    # 출력 설정 확인
+    should_excel = ctx.should_output_excel() if hasattr(ctx, "should_output_excel") else True
+    should_html = ctx.should_output_html() if hasattr(ctx, "should_output_html") else True
+
+    # Step 4: 보고서 생성
+    if should_excel or should_html:
+        console.print("[bold cyan]Step 4: 보고서 생성 중...[/bold cyan]")
+
+    # Excel 보고서 생성 (기본 - 최적화된 상세 리포트)
+    if should_excel:
+        report_filename = _generate_report_filename(analyzer, analysis_results)
+        report_path = os.path.join(output_dir, report_filename)
+
+        reporter = ALBExcelReporter(data=analysis_results, output_dir=output_dir)
+        final_report_path = reporter.generate_report(report_path)
+        report_paths["excel"] = final_report_path
+
+    # HTML 보고서 생성 (요약 대시보드)
+    if should_html:
+        console.print("HTML 보고서 생성 중...")
+        html_path = _generate_html_report(ctx, analyzer, analysis_results, output_dir)
+        if html_path:
+            console.print("[green]HTML 보고서 생성 완료[/green]")
+            report_paths["html"] = html_path
+
+            # HTML만 생성한 경우 브라우저에서 자동 열기
+            if not should_excel:
+                from core.tools.io.html import open_in_browser
+
+                output_config = ctx.get_output_config() if hasattr(ctx, "get_output_config") else None
+                if output_config is None or output_config.auto_open:
+                    open_in_browser(html_path)
+
+    return report_paths
+
+
+def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], output_dir: str) -> str | None:
+    """HTML 요약 보고서 생성
+
+    ALB 로그 분석의 주요 지표를 시각화하는 HTML 대시보드 생성.
+    Excel 리포트의 상세 데이터를 보완하는 용도.
+    """
+    try:
+        from core.tools.io.html import HTMLReport
+
+        # 기본 정보 추출
+        total_logs = analysis_results.get("log_lines_count", 0)
+        alb_name = analysis_results.get("alb_name", "ALB")
+        unique_ips = analysis_results.get("unique_client_ips", 0)
+
+        # 에러 카운트
+        elb_4xx = analysis_results.get("elb_4xx_count", 0)
+        elb_5xx = analysis_results.get("elb_5xx_count", 0)
+        backend_4xx = analysis_results.get("backend_4xx_count", 0)
+        backend_5xx = analysis_results.get("backend_5xx_count", 0)
+        long_response = analysis_results.get("long_response_count", 0)
+
+        # 실제 요청한 IP 중 악성 IP 매칭
+        client_ip_counts = analysis_results.get("client_ip_counts", {})
+        abuse_ips_all = set(analysis_results.get("abuse_ips_list", []))
+        matching_abuse_ips = [(ip, client_ip_counts.get(ip, 0)) for ip in client_ip_counts if ip in abuse_ips_all]
+        matching_abuse_ips = sorted(matching_abuse_ips, key=lambda x: -x[1])
+        abuse_count = len(matching_abuse_ips)
+
+        # HTMLReport 생성
+        subtitle = f"분석 기간: {analyzer.start_datetime.strftime('%Y-%m-%d %H:%M')} ~ {analyzer.end_datetime.strftime('%Y-%m-%d %H:%M')}"
+        report = HTMLReport(title=f"ALB 로그 분석: {alb_name}", subtitle=subtitle)
+
+        # 요약 카드
+        report.add_summary(
+            [
+                ("총 요청", f"{total_logs:,}", None),
+                ("고유 IP", f"{unique_ips:,}", None),
+                ("ELB 4xx", f"{elb_4xx:,}", "warning" if elb_4xx > 0 else None),
+                ("ELB 5xx", f"{elb_5xx:,}", "danger" if elb_5xx > 0 else None),
+                ("Backend 5xx", f"{backend_5xx:,}", "danger" if backend_5xx > 0 else None),
+                ("느린 응답 (≥1s)", f"{long_response:,}", "warning" if long_response > 0 else None),
+                ("악성 IP", f"{abuse_count:,}", "danger" if abuse_count > 0 else None),
+            ]
+        )
+
+        # 1. ELB 상태 코드 분포 (도넛 차트)
+        elb_2xx = analysis_results.get("elb_2xx_count", 0)
+        elb_3xx = analysis_results.get("elb_3xx_count", 0)
+        status_data = [
+            ("2xx 성공", elb_2xx),
+            ("3xx 리다이렉트", elb_3xx),
+            ("4xx 클라이언트 에러", elb_4xx),
+            ("5xx 서버 에러", elb_5xx),
+        ]
+        # 0인 항목 제외
+        status_data = [(name, count) for name, count in status_data if count > 0]
+        if status_data:
+            report.add_pie_chart("ELB 상태 코드 분포", status_data, doughnut=True)
+
+        # 2. 시간대별 요청 트렌드 (라인 차트) - CloudWatch 스타일 적응형 해상도
+        # 타임스탬프와 에러 플래그 수집
+        all_timestamps: list[datetime] = []
+        is_error_list: list[int] = []  # 1 if error, 0 otherwise
+
+        for key in ["ELB 2xx Count", "ELB 3xx Count", "ELB 4xx Count", "ELB 5xx Count"]:
+            log_data = analysis_results.get(key, {})
+            if isinstance(log_data, dict):
+                timestamps = log_data.get("timestamps", [])
+                is_error = 1 if ("4xx" in key or "5xx" in key) else 0
+                for ts in timestamps:
+                    if ts and hasattr(ts, "timestamp"):  # datetime 객체 확인
+                        all_timestamps.append(ts)
+                        is_error_list.append(is_error)
+
+        if all_timestamps:
+            report.add_time_series_chart(
+                "시간대별 요청 트렌드",
+                timestamps=all_timestamps,
+                values={
+                    "전체 요청": [1] * len(all_timestamps),
+                    "에러 (4xx+5xx)": is_error_list,
+                },
+                aggregation="sum",
+                area=True,
+            )
+
+        # 3. ELB vs Backend 에러 비교 (바 차트)
+        if elb_4xx > 0 or elb_5xx > 0 or backend_4xx > 0 or backend_5xx > 0:
+            report.add_bar_chart(
+                "ELB vs Backend 에러 비교",
+                categories=["4xx 에러", "5xx 에러"],
+                series=[
+                    ("ELB", [elb_4xx, elb_5xx]),
+                    ("Backend", [backend_4xx, backend_5xx]),
+                ],
+            )
+
+        # 3. 국가별 요청 분포 (바 차트)
+        country_stats = analysis_results.get("country_statistics", {})
+        if country_stats:
+            # 요청 수 기준 정렬 (두 가지 형식 지원: {country: count} 또는 {country: {"count": count}})
+            sorted_countries = [
+                (country, data.get("count", 0) if isinstance(data, dict) else data)
+                for country, data in country_stats.items()
+            ]
+            sorted_countries = sorted(sorted_countries, key=lambda x: -x[1])[:15]  # Top 15 국가
+
+            if sorted_countries:
+                countries = [c[0] for c in sorted_countries]
+                counts = [c[1] for c in sorted_countries]
+                report.add_bar_chart(
+                    "국가별 요청 분포",
+                    categories=countries,
+                    series=[("요청 수", counts)],
+                    horizontal=True,
+                )
+
+        # 4. Top 요청 URL (바 차트)
+        url_counts = analysis_results.get("request_url_counts", {})
+        if url_counts:
+            sorted_urls = sorted(url_counts.items(), key=lambda x: -x[1])[:15]
+            if sorted_urls:
+                # URL 길이 제한
+                urls = [url[:60] + "..." if len(url) > 60 else url for url, _ in sorted_urls]
+                counts = [count for _, count in sorted_urls]
+                report.add_bar_chart(
+                    "Top 요청 URL",
+                    categories=urls,
+                    series=[("요청 수", counts)],
+                    horizontal=True,
+                )
+
+        # 5. Top 클라이언트 IP (바 차트)
+        if client_ip_counts:
+            sorted_ips = sorted(client_ip_counts.items(), key=lambda x: -x[1])[:10]
+            if sorted_ips:
+                ips = [ip for ip, _ in sorted_ips]
+                counts = [count for _, count in sorted_ips]
+                report.add_bar_chart(
+                    "Top 클라이언트 IP",
+                    categories=ips,
+                    series=[("요청 수", counts)],
+                    horizontal=True,
+                )
+
+        # 6. Client IP별 상태 코드 분포 (상위 IP들의 에러 현황)
+        # client_status_statistics: {client_ip: {status_code: count}}
+        client_status = analysis_results.get("client_status_statistics", {})
+        if client_status:
+            # 상태 코드별 총합 계산
+            status_totals: dict[str, int] = {}
+            for ip_stats in client_status.values():
+                if isinstance(ip_stats, dict):
+                    for code, count in ip_stats.items():
+                        if isinstance(count, int):
+                            status_totals[code] = status_totals.get(code, 0) + count
+
+            if status_totals:
+                # Top 10 상태 코드
+                top_codes = sorted(status_totals.items(), key=lambda x: -x[1])[:10]
+                if top_codes:
+                    codes = [str(code) for code, _ in top_codes]
+                    counts = [count for _, count in top_codes]
+                    report.add_bar_chart(
+                        "클라이언트 상태 코드 분포",
+                        categories=codes,
+                        series=[("요청 수", counts)],
+                    )
+
+        # 7. 데이터 전송량 (테이블)
+        total_received = analysis_results.get("total_received_bytes") or 0
+        total_sent = analysis_results.get("total_sent_bytes") or 0
+
+        def format_bytes(b: int | None) -> str:
+            if b is None:
+                return "0 B"
+            if b >= 1024**3:
+                return f"{b / 1024**3:.2f} GB"
+            elif b >= 1024**2:
+                return f"{b / 1024**2:.2f} MB"
+            elif b >= 1024:
+                return f"{b / 1024:.2f} KB"
+            return f"{b} B"
+
+        # 악성 IP 테이블 (실제 요청한 IP 중 악성 IP만 표시)
+        if matching_abuse_ips:
+            report.add_table(
+                title=f"악성 IP 목록 ({len(matching_abuse_ips)}개)",
+                headers=["IP 주소", "요청 수", "상태"],
+                rows=[
+                    [ip, count, "AbuseIPDB 등록"]
+                    for ip, count in matching_abuse_ips[:50]  # 최대 50개
+                ],
+                page_size=20,
+            )
+
+        # 느린 응답 테이블
+        long_response_times = analysis_results.get("long_response_times", [])
+        if long_response_times:
+            rows = []
+            for r in long_response_times[:100]:
+                response_time = r.get("response_time")
+                response_time_str = f"{response_time:.3f}" if response_time is not None else "-"
+                rows.append(
+                    [
+                        str(r.get("timestamp") or "")[:19],
+                        r.get("client_ip") or "",
+                        (r.get("request") or "")[:50],
+                        response_time_str,
+                        r.get("elb_status_code") or "",
+                        r.get("target_status_code") or "",
+                    ]
+                )
+            report.add_table(
+                title="느린 응답 Top 100",
+                headers=["시간", "Client IP", "URL", "응답 시간(s)", "ELB Status", "Target Status"],
+                rows=rows,
+                page_size=20,
+            )
+
+        # 분석 정보 테이블
+        report.add_table(
+            title="분석 정보",
+            headers=["항목", "값"],
+            rows=[
+                ["S3 경로", analysis_results.get("s3_uri", "")],
+                [
+                    "분석 기간 (요청)",
+                    f"{analysis_results.get('start_time', '')} ~ {analysis_results.get('end_time', '')}",
+                ],
+                [
+                    "실제 데이터 기간",
+                    f"{analysis_results.get('actual_start_time', '')} ~ {analysis_results.get('actual_end_time', '')}",
+                ],
+                ["타임존", analysis_results.get("timezone", "")],
+                ["총 로그 라인", f"{total_logs:,}"],
+                ["로그 파일 수", f"{analysis_results.get('log_files_count') or 0:,}"],
+                ["수신 데이터", format_bytes(total_received)],
+                ["송신 데이터", format_bytes(total_sent)],
+            ],
+            sortable=False,
+            searchable=False,
+        )
+
+        # 파일명 생성 및 저장
+        report_filename = _generate_report_filename(analyzer, analysis_results).replace(".xlsx", ".html")
+        html_path = os.path.join(output_dir, report_filename)
+
+        report.save(html_path, auto_open=False)
+        return html_path
+
+    except Exception as e:
+        console.print(f"[yellow]⚠️ HTML 보고서 생성 실패: {e}[/yellow]")
+        import traceback
+
+        traceback.print_exc()
+        return None
 
 
 def _select_alb_with_pagination(
@@ -343,22 +652,22 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
 
     # ALB 목록 조회
     try:
-        console.print("[cyan]🔍 Application Load Balancer 목록을 조회하는 중...[/cyan]")
+        console.print("[cyan]Application Load Balancer 목록을 조회하는 중...[/cyan]")
         response = elbv2_client.describe_load_balancers()
 
         albs = [lb for lb in response["LoadBalancers"] if lb["Type"] == "application"]
 
         if not albs:
-            console.print("[yellow]⚠️ 이 계정에 ALB가 없습니다. 수동 입력으로 전환합니다.[/yellow]")
+            console.print("[yellow]! 이 계정에 ALB가 없습니다. 수동 입력으로 전환합니다.[/yellow]")
             return _get_bucket_input_manual()
 
         console.print(f"[green]✓ {len(albs)}개의 ALB를 발견했습니다.[/green]")
 
     except ClientError as e:
         if "AccessDenied" in str(e):
-            console.print("[yellow]⚠️ ELB API 접근 권한이 없습니다. 수동 입력으로 전환합니다.[/yellow]")
+            console.print("[yellow]! ELB API 접근 권한이 없습니다. 수동 입력으로 전환합니다.[/yellow]")
         else:
-            console.print(f"[yellow]⚠️ ALB 조회 실패: {e}. 수동 입력으로 전환합니다.[/yellow]")
+            console.print(f"[yellow]! ALB 조회 실패: {e}. 수동 입력으로 전환합니다.[/yellow]")
         return _get_bucket_input_manual()
 
     # ALB 선택 - 목록 생성
@@ -371,9 +680,9 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
             log_enabled = any(
                 attr["Key"] == "access_logs.s3.enabled" and attr["Value"] == "true" for attr in attrs["Attributes"]
             )
-            status = "✅" if log_enabled else "❌"
+            status = "[green]✓[/green]" if log_enabled else "[red]✗[/red]"
         except Exception:
-            status = "❓"
+            status = "[dim]?[/dim]"
 
         alb_list.append(
             {
@@ -437,7 +746,7 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
         return s3_path
 
     except ClientError as e:
-        console.print(f"[yellow]⚠️ 로그 설정 조회 실패: {e}. 수동 입력으로 전환합니다.[/yellow]")
+        console.print(f"[yellow]! 로그 설정 조회 실패: {e}. 수동 입력으로 전환합니다.[/yellow]")
         return _get_bucket_input_manual()
 
 
@@ -502,7 +811,7 @@ def _get_time_range_input() -> tuple[datetime, datetime]:
     now = datetime.now()
     yesterday = now - timedelta(days=1)
 
-    console.print("\n[bold cyan]⏰ 분석 시간 범위 설정[/bold cyan]")
+    console.print("\n[bold cyan]분석 시간 범위 설정[/bold cyan]")
     console.print(f"[dim]기본값: {yesterday.strftime('%Y-%m-%d %H:%M')} ~ {now.strftime('%Y-%m-%d %H:%M')}[/dim]")
 
     # 빠른 선택 (기본값인 24시간을 첫 번째에 배치)
@@ -658,7 +967,7 @@ def _generate_report_filename(analyzer, analysis_results: dict[str, Any]) -> str
 
 def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None:
     """임시 파일 정리 (분석 완료 후 gz, log 파일 삭제)"""
-    console.print("[dim]🧹 임시 파일 정리 중...[/dim]")
+    console.print("[dim]임시 파일 정리 중...[/dim]")
 
     try:
         # 1. analyzer.clean_up 호출 (DuckDB 등 내부 리소스 정리)
@@ -674,7 +983,7 @@ def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None
                         os.remove(filepath)
                 console.print(f"[dim]  ✓ gz 파일 정리 완료: {gz_directory}[/dim]")
             except Exception as e:
-                console.print(f"[dim]  ⚠️ gz 정리 실패: {e}[/dim]")
+                console.print(f"[dim]  ! gz 정리 실패: {e}[/dim]")
 
         # 3. log 디렉토리 내부 파일 삭제
         if isinstance(log_directory, str) and os.path.exists(log_directory):
@@ -685,9 +994,9 @@ def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None
                         os.remove(filepath)
                 console.print(f"[dim]  ✓ log 파일 정리 완료: {log_directory}[/dim]")
             except Exception as e:
-                console.print(f"[dim]  ⚠️ log 정리 실패: {e}[/dim]")
+                console.print(f"[dim]  ! log 정리 실패: {e}[/dim]")
 
-        console.print("[dim]✅ 임시 파일 정리 완료[/dim]")
+        console.print("[dim]✓ 임시 파일 정리 완료[/dim]")
 
     except Exception as e:
-        console.print(f"[dim]⚠️ 정리 중 오류 (무시됨): {e}[/dim]")
+        console.print(f"[dim]! 정리 중 오류 (무시됨): {e}[/dim]")

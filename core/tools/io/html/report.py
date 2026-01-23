@@ -819,6 +819,155 @@ class HTMLReport:
         self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
         return self
 
+    def add_time_series_chart(
+        self,
+        title: str,
+        timestamps: list[datetime],
+        values: list[int | float] | dict[str, list[int | float]],
+        *,
+        bucket_minutes: int | None = None,
+        aggregation: str = "sum",
+        area: bool = True,
+        smooth: bool = True,
+    ) -> HTMLReport:
+        """CloudWatch 스타일 적응형 시계열 차트
+
+        시간 범위에 따라 자동으로 해상도를 조절하여 효율적으로 표현합니다.
+
+        Args:
+            title: 차트 제목
+            timestamps: datetime 리스트 (정렬 필요 없음)
+            values: 값 리스트 (단일 시리즈) 또는 {시리즈명: 값 리스트} (다중 시리즈)
+            bucket_minutes: 버킷 크기 (분). None이면 시간 범위에 따라 자동 결정:
+                - ≤3시간: 5분
+                - ≤24시간: 15분
+                - ≤7일: 1시간
+                - ≤30일: 4시간
+                - >30일: 1일
+            aggregation: 집계 방법 ("sum", "avg", "max", "min", "count")
+            area: 영역 채우기 여부
+            smooth: 곡선 여부
+
+        Returns:
+            self (체이닝 지원)
+
+        Example:
+            >>> report.add_time_series_chart(
+            ...     "요청 트렌드",
+            ...     timestamps=[datetime(2024, 1, 1, 10, 0), ...],
+            ...     values=[100, 150, 200, ...],
+            ... )
+
+            # 다중 시리즈
+            >>> report.add_time_series_chart(
+            ...     "상태코드별 트렌드",
+            ...     timestamps=timestamps,
+            ...     values={"2xx": [...], "4xx": [...], "5xx": [...]},
+            ... )
+        """
+        if not timestamps:
+            return self
+
+        # 단일 시리즈를 dict 형태로 통일
+        if isinstance(values, list):
+            series_data: dict[str, list[int | float]] = {"요청 수": values}
+        else:
+            series_data = values
+
+        # 시간 범위 계산
+        min_time = min(timestamps)
+        max_time = max(timestamps)
+        total_seconds = (max_time - min_time).total_seconds()
+        total_hours = total_seconds / 3600
+
+        # 자동 해상도 결정 (CloudWatch 스타일)
+        if bucket_minutes is None:
+            if total_hours <= 3:
+                bucket_minutes = 5
+            elif total_hours <= 24:
+                bucket_minutes = 15
+            elif total_hours <= 24 * 7:
+                bucket_minutes = 60
+            elif total_hours <= 24 * 30:
+                bucket_minutes = 240
+            else:
+                bucket_minutes = 1440  # 1일
+
+        bucket_seconds = bucket_minutes * 60
+
+        # 시간을 버킷으로 그룹화
+        from collections import defaultdict
+
+        # 각 시리즈별로 버킷 데이터 수집
+        buckets: dict[str, dict[datetime, list[float]]] = {name: defaultdict(list) for name in series_data}
+
+        for i, ts in enumerate(timestamps):
+            # 버킷 시작 시간 계산
+            bucket_start = datetime.fromtimestamp((ts.timestamp() // bucket_seconds) * bucket_seconds)
+            for name, vals in series_data.items():
+                if i < len(vals):
+                    buckets[name][bucket_start].append(vals[i])
+
+        # 모든 시리즈의 버킷 키 통합
+        all_bucket_keys: set[datetime] = set()
+        for name_buckets in buckets.values():
+            all_bucket_keys.update(name_buckets.keys())
+        sorted_buckets = sorted(all_bucket_keys)
+
+        if not sorted_buckets:
+            return self
+
+        # 집계 함수
+        def aggregate_values(vals: list[float]) -> float:
+            if not vals:
+                return 0
+            if aggregation == "sum":
+                return sum(vals)
+            elif aggregation == "avg":
+                return sum(vals) / len(vals)
+            elif aggregation == "max":
+                return max(vals)
+            elif aggregation == "min":
+                return min(vals)
+            elif aggregation == "count":
+                return len(vals)
+            return sum(vals)
+
+        # 카테고리 라벨 생성 (시간 범위에 따라 포맷 변경)
+        if total_hours <= 24:
+            time_format = "%H:%M"
+        elif total_hours <= 24 * 7:
+            time_format = "%m/%d %H:%M"
+        else:
+            time_format = "%m/%d"
+
+        categories = [ts.strftime(time_format) for ts in sorted_buckets]
+
+        # 시리즈 데이터 생성
+        chart_series: list[tuple[str, list[float]]] = []
+        for name in series_data:
+            aggregated = [aggregate_values(buckets[name].get(ts, [])) for ts in sorted_buckets]
+            chart_series.append((name, aggregated))
+
+        # 해상도 라벨 생성
+        if bucket_minutes < 60:
+            period_label = f"{bucket_minutes}분"
+        elif bucket_minutes < 1440:
+            period_label = f"{bucket_minutes // 60}시간"
+        else:
+            period_label = f"{bucket_minutes // 1440}일"
+
+        chart_title = f"{title} ({period_label} 단위)"
+
+        # add_line_chart 사용
+        return self.add_line_chart(
+            title=chart_title,
+            categories=categories,
+            series=chart_series,
+            area=area,
+            smooth=smooth,
+        )
+
     def add_table(
         self,
         title: str,
@@ -880,11 +1029,19 @@ class HTMLReport:
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        html {{
+            zoom: 0.9;  /* Chrome, Safari, Edge */
+            -moz-transform: scale(0.9);  /* Firefox */
+            -moz-transform-origin: 0 0;
+        }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
             background: #f0f2f5;
             color: #333;
             line-height: 1.6;
+        }}
+        @-moz-document url-prefix() {{
+            body {{ width: 111.11%; }}  /* Firefox: 100/0.9 = 111.11% to compensate for scale */
         }}
         .container {{ max-width: 1600px; margin: 0 auto; padding: 24px; }}
 
