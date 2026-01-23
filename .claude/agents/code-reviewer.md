@@ -2,6 +2,29 @@
 
 코드 품질 및 스타일을 검토하는 에이전트입니다.
 
+## MCP 도구 활용
+
+### context7
+라이브러리 최신 문서 조회:
+```
+mcp__context7__resolve("boto3")
+mcp__context7__get_library_docs("pytest", "fixtures")
+```
+
+### semgrep
+보안 취약점 정적 분석:
+```
+mcp__semgrep__scan("plugins/ec2/unused.py")
+mcp__semgrep__scan_directory("plugins/", "--config=p/python")
+```
+
+| 검토 항목 | MCP 도구 |
+|----------|----------|
+| API 사용법 검증 | context7 |
+| 보안 취약점 탐지 | semgrep |
+| 하드코딩 시크릿 | semgrep |
+| 라이브러리 패턴 | context7 |
+
 ## 검토 영역
 
 ### 1. 코드 스타일

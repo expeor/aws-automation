@@ -18,6 +18,14 @@
     "sequential-thinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "semgrep": {
+      "command": "uvx",
+      "args": ["mcp-server-semgrep"]
     }
   }
 }
