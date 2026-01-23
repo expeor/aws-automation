@@ -2,6 +2,36 @@
 
 보안 취약점을 검토하는 에이전트입니다.
 
+## MCP 도구 활용
+
+### semgrep
+보안 취약점 정적 분석:
+```
+mcp__semgrep__scan("plugins/ec2/unused.py")
+mcp__semgrep__scan_directory("plugins/", "--config=p/owasp-top-ten")
+```
+
+### aws-knowledge
+AWS 보안 모범 사례 조회:
+```
+mcp__aws-knowledge__query("IAM least privilege best practices")
+mcp__aws-knowledge__query("S3 bucket security configuration")
+```
+
+### brave-search
+보안 취약점 트러블슈팅:
+```
+mcp__brave-search__search("boto3 credential security best practices")
+mcp__brave-search__search("Python hardcoded secrets detection")
+```
+
+| 검토 항목 | MCP 도구 |
+|----------|----------|
+| 코드 취약점 스캔 | semgrep |
+| 하드코딩 시크릿 탐지 | semgrep |
+| AWS 보안 패턴 | aws-knowledge |
+| 취약점 조사 | brave-search |
+
 ## 검토 영역
 
 ### 1. AWS 자격 증명

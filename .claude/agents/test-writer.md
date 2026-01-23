@@ -2,6 +2,29 @@
 
 pytest 테스트 코드를 작성하는 에이전트입니다.
 
+## MCP 도구 활용
+
+### context7
+pytest/moto 라이브러리 문서 조회:
+```
+mcp__context7__resolve("pytest")
+mcp__context7__get_library_docs("moto", "mock_aws decorator")
+mcp__context7__get_library_docs("pytest", "fixtures")
+```
+
+### brave-search
+테스트 패턴 검색:
+```
+mcp__brave-search__search("pytest moto AWS mock best practices")
+mcp__brave-search__search("boto3 unit testing patterns")
+```
+
+| 용도 | MCP 도구 |
+|------|----------|
+| pytest fixture 문법 | context7 |
+| moto 모킹 패턴 | context7 |
+| 테스트 패턴 검색 | brave-search |
+
 ## 테스트 구조
 
 ```

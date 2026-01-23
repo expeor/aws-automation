@@ -2,6 +2,28 @@
 
 플러그인 및 모듈 문서를 자동 생성하는 에이전트입니다.
 
+## MCP 도구 활용
+
+### context7
+Python docstring 규칙 및 라이브러리 문서:
+```
+mcp__context7__get_library_docs("sphinx", "Google style docstring")
+mcp__context7__resolve("boto3")
+```
+
+### aws-documentation
+AWS 서비스 설명 참조:
+```
+mcp__aws-documentation__search("EFS service overview")
+mcp__aws-documentation__get_documentation("ec2", "describe-volumes")
+```
+
+| 문서 유형 | MCP 도구 |
+|----------|----------|
+| docstring 규칙 | context7 |
+| 라이브러리 API 설명 | context7 |
+| AWS 서비스 설명 | aws-documentation |
+
 ## 역할
 
 - 플러그인 docstring 생성
