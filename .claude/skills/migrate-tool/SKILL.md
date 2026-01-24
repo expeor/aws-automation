@@ -1,3 +1,9 @@
+---
+name: migrate-tool
+description: 레거시 플러그인 패턴을 최신 패턴으로 마이그레이션하는 가이드 제공.
+disable-model-invocation: true
+---
+
 # /migrate-tool - 레거시 패턴 마이그레이션 가이드
 
 기존 플러그인을 최신 패턴으로 마이그레이션하는 가이드를 제공합니다.

@@ -1,3 +1,9 @@
+---
+name: commit
+description: Conventional Commits 형식 커밋 메시지 자동 생성. Git 변경사항 분석 후 커밋 수행.
+disable-model-invocation: true
+---
+
 # /commit - Conventional Commits 자동화
 
 Git 변경사항을 분석하고 Conventional Commits 형식의 커밋 메시지를 자동 생성합니다.

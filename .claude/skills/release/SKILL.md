@@ -1,3 +1,9 @@
+---
+name: release
+description: Semantic Versioning 기반 릴리스 관리. version.txt, CHANGELOG.md 자동 업데이트.
+disable-model-invocation: true
+---
+
 # /release - 릴리스 관리 자동화
 
 Semantic Versioning 기반 릴리스 프로세스를 자동화합니다.
