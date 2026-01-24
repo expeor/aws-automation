@@ -251,15 +251,17 @@ def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_topics,
-            r.unused_topics,
-            r.no_subscribers,
-            r.no_messages,
-            r.normal_topics,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_topics,
+                r.unused_topics,
+                r.no_subscribers,
+                r.no_messages,
+                r.normal_topics,
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.unused_topics > 0:

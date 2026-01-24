@@ -35,12 +35,18 @@ Usage:
     -q, --quiet: 최소 출력 모드
 """
 
+from __future__ import annotations
+
 import sys
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
+
+if TYPE_CHECKING:
+    from cli.flow.context import RoleSelection
 from cli.i18n import t
 from core.filter import expand_region_pattern
 
@@ -301,7 +307,7 @@ class HeadlessRunner:
 
         return True
 
-    def _setup_role_selection(self, accounts: list, provider) -> "RoleSelection | None":
+    def _setup_role_selection(self, accounts: list, provider) -> RoleSelection | None:
         """Role 선택 설정"""
         from collections import defaultdict
 
@@ -350,9 +356,7 @@ class HeadlessRunner:
                 skipped_accounts = list(still_missing)
 
                 if not self.config.quiet and still_missing:
-                    console.print(
-                        f"[yellow]{t('flow.accounts_without_roles', count=len(still_missing))}[/yellow]"
-                    )
+                    console.print(f"[yellow]{t('flow.accounts_without_roles', count=len(still_missing))}[/yellow]")
         else:
             # Fallback 없으면 해당 계정 스킵
             skipped_accounts = list(missing_accounts)

@@ -281,14 +281,16 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_vaults,
-            r.total_recovery_points,
-            r.total_plans,
-            r.job_failed_count,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_vaults,
+                r.total_recovery_points,
+                r.total_plans,
+                r.job_failed_count,
+            ]
+        )
         if r.job_failed_count > 0:
             summary_sheet._ws.cell(row=row_num, column=6).fill = red_fill
 
@@ -306,15 +308,17 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
 
     for r in results:
         for v in r.vaults:
-            row_num = vault_sheet.add_row([
-                v.account_name,
-                v.region,
-                v.vault_name,
-                v.recovery_point_count,
-                f"{v.size_gb:.2f} GB",
-                "Yes" if v.is_encrypted else "No",
-                "Yes" if v.locked else "No",
-            ])
+            row_num = vault_sheet.add_row(
+                [
+                    v.account_name,
+                    v.region,
+                    v.vault_name,
+                    v.recovery_point_count,
+                    f"{v.size_gb:.2f} GB",
+                    "Yes" if v.is_encrypted else "No",
+                    "Yes" if v.locked else "No",
+                ]
+            )
             if not v.is_encrypted:
                 vault_sheet._ws.cell(row=row_num, column=6).fill = yellow_fill
 
@@ -332,15 +336,17 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
 
     for r in results:
         for p in r.plans:
-            row_num = plan_sheet.add_row([
-                p.account_name,
-                p.region,
-                p.plan_name,
-                p.plan_id,
-                p.rule_count,
-                p.resource_count,
-                p.creation_date.strftime("%Y-%m-%d") if p.creation_date else "-",
-            ])
+            row_num = plan_sheet.add_row(
+                [
+                    p.account_name,
+                    p.region,
+                    p.plan_name,
+                    p.plan_id,
+                    p.rule_count,
+                    p.resource_count,
+                    p.creation_date.strftime("%Y-%m-%d") if p.creation_date else "-",
+                ]
+            )
             # 리소스 없는 플랜 경고
             if p.resource_count == 0:
                 plan_sheet._ws.cell(row=row_num, column=6).fill = yellow_fill
@@ -366,16 +372,19 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
         failed_jobs.sort(key=lambda j: j.creation_date or datetime.min, reverse=True)
 
         for j in failed_jobs:
-            row_num = job_sheet.add_row([
-                j.account_name,
-                j.region,
-                j.status,
-                j.resource_type,
-                j.resource_arn,
-                j.vault_name,
-                j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
-                j.status_message or "-",
-            ], style=Styles.danger())
+            row_num = job_sheet.add_row(
+                [
+                    j.account_name,
+                    j.region,
+                    j.status,
+                    j.resource_type,
+                    j.resource_arn,
+                    j.vault_name,
+                    j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
+                    j.status_message or "-",
+                ],
+                style=Styles.danger(),
+            )
             job_sheet._ws.cell(row=row_num, column=3).fill = red_fill
 
     return str(wb.save_as(output_dir, "AWS_Backup"))

@@ -70,7 +70,7 @@ class AccountStep:
         sorted_accounts = sorted(accounts, key=lambda x: x.name.lower())
 
         # 박스로 계정 목록 표시
-        print_box_start(t('flow.account_selection', count=len(sorted_accounts)))
+        print_box_start(t("flow.account_selection", count=len(sorted_accounts)))
 
         if single_only:
             print_box_line(f"[yellow]{t('flow.single_account_only')}[/yellow]")
@@ -189,7 +189,11 @@ class AccountStep:
                     if 1 <= i <= max_num:
                         indices.add(i)
                     else:
-                        err = f"Out of range: {i} (1-{max_num})" if get_lang() == "en" else f"범위 벗어남: {i} (1-{max_num})"
+                        err = (
+                            f"Out of range: {i} (1-{max_num})"
+                            if get_lang() == "en"
+                            else f"범위 벗어남: {i} (1-{max_num})"
+                        )
                         raise ValueError(err)
             else:
                 # 단일 번호
@@ -202,7 +206,11 @@ class AccountStep:
                 if 1 <= num <= max_num:
                     indices.add(num)
                 else:
-                    err = f"Out of range: {num} (1-{max_num})" if get_lang() == "en" else f"범위 벗어남: {num} (1-{max_num})"
+                    err = (
+                        f"Out of range: {num} (1-{max_num})"
+                        if get_lang() == "en"
+                        else f"범위 벗어남: {num} (1-{max_num})"
+                    )
                     raise ValueError(err)
 
         # 단일 모드에서 여러 결과 방지 (안전장치)

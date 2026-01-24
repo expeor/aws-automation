@@ -13,6 +13,7 @@ from rich.console import Console
 
 from cli.i18n import t
 from cli.ui.console import clear_screen
+
 from .context import ExecutionContext, FlowResult, ToolInfo
 from .steps import AccountStep, CategoryStep, ProfileStep, RegionStep, RoleStep
 
@@ -319,7 +320,9 @@ class FlowRunner:
             if len(ctx.regions) == 1:
                 print_box_line(f" {t('runner.summary_region')}: {ctx.regions[0]}")
             else:
-                print_box_line(f" {t('runner.summary_region')}: {t('runner.summary_regions_count', count=len(ctx.regions))}")
+                print_box_line(
+                    f" {t('runner.summary_region')}: {t('runner.summary_regions_count', count=len(ctx.regions))}"
+                )
 
         if ctx.is_multi_account() and ctx.accounts:
             target_count = len(ctx.get_target_accounts())

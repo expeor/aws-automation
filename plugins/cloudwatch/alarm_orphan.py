@@ -233,14 +233,16 @@ def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_alarms,
-            r.orphan_alarms,
-            r.no_actions,
-            r.normal_alarms,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_alarms,
+                r.orphan_alarms,
+                r.no_actions,
+                r.normal_alarms,
+            ]
+        )
         ws = summary_sheet._ws
         if r.orphan_alarms > 0:
             ws.cell(row=row_num, column=4).fill = red_fill
@@ -266,17 +268,20 @@ def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
             if f.status != AlarmStatus.NORMAL:
                 a = f.alarm
                 style = Styles.danger() if f.status == AlarmStatus.ORPHAN else Styles.warning()
-                detail_sheet.add_row([
-                    a.account_name,
-                    a.region,
-                    a.alarm_name,
-                    a.namespace,
-                    a.metric_name,
-                    a.dimensions,
-                    a.state,
-                    f.status.value,
-                    f.recommendation,
-                ], style=style)
+                detail_sheet.add_row(
+                    [
+                        a.account_name,
+                        a.region,
+                        a.alarm_name,
+                        a.namespace,
+                        a.metric_name,
+                        a.dimensions,
+                        a.state,
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
     return str(wb.save_as(output_dir, "CloudWatch_Alarm_Orphan"))
 

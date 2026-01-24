@@ -286,7 +286,9 @@ cli.help = _build_help_text()
     is_flag=True,
     help="최소 출력 모드",
 )
-def run_command(tool_path, profiles, profile_group, sso_session, accounts, role, fallback_role, region, format, output, quiet):
+def run_command(
+    tool_path, profiles, profile_group, sso_session, accounts, role, fallback_role, region, format, output, quiet
+):
     """비대화형 도구 실행 (CI/CD용)
 
     SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.

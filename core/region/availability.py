@@ -131,8 +131,8 @@ class RegionAvailabilityChecker:
         """
         cache_key = "all_regions_info"
         cached = self._get_cached(cache_key)
-        if cached:
-            return cached
+        if cached is not None:
+            return cached  # type: ignore[return-value]
 
         regions: list[RegionInfo] = []
 
@@ -172,8 +172,8 @@ class RegionAvailabilityChecker:
         """
         cache_key = f"available_regions:{include_opt_in_pending}"
         cached = self._get_cached(cache_key)
-        if cached:
-            return cached
+        if cached is not None:
+            return cached  # type: ignore[return-value]
 
         all_regions = self.get_all_regions_info()
 

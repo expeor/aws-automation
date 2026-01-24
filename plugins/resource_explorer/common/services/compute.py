@@ -217,9 +217,7 @@ def collect_ecs_services(session, account_id: str, account_name: str, region: st
     return services
 
 
-def collect_auto_scaling_groups(
-    session, account_id: str, account_name: str, region: str
-) -> list[AutoScalingGroup]:
+def collect_auto_scaling_groups(session, account_id: str, account_name: str, region: str) -> list[AutoScalingGroup]:
     """Auto Scaling Group 수집"""
     asg = get_client(session, "autoscaling", region_name=region)
     groups = []
@@ -289,9 +287,7 @@ def collect_launch_templates(session, account_id: str, account_name: str, region
             key_name = ""
             security_group_ids = []
             try:
-                ver_resp = ec2.describe_launch_template_versions(
-                    LaunchTemplateId=template_id, Versions=["$Default"]
-                )
+                ver_resp = ec2.describe_launch_template_versions(LaunchTemplateId=template_id, Versions=["$Default"])
                 versions = ver_resp.get("LaunchTemplateVersions", [])
                 if versions:
                     data = versions[0].get("LaunchTemplateData", {})

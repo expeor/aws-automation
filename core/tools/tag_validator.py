@@ -388,9 +388,7 @@ class TagPolicyValidator:
 
         return results
 
-    def get_compliance_summary(
-        self, results: dict[str, TagValidationResult]
-    ) -> tuple[int, int, list[str]]:
+    def get_compliance_summary(self, results: dict[str, TagValidationResult]) -> tuple[int, int, list[str]]:
         """준수율 요약
 
         Args:

@@ -18,9 +18,9 @@ from enum import Enum
 
 from rich.console import Console
 
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 console = Console()
 
@@ -179,14 +179,10 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
 
     # 3단계: 배치 메트릭 조회
     if redis_clusters:
-        _collect_elasticache_metrics_batch(
-            cloudwatch, redis_clusters, "ReplicationGroupId", start_time, now
-        )
+        _collect_elasticache_metrics_batch(cloudwatch, redis_clusters, "ReplicationGroupId", start_time, now)
 
     if memcached_clusters:
-        _collect_elasticache_metrics_batch(
-            cloudwatch, memcached_clusters, "CacheClusterId", start_time, now
-        )
+        _collect_elasticache_metrics_batch(cloudwatch, memcached_clusters, "CacheClusterId", start_time, now)
 
     return redis_clusters + memcached_clusters
 
@@ -320,16 +316,18 @@ def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_clusters,
-            r.unused_clusters,
-            r.low_usage_clusters,
-            r.normal_clusters,
-            f"${r.unused_monthly_cost:,.2f}",
-            f"${r.low_usage_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_clusters,
+                r.unused_clusters,
+                r.low_usage_clusters,
+                r.normal_clusters,
+                f"${r.unused_monthly_cost:,.2f}",
+                f"${r.low_usage_monthly_cost:,.2f}",
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.unused_clusters > 0:

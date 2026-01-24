@@ -178,8 +178,8 @@ class ServiceQuotaChecker:
         """
         cache_key = f"quotas:{service_code}:{self.region}"
         cached = self._get_cached(cache_key)
-        if cached:
-            return cached
+        if cached is not None:
+            return cached  # type: ignore[return-value]
 
         quotas: list[ServiceQuotaInfo] = []
 
@@ -283,8 +283,8 @@ class ServiceQuotaChecker:
         """
         cache_key = f"quota_usage:{service_code}:{quota_code}:{self.region}"
         cached = self._get_cached(cache_key)
-        if cached:
-            return cached
+        if cached is not None:
+            return cached  # type: ignore[return-value]
 
         try:
             client = self._get_client()
@@ -349,7 +349,7 @@ class ServiceQuotaChecker:
             if datapoints:
                 # 가장 최근 값
                 latest = max(datapoints, key=lambda x: x["Timestamp"])
-                return latest.get("Maximum", 0.0)
+                return float(latest.get("Maximum", 0.0))
 
         except Exception as e:
             logger.debug(f"메트릭 조회 실패 ({namespace}/{metric_name}): {e}")

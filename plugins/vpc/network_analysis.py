@@ -151,11 +151,17 @@ def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> 
     summary.add_section("Resource Summary")
     summary.add_item("NAT Gateway Total", total_nat)
     summary.add_item("NAT Gateway Unused", total_nat_unused, highlight="danger" if total_nat_unused > 0 else None)
-    summary.add_item("NAT Gateway Waste", f"${total_nat_waste:,.2f}", highlight="warning" if total_nat_waste > 0 else None)
+    summary.add_item(
+        "NAT Gateway Waste", f"${total_nat_waste:,.2f}", highlight="warning" if total_nat_waste > 0 else None
+    )
     summary.add_blank_row()
     summary.add_item("VPC Endpoint (Interface)", total_endpoint_interface)
-    summary.add_item("VPC Endpoint Unused", total_endpoint_unused, highlight="danger" if total_endpoint_unused > 0 else None)
-    summary.add_item("VPC Endpoint Waste", f"${total_endpoint_waste:,.2f}", highlight="warning" if total_endpoint_waste > 0 else None)
+    summary.add_item(
+        "VPC Endpoint Unused", total_endpoint_unused, highlight="danger" if total_endpoint_unused > 0 else None
+    )
+    summary.add_item(
+        "VPC Endpoint Waste", f"${total_endpoint_waste:,.2f}", highlight="warning" if total_endpoint_waste > 0 else None
+    )
     summary.add_blank_row()
     summary.add_item("ENI Total", total_eni)
     summary.add_item("ENI Unused", total_eni_unused, highlight="danger" if total_eni_unused > 0 else None)

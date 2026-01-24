@@ -169,10 +169,7 @@ def enrich_resources_parallel(
     # Use ThreadPoolExecutor for parallel API calls
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
-        future_to_eni = {
-            executor.submit(_enrich_single, eni): eni
-            for eni in enis
-        }
+        future_to_eni = {executor.submit(_enrich_single, eni): eni for eni in enis}
 
         # Collect results as they complete
         for future in as_completed(future_to_eni):

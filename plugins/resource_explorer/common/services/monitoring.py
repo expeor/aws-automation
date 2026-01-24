@@ -57,9 +57,7 @@ def collect_cloudwatch_alarms(session, account_id: str, account_name: str, regio
     return alarms
 
 
-def collect_cloudwatch_log_groups(
-    session, account_id: str, account_name: str, region: str
-) -> list[CloudWatchLogGroup]:
+def collect_cloudwatch_log_groups(session, account_id: str, account_name: str, region: str) -> list[CloudWatchLogGroup]:
     """CloudWatch Log Group 수집"""
     logs = get_client(session, "logs", region_name=region)
     log_groups = []

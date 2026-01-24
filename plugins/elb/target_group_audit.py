@@ -223,15 +223,17 @@ def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_count,
-            r.unattached_count,
-            r.no_targets_count,
-            r.unhealthy_count,
-            r.normal_count,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.unattached_count,
+                r.no_targets_count,
+                r.unhealthy_count,
+                r.normal_count,
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.unattached_count > 0:

@@ -444,22 +444,24 @@ def generate_report(results: list[PCAnalysisResult], output_dir: str) -> str:
             if f.function.has_pc or f.status == PCStatus.UNDERSIZED:
                 fn = f.function
                 savings = f.monthly_waste + f.monthly_savings
-                row_num = pc_sheet.add_row([
-                    fn.account_name,
-                    fn.region,
-                    fn.function_name,
-                    fn.runtime,
-                    fn.memory_mb,
-                    fn.total_provisioned,
-                    fn.max_concurrent,
-                    f"{fn.utilization_pct:.0f}%",
-                    fn.throttles_30d,
-                    f"${fn.monthly_cost:,.2f}",
-                    f.status.value,
-                    f.recommended_pc if f.recommended_pc else "-",
-                    f"${savings:,.2f}" if savings > 0 else "-",
-                    f.recommendation,
-                ])
+                row_num = pc_sheet.add_row(
+                    [
+                        fn.account_name,
+                        fn.region,
+                        fn.function_name,
+                        fn.runtime,
+                        fn.memory_mb,
+                        fn.total_provisioned,
+                        fn.max_concurrent,
+                        f"{fn.utilization_pct:.0f}%",
+                        fn.throttles_30d,
+                        f"${fn.monthly_cost:,.2f}",
+                        f.status.value,
+                        f.recommended_pc if f.recommended_pc else "-",
+                        f"${savings:,.2f}" if savings > 0 else "-",
+                        f.recommendation,
+                    ]
+                )
 
                 # 상태에 따른 셀 하이라이트
                 fill = status_fills.get(f.status)

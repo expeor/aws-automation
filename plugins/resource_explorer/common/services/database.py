@@ -109,12 +109,14 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
             try:
                 pab_resp = s3.get_public_access_block(Bucket=bucket_name)
                 config = pab_resp.get("PublicAccessBlockConfiguration", {})
-                public_access_block = all([
-                    config.get("BlockPublicAcls", False),
-                    config.get("IgnorePublicAcls", False),
-                    config.get("BlockPublicPolicy", False),
-                    config.get("RestrictPublicBuckets", False),
-                ])
+                public_access_block = all(
+                    [
+                        config.get("BlockPublicAcls", False),
+                        config.get("IgnorePublicAcls", False),
+                        config.get("BlockPublicPolicy", False),
+                        config.get("RestrictPublicBuckets", False),
+                    ]
+                )
             except Exception:
                 pass
 

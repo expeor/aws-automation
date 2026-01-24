@@ -11,7 +11,7 @@ from typing import Any
 from rich.console import Console
 from rich.table import Table
 
-from cli.i18n import get_lang, t
+from cli.i18n import t
 from cli.ui.console import clear_screen, print_box_end, print_box_line, print_box_start
 from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
 
@@ -78,7 +78,7 @@ class CategoryStep:
         if not categories:
             console.print(f"[red]! {t('flow.no_tools_registered')}[/red]")
             console.print(f"[yellow]* {t('flow.add_tools_hint')}[/yellow]")
-            raise RuntimeError(t('flow.no_tools_registered'))
+            raise RuntimeError(t("flow.no_tools_registered"))
 
         if entry_point:
             # 특정 카테고리로 진입 (aa ebs 등)
@@ -420,7 +420,7 @@ class CategoryStep:
         )
         table.add_column("#", style="dim", width=4, justify="right")
         table.add_column(t("menu.header_category"), width=16)  # 12 → 16
-        table.add_column(t("menu.header_name"), width=26)      # 20 → 26
+        table.add_column(t("menu.header_name"), width=26)  # 20 → 26
         table.add_column(t("menu.header_description"), style="dim")
 
         for i, r in enumerate(results, 1):
@@ -540,7 +540,9 @@ class CategoryStep:
                         console.print(row_table)
 
             print_box_line()
-            print_box_line(f" [dim]p[/dim] {t('menu.permission_filter')}  [dim]a[/dim] {t('menu.area_filter')}  [dim]r[/dim] {t('menu.reset')}  [dim]0[/dim] {t('menu.go_back')}")
+            print_box_line(
+                f" [dim]p[/dim] {t('menu.permission_filter')}  [dim]a[/dim] {t('menu.area_filter')}  [dim]r[/dim] {t('menu.reset')}  [dim]0[/dim] {t('menu.go_back')}"
+            )
 
             print_box_end()
 
@@ -635,11 +637,15 @@ class CategoryStep:
             if area_filter:
                 area_label = AREA_DISPLAY.get(area_filter, {}).get("label", area_filter)
                 filters.append(area_label)
-            print_box_line(f" [dim]{t('menu.filter_status', filters=', '.join(filters), filtered=filtered_count, total=total_count)}[/dim]")
+            print_box_line(
+                f" [dim]{t('menu.filter_status', filters=', '.join(filters), filtered=filtered_count, total=total_count)}[/dim]"
+            )
 
     def _select_permission_filter(self, current: str | None) -> str | None:
         """권한 필터 선택"""
-        console.print(f"[dim]1){t('menu.permission_read')} 2){t('menu.permission_write')} 3){t('menu.permission_delete')} 0){t('menu.cancel')}[/dim]")
+        console.print(
+            f"[dim]1){t('menu.permission_read')} 2){t('menu.permission_write')} 3){t('menu.permission_delete')} 0){t('menu.cancel')}[/dim]"
+        )
         choice = console.input("> ").strip()
         mapping = {"1": "read", "2": "write", "3": "delete"}
         return mapping.get(choice, current)

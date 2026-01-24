@@ -373,7 +373,9 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
     summary.add_item("최근 스냅샷", totals["normal"])
     summary.add_item("전체 용량 (GB)", totals["total_size"])
     summary.add_item("오래된 용량 (GB)", totals["old_size"], highlight="warning" if totals["old_size"] > 0 else None)
-    summary.add_item("오래된 월 비용 ($)", f"${totals['old_cost']:.2f}", highlight="danger" if totals["old_cost"] > 0 else None)
+    summary.add_item(
+        "오래된 월 비용 ($)", f"${totals['old_cost']:.2f}", highlight="danger" if totals["old_cost"] > 0 else None
+    )
 
     # Findings
     finding_columns = [
@@ -405,21 +407,24 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
 
     for f in all_findings:
         snap = f.snapshot
-        row_num = finding_sheet.add_row([
-            snap.account_name,
-            snap.region,
-            snap.id,
-            snap.db_identifier,
-            snap.snapshot_type.value.upper(),
-            f.usage_status.value,
-            f"{snap.engine} {snap.engine_version}",
-            snap.allocated_storage_gb,
-            snap.age_days,
-            round(snap.monthly_cost, 2),
-            "Yes" if snap.encrypted else "No",
-            snap.create_time.strftime("%Y-%m-%d") if snap.create_time else "",
-            f.recommendation,
-        ], style=Styles.warning())
+        row_num = finding_sheet.add_row(
+            [
+                snap.account_name,
+                snap.region,
+                snap.id,
+                snap.db_identifier,
+                snap.snapshot_type.value.upper(),
+                f.usage_status.value,
+                f"{snap.engine} {snap.engine_version}",
+                snap.allocated_storage_gb,
+                snap.age_days,
+                round(snap.monthly_cost, 2),
+                "Yes" if snap.encrypted else "No",
+                snap.create_time.strftime("%Y-%m-%d") if snap.create_time else "",
+                f.recommendation,
+            ],
+            style=Styles.warning(),
+        )
 
         fill = status_fills.get(f.usage_status)
         if fill:
