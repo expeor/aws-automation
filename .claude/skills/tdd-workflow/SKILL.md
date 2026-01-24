@@ -1,3 +1,8 @@
+---
+name: tdd-workflow
+description: TDD 워크플로우 가이드. pytest, moto 모킹, 테스트 패턴.
+---
+
 # TDD 워크플로우
 
 테스트 주도 개발 가이드입니다.
