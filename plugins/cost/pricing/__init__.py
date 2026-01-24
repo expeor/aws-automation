@@ -53,6 +53,8 @@ AWS Pricing API를 사용하여 실시간 가격 정보를 조회하고 캐싱�
     metrics = pricing_service.get_metrics()
 """
 
+# AMI 가격 (스냅샷 기반)
+from .ami import get_ami_monthly_cost, get_ami_snapshot_price
 from .cache import PriceCache, clear_cache, get_cache_info
 
 # CloudWatch 가격
@@ -96,14 +98,48 @@ from .ec2 import get_ec2_monthly_cost, get_ec2_price, get_ec2_prices, get_ec2_pr
 # ECR 가격
 from .ecr import get_ecr_monthly_cost, get_ecr_prices, get_ecr_storage_price
 
+# EFS 가격
+from .efs import (
+    get_efs_monthly_cost,
+    get_efs_prices,
+    get_efs_storage_price,
+)
+
 # EIP 가격
 from .eip import get_eip_hourly_price, get_eip_monthly_cost, get_eip_prices
+
+# ElastiCache 가격
+from .elasticache import (
+    get_elasticache_hourly_price,
+    get_elasticache_monthly_cost,
+    get_elasticache_prices,
+)
+from .elasticache import (
+    get_elasticache_hourly_price as get_elasticache_node_price,  # alias
+)
 
 # ELB 가격
 from .elb import get_elb_hourly_price, get_elb_monthly_cost, get_elb_prices
 
 # Fetcher & Cache
 from .fetcher import PricingFetcher
+
+# FSx 가격
+from .fsx import (
+    get_fsx_gb_price,
+    get_fsx_monthly_cost,
+    get_fsx_prices,
+)
+
+# Kinesis 가격
+from .kinesis import (
+    get_kinesis_monthly_cost,
+    get_kinesis_prices,
+    get_kinesis_shard_hour_price,
+)
+from .kinesis import (
+    get_kinesis_shard_hour_price as get_kinesis_shard_price,  # alias
+)
 
 # KMS 가격
 from .kms import (
@@ -134,11 +170,35 @@ from .nat import (
     get_nat_prices,
 )
 
+# OpenSearch 가격
+from .opensearch import (
+    get_opensearch_instance_price,
+    get_opensearch_monthly_cost,
+    get_opensearch_prices,
+    get_opensearch_storage_price,
+)
+
+# RDS 가격
+from .rds import (
+    get_rds_instance_price,
+    get_rds_monthly_cost,
+    get_rds_prices,
+    get_rds_storage_price,
+)
+
 # RDS Snapshot 가격
 from .rds_snapshot import (
     get_rds_snapshot_monthly_cost,
     get_rds_snapshot_price,
     get_rds_snapshot_prices,
+)
+
+# Redshift 가격
+from .redshift import (
+    get_redshift_monthly_cost,
+    get_redshift_node_price,
+    get_redshift_prices,
+    get_redshift_storage_price,
 )
 
 # Route53 가격
@@ -168,6 +228,13 @@ from .secretsmanager import (
 
 # EBS Snapshot 가격
 from .snapshot import get_snapshot_monthly_cost, get_snapshot_price, get_snapshot_prices
+
+# Transfer Family 가격
+from .transfer import (
+    get_transfer_hourly_price,
+    get_transfer_monthly_cost,
+    get_transfer_prices,
+)
 
 # Utils - PricingService 통합 가격 조회 서비스
 from .utils import PricingService, get_prices, pricing_service
@@ -282,4 +349,44 @@ __all__: list[str] = [
     "get_sagemaker_monthly_cost",
     "get_sagemaker_prices",
     "get_sagemaker_prices_bulk",  # 하위 호환성 alias
+    # AMI
+    "get_ami_monthly_cost",
+    "get_ami_snapshot_price",
+    # EFS
+    "get_efs_prices",
+    "get_efs_storage_price",
+    "get_efs_monthly_cost",
+    # ElastiCache
+    "get_elasticache_prices",
+    "get_elasticache_hourly_price",
+    "get_elasticache_node_price",  # alias for get_elasticache_hourly_price
+    "get_elasticache_monthly_cost",
+    # FSx
+    "get_fsx_prices",
+    "get_fsx_gb_price",
+    "get_fsx_monthly_cost",
+    # Kinesis
+    "get_kinesis_prices",
+    "get_kinesis_shard_hour_price",
+    "get_kinesis_shard_price",  # alias for get_kinesis_shard_hour_price
+    "get_kinesis_monthly_cost",
+    # OpenSearch
+    "get_opensearch_prices",
+    "get_opensearch_instance_price",
+    "get_opensearch_storage_price",
+    "get_opensearch_monthly_cost",
+    # RDS
+    "get_rds_prices",
+    "get_rds_instance_price",
+    "get_rds_storage_price",
+    "get_rds_monthly_cost",
+    # Redshift
+    "get_redshift_prices",
+    "get_redshift_node_price",
+    "get_redshift_storage_price",
+    "get_redshift_monthly_cost",
+    # Transfer Family
+    "get_transfer_prices",
+    "get_transfer_hourly_price",
+    "get_transfer_monthly_cost",
 ]
