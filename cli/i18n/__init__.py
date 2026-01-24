@@ -25,6 +25,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 from contextvars import ContextVar
 from typing import Any
 
@@ -95,11 +96,8 @@ def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
 
     # Apply format string interpolation if kwargs provided
     if kwargs:
-        try:
+        with contextlib.suppress(KeyError, ValueError):
             text = text.format(**kwargs)
-        except (KeyError, ValueError):
-            # If formatting fails, return unformatted text
-            pass
 
     return text
 

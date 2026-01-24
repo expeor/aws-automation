@@ -4,8 +4,6 @@ tests/core/parallel/test_parallel_quotas.py - Service Quotas 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from core.parallel.quotas import (
     COMMON_QUOTAS,
     QuotaStatus,

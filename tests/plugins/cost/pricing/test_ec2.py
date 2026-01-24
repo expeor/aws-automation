@@ -73,7 +73,7 @@ class TestEC2Pricing:
         """refresh=True로 EC2 가격 조회"""
         from plugins.cost.pricing.ec2 import get_ec2_price
 
-        price = get_ec2_price("t3.micro", "ap-northeast-2", refresh=True)
+        _ = get_ec2_price("t3.micro", "ap-northeast-2", refresh=True)
 
         mock_pricing_service.get_prices.assert_called_with("ec2", "ap-northeast-2", True)
 

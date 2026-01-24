@@ -9,10 +9,10 @@ import os
 from datetime import datetime
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
+from core.tools.output.builder import OutputPath
 from plugins.vpc.ip_search.common.ip_ranges import (
     PublicIPResult,
     get_available_filters,
@@ -21,7 +21,6 @@ from plugins.vpc.ip_search.common.ip_ranges import (
     search_by_filter,
     search_public_ip,
 )
-from core.tools.output.builder import OutputPath
 
 from .i18n import t
 
@@ -51,13 +50,15 @@ def _export_csv(results: list[PublicIPResult], session_name: str) -> str:
 
     with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            t("header_ip"),
-            t("header_provider"),
-            t("header_service"),
-            t("header_ip_range"),
-            t("header_region"),
-        ])
+        writer.writerow(
+            [
+                t("header_ip"),
+                t("header_provider"),
+                t("header_service"),
+                t("header_ip_range"),
+                t("header_region"),
+            ]
+        )
         for r in results:
             writer.writerow([r.ip_address, r.provider, r.service, r.ip_prefix, r.region])
 
@@ -103,7 +104,9 @@ def _copy_to_clipboard(results: list[PublicIPResult]) -> bool:
     if not results:
         return False
 
-    lines = [f"{t('header_ip')}\t{t('header_provider')}\t{t('header_service')}\t{t('header_ip_range')}\t{t('header_region')}"]
+    lines = [
+        f"{t('header_ip')}\t{t('header_provider')}\t{t('header_service')}\t{t('header_ip_range')}\t{t('header_region')}"
+    ]
     for r in results:
         lines.append(f"{r.ip_address}\t{r.provider}\t{r.service}\t{r.ip_prefix}\t{r.region}")
 
@@ -178,7 +181,9 @@ def _show_cache_status() -> None:
 
     for provider, info in status["providers"].items():
         if info.get("cached"):
-            valid_str = f"[green]{t('cache_valid')}[/green]" if info.get("valid") else f"[yellow]{t('cache_expired')}[/yellow]"
+            valid_str = (
+                f"[green]{t('cache_valid')}[/green]" if info.get("valid") else f"[yellow]{t('cache_expired')}[/yellow]"
+            )
             console.print(f"  {provider}: {valid_str} - {info.get('count', 0)} prefixes ({info.get('time', '')})")
         else:
             console.print(f"  {provider}: [dim]{t('cache_none')}[/dim]")
@@ -231,7 +236,6 @@ def _search_by_ip(session_name: str) -> None:
 
     # Filter out Unknown if there are known matches for the same IP
     known_results = [r for r in results if r.provider != "Unknown"]
-    unknown_ips = {r.ip_address for r in results if r.provider == "Unknown"}
     known_ips = {r.ip_address for r in known_results}
     truly_unknown = [r for r in results if r.provider == "Unknown" and r.ip_address not in known_ips]
 
@@ -330,7 +334,7 @@ def run(ctx) -> None:
 
     while True:
         # Main menu with box style
-        print_box_start(t('title'))
+        print_box_start(t("title"))
         print_box_line(f"[dim]{t('subtitle')}[/dim]")
         print_box_line()
         print_box_line(f"  1) {t('menu_search_ip')}")
@@ -339,7 +343,7 @@ def run(ctx) -> None:
         print_box_line(f"  0) {t('menu_back')}")
         print_box_end()
 
-        choice = console.input(f"\n> ").strip()
+        choice = console.input("\n> ").strip()
 
         if choice == "0":
             console.print(f"\n[dim]{t('exit_message')}[/dim]")

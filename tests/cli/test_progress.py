@@ -5,12 +5,7 @@ cli/ui/progress 모듈 단위 테스트
 Progress tracking components for parallel execution.
 """
 
-import threading
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 
 # =============================================================================
 # ParallelTracker 테스트
@@ -387,7 +382,7 @@ class TestParallelProgressContextManager:
 
         with parallel_progress("테스트") as tracker:
             tracker.set_total(10)
-            for i in range(10):
+            for _ in range(10):
                 tracker.on_complete(success=True)
 
         success, failed, total = tracker.stats
@@ -519,7 +514,7 @@ class TestIntegration:
 
             with steps.sub_parallel("수집 중") as tracker:
                 tracker.set_total(5)
-                for i in range(5):
+                for _ in range(5):
                     tracker.on_complete(success=True)
 
             steps.complete_step()
@@ -564,15 +559,7 @@ class TestModuleExports:
         """cli.ui.progress에서 직접 import 가능"""
         from cli.ui.progress import (
             BaseTracker,
-            DownloadTracker,
-            ParallelTracker,
-            StatusTracker,
-            StepTracker,
             SuccessFailColumn,
-            download_progress,
-            indeterminate_progress,
-            parallel_progress,
-            step_progress,
         )
 
         assert BaseTracker is not None

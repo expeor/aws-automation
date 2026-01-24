@@ -2,22 +2,33 @@
 cli/headless.py - Headless CLI Runner
 
 CI/CD 파이프라인 및 자동화를 위한 비대화형 실행 모드입니다.
-SSO Profile 또는 Access Key 프로파일만 지원합니다.
+SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.
 
 Usage:
+    # SSO Profile / Access Key
     aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
+
+    # SSO Session (멀티 계정)
+    aa run ec2/ebs_audit -s my-sso --account 111122223333 --role AdminRole
+
+    # SSO Session (전체 계정)
+    aa run ec2/ebs_audit -s my-sso --account all --role AdminRole -r all
+
+    # SSO Session + Fallback Role
+    aa run ec2/ebs_audit -s my-sso --account all --role AdminRole --fallback-role ReadOnlyRole
 
     # 다중 리전
     aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
-
-    # 전체 리전
-    aa run ec2/ebs_audit -p my-profile -r all
 
     # JSON 출력
     aa run ec2/ebs_audit -p my-profile -f json -o result.json
 
 옵션:
-    -p, --profile: SSO Profile 또는 Access Key 프로파일 (필수)
+    -p, --profile: SSO Profile 또는 Access Key 프로파일
+    -s, --sso-session: SSO Session 이름 (멀티 계정 지원)
+    --account: 계정 ID (다중 가능, 'all'=전체) - SSO Session 전용
+    --role: Primary Role 이름 - SSO Session 전용
+    --fallback-role: Fallback Role 이름 (선택적) - SSO Session 전용
     -r, --region: 리전 또는 리전 패턴 (기본: ap-northeast-2)
     -f, --format: 출력 형식 (기본: both = Excel + HTML, excel, html, console, json, csv)
     -o, --output: 출력 파일 경로 (기본: 자동 생성)
@@ -44,8 +55,14 @@ class HeadlessConfig:
     category: str
     tool_module: str
 
-    # 인증
-    profile: str
+    # 인증 (profile 또는 sso_session 중 하나 사용)
+    profile: str | None = None
+
+    # SSO Session 인증 (멀티 계정)
+    sso_session: str | None = None
+    accounts: list[str] = field(default_factory=list)  # 계정 ID 목록 또는 ["all"]
+    role: str | None = None  # Primary Role
+    fallback_role: str | None = None  # Fallback Role (선택적)
 
     # 대상
     regions: list[str] = field(default_factory=list)
@@ -156,12 +173,15 @@ class HeadlessRunner:
         from core.auth.types import ProviderType
 
         config = load_config()
-        profile_name = self.config.profile
 
-        # SSO Session은 지원하지 않음
-        if profile_name in config.sessions:
-            console.print(f"[red]{t('flow.sso_session_not_supported', profile=profile_name)}[/red]")
-            console.print(f"[dim]{t('flow.use_sso_or_access_key')}[/dim]")
+        # SSO Session 인증
+        if self.config.sso_session:
+            return self._setup_sso_session(config)
+
+        # Profile 인증
+        profile_name = self.config.profile
+        if not profile_name:
+            console.print(f"[red]{t('flow.profile_not_found', profile='')}[/red]")
             return False
 
         # Profile인지 확인
@@ -207,6 +227,147 @@ class HeadlessRunner:
             console.print(f"[dim]{t('flow.using_static_profile', profile=self.config.profile)}[/dim]")
 
         return True
+
+    def _setup_sso_session(self, config) -> bool:
+        """SSO Session 인증 설정 (멀티 계정 지원)"""
+        from core.auth.provider import SSOSessionProvider
+        from core.auth.provider.sso_session import SSOSessionConfig
+
+        assert self._ctx is not None
+        session_name = self.config.sso_session
+
+        # SSO Session 설정 확인
+        if session_name not in config.sessions:
+            console.print(f"[red]{t('flow.sso_session_not_found', session=session_name)}[/red]")
+            console.print(f"[dim]{t('flow.available_sessions')}[/dim]")
+            for name in list(config.sessions.keys())[:5]:
+                console.print(f"  [dim]- {name}[/dim]")
+            return False
+
+        session_config = config.sessions[session_name]
+
+        # Provider 생성 및 인증
+        sso_config = SSOSessionConfig(
+            session_name=session_name,
+            start_url=session_config.get("sso_start_url", ""),
+            region=session_config.get("sso_region", "us-east-1"),
+        )
+        provider = SSOSessionProvider(sso_config)
+
+        if not self.config.quiet:
+            console.print(f"[dim]{t('flow.authenticating_sso', session=session_name)}[/dim]")
+
+        try:
+            provider.authenticate()
+        except Exception as e:
+            console.print(f"[red]{t('flow.sso_auth_failed', error=str(e))}[/red]")
+            return False
+
+        # 계정 목록 조회
+        all_accounts = provider.list_accounts()
+        if not all_accounts:
+            console.print(f"[red]{t('flow.no_accounts')}[/red]")
+            return False
+
+        # 계정 필터링
+        target_accounts = []
+        if "all" in [a.lower() for a in self.config.accounts]:
+            target_accounts = list(all_accounts.values())
+        else:
+            for acc_id in self.config.accounts:
+                if acc_id in all_accounts:
+                    target_accounts.append(all_accounts[acc_id])
+                else:
+                    console.print(f"[yellow]{t('flow.account_not_found', account=acc_id)}[/yellow]")
+
+        if not target_accounts:
+            console.print(f"[red]{t('flow.no_valid_accounts')}[/red]")
+            return False
+
+        # Role 설정 및 검증
+        role_selection = self._setup_role_selection(target_accounts, provider)
+        if not role_selection:
+            return False
+
+        # Context 설정
+        self._ctx.provider_kind = ProviderKind.SSO_SESSION
+        self._ctx.provider = provider
+        self._ctx.profile_name = session_name
+        self._ctx.accounts = target_accounts
+        self._ctx.role_selection = role_selection
+
+        if not self.config.quiet:
+            console.print(f"[dim]{t('flow.sso_session_ready', session=session_name, count=len(target_accounts))}[/dim]")
+
+        return True
+
+    def _setup_role_selection(self, accounts: list, provider) -> "RoleSelection | None":
+        """Role 선택 설정"""
+        from collections import defaultdict
+
+        from cli.flow.context import FallbackStrategy, RoleSelection
+
+        primary_role = self.config.role
+        fallback_role = self.config.fallback_role
+
+        # Role별 계정 매핑 생성
+        role_account_map: dict[str, list[str]] = defaultdict(list)
+        for account in accounts:
+            for role in getattr(account, "roles", []):
+                role_name = role if isinstance(role, str) else role.role_name
+                role_account_map[role_name].append(account.id)
+
+        # Primary Role 검증
+        if primary_role not in role_account_map:
+            console.print(f"[red]{t('flow.role_not_found', role=primary_role)}[/red]")
+            console.print(f"[dim]{t('flow.available_roles')}[/dim]")
+            for role_name in sorted(role_account_map.keys())[:10]:
+                console.print(f"  [dim]- {role_name}[/dim]")
+            return None
+
+        primary_accounts = set(role_account_map[primary_role])
+        all_account_ids = {acc.id for acc in accounts}
+        missing_accounts = all_account_ids - primary_accounts
+
+        # 모든 계정에 Primary Role이 있으면 완료
+        if not missing_accounts:
+            return RoleSelection(
+                primary_role=primary_role,
+                role_account_map=dict(role_account_map),
+            )
+
+        # Fallback 처리
+        skipped_accounts: list[str] = []
+
+        if fallback_role:
+            # Fallback Role 검증
+            if fallback_role not in role_account_map:
+                console.print(f"[yellow]{t('flow.fallback_role_not_found', role=fallback_role)}[/yellow]")
+                skipped_accounts = list(missing_accounts)
+            else:
+                fallback_accounts = set(role_account_map[fallback_role])
+                still_missing = missing_accounts - fallback_accounts
+                skipped_accounts = list(still_missing)
+
+                if not self.config.quiet and still_missing:
+                    console.print(
+                        f"[yellow]{t('flow.accounts_without_roles', count=len(still_missing))}[/yellow]"
+                    )
+        else:
+            # Fallback 없으면 해당 계정 스킵
+            skipped_accounts = list(missing_accounts)
+            if not self.config.quiet and missing_accounts:
+                console.print(
+                    f"[yellow]{t('flow.accounts_skipped_no_role', role=primary_role, count=len(missing_accounts))}[/yellow]"
+                )
+
+        return RoleSelection(
+            primary_role=primary_role,
+            fallback_role=fallback_role,
+            fallback_strategy=FallbackStrategy.USE_FALLBACK if fallback_role else FallbackStrategy.SKIP_ACCOUNT,
+            role_account_map=dict(role_account_map),
+            skipped_accounts=skipped_accounts,
+        )
 
     def _setup_regions(self) -> bool:
         """리전 설정"""
@@ -277,7 +438,16 @@ class HeadlessRunner:
         assert self._ctx is not None
         assert self._ctx.tool is not None
         console.print(f"[bold]{self._ctx.tool.name}[/bold]")
-        console.print(f"  {t('flow.profile_label')} {self._ctx.profile_name}")
+
+        # SSO Session의 경우 세션 이름 + 계정 수 표시
+        if self._ctx.is_sso_session():
+            console.print(f"  {t('flow.session_label')} {self._ctx.profile_name}")
+            target_accounts = self._ctx.get_target_accounts()
+            console.print(f"  {t('flow.accounts_label')} {t('flow.accounts_count', count=len(target_accounts))}")
+            if self._ctx.role_selection:
+                console.print(f"  {t('flow.role_label')} {self._ctx.role_selection.primary_role}")
+        else:
+            console.print(f"  {t('flow.profile_label')} {self._ctx.profile_name}")
 
         if len(self._ctx.regions) == 1:
             console.print(f"  {t('flow.region_label')} {self._ctx.regions[0]}")
@@ -287,15 +457,20 @@ class HeadlessRunner:
 
 def run_headless(
     tool_path: str,
-    profile: str,
-    regions: list[str],
+    profile: str | None = None,
+    regions: list[str] | None = None,
     format: str = "both",
     output: str | None = None,
     quiet: bool = False,
+    # SSO Session 옵션
+    sso_session: str | None = None,
+    accounts: list[str] | None = None,
+    role: str | None = None,
+    fallback_role: str | None = None,
 ) -> int:
     """Headless 실행 편의 함수
 
-    SSO Profile 또는 Access Key 프로파일만 지원합니다.
+    SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.
 
     Args:
         tool_path: 도구 경로 (category/module 형식)
@@ -304,6 +479,10 @@ def run_headless(
         format: 출력 형식
         output: 출력 파일 경로
         quiet: 최소 출력 모드
+        sso_session: SSO Session 이름 (멀티 계정)
+        accounts: 계정 ID 목록 또는 ["all"]
+        role: Primary Role 이름
+        fallback_role: Fallback Role 이름 (선택적)
 
     Returns:
         0: 성공, 1: 실패
@@ -321,6 +500,10 @@ def run_headless(
         category=category,
         tool_module=tool_module,
         profile=profile,
+        sso_session=sso_session,
+        accounts=accounts if accounts else [],
+        role=role,
+        fallback_role=fallback_role,
         regions=regions if regions else ["ap-northeast-2"],
         format=format,
         output=output,

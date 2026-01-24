@@ -4,8 +4,6 @@ tests/core/region/test_region_availability.py - 리전 가용성 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from core.region.availability import (
     RegionAvailabilityChecker,
     RegionInfo,

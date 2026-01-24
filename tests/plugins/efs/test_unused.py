@@ -101,9 +101,7 @@ class TestCollectEfsFilesystems:
         mock_efs.describe_mount_targets.return_value = {"MountTargets": [{"MountTargetId": "mt-1"}]}
 
         # CloudWatch 응답 설정
-        mock_cloudwatch.get_metric_statistics.return_value = {
-            "Datapoints": [{"Average": 1.0, "Sum": 1000.0}]
-        }
+        mock_cloudwatch.get_metric_statistics.return_value = {"Datapoints": [{"Average": 1.0, "Sum": 1000.0}]}
 
         # Act
         with patch("plugins.efs.unused.get_client", side_effect=get_client_mock):

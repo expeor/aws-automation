@@ -2,8 +2,6 @@
 tests/plugins/cost/pricing/test_constants.py - 상수 및 기본값 테스트
 """
 
-import pytest
-
 from plugins.cost.pricing.constants import (
     DEFAULT_PRICES,
     HOURS_PER_MONTH,

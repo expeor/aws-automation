@@ -59,7 +59,11 @@ exclude = [".git", "__pycache__", "build", "dist", ".eggs", "output", "temp"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
-ignore = ["E501"]  # Line length handled by formatter
+ignore = [
+    "E501",    # Line length handled by formatter
+    "SIM102",  # Nested if statements sometimes clearer than combined
+    "SIM108",  # Ternary operators reduce readability for long Korean f-strings
+]
 
 [tool.ruff.format]
 quote-style = "double"
