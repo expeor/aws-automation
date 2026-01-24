@@ -19,7 +19,7 @@ Usage:
 옵션:
     -p, --profile: SSO Profile 또는 Access Key 프로파일 (필수)
     -r, --region: 리전 또는 리전 패턴 (기본: ap-northeast-2)
-    -f, --format: 출력 형식 (console, json, csv)
+    -f, --format: 출력 형식 (기본: both = Excel + HTML, excel, html, console, json, csv)
     -o, --output: 출력 파일 경로 (기본: 자동 생성)
     -q, --quiet: 최소 출력 모드
 """
@@ -289,7 +289,7 @@ def run_headless(
     tool_path: str,
     profile: str,
     regions: list[str],
-    format: str = "console",
+    format: str = "both",
     output: str | None = None,
     quiet: bool = False,
 ) -> int:

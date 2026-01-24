@@ -66,6 +66,28 @@ aa vpc            # VPC 도구 바로 실행
 
 ## CLI 명령어
 
+CLI는 두 가지 모드를 지원합니다:
+- **대화형 모드**: 프롬프트를 통한 단계별 실행
+- **Headless 모드**: CI/CD 및 스크립트 연동
+
+### 명령어 구조
+
+```
+aa [전역 옵션] <명령어> [명령어 옵션]
+```
+
+**명령어 유형:**
+- **서비스 명령어**: `aa ec2`, `aa vpc` - AWS 서비스 대화형 메뉴
+- **유틸리티 명령어**: `aa run`, `aa list-tools`, `aa group` - 기능별 명령
+
+### 전역 옵션
+
+| 옵션 | 설명 |
+| ---- | ---- |
+| `--help` | 도움말 표시 |
+| `--version` | 버전 표시 |
+| `--lang ko\|en` | 출력 언어 선택 (기본: ko) |
+
 ### 기본 사용법
 
 ```bash
@@ -73,6 +95,7 @@ aa                  # 대화형 메뉴
 aa ec2              # EC2 도구 실행
 aa --help           # 도움말
 aa --version        # 버전 표시
+aa --lang en ec2    # 영문 출력으로 EC2 도구 실행
 ```
 
 ### Headless 모드
@@ -95,39 +118,30 @@ aa run ec2/ebs_audit -p my-profile -r all
 # 프로파일 그룹으로 실행
 aa run ec2/ebs_audit -g "개발 환경" -r ap-northeast-2
 
+# Excel + HTML 보고서 (기본값)
+aa run ec2/ebs_audit -p my-profile -f both
+
 # JSON 출력
 aa run ec2/ebs_audit -p my-profile -f json -o result.json
 ```
 
 **옵션:**
 
-| 옵션                  | 설명                                 |
-| --------------------- | ------------------------------------ |
-| `-p, --profile`       | SSO Profile 또는 Access Key 프로파일 |
-| `-g, --profile-group` | 저장된 프로파일 그룹 이름            |
-| `-r, --region`        | 리전 (다중 가능, `all` 또는 패턴)    |
-| `-f, --format`        | 출력 형식 (`console`, `json`, `csv`) |
-| `-o, --output`        | 출력 파일 경로                       |
-| `-q, --quiet`         | 최소 출력 모드                       |
+| 옵션 | 설명 |
+| ---- | ---- |
+| `-p, --profile` | SSO Profile 또는 Access Key 프로파일 |
+| `-g, --profile-group` | 저장된 프로파일 그룹 이름 |
+| `-r, --region` | 리전 (다중 가능, `all` 또는 패턴) |
+| `-f, --format` | 출력 형식: `both` (기본), `excel`, `html`, `console`, `json`, `csv` |
+| `-o, --output` | 출력 파일 경로 |
+| `-q, --quiet` | 최소 출력 모드 |
 
 ### 도구 목록 조회
 
 ```bash
 aa list-tools              # 전체 도구 목록
 aa list-tools -c ec2       # EC2 카테고리만
-aa list-tools --json       # JSON 출력
-```
-
-### IP 검색
-
-VPC 내 IP 주소를 빠르게 검색합니다.
-
-```bash
-aa ip                      # 대화형 모드
-aa ip 10.0.1.50            # 단일 IP 검색
-aa ip 10.0.0.0/8           # CIDR 범위 검색
-aa ip 10.0.1.50 -d         # 상세 모드 (API 조회)
-aa ip vpc-0a6d4f22 -c      # VPC 검색 + CSV 저장
+aa list-tools --json       # JSON 출력 (스크립트 연동용)
 ```
 
 ### 프로파일 그룹 관리
@@ -139,6 +153,39 @@ aa group list              # 그룹 목록
 aa group show "개발 환경"   # 그룹 상세
 aa group create            # 그룹 생성 (인터랙티브)
 aa group delete "개발 환경" # 그룹 삭제
+```
+
+### 환경 변수
+
+| 변수 | 설명 |
+| ---- | ---- |
+| `NO_COLOR` | 설정 시 색상 출력 비활성화 |
+| `AWS_DEFAULT_REGION` | 기본 리전 설정 |
+| `AWS_PROFILE` | 기본 AWS 프로필 |
+
+### Exit Codes
+
+| 코드 | 의미 |
+| ---- | ---- |
+| `0` | 성공 |
+| `1` | 일반 오류 |
+| `2` | 인증 오류 (프로필 없음, 토큰 만료) |
+
+### 사용 예시
+
+**CI/CD 파이프라인:**
+```bash
+aa run ec2/ebs_audit -p prod-profile -r all -f json -o report.json -q
+```
+
+**멀티 계정 분석:**
+```bash
+aa run iam/user_audit -g "전체 계정" -r ap-northeast-2 -f excel
+```
+
+**스크립트에서 결과 파싱:**
+```bash
+aa list-tools --json | jq '.[] | select(.category=="ec2")'
 ```
 
 ## 지원 서비스

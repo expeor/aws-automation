@@ -24,3 +24,6 @@ filelock>=3.16.0
 
 # Security
 cryptography>=44.0.0
+
+# Search
+rapidfuzz>=3.0.0

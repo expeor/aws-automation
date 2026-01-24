@@ -8,6 +8,14 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from rapidfuzz import fuzz
+
+# Fuzzy 검색 상수
+FUZZY_MIN_SCORE = 80  # 최소 유사도 (%)
+FUZZY_SCORE_BASE = 0.4  # fuzzy 기본 점수
+FUZZY_SCORE_MAX = 0.7  # fuzzy 최대 점수
+ALIAS_MATCH_SCORE = 0.80  # 별칭 매칭 점수
+
 
 @dataclass
 class SearchResult:
@@ -94,6 +102,8 @@ class ToolSearchEngine:
     def __init__(self):
         self._index: list[dict[str, Any]] = []
         self._chosung_index: dict[str, list[int]] = {}  # 초성 → 인덱스 리스트
+        self._alias_to_category: dict[str, str] = {}  # 별칭 → 카테고리명
+        self._category_names: set[str] = set()  # 카테고리명 집합
         self._built = False
 
     def build_index(self, categories: list[dict[str, Any]]) -> None:
@@ -104,17 +114,37 @@ class ToolSearchEngine:
         """
         self._index.clear()
         self._chosung_index.clear()
+        self._alias_to_category.clear()
+        self._category_names.clear()
 
         for cat in categories:
             cat_name = cat.get("name", "")
             cat_display = cat.get("display_name", cat_name)  # UI 표시용
             cat_desc = cat.get("description", cat_name)
 
+            # 카테고리명 저장
+            self._category_names.add(cat_name)
+            self._category_names.add(normalize_text(cat_name))
+
+            # 별칭 인덱스 구축
+            aliases = cat.get("aliases", [])
+            sub_services = cat.get("sub_services", [])
+            all_aliases = aliases + sub_services
+
+            for alias in all_aliases:
+                norm_alias = normalize_text(alias)
+                self._alias_to_category[norm_alias] = cat_name
+                # 별칭도 카테고리명으로 취급
+                self._category_names.add(norm_alias)
+
             for tool in cat.get("tools", []):
                 tool_name = tool.get("name", "")
                 tool_module = tool.get("module", "")
                 tool_desc = tool.get("description", "")
                 permission = tool.get("permission", "read")
+
+                # 별칭 및 sub_services 정규화
+                norm_aliases = [normalize_text(a) for a in all_aliases]
 
                 # 인덱스 항목 생성
                 idx = len(self._index)
@@ -132,6 +162,8 @@ class ToolSearchEngine:
                     "norm_desc": normalize_text(tool_desc),
                     "norm_cat": normalize_text(cat_name),
                     "norm_cat_desc": normalize_text(cat_desc),
+                    # 별칭 (정규화)
+                    "norm_aliases": norm_aliases,
                     # 초성
                     "chosung_name": get_chosung(tool_name),
                     "chosung_cat": get_chosung(cat_name),
@@ -156,7 +188,7 @@ class ToolSearchEngine:
         """검색 실행
 
         Args:
-            query: 검색 쿼리
+            query: 검색 쿼리 (카테고리 필터 문법 지원: "ec2:미사용")
             limit: 최대 결과 수
             category_filter: 특정 카테고리만 검색 (선택)
 
@@ -170,8 +202,14 @@ class ToolSearchEngine:
             return []
 
         query = query.strip()
-        norm_query = normalize_text(query)
-        chosung_query = get_chosung(query)
+
+        # 카테고리 필터 문법 파싱 (ec2:미사용)
+        parsed_filter, search_query = self._parse_query(query)
+        if parsed_filter:
+            category_filter = parsed_filter
+
+        norm_query = normalize_text(search_query)
+        chosung_query = get_chosung(search_query)
 
         results: list[tuple[float, str, dict]] = []  # (score, match_type, entry)
 
@@ -204,6 +242,59 @@ class ToolSearchEngine:
             for score, match_type, entry in results[:limit]
         ]
 
+    def _parse_query(self, query: str) -> tuple[str | None, str]:
+        """카테고리 필터 문법 파싱
+
+        Args:
+            query: 검색 쿼리 (예: "ec2:미사용", "lb:unused")
+
+        Returns:
+            (카테고리명 또는 None, 검색어)
+        """
+        if ":" not in query:
+            return None, query
+
+        parts = query.split(":", 1)
+        if len(parts) != 2:
+            return None, query
+
+        filter_part = parts[0].strip()
+        search_part = parts[1].strip()
+
+        # 필터 부분이 비어있으면 검색어만 사용
+        if not filter_part:
+            return None, search_part if search_part else query
+
+        # 카테고리명 또는 별칭으로 변환
+        resolved = self._resolve_category_filter(filter_part)
+        if resolved:
+            return resolved, search_part if search_part else ""
+
+        # 필터가 유효하지 않으면 원본 쿼리 반환
+        return None, query
+
+    def _resolve_category_filter(self, name: str) -> str | None:
+        """별칭을 카테고리명으로 변환
+
+        Args:
+            name: 카테고리명 또는 별칭
+
+        Returns:
+            실제 카테고리명 또는 None
+        """
+        norm_name = normalize_text(name)
+
+        # 직접 카테고리명 매칭
+        for entry in self._index:
+            if entry["norm_cat"] == norm_name:
+                return str(entry["category"])
+
+        # 별칭 매칭
+        if norm_name in self._alias_to_category:
+            return self._alias_to_category[norm_name]
+
+        return None
+
     def _calculate_score(
         self,
         norm_query: str,
@@ -216,15 +307,18 @@ class ToolSearchEngine:
         1. 도구명 정확히 일치 (1.0)
         2. 도구명 시작 (0.95)
         3. 도구명 포함 (0.85)
-        4. 카테고리명 일치/포함 (0.75)
-        5. 설명 포함 (0.6)
-        6. 초성 매칭 (0.5)
-        7. 부분 매칭 (0.3)
+        4. 별칭 매칭 (0.80)
+        5. 카테고리명 일치/포함 (0.75)
+        6. Fuzzy 매칭 (0.4~0.7)
+        7. 설명 포함 (0.6)
+        8. 초성 매칭 (0.5)
+        9. 부분 매칭 (0.3)
         """
         name = entry["norm_name"]
         cat = entry["norm_cat"]
         cat_desc = entry["norm_cat_desc"]
         desc = entry["norm_desc"]
+        aliases = entry.get("norm_aliases", [])
         chosung_name = entry["chosung_name"]
         chosung_cat = entry["chosung_cat"]
 
@@ -240,24 +334,38 @@ class ToolSearchEngine:
         if norm_query in name:
             return 0.85, "contains"
 
-        # 4. 카테고리명 일치/포함
+        # 4. 별칭 매칭
+        for alias in aliases:
+            if norm_query == alias or norm_query in alias or alias in norm_query:
+                return ALIAS_MATCH_SCORE, "alias"
+
+        # 5. 카테고리명 일치/포함
         if norm_query == cat or norm_query in cat:
             return 0.75, "category"
         if norm_query in cat_desc:
             return 0.7, "category_desc"
 
-        # 5. 설명 포함
+        # 6. Fuzzy 매칭 (도구명, 카테고리명, 별칭)
+        fuzzy_score = self._calculate_fuzzy_score(norm_query, name)
+        if fuzzy_score > 0:
+            return fuzzy_score, "fuzzy"
+
+        fuzzy_cat_score = self._calculate_fuzzy_score(norm_query, cat)
+        if fuzzy_cat_score > 0:
+            return fuzzy_cat_score * 0.9, "fuzzy_cat"  # 카테고리 fuzzy는 약간 낮게
+
+        # 7. 설명 포함
         if norm_query in desc:
             return 0.6, "description"
 
-        # 6. 초성 매칭 (한글 쿼리인 경우)
+        # 8. 초성 매칭 (한글 쿼리인 경우)
         if self._is_chosung_only(chosung_query):
             if chosung_query in chosung_name:
                 return 0.5, "chosung"
             if chosung_query in chosung_cat:
                 return 0.45, "chosung_cat"
 
-        # 7. 단어별 부분 매칭
+        # 9. 단어별 부분 매칭
         query_words = norm_query.split()
         if len(query_words) > 1:
             match_count = sum(1 for w in query_words if w in name or w in desc)
@@ -266,6 +374,36 @@ class ToolSearchEngine:
                 return 0.3 * ratio, "partial"
 
         return 0, ""
+
+    def _calculate_fuzzy_score(self, query: str, target: str) -> float:
+        """Fuzzy 유사도 점수 계산
+
+        rapidfuzz를 사용하여 유사도 계산 후 점수 범위(0.4~0.7)로 변환
+
+        Args:
+            query: 검색 쿼리 (정규화됨)
+            target: 대상 텍스트 (정규화됨)
+
+        Returns:
+            매칭 점수 (0 또는 0.4~0.7)
+        """
+        if not query or not target:
+            return 0
+
+        # 짧은 쿼리는 fuzzy 검색 효과가 낮음
+        if len(query) < 3:
+            return 0
+
+        # rapidfuzz로 유사도 계산 (0-100)
+        ratio = fuzz.ratio(query, target)
+
+        # 최소 유사도 미달
+        if ratio < FUZZY_MIN_SCORE:
+            return 0
+
+        # 유사도를 점수 범위로 변환 (80~100 → 0.4~0.7)
+        normalized = (ratio - FUZZY_MIN_SCORE) / (100 - FUZZY_MIN_SCORE)
+        return FUZZY_SCORE_BASE + (FUZZY_SCORE_MAX - FUZZY_SCORE_BASE) * normalized
 
     def _is_chosung_only(self, text: str) -> bool:
         """초성만으로 구성되어 있는지 확인"""
