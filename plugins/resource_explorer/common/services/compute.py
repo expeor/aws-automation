@@ -116,7 +116,7 @@ def collect_lambda_functions(session, account_id: str, account_name: str, region
 def collect_ecs_clusters(session, account_id: str, account_name: str, region: str) -> list[ECSCluster]:
     """ECS Cluster 수집"""
     ecs = get_client(session, "ecs", region_name=region)
-    clusters = []
+    clusters: list[ECSCluster] = []
 
     # 클러스터 ARN 목록 조회
     cluster_arns = []
@@ -324,7 +324,7 @@ def collect_launch_templates(session, account_id: str, account_name: str, region
 def collect_eks_clusters(session, account_id: str, account_name: str, region: str) -> list[EKSCluster]:
     """EKS Cluster 수집"""
     eks = get_client(session, "eks", region_name=region)
-    clusters = []
+    clusters: list[EKSCluster] = []
 
     # 클러스터 이름 목록 조회
     cluster_names = []
@@ -373,7 +373,7 @@ def collect_eks_clusters(session, account_id: str, account_name: str, region: st
 def collect_eks_node_groups(session, account_id: str, account_name: str, region: str) -> list[EKSNodeGroup]:
     """EKS Node Group 수집"""
     eks = get_client(session, "eks", region_name=region)
-    node_groups = []
+    node_groups: list[EKSNodeGroup] = []
 
     # 클러스터 목록 조회
     cluster_names = []

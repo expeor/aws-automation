@@ -15,7 +15,7 @@ Structure:
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Any, TypedDict
 
 
 class MessageDict(TypedDict):
@@ -26,10 +26,10 @@ class MessageDict(TypedDict):
 
 
 # Master message registry
-MESSAGES: dict[str, MessageDict] = {}
+MESSAGES: dict[str, Any] = {}
 
 
-def register_messages(namespace: str, messages: dict[str, MessageDict]) -> None:
+def register_messages(namespace: str, messages: dict[str, dict[str, str]]) -> None:
     """Register messages for a namespace.
 
     Args:

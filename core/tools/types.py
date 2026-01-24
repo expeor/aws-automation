@@ -287,8 +287,8 @@ def get_tool_name(tool: dict, lang: str = "ko") -> str:
         Tool name in the specified language
     """
     if lang == "en":
-        return tool.get("name_en") or tool.get("name", "")
-    return tool.get("name", "")
+        return str(tool.get("name_en") or tool.get("name", ""))
+    return str(tool.get("name", ""))
 
 
 def get_tool_description(tool: dict, lang: str = "ko") -> str:
@@ -302,8 +302,8 @@ def get_tool_description(tool: dict, lang: str = "ko") -> str:
         Tool description in the specified language
     """
     if lang == "en":
-        return tool.get("description_en") or tool.get("description", "")
-    return tool.get("description", "")
+        return str(tool.get("description_en") or tool.get("description", ""))
+    return str(tool.get("description", ""))
 
 
 def get_category_description(category: dict, lang: str = "ko") -> str:
@@ -317,8 +317,8 @@ def get_category_description(category: dict, lang: str = "ko") -> str:
         Category description in the specified language
     """
     if lang == "en":
-        return category.get("description_en") or category.get("description", "")
-    return category.get("description", "")
+        return str(category.get("description_en") or category.get("description", ""))
+    return str(category.get("description", ""))
 
 
 class ToolMeta(TypedDict, total=False):

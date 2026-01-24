@@ -7,6 +7,7 @@ Consolidates parsing logic from private.py and detail.py.
 
 import re
 from dataclasses import dataclass, field
+from re import Pattern
 from typing import Any
 
 
@@ -31,16 +32,14 @@ class ParsedResource:
 # =============================================================================
 
 # Compiled regex patterns for performance
-_PATTERNS = {
-    "efs_fs_id": re.compile(r"fs-[a-zA-Z0-9]+"),
-    "lambda_function": re.compile(r"AWS Lambda VPC ENI-(.+)"),
-    "rds_id": [
-        re.compile(r"RDSNetworkInterface[:\s-]+([a-zA-Z0-9_-]+)", re.IGNORECASE),
-        re.compile(r"([a-zA-Z0-9_-]+)\..*\.rds\.amazonaws\.com", re.IGNORECASE),
-    ],
-    "nat_gateway": re.compile(r"nat-[a-zA-Z0-9]+"),
-    "tgw_attachment": re.compile(r"tgw-attach-[a-zA-Z0-9]+"),
-}
+_EFS_FS_ID_PATTERN: Pattern[str] = re.compile(r"fs-[a-zA-Z0-9]+")
+_LAMBDA_FUNCTION_PATTERN: Pattern[str] = re.compile(r"AWS Lambda VPC ENI-(.+)")
+_NAT_GATEWAY_PATTERN: Pattern[str] = re.compile(r"nat-[a-zA-Z0-9]+")
+_TGW_ATTACHMENT_PATTERN: Pattern[str] = re.compile(r"tgw-attach-[a-zA-Z0-9]+")
+_RDS_ID_PATTERNS: list[Pattern[str]] = [
+    re.compile(r"RDSNetworkInterface[:\s-]+([a-zA-Z0-9_-]+)", re.IGNORECASE),
+    re.compile(r"([a-zA-Z0-9_-]+)\..*\.rds\.amazonaws\.com", re.IGNORECASE),
+]
 
 
 # =============================================================================
@@ -83,7 +82,7 @@ def parse_eni_description(
 
     # EFS Mount Target
     if "EFS" in description or "mount target" in description.lower():
-        fs_match = _PATTERNS["efs_fs_id"].search(description)
+        fs_match = _EFS_FS_ID_PATTERN.search(description)
         if fs_match:
             fs_id = fs_match.group(0)
             return ParsedResource(
@@ -99,7 +98,7 @@ def parse_eni_description(
 
     # Lambda
     if "AWS Lambda VPC ENI" in description:
-        func_match = _PATTERNS["lambda_function"].search(description)
+        func_match = _LAMBDA_FUNCTION_PATTERN.search(description)
         if func_match:
             func_name = func_match.group(1).strip()
             return ParsedResource(
@@ -145,7 +144,7 @@ def parse_eni_description(
 
     # RDS
     if "RDSNetworkInterface" in description:
-        for pattern in _PATTERNS["rds_id"]:
+        for pattern in _RDS_ID_PATTERNS:
             match = pattern.search(description)
             if match:
                 db_id = match.group(1)
@@ -172,7 +171,7 @@ def parse_eni_description(
 
     # FSx
     if "FSx" in description or "fsx" in description.lower():
-        fs_match = _PATTERNS["efs_fs_id"].search(description)  # Same pattern as EFS
+        fs_match = _EFS_FS_ID_PATTERN.search(description)  # Same pattern as EFS
         if fs_match:
             fs_id = fs_match.group(0)
             return ParsedResource(
@@ -188,7 +187,7 @@ def parse_eni_description(
 
     # NAT Gateway
     if "NAT Gateway" in description or interface_type == "nat_gateway":
-        nat_match = _PATTERNS["nat_gateway"].search(description)
+        nat_match = _NAT_GATEWAY_PATTERN.search(description)
         if nat_match:
             nat_id = nat_match.group(0)
             return ParsedResource(
@@ -228,7 +227,7 @@ def parse_eni_description(
 
     # Transit Gateway
     if "Transit Gateway" in description:
-        tgw_match = _PATTERNS["tgw_attachment"].search(description)
+        tgw_match = _TGW_ATTACHMENT_PATTERN.search(description)
         if tgw_match:
             att_id = tgw_match.group(0)
             return ParsedResource(

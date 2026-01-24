@@ -101,7 +101,7 @@ def collect_codepipelines(session, account_id: str, account_name: str, region: s
 def collect_codebuild_projects(session, account_id: str, account_name: str, region: str) -> list[CodeBuildProject]:
     """CodeBuild Project 수집"""
     codebuild = get_client(session, "codebuild", region_name=region)
-    projects = []
+    projects: list[CodeBuildProject] = []
 
     try:
         # 프로젝트 이름 목록
