@@ -213,6 +213,7 @@ class HeadlessRunner:
     def _setup_sso_profile(self) -> bool:
         """SSO Profile 인증 설정"""
         assert self._ctx is not None
+        assert self.config.profile is not None
         self._ctx.provider_kind = ProviderKind.SSO_PROFILE
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -225,6 +226,7 @@ class HeadlessRunner:
     def _setup_static(self) -> bool:
         """Static Credentials 인증 설정"""
         assert self._ctx is not None
+        assert self.config.profile is not None
         self._ctx.provider_kind = ProviderKind.STATIC_CREDENTIALS
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -240,6 +242,7 @@ class HeadlessRunner:
         from core.auth.provider.sso_session import SSOSessionConfig
 
         assert self._ctx is not None
+        assert self.config.sso_session is not None
         session_name = self.config.sso_session
 
         # SSO Session 설정 확인

@@ -125,7 +125,7 @@ class AWSReport:
 
     def _extract_execution_info(self, ctx: Any | None) -> dict[str, Any]:
         """컨텍스트에서 실행 정보 추출"""
-        info = {
+        info: dict[str, Any] = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "accounts": [],
             "regions": [],

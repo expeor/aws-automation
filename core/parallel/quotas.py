@@ -179,7 +179,7 @@ class ServiceQuotaChecker:
         cache_key = f"quotas:{service_code}:{self.region}"
         cached = self._get_cached(cache_key)
         if cached is not None:
-            return cached  # type: ignore[return-value]
+            return cached  # type: ignore[no-any-return]
 
         quotas: list[ServiceQuotaInfo] = []
 
@@ -284,7 +284,7 @@ class ServiceQuotaChecker:
         cache_key = f"quota_usage:{service_code}:{quota_code}:{self.region}"
         cached = self._get_cached(cache_key)
         if cached is not None:
-            return cached  # type: ignore[return-value]
+            return cached  # type: ignore[no-any-return]
 
         try:
             client = self._get_client()

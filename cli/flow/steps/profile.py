@@ -236,6 +236,7 @@ class ProfileStep:
                 selected_kind, _ = available_types[type_idx]
                 info = auth_type_info[selected_kind]
                 console.print(f"[dim]{t('flow.auth_label')}[/dim] {info['name']}")
+                assert isinstance(selected_kind, ProviderKind)
                 return selected_kind
 
             except ValueError:
