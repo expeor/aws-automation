@@ -383,6 +383,32 @@ aa group
 | `-o, --output` | 출력 파일 경로 |
 | `-q, --quiet` | 최소 출력 모드 |
 
+## Git 워크플로우
+
+### Branch Protection Rules
+
+- **master 브랜치 직접 push 금지**: GitHub branch protection rule로 master에 직접 push 불가
+- 모든 변경은 PR(Pull Request)을 통해 진행
+- 커밋 후 push 시 항상 feature 브랜치 사용
+
+### 권장 워크플로우
+
+1. Feature 브랜치 생성: `git checkout -b feature/기능명` 또는 `refactor/설명`
+2. 변경사항 커밋
+3. Feature 브랜치 push: `git push -u origin 브랜치명`
+4. PR 생성: `gh pr create`
+5. 리뷰 후 merge
+
+### 브랜치 네이밍
+
+| Prefix | 용도 | 예시 |
+|--------|------|------|
+| `feature/` | 새 기능 | `feature/elasticache-plugin` |
+| `fix/` | 버그 수정 | `fix/sso-token-refresh` |
+| `refactor/` | 리팩토링 | `refactor/parallel-executor` |
+| `docs/` | 문서 | `docs/api-guide` |
+| `chore/` | 설정/의존성 | `chore/update-deps` |
+
 ## Contributing
 
 기여 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요:
