@@ -235,6 +235,31 @@ cli.help = _build_help_text()
     help="저장된 프로파일 그룹 이름 (aa group list로 확인)",
 )
 @click.option(
+    "-s",
+    "--sso-session",
+    "sso_session",
+    required=False,
+    help="SSO Session 이름 (멀티 계정 지원)",
+)
+@click.option(
+    "--account",
+    "accounts",
+    multiple=True,
+    help="계정 ID (다중 가능, 'all'=전체) - SSO Session 전용",
+)
+@click.option(
+    "--role",
+    "role",
+    required=False,
+    help="사용할 Role 이름 - SSO Session 전용",
+)
+@click.option(
+    "--fallback-role",
+    "fallback_role",
+    required=False,
+    help="Fallback Role 이름 (Primary Role 없는 계정용) - SSO Session 전용",
+)
+@click.option(
     "-r",
     "--region",
     multiple=True,
@@ -260,10 +285,10 @@ cli.help = _build_help_text()
     is_flag=True,
     help="최소 출력 모드",
 )
-def run_command(tool_path, profile, profile_group, region, format, output, quiet):
+def run_command(tool_path, profile, profile_group, sso_session, accounts, role, fallback_role, region, format, output, quiet):
     """비대화형 도구 실행 (CI/CD용)
 
-    SSO Profile 또는 Access Key 프로파일만 지원합니다.
+    SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.
 
     \b
     TOOL_PATH: category/module 형식 (aa list-tools로 확인)
@@ -271,31 +296,62 @@ def run_command(tool_path, profile, profile_group, region, format, output, quiet
 
     \b
     Examples:
-        # 기본 실행
+        # SSO Profile / Access Key 실행
         aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
 
         # 프로파일 그룹으로 실행
         aa run ec2/ebs_audit -g "개발 환경" -r ap-northeast-2
 
+        # SSO Session으로 멀티 계정 실행
+        aa run ec2/ebs_audit -s my-sso --account 111122223333 --account 444455556666 --role AdminRole
+
+        # SSO Session 전체 계정 실행
+        aa run ec2/ebs_audit -s my-sso --account all --role AdminRole -r all
+
+        # SSO Session + Fallback Role
+        aa run ec2/ebs_audit -s my-sso --account all --role AdminRole --fallback-role ReadOnlyRole
+
         # 다중 리전
         aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
-
-        # 전체 리전
-        aa run ec2/ebs_audit -p my-profile -r all
 
         # JSON 출력
         aa run ec2/ebs_audit -p my-profile -f json -o result.json
     """
     from cli.headless import run_headless
 
-    # 프로파일 또는 그룹 둘 중 하나는 필수
-    if not profile and not profile_group:
-        click.echo(t("cli.run_profile_required"), err=True)
+    # 인증 옵션 검증: profile, profile_group, sso_session 중 하나만 사용
+    auth_options = [bool(profile), bool(profile_group), bool(sso_session)]
+    if sum(auth_options) == 0:
+        click.echo(t("cli.run_auth_required"), err=True)
         raise SystemExit(1)
 
-    if profile and profile_group:
-        click.echo(t("cli.run_profile_conflict"), err=True)
+    if sum(auth_options) > 1:
+        click.echo(t("cli.run_auth_conflict"), err=True)
         raise SystemExit(1)
+
+    # SSO Session 옵션 검증
+    if sso_session:
+        if not role:
+            click.echo(t("cli.run_sso_role_required"), err=True)
+            raise SystemExit(1)
+        if not accounts:
+            click.echo(t("cli.run_sso_account_required"), err=True)
+            raise SystemExit(1)
+
+    # SSO Session 실행
+    if sso_session:
+        exit_code = run_headless(
+            tool_path=tool_path,
+            sso_session=sso_session,
+            accounts=list(accounts),
+            role=role,
+            fallback_role=fallback_role,
+            regions=list(region),
+            format=format,
+            output=output,
+            quiet=quiet,
+        )
+        raise SystemExit(exit_code)
 
     # 프로파일 그룹 처리
     profiles_to_run = []

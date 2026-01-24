@@ -76,6 +76,14 @@ CLI_MESSAGES = {
     # =========================================================================
     # Run Command
     # =========================================================================
+    "run_auth_required": {
+        "ko": "오류: -p/--profile, -g/--profile-group, -s/--sso-session 중 하나를 지정하세요.",
+        "en": "Error: Please specify one of -p/--profile, -g/--profile-group, or -s/--sso-session.",
+    },
+    "run_auth_conflict": {
+        "ko": "오류: -p/--profile, -g/--profile-group, -s/--sso-session은 동시에 사용할 수 없습니다.",
+        "en": "Error: Cannot use -p/--profile, -g/--profile-group, and -s/--sso-session together.",
+    },
     "run_profile_required": {
         "ko": "오류: -p/--profile 또는 -g/--profile-group 중 하나를 지정하세요.",
         "en": "Error: Please specify either -p/--profile or -g/--profile-group.",
@@ -83,6 +91,14 @@ CLI_MESSAGES = {
     "run_profile_conflict": {
         "ko": "오류: -p/--profile과 -g/--profile-group은 동시에 사용할 수 없습니다.",
         "en": "Error: Cannot use -p/--profile and -g/--profile-group together.",
+    },
+    "run_sso_role_required": {
+        "ko": "오류: SSO Session 사용 시 --role 옵션이 필수입니다.",
+        "en": "Error: --role option is required when using SSO Session.",
+    },
+    "run_sso_account_required": {
+        "ko": "오류: SSO Session 사용 시 --account 옵션이 필수입니다. (예: --account 111122223333 또는 --account all)",
+        "en": "Error: --account option is required when using SSO Session. (e.g., --account 111122223333 or --account all)",
     },
     "run_group_not_found": {
         "ko": "오류: 그룹을 찾을 수 없습니다: {name}",

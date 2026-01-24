@@ -403,4 +403,67 @@ FLOW_MESSAGES = {
         "ko": "오류: {message}",
         "en": "Error: {message}",
     },
+    # =========================================================================
+    # SSO Session (Headless)
+    # =========================================================================
+    "sso_session_not_found": {
+        "ko": "SSO Session을 찾을 수 없습니다: {session}",
+        "en": "SSO Session not found: {session}",
+    },
+    "available_sessions": {
+        "ko": "사용 가능한 SSO Session:",
+        "en": "Available SSO Sessions:",
+    },
+    "authenticating_sso": {
+        "ko": "SSO 인증 중: {session}",
+        "en": "Authenticating SSO: {session}",
+    },
+    "sso_auth_failed": {
+        "ko": "SSO 인증 실패: {error}",
+        "en": "SSO authentication failed: {error}",
+    },
+    "account_not_found": {
+        "ko": "계정을 찾을 수 없습니다: {account}",
+        "en": "Account not found: {account}",
+    },
+    "no_valid_accounts": {
+        "ko": "유효한 계정이 없습니다.",
+        "en": "No valid accounts found.",
+    },
+    "sso_session_ready": {
+        "ko": "SSO Session 준비 완료: {session} ({count}개 계정)",
+        "en": "SSO Session ready: {session} ({count} accounts)",
+    },
+    "role_not_found": {
+        "ko": "Role을 찾을 수 없습니다: {role}",
+        "en": "Role not found: {role}",
+    },
+    "available_roles": {
+        "ko": "사용 가능한 Role:",
+        "en": "Available Roles:",
+    },
+    "fallback_role_not_found": {
+        "ko": "Fallback Role을 찾을 수 없습니다: {role}",
+        "en": "Fallback Role not found: {role}",
+    },
+    "accounts_without_roles": {
+        "ko": "Primary/Fallback Role 모두 없는 계정 {count}개 스킵됨",
+        "en": "{count} accounts skipped (neither Primary nor Fallback Role available)",
+    },
+    "accounts_skipped_no_role": {
+        "ko": "'{role}' Role이 없는 계정 {count}개 스킵됨",
+        "en": "{count} accounts skipped (no '{role}' Role)",
+    },
+    "session_label": {
+        "ko": "세션:",
+        "en": "Session:",
+    },
+    "accounts_label": {
+        "ko": "계정:",
+        "en": "Accounts:",
+    },
+    "accounts_count": {
+        "ko": "{count}개",
+        "en": "{count}",
+    },
 }
