@@ -18,6 +18,7 @@ from .builder import (
     create_report_directory,
     open_file,
     open_in_explorer,
+    print_report_complete,
     single_report_directory,
 )
 from .report_types import (
@@ -47,6 +48,7 @@ __all__: list[str] = [
     "open_in_explorer",
     "open_file_explorer",  # 레거시 호환
     "open_file",
+    "print_report_complete",
     # Report types
     "ReportType",
     "ToolType",

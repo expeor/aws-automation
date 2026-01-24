@@ -253,6 +253,40 @@ def single_report_directory(session_name: str) -> str:
     return OutputPath(session_name).sub("reports").with_date(DatePattern.DAILY).build()
 
 
+def print_report_complete(
+    paths: str | dict[str, str],
+    message: str = "보고서 생성 완료!",
+) -> None:
+    """보고서 생성 완료 메시지 출력 (공통 포맷)
+
+    단일 경로 또는 멀티 경로(Excel/HTML 등)를 표준화된 형식으로 출력합니다.
+
+    Args:
+        paths: 단일 경로(str) 또는 포맷-경로 딕셔너리(dict)
+            - str: 단일 파일 경로
+            - dict: {"excel": "...", "html": "..."} 형태
+        message: 완료 메시지 (기본: "보고서 생성 완료!")
+
+    사용 예시:
+        # 단일 경로
+        print_report_complete("/path/to/report.xlsx")
+
+        # 멀티 경로
+        print_report_complete({"excel": "/path/report.xlsx", "html": "/path/report.html"})
+    """
+    from rich.console import Console
+
+    console = Console()
+    console.print(f"\n[bold green]✓ {message}[/bold green]")
+
+    if isinstance(paths, str):
+        console.print(f"   [bold]경로[/bold]: {paths}")
+    elif isinstance(paths, dict):
+        for fmt, path in paths.items():
+            if path:
+                console.print(f"   [bold]{fmt.upper()}[/bold]: {path}")
+
+
 def create_report_directory(
     tool_name: str,
     identifier: str = "default",

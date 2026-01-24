@@ -134,8 +134,9 @@ def run(ctx) -> None:
     reporter = SSOExcelReporter(all_results, all_stats)
     filepath = reporter.generate(output_path)
 
-    console.print("[bold green]보고서 생성 완료![/bold green]")
-    console.print(f"  경로: {filepath}")
+    from core.tools.output import print_report_complete
+
+    print_report_complete(filepath)
 
     # 오류 출력
     if collector.errors:

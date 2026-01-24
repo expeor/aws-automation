@@ -550,8 +550,6 @@ def run(ctx) -> None:
     # Excel + HTML 동시 생성 (ctx.output_config 설정에 따라)
     report_paths = generate_report(results, output_path, ctx)
 
-    console.print("\n[bold green]완료![/bold green]")
-    if report_paths.get("excel"):
-        console.print(f"  Excel: {report_paths['excel']}")
-    if report_paths.get("html"):
-        console.print(f"  HTML: {report_paths['html']}")
+    from core.tools.output import print_report_complete
+
+    print_report_complete(report_paths, "분석 완료!")

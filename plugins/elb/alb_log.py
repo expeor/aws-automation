@@ -155,9 +155,9 @@ def run(ctx) -> None:
         # 리포트 생성 (ctx.output_config에 따라 Excel, HTML, 또는 둘 다)
         report_paths = _generate_reports(ctx, analyzer, analysis_results, output_dir)
 
-        console.print("\n[bold green]✓ 보고서 생성 완료![/bold green]")
-        for fmt, path in report_paths.items():
-            console.print(f"   {fmt.upper()}: {path}")
+        from core.tools.output import print_report_complete
+
+        print_report_complete(report_paths)
 
         # Step 5: 임시 파일 정리
         _cleanup_temp_files(analyzer, gz_directory, log_directory)
