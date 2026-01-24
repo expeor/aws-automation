@@ -19,6 +19,9 @@ venv/
 *.swp
 *~
 
+# Claude Code
+.claude/settings.local.json
+
 # Testing
 .coverage
 .pytest_cache/

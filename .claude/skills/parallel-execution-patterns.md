@@ -281,9 +281,40 @@ def _callback(session, account_id, account_name, region):
 result = parallel_collect(ctx, _callback, service="service_name")
 ```
 
+## Service Quotas 확인
+
+운영 전 서비스 한도 확인:
+
+```python
+from core.parallel import get_quota_checker, QuotaStatus
+
+def run(ctx):
+    session = ctx.provider.get_session()
+    checker = get_quota_checker(session, "ap-northeast-2")
+
+    # 특정 쿼터 확인
+    quota = checker.get_quota("ec2", "Running On-Demand")
+    if quota and quota.usage_percent > 80:
+        console.print(f"[yellow]경고: {quota.quota_name} 사용률 {quota.usage_percent:.1f}%[/yellow]")
+
+    # 서비스 모든 쿼터 확인
+    quotas = checker.get_service_quotas("ec2")
+    high_usage = [q for q in quotas if q.status in (QuotaStatus.WARNING, QuotaStatus.CRITICAL)]
+```
+
+주요 쿼터:
+
+| 서비스 | 쿼터 코드 | 설명 |
+|--------|----------|------|
+| EC2 | L-1216C47A | Running On-Demand Standard instances |
+| EC2 | L-34B43A08 | All Standard Spot Instance Requests |
+| Lambda | L-B99A9384 | Concurrent executions |
+| IAM | L-F4A5425F | Roles |
+
 ## 참조
 
 - `core/parallel/__init__.py` - parallel_collect, get_client
 - `core/parallel/executor.py` - ParallelSessionExecutor, ParallelConfig
 - `core/parallel/rate_limiter.py` - Rate limiter
+- `core/parallel/quotas.py` - ServiceQuotaChecker, QuotaStatus
 - `core/parallel/types.py` - ParallelExecutionResult

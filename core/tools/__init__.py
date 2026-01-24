@@ -11,6 +11,18 @@ from .discovery import (
     list_tools_by_area,
     load_tool,
 )
+from .tag_validator import (
+    TagPolicy,
+    TagPolicyValidator,
+    TagRule,
+    TagValidationError,
+    TagValidationErrorType,
+    TagValidationResult,
+    create_basic_policy,
+    create_cost_allocation_policy,
+    create_map_migration_policy,
+    create_security_policy,
+)
 
 __all__: list[str] = [
     "BaseToolRunner",
@@ -20,4 +32,15 @@ __all__: list[str] = [
     "load_tool",
     "list_tools_by_area",
     "get_area_summary",
+    # Tag Validation
+    "TagPolicyValidator",
+    "TagPolicy",
+    "TagRule",
+    "TagValidationResult",
+    "TagValidationError",
+    "TagValidationErrorType",
+    "create_basic_policy",
+    "create_cost_allocation_policy",
+    "create_security_policy",
+    "create_map_migration_policy",
 ]

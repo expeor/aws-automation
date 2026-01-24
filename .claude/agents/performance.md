@@ -163,6 +163,287 @@ for resource in resources:
     client.describe_resource(ResourceId=resource["Id"])
 ```
 
+## 벤치마크 기준
+
+### 실행 시간 기준
+
+| 시나리오 | 목표 | 허용 범위 |
+|---------|------|----------|
+| 10계정 × 10리전 | < 2분 | < 3분 |
+| 단일 계정/리전 | < 10초 | < 30초 |
+| 대용량 (100+ 리소스) | < 30초 | < 1분 |
+
+### API 호출 기준
+
+| 최적화 영역 | 목표 감소율 | 측정 방법 |
+|------------|-----------|----------|
+| CloudWatch 배치 | > 85% | 개별 vs 배치 호출 수 비교 |
+| 리소스 캐싱 | > 50% | 중복 API 호출 제거 |
+| Paginator | 100% 커버 | 대용량 응답 누락 방지 |
+
+### 메모리 기준
+
+| 시나리오 | 피크 메모리 | 측정 도구 |
+|---------|-----------|----------|
+| 10,000 리소스 | < 200MB | tracemalloc |
+| 100,000 리소스 | < 500MB | tracemalloc |
+| 스트리밍 처리 | < 50MB | tracemalloc |
+
+### 벤치마크 예시
+
+```python
+import time
+from contextlib import contextmanager
+
+@contextmanager
+def benchmark(name: str, threshold_seconds: float):
+    """벤치마크 컨텍스트 매니저"""
+    start = time.perf_counter()
+    yield
+    elapsed = time.perf_counter() - start
+
+    status = "✅ PASS" if elapsed < threshold_seconds else "❌ FAIL"
+    print(f"{status} {name}: {elapsed:.2f}s (threshold: {threshold_seconds}s)")
+
+# 사용
+with benchmark("10계정 수집", threshold_seconds=120):
+    result = parallel_collect(ctx, _collect_and_analyze, service="ec2")
+```
+
+## CloudWatch 배치 최적화
+
+### 기본 개념
+
+GetMetricData API는 최대 500개 메트릭을 1회 호출로 조회 가능합니다.
+기존 get_metric_statistics()는 메트릭당 1회 호출이 필요합니다.
+
+| 방식 | 50 Lambda × 5 메트릭 | API 호출 |
+|------|---------------------|---------|
+| 레거시 (개별) | 250개 메트릭 | 250회 |
+| 배치 (GetMetricData) | 250개 메트릭 | 1회 |
+| **절감율** | - | **99.6%** |
+
+### 사용 패턴
+
+```python
+from datetime import datetime, timedelta
+from plugins.cloudwatch.common.batch_metrics import (
+    batch_get_metrics,
+    build_lambda_metric_queries,
+    MetricQuery,
+    sanitize_metric_id,
+)
+
+# 1. 함수별 쿼리 빌드 (헬퍼 사용)
+function_names = [f["FunctionName"] for f in functions]
+queries = build_lambda_metric_queries(
+    function_names,
+    metrics=["Invocations", "Errors", "Duration", "Throttles"]
+)
+
+# 2. 배치 조회
+end_time = datetime.now()
+start_time = end_time - timedelta(days=30)
+
+results = batch_get_metrics(
+    cloudwatch_client=cw_client,
+    queries=queries,
+    start_time=start_time,
+    end_time=end_time,
+    period=86400  # 1일 단위 집계
+)
+
+# 3. 결과 매핑
+# results: {"func1_invocations_sum": 1000, "func1_errors_sum": 5, ...}
+for func in functions:
+    safe_id = sanitize_metric_id(func["FunctionName"])
+    invocations = results.get(f"{safe_id}_invocations_sum", 0)
+    errors = results.get(f"{safe_id}_errors_sum", 0)
+```
+
+### 서비스별 헬퍼
+
+| 서비스 | 헬퍼 함수 | 기본 메트릭 |
+|--------|----------|-----------|
+| Lambda | `build_lambda_metric_queries()` | Invocations, Errors, Duration |
+| RDS | `build_rds_metric_queries()` | DatabaseConnections, CPUUtilization |
+| EC2 | `build_ec2_metric_queries()` | CPUUtilization, NetworkIn/Out |
+| NAT Gateway | `build_nat_metric_queries()` | BytesOut, PacketsOut |
+| ElastiCache | `build_elasticache_metric_queries()` | CurrConnections, CPUUtilization |
+
+### 커스텀 쿼리
+
+```python
+# 직접 MetricQuery 생성
+queries = [
+    MetricQuery(
+        id=sanitize_metric_id(f"{resource_id}_custom_metric"),
+        namespace="AWS/CustomNamespace",
+        metric_name="CustomMetric",
+        dimensions={"ResourceId": resource_id},
+        stat="Average"
+    )
+    for resource_id in resource_ids
+]
+```
+
+## InventoryCollector 활용
+
+### 기본 사용법
+
+```python
+from plugins.resource_explorer.common.collector import InventoryCollector
+
+def analyze_resources(ctx):
+    collector = InventoryCollector(ctx)
+
+    # 한 번 수집하면 세션 내 캐싱
+    ec2_instances = collector.collect_ec2()
+    ebs_volumes = collector.collect_ebs_volumes()
+    security_groups = collector.collect_security_groups()
+
+    # 분석 로직...
+```
+
+### 지원 리소스 카테고리
+
+| 카테고리 | 메서드 | 반환 타입 |
+|---------|--------|----------|
+| **Compute** | `collect_ec2()` | `list[EC2Instance]` |
+| | `collect_ebs_volumes()` | `list[EBSVolume]` |
+| | `collect_lambda_functions()` | `list[LambdaFunction]` |
+| **Network** | `collect_vpcs()` | `list[VPC]` |
+| | `collect_subnets()` | `list[Subnet]` |
+| | `collect_security_groups()` | `list[SecurityGroup]` |
+| **Database** | `collect_rds_instances()` | `list[RDSInstance]` |
+| | `collect_dynamodb_tables()` | `list[DynamoDBTable]` |
+| **Load Balancing** | `collect_load_balancers()` | `list[LoadBalancer]` |
+| | `collect_target_groups()` | `list[TargetGroup]` |
+
+### 캐싱 활용 패턴
+
+```python
+# ❌ 비효율적: 여러 도구에서 중복 수집
+def tool1(ctx):
+    ec2 = ctx.provider.get_session().client("ec2")
+    instances = ec2.describe_instances()  # API 호출
+
+def tool2(ctx):
+    ec2 = ctx.provider.get_session().client("ec2")
+    instances = ec2.describe_instances()  # 중복 API 호출!
+
+# ✅ 효율적: InventoryCollector 캐싱 활용
+def tool1(ctx):
+    collector = InventoryCollector(ctx)
+    instances = collector.collect_ec2()  # API 호출 + 캐싱
+
+def tool2(ctx):
+    collector = InventoryCollector(ctx)
+    instances = collector.collect_ec2()  # 캐시에서 반환 (API 호출 없음)
+```
+
+### 리소스 연관 분석
+
+```python
+def analyze_with_relationships(ctx):
+    """리소스 간 관계 분석"""
+    collector = InventoryCollector(ctx)
+
+    # 모든 필요 리소스 수집 (병렬 + 캐싱)
+    instances = collector.collect_ec2()
+    volumes = collector.collect_ebs_volumes()
+    security_groups = collector.collect_security_groups()
+
+    # 인스턴스 ID → 인스턴스 매핑
+    instance_map = {i.instance_id: i for i in instances}
+
+    # 볼륨-인스턴스 연관 분석
+    for volume in volumes:
+        if volume.attachments:
+            instance_id = volume.attachments[0].get("InstanceId")
+            instance = instance_map.get(instance_id)
+            # 연관 분석...
+```
+
+## 메모리 프로파일링
+
+### tracemalloc 사용
+
+```python
+import tracemalloc
+from contextlib import contextmanager
+
+@contextmanager
+def memory_profile(name: str, threshold_mb: float = 200):
+    """메모리 프로파일링 컨텍스트"""
+    tracemalloc.start()
+    yield
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    peak_mb = peak / 1024 / 1024
+    status = "✅" if peak_mb < threshold_mb else "❌"
+    print(f"{status} {name}: 피크 {peak_mb:.1f}MB (threshold: {threshold_mb}MB)")
+
+# 사용
+with memory_profile("대용량 수집", threshold_mb=200):
+    data = collect_large_dataset()
+```
+
+### 스트리밍 처리 패턴
+
+```python
+# ❌ 메모리 집약적: 전체 로드
+def batch_process(paginator):
+    all_items = []
+    for page in paginator.paginate():
+        all_items.extend(page["Items"])  # 메모리에 전체 적재
+    return analyze(all_items)
+
+# ✅ 메모리 효율적: 스트리밍
+def stream_process(paginator):
+    for page in paginator.paginate():
+        for item in page["Items"]:
+            yield item  # 한 번에 하나씩 처리
+
+# 또는 청크 처리
+def chunked_process(paginator, chunk_size: int = 1000):
+    chunk = []
+    for page in paginator.paginate():
+        for item in page["Items"]:
+            chunk.append(item)
+            if len(chunk) >= chunk_size:
+                yield from analyze_chunk(chunk)
+                chunk = []
+    if chunk:
+        yield from analyze_chunk(chunk)
+```
+
+### 대용량 데이터 처리 가이드
+
+| 데이터 규모 | 권장 패턴 | 메모리 사용 |
+|------------|----------|-----------|
+| < 1,000건 | 배치 (리스트) | 낮음 |
+| 1,000~10,000건 | 청크 처리 | 중간 |
+| > 10,000건 | 스트리밍 (제너레이터) | 최소 |
+
+```python
+def process_with_strategy(items: list, count: int):
+    """데이터 규모에 따른 처리 전략 선택"""
+    if count < 1000:
+        # 배치 처리
+        return analyze_batch(items)
+    elif count < 10000:
+        # 청크 처리
+        results = []
+        for chunk in chunks(items, 1000):
+            results.extend(analyze_chunk(chunk))
+        return results
+    else:
+        # 스트리밍 처리
+        return list(stream_analyze(items))
+```
+
 ## 성능 측정
 
 ### 프로파일링
