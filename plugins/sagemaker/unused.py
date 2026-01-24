@@ -23,9 +23,9 @@ from enum import Enum
 
 from rich.console import Console
 
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from plugins.cost.pricing import get_sagemaker_monthly_cost
 
 console = Console()
@@ -76,9 +76,7 @@ class SageMakerEndpointInfo:
     @property
     def estimated_monthly_cost(self) -> float:
         """월간 비용 추정 (AWS Pricing API 동적 조회)"""
-        return get_sagemaker_monthly_cost(
-            self.instance_type, self.region, self.instance_count
-        )
+        return get_sagemaker_monthly_cost(self.instance_type, self.region, self.instance_count)
 
     @property
     def age_days(self) -> int:
@@ -114,7 +112,9 @@ class SageMakerAnalysisResult:
     findings: list[EndpointFinding] = field(default_factory=list)
 
 
-def collect_sagemaker_endpoints(session, account_id: str, account_name: str, region: str) -> list[SageMakerEndpointInfo]:
+def collect_sagemaker_endpoints(
+    session, account_id: str, account_name: str, region: str
+) -> list[SageMakerEndpointInfo]:
     """SageMaker Endpoint 수집 (배치 메트릭 최적화)"""
     from botocore.exceptions import ClientError
 
@@ -330,16 +330,18 @@ def generate_report(results: list[SageMakerAnalysisResult], output_dir: str) -> 
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_endpoints,
-            r.unused_endpoints,
-            r.low_usage_endpoints,
-            r.normal_endpoints,
-            f"${r.unused_monthly_cost:,.2f}",
-            f"${r.low_usage_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_endpoints,
+                r.unused_endpoints,
+                r.low_usage_endpoints,
+                r.normal_endpoints,
+                f"${r.unused_monthly_cost:,.2f}",
+                f"${r.low_usage_monthly_cost:,.2f}",
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.unused_endpoints > 0:

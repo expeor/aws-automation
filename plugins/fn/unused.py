@@ -210,15 +210,17 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
     summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_count,
-            r.unused_count,
-            r.low_usage_count,
-            r.normal_count,
-            f"${r.unused_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.unused_count,
+                r.low_usage_count,
+                r.normal_count,
+                f"${r.unused_monthly_cost:,.2f}",
+            ]
+        )
         if r.unused_count > 0:
             summary_sheet._ws.cell(row=row_num, column=4).fill = red_fill
 
@@ -226,15 +228,17 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
     total_functions = sum(r.total_count for r in results)
     total_unused = sum(r.unused_count for r in results)
     total_waste = sum(r.unused_monthly_cost for r in results)
-    summary_sheet.add_summary_row([
-        "합계",
-        "-",
-        total_functions,
-        total_unused,
-        "-",
-        "-",
-        f"${total_waste:,.2f}",
-    ])
+    summary_sheet.add_summary_row(
+        [
+            "합계",
+            "-",
+            total_functions,
+            total_unused,
+            "-",
+            "-",
+            f"${total_waste:,.2f}",
+        ]
+    )
 
     # Unused Functions Sheet
     unused_columns = [
@@ -261,20 +265,22 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
                 UsageStatus.LOW_USAGE,
             ):
                 fn = f.function
-                row_num = unused_sheet.add_row([
-                    fn.account_name,
-                    fn.region,
-                    fn.function_name,
-                    fn.runtime,
-                    fn.memory_mb,
-                    fn.timeout_seconds,
-                    round(fn.code_size_mb, 2),
-                    fn.last_modified.strftime("%Y-%m-%d") if fn.last_modified else "-",
-                    fn.provisioned_concurrency or "-",
-                    f.status.value,
-                    f"${f.monthly_waste:,.2f}" if f.monthly_waste > 0 else "-",
-                    f.recommendation,
-                ])
+                row_num = unused_sheet.add_row(
+                    [
+                        fn.account_name,
+                        fn.region,
+                        fn.function_name,
+                        fn.runtime,
+                        fn.memory_mb,
+                        fn.timeout_seconds,
+                        round(fn.code_size_mb, 2),
+                        fn.last_modified.strftime("%Y-%m-%d") if fn.last_modified else "-",
+                        fn.provisioned_concurrency or "-",
+                        f.status.value,
+                        f"${f.monthly_waste:,.2f}" if f.monthly_waste > 0 else "-",
+                        f.recommendation,
+                    ]
+                )
 
                 # 상태별 색상
                 ws = unused_sheet._ws
@@ -308,23 +314,25 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
             fn = f.function
             metrics = fn.metrics
 
-            all_sheet.add_row([
-                fn.account_name,
-                fn.region,
-                fn.function_name,
-                fn.runtime,
-                fn.memory_mb,
-                fn.timeout_seconds,
-                round(fn.code_size_mb, 2),
-                metrics.invocations if metrics else 0,
-                round(metrics.duration_avg_ms, 2) if metrics else 0,
-                metrics.errors if metrics else 0,
-                metrics.throttles if metrics else 0,
-                fn.provisioned_concurrency or "-",
-                fn.reserved_concurrency if fn.reserved_concurrency is not None else "-",
-                f.status.value,
-                f"${fn.estimated_monthly_cost:,.4f}" if fn.estimated_monthly_cost > 0 else "-",
-            ])
+            all_sheet.add_row(
+                [
+                    fn.account_name,
+                    fn.region,
+                    fn.function_name,
+                    fn.runtime,
+                    fn.memory_mb,
+                    fn.timeout_seconds,
+                    round(fn.code_size_mb, 2),
+                    metrics.invocations if metrics else 0,
+                    round(metrics.duration_avg_ms, 2) if metrics else 0,
+                    metrics.errors if metrics else 0,
+                    metrics.throttles if metrics else 0,
+                    fn.provisioned_concurrency or "-",
+                    fn.reserved_concurrency if fn.reserved_concurrency is not None else "-",
+                    f.status.value,
+                    f"${fn.estimated_monthly_cost:,.4f}" if fn.estimated_monthly_cost > 0 else "-",
+                ]
+            )
 
     return str(wb.save_as(output_dir, "Lambda_Unused"))
 

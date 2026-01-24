@@ -646,17 +646,19 @@ def generate_report(results: list[MigrationAnalysisResult], output_dir: str) -> 
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_clbs,
-            r.alb_recommended,
-            r.nlb_recommended,
-            r.split_recommended,
-            r.keep_recommended,
-            f"${r.total_current_cost:.2f}",
-            f"${r.total_estimated_cost:.2f}",
-        ])
+        summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_clbs,
+                r.alb_recommended,
+                r.nlb_recommended,
+                r.split_recommended,
+                r.keep_recommended,
+                f"${r.total_current_cost:.2f}",
+                f"${r.total_estimated_cost:.2f}",
+            ]
+        )
 
     # Recommendations 시트
     rec_columns = [

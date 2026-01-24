@@ -35,12 +35,18 @@ Usage:
     -q, --quiet: 최소 출력 모드
 """
 
+from __future__ import annotations
+
 import sys
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
+
+if TYPE_CHECKING:
+    from cli.flow.context import RoleSelection
 from cli.i18n import t
 from core.filter import expand_region_pattern
 
@@ -207,6 +213,7 @@ class HeadlessRunner:
     def _setup_sso_profile(self) -> bool:
         """SSO Profile 인증 설정"""
         assert self._ctx is not None
+        assert self.config.profile is not None
         self._ctx.provider_kind = ProviderKind.SSO_PROFILE
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -219,6 +226,7 @@ class HeadlessRunner:
     def _setup_static(self) -> bool:
         """Static Credentials 인증 설정"""
         assert self._ctx is not None
+        assert self.config.profile is not None
         self._ctx.provider_kind = ProviderKind.STATIC_CREDENTIALS
         self._ctx.profiles = [self.config.profile]
         self._ctx.profile_name = self.config.profile
@@ -234,6 +242,7 @@ class HeadlessRunner:
         from core.auth.provider.sso_session import SSOSessionConfig
 
         assert self._ctx is not None
+        assert self.config.sso_session is not None
         session_name = self.config.sso_session
 
         # SSO Session 설정 확인
@@ -301,7 +310,7 @@ class HeadlessRunner:
 
         return True
 
-    def _setup_role_selection(self, accounts: list, provider) -> "RoleSelection | None":
+    def _setup_role_selection(self, accounts: list, provider) -> RoleSelection | None:
         """Role 선택 설정"""
         from collections import defaultdict
 
@@ -350,9 +359,7 @@ class HeadlessRunner:
                 skipped_accounts = list(still_missing)
 
                 if not self.config.quiet and still_missing:
-                    console.print(
-                        f"[yellow]{t('flow.accounts_without_roles', count=len(still_missing))}[/yellow]"
-                    )
+                    console.print(f"[yellow]{t('flow.accounts_without_roles', count=len(still_missing))}[/yellow]")
         else:
             # Fallback 없으면 해당 계정 스킵
             skipped_accounts = list(missing_accounts)

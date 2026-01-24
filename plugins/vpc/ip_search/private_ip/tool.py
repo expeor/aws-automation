@@ -7,10 +7,8 @@ Supports multi-profile/multi-account cache management.
 
 import ipaddress
 import logging
-from datetime import datetime
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
@@ -22,7 +20,6 @@ from .cache import (
     MultiCacheSearch,
     PrivateIPResult,
     build_cache,
-    delete_all_caches,
     delete_cache,
     list_available_caches,
 )
@@ -84,7 +81,9 @@ def _select_caches(caches: list[CacheInfo]) -> list[CacheInfo]:
         console.print(f"\n[bold cyan]{t('cache_available')}[/bold cyan]")
         _display_cache_table(caches, selected)
 
-        console.print(f"\n  [dim]번호 입력: 선택/해제 | a={t('cache_toggle_all')} | Enter={t('cache_confirm_selection')} | 0={t('menu_back')}[/dim]")
+        console.print(
+            f"\n  [dim]번호 입력: 선택/해제 | a={t('cache_toggle_all')} | Enter={t('cache_confirm_selection')} | 0={t('menu_back')}[/dim]"
+        )
         choice = Prompt.ask(t("prompt_select"), default="").strip()
 
         if choice == "":
@@ -443,7 +442,9 @@ def _run_search_loop(
     while True:
         # Prompt with hints
         console.print(f"\n[dim]{t('search_examples')}[/dim]")
-        detail_hint = f"[magenta]{t('detail_mode_on')}[/magenta]" if detail_mode else f"[dim]{t('hint_toggle_detail')}[/dim]"
+        detail_hint = (
+            f"[magenta]{t('detail_mode_on')}[/magenta]" if detail_mode else f"[dim]{t('hint_toggle_detail')}[/dim]"
+        )
         console.print(f"[dim]{detail_hint} | {t('hint_back')}[/dim]")
 
         query = Prompt.ask(f"[bold cyan]{t('menu_search')}[/bold cyan]").strip()
@@ -512,7 +513,7 @@ def run(ctx) -> None:
         cache_count = len(available_caches)
 
         # Main menu with box style
-        print_box_start(t('title'))
+        print_box_start(t("title"))
         print_box_line(f"[dim]{t('subtitle')}[/dim]")
         print_box_line()
         print_box_line(f"  1) {t('menu_search')}")
@@ -522,7 +523,7 @@ def run(ctx) -> None:
         print_box_line(f"  0) {t('menu_back')}")
         print_box_end()
 
-        choice = console.input(f"\n> ").strip()
+        choice = console.input("\n> ").strip()
 
         if choice == "0":
             console.print(f"\n[dim]{t('exit_message')}[/dim]")

@@ -535,17 +535,19 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
     total_issues = sum(r.functions_with_issues for r in results)
     total_cost = sum(r.total_monthly_cost for r in results)
     total_savings = sum(r.potential_savings for r in results)
-    summary_sheet.add_summary_row([
-        "합계",
-        "-",
-        total_functions,
-        total_issues,
-        "-",
-        "-",
-        "-",
-        f"${total_cost:,.2f}",
-        f"${total_savings:,.2f}",
-    ])
+    summary_sheet.add_summary_row(
+        [
+            "합계",
+            "-",
+            total_functions,
+            total_issues,
+            "-",
+            "-",
+            "-",
+            f"${total_cost:,.2f}",
+            f"${total_savings:,.2f}",
+        ]
+    )
 
     # Issues Sheet
     issue_columns = [
@@ -565,18 +567,20 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
         for comp in r.results:
             for issue in comp.issues:
                 fn = comp.function
-                row_num = issues_sheet.add_row([
-                    fn.account_name,
-                    fn.region,
-                    fn.function_name,
-                    fn.runtime,
-                    fn.memory_mb,
-                    issue.issue_type.value,
-                    issue.severity.value,
-                    issue.description,
-                    issue.recommendation,
-                    f"${issue.potential_savings:,.2f}" if issue.potential_savings > 0 else "-",
-                ])
+                row_num = issues_sheet.add_row(
+                    [
+                        fn.account_name,
+                        fn.region,
+                        fn.function_name,
+                        fn.runtime,
+                        fn.memory_mb,
+                        issue.issue_type.value,
+                        issue.severity.value,
+                        issue.description,
+                        issue.recommendation,
+                        f"${issue.potential_savings:,.2f}" if issue.potential_savings > 0 else "-",
+                    ]
+                )
 
                 # 심각도에 따른 셀 하이라이트
                 fill = severity_fills.get(issue.severity)
@@ -604,20 +608,22 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
         for comp in r.results:
             fn = comp.function
             metrics = fn.metrics
-            all_sheet.add_row([
-                fn.account_name,
-                fn.region,
-                fn.function_name,
-                fn.runtime,
-                fn.memory_mb,
-                fn.timeout_seconds,
-                metrics.invocations if metrics else 0,
-                f"{metrics.duration_avg_ms:.1f}ms" if metrics else "-",
-                metrics.errors if metrics else 0,
-                metrics.throttles if metrics else 0,
-                comp.issue_count,
-                f"${comp.estimated_monthly_cost:,.4f}",
-            ])
+            all_sheet.add_row(
+                [
+                    fn.account_name,
+                    fn.region,
+                    fn.function_name,
+                    fn.runtime,
+                    fn.memory_mb,
+                    fn.timeout_seconds,
+                    metrics.invocations if metrics else 0,
+                    f"{metrics.duration_avg_ms:.1f}ms" if metrics else "-",
+                    metrics.errors if metrics else 0,
+                    metrics.throttles if metrics else 0,
+                    comp.issue_count,
+                    f"${comp.estimated_monthly_cost:,.4f}",
+                ]
+            )
 
     return str(wb.save_as(output_dir, "Lambda_Comprehensive"))
 

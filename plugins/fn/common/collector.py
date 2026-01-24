@@ -15,8 +15,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import ErrorSeverity, get_client, try_or_default
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 logger = logging.getLogger(__name__)
 
@@ -260,9 +260,7 @@ def collect_function_metrics(
 
         # 마지막 호출 시간 추정 (호출이 있었던 경우만)
         if metrics.invocations > 0:
-            metrics.last_invocation_time = _get_last_invocation_time(
-                cloudwatch, function_name, start_time, end_time
-            )
+            metrics.last_invocation_time = _get_last_invocation_time(cloudwatch, function_name, start_time, end_time)
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -321,9 +319,7 @@ def collect_all_function_metrics(
 
         # 호출이 있었던 함수들의 마지막 호출 시간 조회
         # (이 부분은 추가 API 호출이 필요하므로 필요시만 조회)
-        funcs_with_invocations = [
-            fn for fn in function_names if results_map[fn].invocations > 0
-        ]
+        funcs_with_invocations = [fn for fn in function_names if results_map[fn].invocations > 0]
 
         if funcs_with_invocations:
             # 일별 호출 데이터 배치 조회
@@ -338,9 +334,7 @@ def collect_all_function_metrics(
                 for fn in funcs_with_invocations
             ]
 
-            daily_results = batch_get_metrics(
-                cloudwatch, daily_queries, start_time, end_time, period=86400
-            )
+            daily_results = batch_get_metrics(cloudwatch, daily_queries, start_time, end_time, period=86400)
 
             # 일별 데이터에서 마지막 호출 시간 추정
             # Note: GetMetricData는 타임스탬프를 반환하지 않아 정확한 시간 추정 어려움

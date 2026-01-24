@@ -45,11 +45,7 @@ def _get_cache_dir() -> str:
     """Get cache directory path (project root's temp folder)"""
     # plugins/vpc/ip_search/common/ip_ranges -> ip_ranges -> common -> ip_search -> vpc -> plugins -> project_root
     project_root = os.path.dirname(
-        os.path.dirname(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            )
-        )
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     )
     cache_dir = os.path.join(project_root, "temp", "ip_ranges")
     os.makedirs(cache_dir, exist_ok=True)
@@ -120,9 +116,7 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
         "aws": lambda: _fetch_and_cache("aws", "https://ip-ranges.amazonaws.com/ip-ranges.json"),
         "gcp": lambda: _fetch_and_cache("gcp", "https://www.gstatic.com/ipranges/cloud.json"),
         "azure": _fetch_azure_fresh,
-        "oracle": lambda: _fetch_and_cache(
-            "oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"
-        ),
+        "oracle": lambda: _fetch_and_cache("oracle", "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json"),
     }
 
     for provider in providers:
@@ -169,7 +163,9 @@ def _fetch_azure_fresh() -> dict[Any, Any] | None:
     """Download Azure data (weekly update URL search)"""
     from datetime import datetime, timedelta
 
-    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    base_url = (
+        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    )
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -276,7 +272,9 @@ def get_azure_ip_ranges() -> dict[str, Any]:
 
     from datetime import datetime, timedelta
 
-    base_url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    base_url = (
+        "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_{}.json"
+    )
 
     for weeks_back in range(5):
         for day_offset in range(7):
@@ -303,9 +301,7 @@ def get_oracle_ip_ranges() -> dict[str, Any]:
         return cached
 
     try:
-        response = requests.get(
-            "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10
-        )
+        response = requests.get("https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json", timeout=10)
         data: dict[str, Any] = response.json()
         _save_to_cache("oracle", data)
         return data

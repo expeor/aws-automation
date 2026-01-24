@@ -101,7 +101,9 @@ def collect_vpn_gateways(session, account_id: str, account_name: str, region: st
             tags = parse_tags(vgw.get("Tags"))
 
             # VPC Attachment IDs
-            vpc_attachments = [att.get("VpcId", "") for att in vgw.get("VpcAttachments", []) if att.get("State") == "attached"]
+            vpc_attachments = [
+                att.get("VpcId", "") for att in vgw.get("VpcAttachments", []) if att.get("State") == "attached"
+            ]
 
             gateways.append(
                 VPNGateway(

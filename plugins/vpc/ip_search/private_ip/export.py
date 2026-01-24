@@ -151,16 +151,16 @@ def export_excel(
 
     headers = get_headers(lang)
     columns = [
-        ColumnDef(header=headers[0], width=18),   # IP Address
-        ColumnDef(header=headers[1], width=15),   # Profile
-        ColumnDef(header=headers[2], width=15),   # Account ID
-        ColumnDef(header=headers[3], width=20),   # Account Name
-        ColumnDef(header=headers[4], width=15),   # Region
-        ColumnDef(header=headers[5], width=25),   # Resource
-        ColumnDef(header=headers[6], width=25),   # ENI ID
-        ColumnDef(header=headers[7], width=25),   # VPC ID
-        ColumnDef(header=headers[8], width=28),   # Subnet ID
-        ColumnDef(header=headers[9], width=18),   # Private IP
+        ColumnDef(header=headers[0], width=18),  # IP Address
+        ColumnDef(header=headers[1], width=15),  # Profile
+        ColumnDef(header=headers[2], width=15),  # Account ID
+        ColumnDef(header=headers[3], width=20),  # Account Name
+        ColumnDef(header=headers[4], width=15),  # Region
+        ColumnDef(header=headers[5], width=25),  # Resource
+        ColumnDef(header=headers[6], width=25),  # ENI ID
+        ColumnDef(header=headers[7], width=25),  # VPC ID
+        ColumnDef(header=headers[8], width=28),  # Subnet ID
+        ColumnDef(header=headers[9], width=18),  # Private IP
         ColumnDef(header=headers[10], width=18),  # Public IP
         ColumnDef(header=headers[11], width=18),  # Interface Type
         ColumnDef(header=headers[12], width=12),  # Status

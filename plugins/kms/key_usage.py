@@ -1158,28 +1158,32 @@ def generate_report(results: list[KMSUsageResult], output_dir: str) -> str:
         for ku in r.key_usages:
             if ku.usages:
                 for usage in ku.usages:
-                    usage_sheet.add_row([
+                    usage_sheet.add_row(
+                        [
+                            r.account_name,
+                            r.region,
+                            ku.key.key_id[:20] + "...",
+                            ku.key.alias or "-",
+                            ku.usage_count,
+                            usage.service,
+                            usage.resource_type,
+                            usage.resource_name,
+                        ]
+                    )
+            else:
+                # 미사용 키
+                row_num = usage_sheet.add_row(
+                    [
                         r.account_name,
                         r.region,
                         ku.key.key_id[:20] + "...",
                         ku.key.alias or "-",
-                        ku.usage_count,
-                        usage.service,
-                        usage.resource_type,
-                        usage.resource_name,
-                    ])
-            else:
-                # 미사용 키
-                row_num = usage_sheet.add_row([
-                    r.account_name,
-                    r.region,
-                    ku.key.key_id[:20] + "...",
-                    ku.key.alias or "-",
-                    0,
-                    "-",
-                    "-",
-                    "(미사용)",
-                ])
+                        0,
+                        "-",
+                        "-",
+                        "(미사용)",
+                    ]
+                )
                 # 사용 횟수 0인 셀 강조
                 ws = usage_sheet._ws
                 ws.cell(row=row_num, column=5).fill = red_fill

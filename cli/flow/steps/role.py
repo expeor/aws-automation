@@ -50,7 +50,7 @@ class RoleStep:
 
         if not role_account_map:
             console.print(f"[red]! {t('flow.no_roles_available')}[/red]")
-            raise RuntimeError(t('flow.no_roles_error'))
+            raise RuntimeError(t("flow.no_roles_error"))
 
         # Primary Role 선택
         primary_role = self._select_primary_role(role_account_map, len(ctx.accounts))
@@ -133,7 +133,7 @@ class RoleStep:
             key=lambda x: x[0].lower(),
         )
 
-        print_box_start(t('flow.role_selection', count=len(sorted_roles)))
+        print_box_start(t("flow.role_selection", count=len(sorted_roles)))
 
         # 1열 레이아웃 (Role 이름 전체 표시)
         for idx, (role_name, account_ids) in enumerate(sorted_roles, 1):
@@ -198,12 +198,12 @@ class RoleStep:
             confirm = console.input("> ").strip().lower()
             if confirm != "y":
                 console.print(f"[yellow]{t('flow.terminated')}[/yellow]")
-                raise KeyboardInterrupt(t('flow.user_cancelled'))
+                raise KeyboardInterrupt(t("flow.user_cancelled"))
             return None, FallbackStrategy.SKIP_ACCOUNT
 
         best_fallback = fallback_candidates[0]
 
-        print_box_start(t('flow.fallback_setup'))
+        print_box_start(t("flow.fallback_setup"))
         print_box_line(f"  1) {best_fallback[0]:<40} ({t('flow.recommended_covers', count=best_fallback[1])})")
         print_box_line(f"  2) {t('flow.select_other_role')}")
         print_box_line(f"  3) {t('flow.skip_accounts', count=missing_count)}")
@@ -218,7 +218,7 @@ class RoleStep:
                 return None, FallbackStrategy.SKIP_ACCOUNT
             elif action == "2":
                 # Fallback Role 선택
-                print_box_start(t('flow.select_fallback_role'))
+                print_box_start(t("flow.select_fallback_role"))
                 for i, (role, covers, _) in enumerate(fallback_candidates, 1):
                     print_box_line(f"  {i:>2}) {role:<40} ({t('flow.covers_count', count=covers)})")
                 print_box_end()

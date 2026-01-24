@@ -51,20 +51,20 @@ class RegionStep:
         # 선택 모드 (번호 입력 방식)
         if is_single_region_only:
             modes = [
-                t('flow.current_region', region=self.default_region),
-                t('flow.select_other_region'),
+                t("flow.current_region", region=self.default_region),
+                t("flow.select_other_region"),
             ]
         else:
             modes = [
-                t('flow.current_region', region=self.default_region),
-                t('flow.select_other_region'),
-                t('flow.all_regions', count=len(ALL_REGIONS)),
+                t("flow.current_region", region=self.default_region),
+                t("flow.select_other_region"),
+                t("flow.all_regions", count=len(ALL_REGIONS)),
             ]
 
         # 화면 클리어 (Global 서비스 제외)
         clear_screen()
 
-        print_box_start(t('flow.region_selection'))
+        print_box_start(t("flow.region_selection"))
         if is_single_region_only:
             print_box_line(f"[yellow]{t('flow.single_region_only')}[/yellow]")
             print_box_line()
@@ -121,7 +121,7 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions_for_selection = common_region_codes + other_regions
 
-        print_box_start(t('flow.region_count', count=len(all_regions_for_selection)))
+        print_box_start(t("flow.region_count", count=len(all_regions_for_selection)))
 
         # 3열 레이아웃 (리전 코드만)
         cols = 3
@@ -164,7 +164,7 @@ class RegionStep:
         other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
         all_regions = common_region_codes + other_regions
 
-        print_box_start(t('flow.region_count', count=len(all_regions)))
+        print_box_start(t("flow.region_count", count=len(all_regions)))
 
         # 3열 레이아웃 (리전 코드만)
         cols = 3

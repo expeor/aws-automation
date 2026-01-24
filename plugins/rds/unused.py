@@ -18,9 +18,9 @@ from enum import Enum
 
 from rich.console import Console
 
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 console = Console()
 
@@ -323,17 +323,19 @@ def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_instances,
-            r.unused_instances,
-            r.low_usage_instances,
-            r.stopped_instances,
-            r.normal_instances,
-            f"${r.unused_monthly_cost:,.2f}",
-            f"${r.low_usage_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_instances,
+                r.unused_instances,
+                r.low_usage_instances,
+                r.stopped_instances,
+                r.normal_instances,
+                f"${r.unused_monthly_cost:,.2f}",
+                f"${r.low_usage_monthly_cost:,.2f}",
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.unused_instances > 0:

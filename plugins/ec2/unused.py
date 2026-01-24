@@ -22,9 +22,9 @@ from enum import Enum
 
 from rich.console import Console
 
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from plugins.cost.pricing import get_ec2_monthly_cost
 
 console = Console()

@@ -266,16 +266,18 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_count,
-            r.empty_count,
-            r.old_count,
-            r.no_retention_count,
-            round(r.total_stored_gb, 2),
-            f"${r.empty_monthly_cost + r.old_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.empty_count,
+                r.old_count,
+                r.no_retention_count,
+                round(r.total_stored_gb, 2),
+                f"${r.empty_monthly_cost + r.old_monthly_cost:,.2f}",
+            ]
+        )
         ws = summary_sheet._ws
         if r.empty_count > 0:
             ws.cell(row=row_num, column=4).fill = red_fill
@@ -303,17 +305,20 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
             if f.status != LogGroupStatus.NORMAL:
                 lg = f.log_group
                 style = Styles.danger() if f.status in (LogGroupStatus.EMPTY, LogGroupStatus.OLD) else Styles.warning()
-                detail_sheet.add_row([
-                    lg.account_name,
-                    lg.region,
-                    lg.name,
-                    f.status.value,
-                    round(lg.stored_gb, 4),
-                    f"{lg.retention_days}일" if lg.retention_days else "무기한",
-                    lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-",
-                    round(lg.monthly_cost, 4),
-                    f.recommendation,
-                ], style=style)
+                detail_sheet.add_row(
+                    [
+                        lg.account_name,
+                        lg.region,
+                        lg.name,
+                        f.status.value,
+                        round(lg.stored_gb, 4),
+                        f"{lg.retention_days}일" if lg.retention_days else "무기한",
+                        lg.last_ingestion_time.strftime("%Y-%m-%d") if lg.last_ingestion_time else "-",
+                        round(lg.monthly_cost, 4),
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
     return str(wb.save_as(output_dir, "LogGroup_Audit"))
 

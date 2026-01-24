@@ -205,15 +205,17 @@ def generate_report(results: list[Route53AnalysisResult], output_dir: str) -> st
     summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.total_zones,
-            r.empty_zones,
-            r.ns_soa_only_zones,
-            r.public_zones,
-            r.private_zones,
-            f"${r.wasted_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.total_zones,
+                r.empty_zones,
+                r.ns_soa_only_zones,
+                r.public_zones,
+                r.private_zones,
+                f"${r.wasted_monthly_cost:,.2f}",
+            ]
+        )
         ws = summary_sheet._ws
         if r.empty_zones > 0:
             ws.cell(row=row_num, column=3).fill = red_fill
@@ -237,16 +239,18 @@ def generate_report(results: list[Route53AnalysisResult], output_dir: str) -> st
         for f in r.findings:
             if f.status != ZoneStatus.NORMAL:
                 zone = f.zone
-                detail_sheet.add_row([
-                    zone.account_name,
-                    zone.zone_id,
-                    zone.name,
-                    "Private" if zone.is_private else "Public",
-                    zone.record_count,
-                    f.status.value,
-                    zone.comment,
-                    f.recommendation,
-                ])
+                detail_sheet.add_row(
+                    [
+                        zone.account_name,
+                        zone.zone_id,
+                        zone.name,
+                        "Private" if zone.is_private else "Public",
+                        zone.record_count,
+                        f.status.value,
+                        zone.comment,
+                        f.recommendation,
+                    ]
+                )
 
     return str(wb.save_as(output_dir, "Route53_EmptyZone"))
 

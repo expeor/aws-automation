@@ -327,14 +327,16 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.total_buckets,
-            r.empty_buckets,
-            r.versioning_only_buckets,
-            r.small_buckets,
-            f"{r.total_size_gb:.2f} GB",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.total_buckets,
+                r.empty_buckets,
+                r.versioning_only_buckets,
+                r.small_buckets,
+                f"{r.total_size_gb:.2f} GB",
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.empty_buckets > 0:

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
-from cli.i18n import get_lang, get_text, t
+from cli.i18n import t
 from cli.ui.banner import print_banner
 
 if TYPE_CHECKING:
@@ -19,10 +19,11 @@ if TYPE_CHECKING:
     from core.auth.config.loader import AWSProfile
     from core.tools.history import FavoritesManager, RecentHistory
     from core.tools.types import AreaInfo
-from cli.ui.console import clear_screen, console as default_console
 from cli.ui.console import (
+    clear_screen,
     wait_for_any_key,
 )
+from cli.ui.console import console as default_console
 from core.tools.types import AREA_COMMANDS, AREA_KEYWORDS, AREA_REGISTRY
 
 # 권한별 색상
@@ -161,15 +162,15 @@ class MainMenu:
 
         cmd_table.add_row(
             "[dim]a[/dim]",
-            t('menu.all_tools'),
+            t("menu.all_tools"),
             "[dim]s[/dim]",
-            t('menu.aws_services'),
+            t("menu.aws_services"),
             "[dim]c[/dim]",
-            t('menu.aws_category'),
+            t("menu.aws_category"),
         )
         cmd_table.add_row(
             "[dim]t[/dim]",
-            t('menu.check_types'),
+            t("menu.check_types"),
             "",
             "",
             "",
@@ -193,15 +194,15 @@ class MainMenu:
         cmd_table2.add_column(width=16)
         cmd_table2.add_row(
             "[dim]f[/dim]",
-            t('menu.favorites'),
+            t("menu.favorites"),
             "[dim]p[/dim]",
-            t('menu.profiles'),
+            t("menu.profiles"),
             "[dim]g[/dim]",
-            t('menu.profile_groups'),
+            t("menu.profile_groups"),
         )
         cmd_table2.add_row(
             "[dim]q[/dim]",
-            t('common.exit'),
+            t("common.exit"),
             "",
             "",
             "",
@@ -461,7 +462,7 @@ class MainMenu:
         )
         table.add_column("#", style="dim", width=4, justify="right")
         table.add_column(t("menu.header_category"), width=16)  # 12 → 16
-        table.add_column(t("menu.header_tools"), width=28)      # 25 → 28
+        table.add_column(t("menu.header_tools"), width=28)  # 25 → 28
         table.add_column(t("menu.header_description"), style="dim")
 
         for i, (_, tool) in enumerate(results, 1):
@@ -542,7 +543,7 @@ class MainMenu:
             )
             table.add_column("#", style="dim", width=4, justify="right")
             table.add_column(t("menu.header_category"), width=18)  # 14 → 18
-            table.add_column(t("menu.header_tools"), width=28)      # 22 → 28
+            table.add_column(t("menu.header_tools"), width=28)  # 22 → 28
             table.add_column(t("menu.header_description"), style="dim")
 
             for idx, tool in enumerate(page_tools, start_idx + 1):
@@ -667,7 +668,7 @@ class MainMenu:
         )
         table.add_column("#", style="dim", width=4, justify="right")
         table.add_column(t("menu.header_category"), width=18)  # 14 → 18
-        table.add_column(t("menu.header_tools"), width=28)      # 22 → 28
+        table.add_column(t("menu.header_tools"), width=28)  # 22 → 28
         table.add_column(t("menu.header_description"), style="dim")
 
         for orig_idx, tool in results:
@@ -771,7 +772,11 @@ class MainMenu:
             # 메뉴 옵션
             self.console.print(
                 f"[dim]a[/dim] {t('menu.add')}"
-                + (f"  [dim]d[/dim] {t('menu.delete')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}" if fav_items else "")
+                + (
+                    f"  [dim]d[/dim] {t('menu.delete')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}"
+                    if fav_items
+                    else ""
+                )
                 + f"  [dim]0[/dim] {t('menu.go_back')}"
             )
             self.console.print()
@@ -863,8 +868,10 @@ class MainMenu:
     def _reorder_favorite_interactive(self, fav_items: list, direction: str) -> None:
         """즐겨찾기 순서 변경"""
         self.console.print()
-        label = t('menu.move_up') if direction == "up" else t('menu.move_down')
-        self.console.print(f"[bold]{t('menu.move_number_prompt', direction=label)}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
+        label = t("menu.move_up") if direction == "up" else t("menu.move_down")
+        self.console.print(
+            f"[bold]{t('menu.move_number_prompt', direction=label)}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]"
+        )
 
         choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
@@ -884,7 +891,7 @@ class MainMenu:
                 if success:
                     self.console.print(f"[dim]{t('menu.moved', name=item.tool_name)}[/dim]")
                 else:
-                    pos = t('menu.already_at_top') if direction == "up" else t('menu.already_at_bottom')
+                    pos = t("menu.already_at_top") if direction == "up" else t("menu.already_at_bottom")
                     self.console.print(f"[dim]{pos}[/dim]")
             else:
                 self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(fav_items))}[/dim]")
@@ -909,7 +916,9 @@ class MainMenu:
             # SSO 세션 목록
             sso_sessions = list_sso_sessions()
             if sso_sessions:
-                self.console.print(f"[bold]{t('menu.sso_session_multi')}[/bold] [dim]({t('menu.sso_session_desc')})[/dim]")
+                self.console.print(
+                    f"[bold]{t('menu.sso_session_multi')}[/bold] [dim]({t('menu.sso_session_desc')})[/dim]"
+                )
                 for session in sso_sessions:
                     session_config = config.sessions.get(session)
                     if session_config:
@@ -941,7 +950,9 @@ class MainMenu:
 
                 # SSO 프로파일
                 if sso_profiles:
-                    self.console.print(f"[bold]{t('menu.sso_profile_single')}[/bold] [dim]({t('menu.sso_profile_desc')})[/dim]")
+                    self.console.print(
+                        f"[bold]{t('menu.sso_profile_single')}[/bold] [dim]({t('menu.sso_profile_desc')})[/dim]"
+                    )
                     for name, cfg in sso_profiles:
                         if cfg and cfg.sso_account_id:
                             self.console.print(f"  [green]●[/green] {name} [dim]({cfg.sso_account_id})[/dim]")
@@ -951,7 +962,9 @@ class MainMenu:
 
                 # Static 프로파일
                 if static_profiles:
-                    self.console.print(f"[bold]{t('menu.iam_access_key')}[/bold] [dim]({t('menu.static_credentials_desc')})[/dim]")
+                    self.console.print(
+                        f"[bold]{t('menu.iam_access_key')}[/bold] [dim]({t('menu.static_credentials_desc')})[/dim]"
+                    )
                     for name, cfg in static_profiles:
                         region_info = f" ({cfg.region})" if cfg and cfg.region else ""
                         self.console.print(f"  [yellow]●[/yellow] {name}{region_info}")
@@ -959,7 +972,9 @@ class MainMenu:
 
                 # 기타 (지원하지 않는 타입)
                 if other_profiles:
-                    self.console.print(f"[bold dim]{t('menu.other_unsupported')}[/bold dim] [dim]({t('menu.unsupported')})[/dim]")
+                    self.console.print(
+                        f"[bold dim]{t('menu.other_unsupported')}[/bold dim] [dim]({t('menu.unsupported')})[/dim]"
+                    )
                     for name, _ in other_profiles:
                         self.console.print(f"  [dim]○[/dim] {name}")
                     self.console.print()
@@ -1026,8 +1041,8 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_area"), width=14)      # 12 → 14
-            table.add_column(t("menu.header_description"), width=30)      # 25 → 30
+            table.add_column(t("menu.header_area"), width=14)  # 12 → 14
+            table.add_column(t("menu.header_description"), width=30)  # 25 → 30
             table.add_column(t("menu.header_tools"), width=6, justify="right")
 
             for i, area in enumerate(AREA_REGISTRY, 1):
@@ -1088,8 +1103,8 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_service"), width=14)    # 12 → 14
-            table.add_column(t("menu.header_tools"), width=28)      # 25 → 28
+            table.add_column(t("menu.header_service"), width=14)  # 12 → 14
+            table.add_column(t("menu.header_tools"), width=28)  # 25 → 28
             table.add_column(t("menu.header_permission"), width=6)
             table.add_column(t("menu.header_description"), style="dim")
 
@@ -1210,7 +1225,7 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_service"), width=26)    # 20 → 26
+            table.add_column(t("menu.header_service"), width=26)  # 20 → 26
             table.add_column(t("menu.header_tools"), width=6, justify="right")
             table.add_column(t("menu.header_description"), style="dim")
 
@@ -1269,7 +1284,7 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_tools"), width=30)      # 25 → 30
+            table.add_column(t("menu.header_tools"), width=30)  # 25 → 30
             table.add_column(t("menu.header_permission"), width=6)
             table.add_column(t("menu.header_area"), width=10)
             table.add_column(t("menu.header_description"), style="dim")
@@ -1376,7 +1391,11 @@ class MainMenu:
             # 메뉴 옵션
             self.console.print(
                 f"[dim]a[/dim] {t('menu.add')}"
-                + (f"  [dim]d[/dim] {t('menu.delete')}  [dim]e[/dim] {t('menu.edit')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}" if groups else "")
+                + (
+                    f"  [dim]d[/dim] {t('menu.delete')}  [dim]e[/dim] {t('menu.edit')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}"
+                    if groups
+                    else ""
+                )
                 + f"  [dim]0[/dim] {t('menu.go_back')}"
             )
             self.console.print()
@@ -1429,7 +1448,9 @@ class MainMenu:
 
         # 3. 프로파일 선택 (멀티)
         self.console.print()
-        self.console.print(f"[bold]{t('cli.select_profiles_title', type=type_label)}[/bold] {t('cli.select_2_or_more')}")
+        self.console.print(
+            f"[bold]{t('cli.select_profiles_title', type=type_label)}[/bold] {t('cli.select_2_or_more')}"
+        )
         self.console.print()
         for i, p in enumerate(available, 1):
             self.console.print(f"  [cyan]{i:2})[/cyan] {p}")
@@ -1573,8 +1594,10 @@ class MainMenu:
     def _reorder_profile_group_interactive(self, manager, groups, direction: str) -> None:
         """프로파일 그룹 순서 변경"""
         self.console.print()
-        label = t('menu.move_up') if direction == "up" else t('menu.move_down')
-        self.console.print(f"[bold]{t('menu.move_number_prompt', direction=label)}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]")
+        label = t("menu.move_up") if direction == "up" else t("menu.move_down")
+        self.console.print(
+            f"[bold]{t('menu.move_number_prompt', direction=label)}[/bold] [dim]({t('menu.cancel_enter_hint')})[/dim]"
+        )
 
         choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
 
@@ -1590,7 +1613,7 @@ class MainMenu:
                 if success:
                     self.console.print(f"[dim]{t('menu.moved', name=group.name)}[/dim]")
                 else:
-                    pos = t('menu.already_at_top') if direction == "up" else t('menu.already_at_bottom')
+                    pos = t("menu.already_at_top") if direction == "up" else t("menu.already_at_bottom")
                     self.console.print(f"[dim]{pos}[/dim]")
             else:
                 self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(groups))}[/dim]")

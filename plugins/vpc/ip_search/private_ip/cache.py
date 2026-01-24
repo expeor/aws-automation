@@ -20,7 +20,6 @@ from botocore.exceptions import ClientError
 
 from core.parallel import get_client
 
-
 # =============================================================================
 # Data Structures
 # =============================================================================
@@ -156,15 +155,17 @@ def list_available_caches(expiry_hours: int = 24) -> list[CacheInfo]:
                     if region:
                         regions.add(region)
 
-            caches.append(CacheInfo(
-                filepath=filepath,
-                profile_name=profile_name,
-                account_id=account_id,
-                eni_count=eni_count,
-                created_at=created_at,
-                is_valid=is_valid,
-                regions=sorted(regions),
-            ))
+            caches.append(
+                CacheInfo(
+                    filepath=filepath,
+                    profile_name=profile_name,
+                    account_id=account_id,
+                    eni_count=eni_count,
+                    created_at=created_at,
+                    is_valid=is_valid,
+                    regions=sorted(regions),
+                )
+            )
         except Exception:
             continue
 

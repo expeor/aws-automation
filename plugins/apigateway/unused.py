@@ -334,15 +334,17 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_apis,
-            r.unused_apis,
-            r.no_stages,
-            r.low_usage,
-            r.normal_apis,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_apis,
+                r.unused_apis,
+                r.no_stages,
+                r.low_usage,
+                r.normal_apis,
+            ]
+        )
         ws = summary_sheet._ws
         if r.unused_apis > 0:
             ws.cell(row=row_num, column=4).fill = red_fill
@@ -368,17 +370,20 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
             if f.status != APIStatus.NORMAL:
                 a = f.api
                 style = Styles.danger() if f.status == APIStatus.UNUSED else Styles.warning()
-                detail_sheet.add_row([
-                    a.account_name,
-                    a.region,
-                    a.api_name,
-                    a.api_type,
-                    a.endpoint_type,
-                    a.stage_count,
-                    int(a.total_requests),
-                    f.status.value,
-                    f.recommendation,
-                ], style=style)
+                detail_sheet.add_row(
+                    [
+                        a.account_name,
+                        a.region,
+                        a.api_name,
+                        a.api_type,
+                        a.endpoint_type,
+                        a.stage_count,
+                        int(a.total_requests),
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
     return str(wb.save_as(output_dir, "APIGateway_Unused"))
 

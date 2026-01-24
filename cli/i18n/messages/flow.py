@@ -462,8 +462,4 @@ FLOW_MESSAGES = {
         "ko": "계정:",
         "en": "Accounts:",
     },
-    "accounts_count": {
-        "ko": "{count}개",
-        "en": "{count}",
-    },
 }

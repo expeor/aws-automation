@@ -346,10 +346,10 @@ class TagPolicyValidator:
 
         # 2. 각 태그 값 검증
         for tag_key, tag_value in tags.items():
-            rule = self.policy.get_rule_for_key(tag_key)
+            matching_rule = self.policy.get_rule_for_key(tag_key)
 
-            if rule:
-                error = rule.validate_value(tag_value)
+            if matching_rule:
+                error = matching_rule.validate_value(tag_value)
                 if error:
                     result.add_error(error)
             elif not self.policy.allow_extra_tags:
@@ -388,9 +388,7 @@ class TagPolicyValidator:
 
         return results
 
-    def get_compliance_summary(
-        self, results: dict[str, TagValidationResult]
-    ) -> tuple[int, int, list[str]]:
+    def get_compliance_summary(self, results: dict[str, TagValidationResult]) -> tuple[int, int, list[str]]:
         """준수율 요약
 
         Args:

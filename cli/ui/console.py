@@ -9,8 +9,6 @@ import platform
 import sys
 
 from rich.console import Console
-
-from cli.i18n import t
 from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.progress import (
@@ -23,6 +21,8 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from rich.table import Table
+
+from cli.i18n import t
 
 # botocore 노이즈 로그 제한
 logging.getLogger("botocore.httpchecksum").setLevel(logging.WARNING)

@@ -261,14 +261,16 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
     summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_queues,
-            r.unused_queues,
-            r.empty_dlqs,
-            r.normal_queues,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_queues,
+                r.unused_queues,
+                r.empty_dlqs,
+                r.normal_queues,
+            ]
+        )
         ws = summary_sheet._ws
         if r.unused_queues > 0:
             ws.cell(row=row_num, column=4).fill = red_fill
@@ -297,18 +299,20 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
                 queue_type = "FIFO" if q.is_fifo else "Standard"
                 if q.is_dlq:
                     queue_type += " (DLQ)"
-                detail_sheet.add_row([
-                    q.account_name,
-                    q.region,
-                    q.queue_name,
-                    queue_type,
-                    q.approximate_messages,
-                    f.status.value,
-                    int(q.messages_sent),
-                    int(q.messages_received),
-                    int(q.messages_deleted),
-                    f.recommendation,
-                ])
+                detail_sheet.add_row(
+                    [
+                        q.account_name,
+                        q.region,
+                        q.queue_name,
+                        queue_type,
+                        q.approximate_messages,
+                        f.status.value,
+                        int(q.messages_sent),
+                        int(q.messages_received),
+                        int(q.messages_deleted),
+                        f.recommendation,
+                    ]
+                )
 
     return str(wb.save_as(output_dir, "SQS_Unused"))
 

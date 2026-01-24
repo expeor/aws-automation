@@ -349,17 +349,19 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
         for func in r.functions:
             if func.issue_count > 0:
                 cleanup_versions = func.old_versions + func.unused_versions
-                issues_sheet.add_row([
-                    func.account_name,
-                    func.region,
-                    func.function_name,
-                    func.runtime,
-                    func.version_count,
-                    len(func.old_versions),
-                    len(func.unused_versions),
-                    func.alias_count,
-                    ", ".join(cleanup_versions[:10]) + ("..." if len(cleanup_versions) > 10 else ""),
-                ])
+                issues_sheet.add_row(
+                    [
+                        func.account_name,
+                        func.region,
+                        func.function_name,
+                        func.runtime,
+                        func.version_count,
+                        len(func.old_versions),
+                        len(func.unused_versions),
+                        func.alias_count,
+                        ", ".join(cleanup_versions[:10]) + ("..." if len(cleanup_versions) > 10 else ""),
+                    ]
+                )
 
     # All Versions Sheet
     all_columns = [
@@ -400,17 +402,19 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
                 else:
                     status = "unused"
 
-                row_num = all_sheet.add_row([
-                    func.account_name,
-                    func.region,
-                    func.function_name,
-                    v.version,
-                    v.description[:50] if v.description else "-",
-                    v.runtime,
-                    f"{v.code_size_bytes / 1024 / 1024:.2f} MB",
-                    v.last_modified.strftime("%Y-%m-%d") if v.last_modified else "-",
-                    status,
-                ])
+                row_num = all_sheet.add_row(
+                    [
+                        func.account_name,
+                        func.region,
+                        func.function_name,
+                        v.version,
+                        v.description[:50] if v.description else "-",
+                        v.runtime,
+                        f"{v.code_size_bytes / 1024 / 1024:.2f} MB",
+                        v.last_modified.strftime("%Y-%m-%d") if v.last_modified else "-",
+                        status,
+                    ]
+                )
 
                 # old 상태인 경우 노란색 하이라이트
                 if status == "old":
@@ -436,15 +440,17 @@ def generate_report(results: list[VersionAuditResult], output_dir: str) -> str:
                     weights = alias.routing_config.get("AdditionalVersionWeights", {})
                     if weights:
                         routing = ", ".join(f"v{k}: {v * 100:.0f}%" for k, v in weights.items())
-                alias_sheet.add_row([
-                    func.account_name,
-                    func.region,
-                    func.function_name,
-                    alias.alias_name,
-                    alias.function_version,
-                    alias.description or "-",
-                    routing,
-                ])
+                alias_sheet.add_row(
+                    [
+                        func.account_name,
+                        func.region,
+                        func.function_name,
+                        alias.alias_name,
+                        alias.function_version,
+                        alias.description or "-",
+                        routing,
+                    ]
+                )
 
     return str(wb.save_as(output_dir, "Lambda_Version_Audit"))
 

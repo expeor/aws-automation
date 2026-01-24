@@ -18,8 +18,8 @@ from datetime import datetime, timedelta, timezone
 
 from botocore.exceptions import ClientError
 
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from core.parallel import get_client
+from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,9 @@ class NATCollector:
                 # (정확한 일별 데이터는 별도 조회 필요)
                 if nat.bytes_out_total > 0:
                     # 트래픽이 있으면 일부 날에 트래픽이 있었다고 가정
-                    nat.days_with_traffic = min(self.METRIC_PERIOD_DAYS, max(1, int(nat.bytes_out_total / (1024 * 1024))))
+                    nat.days_with_traffic = min(
+                        self.METRIC_PERIOD_DAYS, max(1, int(nat.bytes_out_total / (1024 * 1024)))
+                    )
                 else:
                     nat.days_with_traffic = 0
 

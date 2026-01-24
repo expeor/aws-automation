@@ -67,16 +67,32 @@ class NATExcelReporter:
         summary.add_blank_row()
         summary.add_section("핵심 지표")
         summary.add_item("전체 NAT Gateway", totals["total_nat_count"])
-        summary.add_item("미사용 (삭제 권장)", totals["unused_count"], highlight="danger" if totals["unused_count"] > 0 else None)
-        summary.add_item("저사용 (검토 필요)", totals["low_usage_count"], highlight="warning" if totals["low_usage_count"] > 0 else None)
-        summary.add_item("정상 사용", totals["normal_count"], highlight="success" if totals["normal_count"] > 0 else None)
+        summary.add_item(
+            "미사용 (삭제 권장)", totals["unused_count"], highlight="danger" if totals["unused_count"] > 0 else None
+        )
+        summary.add_item(
+            "저사용 (검토 필요)",
+            totals["low_usage_count"],
+            highlight="warning" if totals["low_usage_count"] > 0 else None,
+        )
+        summary.add_item(
+            "정상 사용", totals["normal_count"], highlight="success" if totals["normal_count"] > 0 else None
+        )
         summary.add_item("대기 중", totals["pending_count"])
 
         summary.add_blank_row()
         summary.add_section("비용 분석")
         summary.add_item("월간 총 비용", f"${totals['total_monthly_cost']:,.2f}")
-        summary.add_item("월간 낭비 추정", f"${totals['total_monthly_waste']:,.2f}", highlight="danger" if totals["total_monthly_waste"] > 0 else None)
-        summary.add_item("연간 절감 가능액", f"${totals['total_annual_savings']:,.2f}", highlight="info" if totals["total_annual_savings"] > 0 else None)
+        summary.add_item(
+            "월간 낭비 추정",
+            f"${totals['total_monthly_waste']:,.2f}",
+            highlight="danger" if totals["total_monthly_waste"] > 0 else None,
+        )
+        summary.add_item(
+            "연간 절감 가능액",
+            f"${totals['total_annual_savings']:,.2f}",
+            highlight="info" if totals["total_annual_savings"] > 0 else None,
+        )
 
         # 계정/리전별 현황 시트
         account_columns = [

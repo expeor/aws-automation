@@ -51,7 +51,12 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("EventBridge", "eventbridge_total", "eventbridge_unused", None),
         ("Lambda", "lambda_total", "lambda_unused", "lambda_monthly_waste"),
         # ML
-        ("SageMaker Endpoint", "sagemaker_endpoint_total", "sagemaker_endpoint_unused", "sagemaker_endpoint_monthly_waste"),
+        (
+            "SageMaker Endpoint",
+            "sagemaker_endpoint_total",
+            "sagemaker_endpoint_unused",
+            "sagemaker_endpoint_monthly_waste",
+        ),
         # Messaging
         ("SNS", "sns_total", "sns_unused", None),
         ("SQS", "sqs_total", "sqs_unused", None),

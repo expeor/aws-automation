@@ -280,15 +280,17 @@ def generate_report(results: list[EventBridgeAnalysisResult], output_dir: str) -
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_rules,
-            r.disabled_rules,
-            r.no_targets,
-            r.unused_rules,
-            r.normal_rules,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_rules,
+                r.disabled_rules,
+                r.no_targets,
+                r.unused_rules,
+                r.normal_rules,
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.disabled_rules > 0:

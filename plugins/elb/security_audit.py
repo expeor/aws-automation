@@ -895,15 +895,17 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_count,
-            r.critical_count,
-            r.high_count,
-            r.medium_count,
-            r.low_count,
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.critical_count,
+                r.high_count,
+                r.medium_count,
+                r.low_count,
+            ]
+        )
         # 셀 단위 조건부 스타일링
         ws = summary_sheet._ws
         if r.critical_count > 0:
@@ -994,20 +996,22 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
 
     for result in results:
         for lb in result.load_balancers:
-            lb_sheet.add_row([
-                lb.account_name,
-                lb.region,
-                lb.name,
-                lb.lb_type.upper(),
-                lb.scheme,
-                lb.state,
-                lb.risk_score,
-                len(lb.findings),
-                "Yes" if lb.access_logs_enabled else "No",
-                "Yes" if lb.deletion_protection else "No",
-                "Yes" if lb.waf_web_acl_arn else "No",
-                "Yes" if lb.has_https_listener else "No",
-            ])
+            lb_sheet.add_row(
+                [
+                    lb.account_name,
+                    lb.region,
+                    lb.name,
+                    lb.lb_type.upper(),
+                    lb.scheme,
+                    lb.state,
+                    lb.risk_score,
+                    len(lb.findings),
+                    "Yes" if lb.access_logs_enabled else "No",
+                    "Yes" if lb.deletion_protection else "No",
+                    "Yes" if lb.waf_web_acl_arn else "No",
+                    "Yes" if lb.has_https_listener else "No",
+                ]
+            )
 
     return str(wb.save_as(output_dir, "ELB_Security_Audit"))
 

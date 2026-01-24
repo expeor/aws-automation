@@ -604,10 +604,6 @@ MENU_MESSAGES = {
         "ko": "0: 돌아가기",
         "en": "0: Return",
     },
-    "already_registered": {
-        "ko": "'{name}' 이미 등록됨",
-        "en": "'{name}' already registered",
-    },
     "no_tools_in_area": {
         "ko": "{area} 영역에 도구가 없습니다.",
         "en": "No tools in {area} area.",

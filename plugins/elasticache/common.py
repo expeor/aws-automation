@@ -312,16 +312,18 @@ def generate_unused_report(
     summary_sheet = wb.new_sheet("Summary", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_clusters,
-            r.unused_clusters,
-            r.low_usage_clusters,
-            r.normal_clusters,
-            f"${r.unused_monthly_cost:,.2f}",
-            f"${r.low_usage_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_clusters,
+                r.unused_clusters,
+                r.low_usage_clusters,
+                r.normal_clusters,
+                f"${r.unused_monthly_cost:,.2f}",
+                f"${r.low_usage_monthly_cost:,.2f}",
+            ]
+        )
         if r.unused_clusters > 0:
             summary_sheet._ws.cell(row=row_num, column=4).fill = red_fill
         if r.low_usage_clusters > 0:
@@ -348,18 +350,21 @@ def generate_unused_report(
             if f.status != ClusterStatus.NORMAL:
                 c = f.cluster
                 style = Styles.danger() if f.status == ClusterStatus.UNUSED else Styles.warning()
-                detail_sheet.add_row([
-                    c.account_name,
-                    c.region,
-                    c.cluster_id,
-                    c.engine,
-                    c.node_type,
-                    c.num_nodes,
-                    f.status.value,
-                    f"{c.avg_connections:.1f}",
-                    f"{c.avg_cpu:.1f}%",
-                    f"${c.estimated_monthly_cost:.2f}",
-                    f.recommendation,
-                ], style=style)
+                detail_sheet.add_row(
+                    [
+                        c.account_name,
+                        c.region,
+                        c.cluster_id,
+                        c.engine,
+                        c.node_type,
+                        c.num_nodes,
+                        f.status.value,
+                        f"{c.avg_connections:.1f}",
+                        f"{c.avg_cpu:.1f}%",
+                        f"${c.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=style,
+                )
 
     return str(wb.save_as(output_dir, f"{engine_name}_Unused"))

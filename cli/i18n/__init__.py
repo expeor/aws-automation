@@ -89,10 +89,7 @@ def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
         return key
 
     # Get the translation for the specified language
-    text = msg_dict.get(lang)
-    if text is None:
-        # Fallback to Korean if English not available
-        text = msg_dict.get(DEFAULT_LANG, key)
+    text: str = str(msg_dict.get(lang) or msg_dict.get(DEFAULT_LANG, key))
 
     # Apply format string interpolation if kwargs provided
     if kwargs:

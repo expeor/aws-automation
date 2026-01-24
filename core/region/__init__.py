@@ -1,7 +1,6 @@
 # internal/region - 리전 데이터
 """리전 데이터 및 가용성 확인 모듈"""
 
-from .data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
 from .availability import (
     RegionAvailabilityChecker,
     RegionInfo,
@@ -11,6 +10,7 @@ from .availability import (
     reset_region_checkers,
     validate_regions,
 )
+from .data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
 
 __all__: list[str] = [
     # 리전 데이터

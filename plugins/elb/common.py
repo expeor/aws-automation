@@ -509,7 +509,9 @@ def generate_unused_report(
     summary.add_item("미사용", totals["unused"], highlight="danger" if totals["unused"] > 0 else None)
     summary.add_item("Unhealthy", totals["unhealthy"], highlight="warning" if totals["unhealthy"] > 0 else None)
     summary.add_item("정상", totals["normal"])
-    summary.add_item("미사용 월 비용", f"${totals['unused_cost']:.2f}", highlight="danger" if totals["unused_cost"] > 0 else None)
+    summary.add_item(
+        "미사용 월 비용", f"${totals['unused_cost']:.2f}", highlight="danger" if totals["unused_cost"] > 0 else None
+    )
 
     # Findings 시트
     columns = [

@@ -204,15 +204,17 @@ def generate_report(results: list[SecretAnalysisResult], output_dir: str) -> str
     summary_sheet = wb.new_sheet("Summary Data", summary_columns)
 
     for r in results:
-        row_num = summary_sheet.add_row([
-            r.account_name,
-            r.region,
-            r.total_count,
-            r.unused_count,
-            r.pending_delete_count,
-            f"${r.total_monthly_cost:,.2f}",
-            f"${r.unused_monthly_cost:,.2f}",
-        ])
+        row_num = summary_sheet.add_row(
+            [
+                r.account_name,
+                r.region,
+                r.total_count,
+                r.unused_count,
+                r.pending_delete_count,
+                f"${r.total_monthly_cost:,.2f}",
+                f"${r.unused_monthly_cost:,.2f}",
+            ]
+        )
         if r.unused_count > 0:
             summary_sheet._ws.cell(row=row_num, column=4).fill = red_fill
 
@@ -233,16 +235,18 @@ def generate_report(results: list[SecretAnalysisResult], output_dir: str) -> str
         for f in r.findings:
             if f.status != SecretStatus.NORMAL:
                 s = f.secret
-                detail_sheet.add_row([
-                    s.account_name,
-                    s.region,
-                    s.name,
-                    f.status.value,
-                    s.last_accessed_date.strftime("%Y-%m-%d") if s.last_accessed_date else "없음",
-                    "예" if s.rotation_enabled else "아니오",
-                    f"${s.monthly_cost:,.2f}",
-                    f.recommendation,
-                ])
+                detail_sheet.add_row(
+                    [
+                        s.account_name,
+                        s.region,
+                        s.name,
+                        f.status.value,
+                        s.last_accessed_date.strftime("%Y-%m-%d") if s.last_accessed_date else "없음",
+                        "예" if s.rotation_enabled else "아니오",
+                        f"${s.monthly_cost:,.2f}",
+                        f.recommendation,
+                    ]
+                )
 
     return str(wb.save_as(output_dir, "Secrets_Unused"))
 

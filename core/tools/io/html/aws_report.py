@@ -125,7 +125,7 @@ class AWSReport:
 
     def _extract_execution_info(self, ctx: Any | None) -> dict[str, Any]:
         """컨텍스트에서 실행 정보 추출"""
-        info = {
+        info: dict[str, Any] = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "accounts": [],
             "regions": [],
@@ -197,9 +197,7 @@ class AWSReport:
             data: 차트 데이터 (타입별로 다름)
             **kwargs: 추가 옵션
         """
-        self.custom_charts.append(
-            {"type": chart_type, "title": title, "data": data, "options": kwargs}
-        )
+        self.custom_charts.append({"type": chart_type, "title": title, "data": data, "options": kwargs})
         return self
 
     def add_custom_section(
@@ -215,9 +213,7 @@ class AWSReport:
             content_type: "table", "list", "text"
             data: 섹션 데이터
         """
-        self.custom_sections.append(
-            {"title": title, "type": content_type, "data": data}
-        )
+        self.custom_sections.append({"title": title, "type": content_type, "data": data})
         return self
 
     def save(
@@ -493,11 +489,26 @@ def create_aws_report(
                 status=r.get("status", ""),
                 reason=r.get("reason", ""),
                 cost=r.get("cost", r.get("monthly_cost", 0.0)),
-                extra={k: v for k, v in r.items() if k not in [
-                    "account_id", "account_name", "region", "resource_id", "id",
-                    "resource_name", "name", "resource_type", "type", "status",
-                    "reason", "cost", "monthly_cost"
-                ]},
+                extra={
+                    k: v
+                    for k, v in r.items()
+                    if k
+                    not in [
+                        "account_id",
+                        "account_name",
+                        "region",
+                        "resource_id",
+                        "id",
+                        "resource_name",
+                        "name",
+                        "resource_type",
+                        "type",
+                        "status",
+                        "reason",
+                        "cost",
+                        "monthly_cost",
+                    ]
+                },
             )
             report.add_resource(item)
 
