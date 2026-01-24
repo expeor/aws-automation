@@ -13,6 +13,43 @@ $ARGUMENTS
 
 ---
 
+## MCP 도구 활용
+
+플러그인 생성 시 다음 MCP 도구를 활용하여 정확한 AWS API 정보를 조사하고 구조를 설계합니다.
+
+### aws-documentation
+
+AWS 서비스 API 조사:
+```
+mcp__aws-documentation__search("DynamoDB API describe_table")
+mcp__aws-documentation__get_documentation("dynamodb", "list-tables")
+mcp__aws-documentation__search("boto3 paginator DynamoDB")
+```
+
+### sequential-thinking
+
+플러그인 구조 설계:
+```
+mcp__sequential-thinking__analyze("EKS 미사용 리소스 분석 플러그인 설계")
+mcp__sequential-thinking__analyze("도구 의존성 및 데이터 흐름 분석")
+```
+
+### context7
+
+라이브러리 문서 참조:
+```
+mcp__context7__resolve("boto3")
+mcp__context7__get_library_docs("boto3", "paginator")
+```
+
+| 설계 영역 | MCP 도구 |
+|----------|----------|
+| AWS API 조사 | aws-documentation |
+| boto3 패턴 참조 | aws-documentation, context7 |
+| 플러그인 구조 설계 | sequential-thinking |
+
+---
+
 ## 생성할 파일 목록
 
 1. `plugins/{service}/__init__.py` - 카테고리 메타데이터
