@@ -1,3 +1,8 @@
+---
+name: error-handling-patterns
+description: 에러 핸들링 패턴. ErrorCollector, try_or_default, 에러 분류 등.
+---
+
 # 에러 핸들링 패턴
 
 프로젝트의 표준 에러 처리 패턴입니다.
@@ -160,18 +165,18 @@ def run(ctx):
 ## 레거시 패턴 (사용 지양)
 
 ```python
-# ❌ 단순 try-except
+# 단순 try-except
 try:
     result = client.describe_instances()
 except Exception as e:
     print(f"Error: {e}")
     return []
 
-# ❌ 빈 except
+# 빈 except
 except:
     pass
 
-# ❌ print로 에러 출력
+# print로 에러 출력
 except ClientError as e:
     print(f"Error in {region}: {e}")
 ```
@@ -179,7 +184,7 @@ except ClientError as e:
 ## 권장 패턴
 
 ```python
-# ✅ ErrorCollector 사용
+# ErrorCollector 사용
 from core.parallel.errors import ErrorCollector, ErrorSeverity
 
 errors = ErrorCollector(service="ec2")
@@ -197,7 +202,7 @@ except ClientError as e:
     )
     return []
 
-# ✅ try_or_default로 간소화
+# try_or_default로 간소화
 tags = try_or_default(
     lambda: client.describe_tags(...)["Tags"],
     default=[],

@@ -15,6 +15,59 @@
 /make-test vpc/sg_audit
 ```
 
+---
+
+## MCP 도구 활용
+
+테스트 작성 시 다음 MCP 도구를 활용합니다.
+
+### context7
+pytest, moto 문서 참조:
+```
+mcp__context7__resolve("pytest")
+mcp__context7__get_library_docs("pytest", "fixtures")
+mcp__context7__get_library_docs("moto", "mock_aws decorator")
+```
+
+### aws-documentation
+AWS API 응답 구조 확인:
+```
+mcp__aws-documentation__search("EC2 describe_instances response")
+mcp__aws-documentation__get_documentation("ec2", "describe-instances")
+```
+
+| 테스트 영역 | MCP 도구 |
+|------------|----------|
+| pytest 패턴 | context7 |
+| moto 모킹 | context7 |
+| AWS 응답 구조 | aws-documentation |
+
+---
+
+## 테스트 전략
+
+### 테스트 피라미드
+
+```
+        /\
+       /  \     E2E (run 함수 통합)
+      /────\
+     /      \   Integration (collect + analyze)
+    /────────\
+   /          \ Unit (개별 함수)
+  /────────────\
+```
+
+### 커버리지 목표
+
+| 함수 유형 | 필수 테스트 | 권장 테스트 |
+|----------|------------|------------|
+| `collect_*` | 정상, 빈 결과, AccessDenied | Throttling, Timeout |
+| `analyze_*` | 정상, 빈 입력 | 엣지 케이스 |
+| `run` | 정상, 결과 없음 | 부분 실패 |
+
+---
+
 ## 실행 순서
 
 ### 1. 대상 모듈 확인
@@ -522,11 +575,34 @@ pytest tests/ -m memory
 
 ---
 
+## 검증 체크리스트
+
+### 생성 전 확인
+- [ ] 대상 플러그인 파일 존재: `plugins/{service}/{module}.py`
+- [ ] `run(ctx)` 함수 존재 확인
+- [ ] 테스트 디렉토리 확인: `tests/plugins/{service}/`
+
+### 생성 후 확인
+- [ ] 문법 검사: `python -m py_compile tests/plugins/{service}/test_{module}.py`
+- [ ] 테스트 실행: `pytest tests/plugins/{service}/test_{module}.py -v`
+- [ ] 커버리지 확인: `pytest --cov=plugins/{service}/{module}`
+
+### 품질 기준
+- [ ] 최소 3개 테스트 케이스 (정상, 빈 결과, 에러)
+- [ ] moto 또는 MagicMock 사용
+- [ ] AAA 패턴 준수 (Arrange-Act-Assert)
+
+---
+
 ## 참조 파일
 
+### 코드 참조
 - `tests/conftest.py` - 공통 fixture 정의
-- `.claude/skills/tdd-workflow.md` - TDD 가이드
-- `.claude/skills/python-best-practices.md` - 코딩 스타일
+- `tests/plugins/` - 기존 테스트 예시
+
+### Skills 참조
+- `.claude/skills/tdd-workflow/SKILL.md` - TDD 가이드
+- `.claude/skills/python-best-practices/SKILL.md` - 코딩 스타일
 
 ## 주의사항
 

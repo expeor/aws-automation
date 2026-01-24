@@ -13,6 +13,51 @@ $ARGUMENTS
 
 ---
 
+## MCP 도구 활용
+
+도구 추가 시 다음 MCP 도구를 활용합니다.
+
+### aws-documentation
+AWS API 조사:
+```
+mcp__aws-documentation__search("EC2 describe security groups")
+mcp__aws-documentation__get_documentation("ec2", "describe-security-groups")
+```
+
+### context7
+라이브러리 문서 참조:
+```
+mcp__context7__resolve("boto3")
+mcp__context7__get_library_docs("boto3", "EC2 paginator")
+```
+
+---
+
+## 결정 플로우
+
+```
+프롬프트 분석
+    │
+    ▼
+plugins/{service}/ 존재?
+    │
+    ├─ NO → /make-plugin-service 사용
+    │
+    └─ YES
+        │
+        ▼
+    타입 결정 (unused/security/cost/...)
+        │
+        ▼
+    plugins/{service}/{type}.py 존재?
+        │
+        ├─ YES → 기존 파일에 함수 추가 (Case 2)
+        │
+        └─ NO → 새 파일 생성 (Case 1)
+```
+
+---
+
 ## 타입 체계 (중요!)
 
 ### ReportType (10개) - 상태 점검 보고서 (read-only)
@@ -342,12 +387,37 @@ TOOLS = [
 
 ---
 
+## 검증 체크리스트
+
+### 추가 전 확인
+- [ ] 서비스 폴더 존재: `plugins/{service}/` 확인
+- [ ] 타입 분류 완료 (ReportType/ToolType 중 선택)
+- [ ] 기존 타입 파일 존재 여부 확인
+
+### 추가 후 확인
+- [ ] `plugins/{service}/__init__.py` - TOOLS 배열 업데이트
+- [ ] 새 파일/함수에 `run(ctx)` 또는 분석 함수 존재
+- [ ] 린트 통과: `ruff check plugins/{service}/{type}.py`
+- [ ] 타입 체크: `mypy plugins/{service}/{type}.py`
+
+### 테스트 (선택)
+- [ ] 기존 테스트 파일 업데이트 또는 `/make-test` 실행
+- [ ] `pytest tests/plugins/{service}/ -v` 통과
+
+---
+
 ## 참조
 
+### 코드 참조
 - 기존 도구 확인: `plugins/{service}/` 폴더의 다른 `.py` 파일들
 - 타입 정의: `core/tools/output/report_types.py`
-- 리포트 출력: `.claude/skills/output-patterns.md`
 - Excel + HTML 통합: `plugins/ec2/unused.py` (참고 구현)
+
+### Skills 참조
+- `.claude/skills/output-patterns/SKILL.md` - 리포트 출력 패턴
+- `.claude/skills/parallel-execution-patterns/SKILL.md` - 병렬 처리 패턴
+- `.claude/skills/error-handling-patterns/SKILL.md` - 에러 핸들링 패턴
+- `.claude/skills/aws-boto3-patterns/SKILL.md` - AWS boto3 패턴
 
 ---
 

@@ -1,3 +1,8 @@
+---
+name: parallel-execution-patterns
+description: 병렬 실행 패턴. parallel_collect, Rate Limiter, Service Quotas 확인.
+---
+
 # 병렬 실행 패턴
 
 멀티 계정/리전 병렬 처리 패턴입니다.
@@ -89,11 +94,11 @@ print(f"성공: {result.success_count}, 실패: {result.error_count}")
 from core.parallel import get_client
 
 def _collect(session, account_id: str, account_name: str, region: str):
-    # ✅ 권장: get_client 사용
+    # 권장: get_client 사용
     ec2 = get_client(session, "ec2", region_name=region)
     s3 = get_client(session, "s3", region_name=region)
 
-    # ❌ 직접 client 생성 (재시도 없음)
+    # 직접 client 생성 (재시도 없음) - 사용 지양
     # ec2 = session.client("ec2", region_name=region)
 ```
 
@@ -193,6 +198,36 @@ def _collect(session, account_id, account_name, region):
     return volumes
 ```
 
+## Service Quotas 확인
+
+운영 전 서비스 한도 확인:
+
+```python
+from core.parallel import get_quota_checker, QuotaStatus
+
+def run(ctx):
+    session = ctx.provider.get_session()
+    checker = get_quota_checker(session, "ap-northeast-2")
+
+    # 특정 쿼터 확인
+    quota = checker.get_quota("ec2", "Running On-Demand")
+    if quota and quota.usage_percent > 80:
+        console.print(f"[yellow]경고: {quota.quota_name} 사용률 {quota.usage_percent:.1f}%[/yellow]")
+
+    # 서비스 모든 쿼터 확인
+    quotas = checker.get_service_quotas("ec2")
+    high_usage = [q for q in quotas if q.status in (QuotaStatus.WARNING, QuotaStatus.CRITICAL)]
+```
+
+주요 쿼터:
+
+| 서비스 | 쿼터 코드 | 설명 |
+|--------|----------|------|
+| EC2 | L-1216C47A | Running On-Demand Standard instances |
+| EC2 | L-34B43A08 | All Standard Spot Instance Requests |
+| Lambda | L-B99A9384 | Concurrent executions |
+| IAM | L-F4A5425F | Roles |
+
 ## 전체 예시
 
 ```python
@@ -256,60 +291,17 @@ def run(ctx) -> None:
 ## 레거시 패턴 (사용 지양)
 
 ```python
-# ❌ 순차 루프
+# 순차 루프
 for account in accounts:
     for region in regions:
         session = ctx.provider.get_session(account.id, region=region)
         result = analyze(session, account, region)
 
-# ❌ 직접 ThreadPoolExecutor
+# 직접 ThreadPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 with ThreadPoolExecutor() as executor:
     futures = [executor.submit(func, args) for args in items]
 ```
-
-## 권장 패턴
-
-```python
-# ✅ parallel_collect 사용
-from core.parallel import parallel_collect
-
-def _callback(session, account_id, account_name, region):
-    # 단일 계정/리전 처리
-    return result
-
-result = parallel_collect(ctx, _callback, service="service_name")
-```
-
-## Service Quotas 확인
-
-운영 전 서비스 한도 확인:
-
-```python
-from core.parallel import get_quota_checker, QuotaStatus
-
-def run(ctx):
-    session = ctx.provider.get_session()
-    checker = get_quota_checker(session, "ap-northeast-2")
-
-    # 특정 쿼터 확인
-    quota = checker.get_quota("ec2", "Running On-Demand")
-    if quota and quota.usage_percent > 80:
-        console.print(f"[yellow]경고: {quota.quota_name} 사용률 {quota.usage_percent:.1f}%[/yellow]")
-
-    # 서비스 모든 쿼터 확인
-    quotas = checker.get_service_quotas("ec2")
-    high_usage = [q for q in quotas if q.status in (QuotaStatus.WARNING, QuotaStatus.CRITICAL)]
-```
-
-주요 쿼터:
-
-| 서비스 | 쿼터 코드 | 설명 |
-|--------|----------|------|
-| EC2 | L-1216C47A | Running On-Demand Standard instances |
-| EC2 | L-34B43A08 | All Standard Spot Instance Requests |
-| Lambda | L-B99A9384 | Concurrent executions |
-| IAM | L-F4A5425F | Roles |
 
 ## 참조
 

@@ -1,3 +1,8 @@
+---
+name: python-best-practices
+description: Python 코딩 표준 및 스타일 가이드. 타입 힌트, import 정렬, 예외 처리 등.
+---
+
 # Python Best Practices
 
 이 프로젝트의 Python 코딩 표준입니다.

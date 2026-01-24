@@ -1,3 +1,10 @@
+---
+name: review-pr
+description: PR 코드 리뷰 전문가. 코드 품질, 보안, 패턴 준수 검토.
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
 # /review-pr - PR 코드 리뷰
 
 Pull Request의 코드를 검토하고 구조화된 리뷰 피드백을 제공합니다.

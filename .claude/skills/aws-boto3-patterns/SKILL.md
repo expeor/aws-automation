@@ -1,3 +1,8 @@
+---
+name: aws-boto3-patterns
+description: AWS boto3 사용 패턴. Paginator, 세션 관리, CloudWatch 배치 메트릭 등.
+---
+
 # AWS boto3 패턴
 
 이 프로젝트의 boto3 사용 패턴입니다.
