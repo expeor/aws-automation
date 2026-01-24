@@ -101,10 +101,32 @@ class SummarySheetWriter(BaseSheetWriter):
             # 9. Performance Analysis
             helper.add_blank_row()
             helper.add_section("성능 분석")
-            response_stats = self._calculate_response_time_stats()
-            helper.add_item("최대 응답 시간", response_stats["max"])
-            helper.add_item("최소 응답 시간", response_stats["min"])
-            helper.add_item("중간 응답 시간", response_stats["median"])
+
+            # 백분위수 데이터 활용
+            percentiles = self.data.get("response_time_percentiles", {})
+            if percentiles:
+                helper.add_item("P50 응답 시간", f"{percentiles.get('p50', 0) * 1000:.1f}ms")
+                helper.add_item("P90 응답 시간", f"{percentiles.get('p90', 0) * 1000:.1f}ms")
+                helper.add_item("P95 응답 시간", f"{percentiles.get('p95', 0) * 1000:.1f}ms")
+                p99 = percentiles.get("p99", 0) * 1000
+                highlight = "warning" if p99 > 1000 else None  # 1초 이상이면 경고
+                helper.add_item("P99 응답 시간", f"{p99:.1f}ms", highlight=highlight)
+                helper.add_item("평균 응답 시간", f"{percentiles.get('avg', 0) * 1000:.1f}ms")
+                helper.add_item("최대 응답 시간", f"{percentiles.get('max', 0) * 1000:.1f}ms")
+            else:
+                response_stats = self._calculate_response_time_stats()
+                helper.add_item("최대 응답 시간", response_stats["max"])
+                helper.add_item("최소 응답 시간", response_stats["min"])
+                helper.add_item("중간 응답 시간", response_stats["median"])
+
+            # 10. Error Reasons (Top 5)
+            error_reasons = self.data.get("error_reason_counts", {})
+            if error_reasons:
+                helper.add_blank_row()
+                helper.add_section("에러 원인 분석")
+                sorted_reasons = sorted(error_reasons.items(), key=lambda x: x[1], reverse=True)[:5]
+                for reason, count in sorted_reasons:
+                    helper.add_item(reason, f"{count:,}건", highlight="warning")
 
             # Set zoom
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE

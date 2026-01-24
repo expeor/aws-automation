@@ -32,12 +32,20 @@ from rich.progress import (
 
 # 콘솔 및 로거 (aa_cli.aa.ui 또는 로컬 생성)
 try:
-    from cli.ui import console, logger
+    from cli.ui import console, logger, print_sub_info, print_sub_task_done
 except ImportError:
     import logging
 
     console = Console()
     logger = logging.getLogger(__name__)
+
+    # Fallback functions
+    def print_sub_info(msg: str) -> None:
+        console.print(f"[blue]{msg}[/blue]")
+
+    def print_sub_task_done(msg: str) -> None:
+        console.print(f"[green]✓ {msg}[/green]")
+
 
 import contextlib
 
@@ -304,7 +312,7 @@ class ALBLogAnalyzer:
     def analyze_logs(self, log_directory: str) -> dict[str, Any]:
         """DuckDB 기반 로그 파일들을 분석합니다."""
         try:
-            self.console.print("[bold blue]ALB 로그 분석을 시작합니다...[/bold blue]")
+            print_sub_info("ALB 로그 분석을 시작합니다...")
 
             # 단일 진행 바로 전체 파이프라인 진행 상황 표시
             with Progress(
@@ -349,7 +357,7 @@ class ALBLogAnalyzer:
             analysis_results["abuse_ip_details"] = abuse_ip_details
 
             progress.update(task, description="[green]✓ 분석 완료!")
-            self.console.print("[bold green]✓ ALB 로그 분석이 완료되었습니다![/bold green]")
+            print_sub_task_done("ALB 로그 분석이 완료되었습니다!")
             return analysis_results
 
         except Exception as e:
@@ -694,13 +702,29 @@ class ALBLogAnalyzer:
                     """
                     avg_rt_rows = self.conn.execute(avg_rt_sql).fetchall()
 
-                    # 6) 총 카운트 (이미 계산된 request_url_counts 사용)
+                    # 6) URL별 Top Client IP (가장 많이 요청한 IP)
+                    top_client_sql = f"""
+                    WITH ranked AS (
+                        SELECT TRIM(url) as url, client_ip, COUNT(*) as cnt,
+                               ROW_NUMBER() OVER (PARTITION BY TRIM(url) ORDER BY COUNT(*) DESC) as rn
+                        FROM alb_logs
+                        WHERE TRIM(url) IN ({in_list_sql}) AND url IS NOT NULL AND TRIM(url) != ''
+                          AND client_ip IS NOT NULL AND client_ip != ''
+                        GROUP BY TRIM(url), client_ip
+                    )
+                    SELECT url, client_ip FROM ranked WHERE rn = 1
+                    """
+                    top_client_rows = self.conn.execute(top_client_sql).fetchall()
+                    top_client_map = {url: ip for url, ip in top_client_rows}
+
+                    # 7) 총 카운트 (이미 계산된 request_url_counts 사용)
                     for url in top_urls:
                         request_url_details[url] = {
                             "count": int(request_url_counts.get(url, 0) or 0),
                             "methods": {},
                             "user_agents": {},
                             "status_codes": {},
+                            "top_client_ip": top_client_map.get(url, ""),
                             # 메모리 절약: 세트/리스트 대신 통계 값만 저장
                             "unique_ips": 0,
                             "avg_response_time": 0.0,
@@ -790,6 +814,114 @@ class ALBLogAnalyzer:
                 long_response_count_val = long_resp_count_row[0] if long_resp_count_row else 0
             except Exception:
                 long_response_count_val = 0
+
+            # 응답 시간 백분위수 (P50, P90, P95, P99)
+            response_time_percentiles: dict[str, float] = {}
+            try:
+                percentile_query = """
+                SELECT
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY response_time) as p50,
+                    PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY response_time) as p90,
+                    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_time) as p95,
+                    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY response_time) as p99,
+                    AVG(response_time) as avg,
+                    MIN(response_time) as min,
+                    MAX(response_time) as max
+                FROM alb_logs
+                WHERE response_time IS NOT NULL AND response_time >= 0
+                """
+                percentile_result = self.conn.execute(percentile_query).fetchone()
+                if percentile_result:
+                    response_time_percentiles = {
+                        "p50": float(percentile_result[0] or 0),
+                        "p90": float(percentile_result[1] or 0),
+                        "p95": float(percentile_result[2] or 0),
+                        "p99": float(percentile_result[3] or 0),
+                        "avg": float(percentile_result[4] or 0),
+                        "min": float(percentile_result[5] or 0),
+                        "max": float(percentile_result[6] or 0),
+                    }
+            except Exception as e:
+                logger.debug(f"응답 시간 백분위수 계산 실패: {e}")
+                response_time_percentiles = {}
+
+            # 에러 원인(error_reason) 분포
+            error_reason_counts: dict[str, int] = {}
+            try:
+                error_reason_query = """
+                SELECT error_reason, COUNT(*) as count
+                FROM alb_logs
+                WHERE error_reason IS NOT NULL
+                  AND error_reason != ''
+                  AND error_reason != '-'
+                GROUP BY error_reason
+                ORDER BY count DESC
+                """
+                error_reason_results = self.conn.execute(error_reason_query).fetchall()
+                error_reason_counts = {reason: count for reason, count in error_reason_results if reason}
+            except Exception as e:
+                logger.debug(f"에러 원인 집계 실패: {e}")
+                error_reason_counts = {}
+
+            # Target별 요청 분포 및 에러율
+            target_request_stats: dict[str, dict[str, Any]] = {}
+            try:
+                target_stats_query = """
+                SELECT
+                    target,
+                    target_group_name,
+                    COUNT(*) as total_requests,
+                    SUM(CASE WHEN elb_status_code LIKE '4%' OR elb_status_code LIKE '5%' THEN 1 ELSE 0 END) as error_count,
+                    AVG(response_time) as avg_response_time
+                FROM alb_logs
+                WHERE target IS NOT NULL AND target != '' AND target != '-'
+                GROUP BY target, target_group_name
+                ORDER BY total_requests DESC
+                """
+                target_stats_results = self.conn.execute(target_stats_query).fetchall()
+                for target, tg_name, total, errors, avg_rt in target_stats_results:
+                    display_key = f"{tg_name}({target})" if tg_name else target
+                    error_rate = (errors / total * 100) if total > 0 else 0
+                    target_request_stats[display_key] = {
+                        "total_requests": total,
+                        "error_count": errors,
+                        "error_rate": round(error_rate, 2),
+                        "avg_response_time": round(float(avg_rt or 0), 4),
+                    }
+            except Exception as e:
+                logger.debug(f"Target 통계 계산 실패: {e}")
+                target_request_stats = {}
+
+            # URL별 에러율
+            url_error_stats: dict[str, dict[str, Any]] = {}
+            try:
+                url_error_query = """
+                SELECT
+                    TRIM(url) as url,
+                    COUNT(*) as total_requests,
+                    SUM(CASE WHEN elb_status_code LIKE '4%' THEN 1 ELSE 0 END) as count_4xx,
+                    SUM(CASE WHEN elb_status_code LIKE '5%' THEN 1 ELSE 0 END) as count_5xx
+                FROM alb_logs
+                WHERE url IS NOT NULL AND TRIM(url) != ''
+                GROUP BY url
+                HAVING COUNT(*) >= 10
+                ORDER BY (count_4xx + count_5xx) DESC
+                LIMIT 50
+                """
+                url_error_results = self.conn.execute(url_error_query).fetchall()
+                for url, total, c4xx, c5xx in url_error_results:
+                    error_total = (c4xx or 0) + (c5xx or 0)
+                    error_rate = (error_total / total * 100) if total > 0 else 0
+                    url_error_stats[url] = {
+                        "total_requests": total,
+                        "count_4xx": c4xx or 0,
+                        "count_5xx": c5xx or 0,
+                        "error_count": error_total,
+                        "error_rate": round(error_rate, 2),
+                    }
+            except Exception as e:
+                logger.debug(f"URL 에러율 계산 실패: {e}")
+                url_error_stats = {}
 
             # 바이트 분석
             received_bytes_query = """
@@ -1029,6 +1161,11 @@ class ALBLogAnalyzer:
                 "long_response_times": long_response_times,
                 "received_bytes": received_bytes,
                 "sent_bytes": sent_bytes,
+                # 추가 분석 데이터
+                "response_time_percentiles": response_time_percentiles,
+                "error_reason_counts": error_reason_counts,
+                "target_request_stats": target_request_stats,
+                "url_error_stats": url_error_stats,
                 # 빈 데이터 (호환성)
                 "elb_error_timestamps": [],
                 "backend_error_timestamps": [],
@@ -1147,6 +1284,11 @@ class ALBLogAnalyzer:
             "long_response_times": [],
             "received_bytes": {},
             "sent_bytes": {},
+            # 추가 분석 데이터
+            "response_time_percentiles": {},
+            "error_reason_counts": {},
+            "target_request_stats": {},
+            "url_error_stats": {},
             # 국가 정보
             "ip_country_mapping": {},
             "country_statistics": {},

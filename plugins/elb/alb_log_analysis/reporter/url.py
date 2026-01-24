@@ -55,11 +55,13 @@ class URLSheetWriter(BaseSheetWriter):
             if not isinstance(count, (int, float)):
                 count = 0
 
-            # Client info
-            client_info = details.get("client_info", {})
-            client_ip = ""
+            # Client info - Top Client IP (가장 많이 요청한 IP)
+            client_ip = details.get("top_client_ip", "")
             country = ""
-            if client_info:
+            if client_ip:
+                country = self.get_country_code(client_ip)
+            elif "client_info" in details:
+                client_info = details.get("client_info", {})
                 client_ip = client_info.get("ip", "")
                 country = client_info.get("country", "")
             elif "client_ips" in details:

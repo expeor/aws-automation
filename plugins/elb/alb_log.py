@@ -12,16 +12,20 @@ from typing import Any
 
 import pytz  # type: ignore[import-untyped]
 import questionary
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from cli.ui import (
+    console,
+    print_step_header,
+    print_sub_info,
+    print_sub_task_done,
+    print_sub_warning,
+)
 from core.auth import get_context_session
 from core.parallel import get_client
 from core.tools.cache import get_cache_dir
 from core.tools.output import open_in_explorer
-
-console = Console()
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -107,7 +111,7 @@ def run(ctx) -> None:
 
     try:
         # Step 1: 로그 분석기 초기화
-        console.print("[bold cyan]Step 1: 로그 분석기 준비 중...[/bold cyan]")
+        print_step_header(1, "로그 분석기 준비 중...")
         analyzer = ALBLogAnalyzer(
             s3_client=s3_client,
             bucket_name=bucket_name,
@@ -119,13 +123,11 @@ def run(ctx) -> None:
         )
 
         # Step 2: 로그 다운로드
-        console.print("[bold cyan]Step 2: 로그 다운로드 및 압축 해제 중...[/bold cyan]")
+        print_step_header(2, "로그 다운로드 및 압축 해제 중...")
         downloaded_files = analyzer.download_logs()
         if not downloaded_files:
-            console.print("[yellow]⚠️ 요청 범위에 해당하는 ALB 로그 파일이 없습니다.[/yellow]")
-            console.print(
-                "[dim]ALB는 5분 단위로 파일을 생성하며, 트래픽이 없으면 파일이 생성되지 않을 수 있습니다.[/dim]"
-            )
+            print_sub_warning("요청 범위에 해당하는 ALB 로그 파일이 없습니다.")
+            print_sub_info("ALB는 5분 단위로 파일을 생성하며, 트래픽이 없으면 파일이 생성되지 않을 수 있습니다.")
             return
 
         # 압축 해제
@@ -137,7 +139,7 @@ def run(ctx) -> None:
         log_directory = analyzer.decompress_logs(gz_directory)
 
         # Step 3: 로그 분석
-        console.print("[bold cyan]Step 3: 로그 분석 중...[/bold cyan]")
+        print_step_header(3, "로그 분석 중...")
         analysis_results = analyzer.analyze_logs(log_directory)
 
         # abuse_ips 처리
@@ -147,7 +149,8 @@ def run(ctx) -> None:
 
         # Step 4: 보고서 생성
         total_logs = analysis_results.get("log_lines_count", 0)
-        console.print(f"[green]✓ 데이터 크기: {total_logs:,}개 로그 라인[/green]")
+        print_sub_task_done(f"데이터 크기: {total_logs:,}개 로그 라인")
+        print_step_header(4, "보고서 생성 중...")
 
         # 출력 경로 생성
         output_dir = _create_output_directory(ctx)
@@ -195,10 +198,6 @@ def _generate_reports(ctx, analyzer, analysis_results: dict[str, Any], output_di
     # 출력 설정 확인
     should_excel = ctx.should_output_excel() if hasattr(ctx, "should_output_excel") else True
     should_html = ctx.should_output_html() if hasattr(ctx, "should_output_html") else True
-
-    # Step 4: 보고서 생성
-    if should_excel or should_html:
-        console.print("[bold cyan]Step 4: 보고서 생성 중...[/bold cyan]")
 
     # Excel 보고서 생성 (기본 - 최적화된 상세 리포트)
     if should_excel:
@@ -287,7 +286,16 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
         if status_data:
             report.add_pie_chart("ELB 상태 코드 분포", status_data, doughnut=True)
 
-        # 2. 시간대별 요청 트렌드 (라인 차트) - CloudWatch 스타일 적응형 해상도
+        # 2. Backend 상태 코드 분포 (도넛 차트) - ELB 상태 코드 옆에 배치
+        backend_status_data = [
+            ("4xx 클라이언트 에러", backend_4xx),
+            ("5xx 서버 에러", backend_5xx),
+        ]
+        backend_status_data = [(name, count) for name, count in backend_status_data if count > 0]
+        if backend_status_data:
+            report.add_pie_chart("Backend 상태 코드 분포", backend_status_data, doughnut=True)
+
+        # 3. 시간대별 요청 트렌드 (라인 차트) - CloudWatch 스타일 적응형 해상도
         # 타임스탬프와 에러 플래그 수집
         all_timestamps: list[datetime] = []
         is_error_list: list[int] = []  # 1 if error, 0 otherwise
@@ -314,7 +322,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                 area=True,
             )
 
-        # 3. ELB vs Backend 에러 비교 (바 차트)
+        # 4. ELB vs Backend 에러 비교 (바 차트)
         if elb_4xx > 0 or elb_5xx > 0 or backend_4xx > 0 or backend_5xx > 0:
             report.add_bar_chart(
                 "ELB vs Backend 에러 비교",
@@ -325,7 +333,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                 ],
             )
 
-        # 3. 국가별 요청 분포 (바 차트)
+        # 5. 국가별 요청 분포 (바 차트)
         country_stats = analysis_results.get("country_statistics", {})
         if country_stats:
             # 요청 수 기준 정렬 (두 가지 형식 지원: {country: count} 또는 {country: {"count": count}})
@@ -345,7 +353,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                     horizontal=True,
                 )
 
-        # 4. Top 요청 URL (바 차트)
+        # 6. Top 요청 URL (바 차트)
         url_counts = analysis_results.get("request_url_counts", {})
         if url_counts:
             sorted_urls = sorted(url_counts.items(), key=lambda x: -x[1])[:15]
@@ -360,7 +368,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                     horizontal=True,
                 )
 
-        # 5. Top 클라이언트 IP (바 차트)
+        # 7. Top 클라이언트 IP (바 차트)
         if client_ip_counts:
             sorted_ips = sorted(client_ip_counts.items(), key=lambda x: -x[1])[:10]
             if sorted_ips:
@@ -373,7 +381,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                     horizontal=True,
                 )
 
-        # 6. Client IP별 상태 코드 분포 (상위 IP들의 에러 현황)
+        # 8. Client IP별 상태 코드 분포 (상위 IP들의 에러 현황)
         # client_status_statistics: {client_ip: {status_code: count}}
         client_status = analysis_results.get("client_status_statistics", {})
         if client_status:
@@ -397,9 +405,164 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                         series=[("요청 수", counts)],
                     )
 
-        # 7. 데이터 전송량 (테이블)
+        # 9. HTTP 메서드 분포 (클라이언트 상태 코드 옆에 배치)
+        request_url_details = analysis_results.get("request_url_details", {})
+        if request_url_details:
+            # 모든 URL의 메서드를 집계
+            method_totals: dict[str, int] = {}
+            for url_detail in request_url_details.values():
+                if isinstance(url_detail, dict):
+                    methods = url_detail.get("methods", {})
+                    for method, cnt in methods.items():
+                        if method and isinstance(cnt, int):
+                            method_totals[method] = method_totals.get(method, 0) + cnt
+
+            if method_totals:
+                sorted_methods = sorted(method_totals.items(), key=lambda x: -x[1])
+                if sorted_methods:
+                    method_data = [(m, c) for m, c in sorted_methods if m.strip()]
+                    if method_data:
+                        report.add_pie_chart("HTTP 메서드 분포", method_data, doughnut=True)
+
+        # 10. Top User-Agent (바 차트)
+        user_agent_counts = analysis_results.get("user_agent_counts", {})
+        if user_agent_counts:
+            sorted_uas = sorted(user_agent_counts.items(), key=lambda x: -x[1])[:10]
+            if sorted_uas:
+                # User-Agent 문자열 길이 제한
+                uas = [ua[:50] + "..." if len(ua) > 50 else ua for ua, _ in sorted_uas]
+                counts = [count for _, count in sorted_uas]
+                report.add_bar_chart(
+                    "Top User-Agent",
+                    categories=uas,
+                    series=[("요청 수", counts)],
+                    horizontal=True,
+                )
+
+        # 11. 데이터 전송량 (바 차트) - 시각적으로 표현
         total_received = analysis_results.get("total_received_bytes") or 0
         total_sent = analysis_results.get("total_sent_bytes") or 0
+        if total_received > 0 or total_sent > 0:
+            # GB 단위로 변환
+            def to_gb(b: int) -> float:
+                return b / (1024**3) if b else 0
+
+            transfer_data = [
+                ("수신 (Received)", to_gb(total_received)),
+                ("송신 (Sent)", to_gb(total_sent)),
+            ]
+            # 값이 있는 항목만
+            transfer_data = [(name, val) for name, val in transfer_data if val > 0]
+            if transfer_data:
+                report.add_bar_chart(
+                    "데이터 전송량 (GB)",
+                    categories=[name for name, _ in transfer_data],
+                    series=[("GB", [round(val, 2) for _, val in transfer_data])],
+                )
+
+        # 12. 응답 시간 백분위수 (바 차트)
+        response_time_percentiles = analysis_results.get("response_time_percentiles", {})
+        if response_time_percentiles:
+            percentile_labels = ["P50", "P90", "P95", "P99", "평균"]
+            percentile_values = [
+                round(response_time_percentiles.get("p50", 0) * 1000, 1),  # ms 변환
+                round(response_time_percentiles.get("p90", 0) * 1000, 1),
+                round(response_time_percentiles.get("p95", 0) * 1000, 1),
+                round(response_time_percentiles.get("p99", 0) * 1000, 1),
+                round(response_time_percentiles.get("avg", 0) * 1000, 1),
+            ]
+            if any(v > 0 for v in percentile_values):
+                report.add_bar_chart(
+                    "응답 시간 분포 (ms)",
+                    categories=percentile_labels,
+                    series=[("응답 시간", percentile_values)],
+                )
+
+        # 13. 에러 원인 분포 (바 차트)
+        error_reason_counts = analysis_results.get("error_reason_counts", {})
+        if error_reason_counts:
+            sorted_reasons = sorted(error_reason_counts.items(), key=lambda x: -x[1])[:10]
+            if sorted_reasons:
+                reasons = [reason for reason, _ in sorted_reasons]
+                counts = [count for _, count in sorted_reasons]
+                report.add_bar_chart(
+                    "에러 원인 분포",
+                    categories=reasons,
+                    series=[("건수", counts)],
+                    horizontal=True,
+                )
+
+        # 14. Target별 요청 분포 및 에러율 (바 차트)
+        target_request_stats = analysis_results.get("target_request_stats", {})
+        if target_request_stats:
+            # 요청 수 기준 정렬
+            sorted_targets = sorted(
+                target_request_stats.items(),
+                key=lambda x: x[1].get("total_requests", 0),
+                reverse=True,
+            )[:10]
+            if sorted_targets:
+                target_names = [name[:40] + "..." if len(name) > 40 else name for name, _ in sorted_targets]
+                request_counts = [stats.get("total_requests", 0) for _, stats in sorted_targets]
+                error_counts = [stats.get("error_count", 0) for _, stats in sorted_targets]
+                report.add_bar_chart(
+                    "Target별 요청 분포",
+                    categories=target_names,
+                    series=[
+                        ("정상 요청", [r - e for r, e in zip(request_counts, error_counts, strict=True)]),
+                        ("에러", error_counts),
+                    ],
+                    stacked=True,
+                    horizontal=True,
+                )
+
+        # 15. URL별 에러율 Top 20 (바 차트)
+        url_error_stats = analysis_results.get("url_error_stats", {})
+        if url_error_stats:
+            # 에러율이 높은 순으로 정렬 (최소 에러가 있는 것만)
+            sorted_urls = sorted(
+                [(url, stats) for url, stats in url_error_stats.items() if stats.get("error_count", 0) > 0],
+                key=lambda x: x[1].get("error_rate", 0),
+                reverse=True,
+            )[:15]
+            if sorted_urls:
+                url_names = [url[:50] + "..." if len(url) > 50 else url for url, _ in sorted_urls]
+                error_rates = [stats.get("error_rate", 0) for _, stats in sorted_urls]
+                report.add_bar_chart(
+                    "URL별 에러율 (%)",
+                    categories=url_names,
+                    series=[("에러율", error_rates)],
+                    horizontal=True,
+                )
+
+        # 16. 시간대별 에러 트렌드 (라인 차트) - 에러만 분리
+        error_timestamps: list[datetime] = []
+        error_types: list[str] = []
+
+        for key, error_type in [("ELB 4xx Count", "4xx"), ("ELB 5xx Count", "5xx")]:
+            log_data = analysis_results.get(key, {})
+            if isinstance(log_data, dict):
+                timestamps = log_data.get("timestamps", [])
+                for ts in timestamps:
+                    if ts and hasattr(ts, "timestamp"):
+                        error_timestamps.append(ts)
+                        error_types.append(error_type)
+
+        if error_timestamps:
+            # 에러 타입별 값 리스트 생성
+            is_4xx = [1 if t == "4xx" else 0 for t in error_types]
+            is_5xx = [1 if t == "5xx" else 0 for t in error_types]
+
+            report.add_time_series_chart(
+                "시간대별 에러 트렌드",
+                timestamps=error_timestamps,
+                values={
+                    "4xx 에러": is_4xx,
+                    "5xx 에러": is_5xx,
+                },
+                aggregation="sum",
+                area=True,
+            )
 
         def format_bytes(b: int | None) -> str:
             if b is None:
@@ -967,7 +1130,7 @@ def _generate_report_filename(analyzer, analysis_results: dict[str, Any]) -> str
 
 def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None:
     """임시 파일 정리 (분석 완료 후 gz, log 파일 삭제)"""
-    console.print("[dim]임시 파일 정리 중...[/dim]")
+    print_sub_info("임시 파일 정리 중...")
 
     try:
         # 1. analyzer.clean_up 호출 (DuckDB 등 내부 리소스 정리)
@@ -981,9 +1144,8 @@ def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None
                     filepath = os.path.join(gz_directory, filename)
                     if os.path.isfile(filepath):
                         os.remove(filepath)
-                console.print(f"[dim]  ✓ gz 파일 정리 완료: {gz_directory}[/dim]")
-            except Exception as e:
-                console.print(f"[dim]  ! gz 정리 실패: {e}[/dim]")
+            except Exception:
+                pass  # 조용히 실패 처리
 
         # 3. log 디렉토리 내부 파일 삭제
         if isinstance(log_directory, str) and os.path.exists(log_directory):
@@ -992,11 +1154,10 @@ def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None
                     filepath = os.path.join(log_directory, filename)
                     if os.path.isfile(filepath):
                         os.remove(filepath)
-                console.print(f"[dim]  ✓ log 파일 정리 완료: {log_directory}[/dim]")
-            except Exception as e:
-                console.print(f"[dim]  ! log 정리 실패: {e}[/dim]")
+            except Exception:
+                pass  # 조용히 실패 처리
 
-        console.print("[dim]✓ 임시 파일 정리 완료[/dim]")
+        print_sub_task_done("임시 파일 정리 완료")
 
-    except Exception as e:
-        console.print(f"[dim]! 정리 중 오류 (무시됨): {e}[/dim]")
+    except Exception:
+        pass  # 정리 실패는 무시

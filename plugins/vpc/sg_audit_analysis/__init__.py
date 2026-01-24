@@ -2,7 +2,7 @@
 Security Group Audit Analysis Module
 """
 
-from .analyzer import RuleAnalysisResult, SGAnalysisResult, SGAnalyzer
+from .analyzer import RuleAnalysisResult, SGAnalysisResult, SGAnalyzer, SGStatus
 from .collector import SGCollector
 from .critical_ports import (
     ALL_RISKY_PORTS,
@@ -18,6 +18,7 @@ __all__: list[str] = [
     "SGCollector",
     "SGAnalyzer",
     "SGExcelReporter",
+    "SGStatus",
     "RuleAnalysisResult",
     "SGAnalysisResult",
     "CRITICAL_PORTS",

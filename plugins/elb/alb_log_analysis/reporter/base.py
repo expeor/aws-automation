@@ -322,7 +322,7 @@ class SummarySheetHelper:
             self.row += 1
         else:
             for i, (name, count) in enumerate(items[:max_items], 1):
-                display = str(name)[:47] + "..." if len(str(name)) > 50 else str(name)
+                display = str(name)[:27] + "..." if len(str(name)) > 30 else str(name)
                 name_cell = self.ws.cell(row=self.row, column=1, value=f"{i}. {display}")
                 name_cell.font = self.styles.value_font
                 name_cell.alignment = self.styles.align_left
