@@ -82,8 +82,9 @@ def run(ctx) -> None:
     reporter = NATExcelReporter(all_results, all_stats)
     filepath = reporter.generate(output_path)
 
-    console.print("[bold green]보고서 생성 완료![/bold green]")
-    console.print(f"  경로: {filepath}")
+    from core.tools.output import print_report_complete
+
+    print_report_complete(filepath)
 
     # 폴더 열기
     open_in_explorer(output_path)
