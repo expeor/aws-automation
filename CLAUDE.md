@@ -23,7 +23,10 @@ aws-automation/
 ```
 core/
 ├── auth/           # 인증 (SSO Session, SSO Profile, Static)
-├── parallel/       # 병렬 실행 (Map-Reduce, Rate Limiting)
+├── parallel/       # 병렬 실행 (Map-Reduce, Rate Limiting, Quotas)
+│   ├── executor.py       # ParallelSessionExecutor, parallel_collect
+│   ├── rate_limiter.py   # Token Bucket Rate Limiting
+│   └── quotas.py         # Service Quotas 확인 (NEW)
 ├── tools/          # 도구 관리, 캐시, 히스토리
 │   ├── io/         # 파일 입출력
 │   │   ├── csv/    # CSV 읽기 (인코딩 감지)
@@ -31,9 +34,12 @@ core/
 │   │   ├── html/   # HTML 리포트 (ECharts)
 │   │   └── file/   # 기본 파일 I/O
 │   ├── output/     # 출력 빌더
-│   └── history/    # 사용 기록, 즐겨찾기
+│   ├── history/    # 사용 기록, 즐겨찾기
+│   └── tag_validator.py  # 태그 정책 검증 (NEW)
 ├── cloudwatch/     # CloudWatch re-export (→ plugins/cloudwatch/common)
-├── region/         # 리전 데이터
+├── region/         # 리전 데이터 및 가용성 확인
+│   ├── data.py           # ALL_REGIONS, REGION_NAMES
+│   └── availability.py   # 리전 가용성 확인 (NEW)
 └── filter.py       # 리전 필터링
 ```
 
@@ -168,6 +174,9 @@ from core.parallel import (
     safe_aws_call,          # 재시도 + Rate limiting 데코레이터
     quiet_mode,             # 로그 출력 억제
     ErrorCollector,         # 에러 수집/분류
+    # Service Quotas 확인
+    get_quota_checker,      # 쿼터 체커 싱글톤
+    QuotaStatus,            # 쿼터 상태 (OK, WARNING, CRITICAL, EXCEEDED)
 )
 
 # 기본 사용
@@ -184,6 +193,52 @@ with parallel_progress("수집 중") as tracker:
 def get_instances(session, region):
     ec2 = session.client("ec2", region_name=region)
     return ec2.describe_instances()["Reservations"]
+
+# 쿼터 확인
+checker = get_quota_checker(session, "ap-northeast-2")
+quota = checker.get_quota("ec2", "Running On-Demand")
+if quota and quota.usage_percent > 80:
+    print(f"경고: {quota.quota_name} 사용률 {quota.usage_percent:.1f}%")
+```
+
+### 리전 가용성 확인 (core.region)
+
+```python
+from core.region import (
+    get_available_regions,      # 사용 가능한 리전 조회
+    filter_available_regions,   # 리전 필터링
+    validate_regions,           # 리전 검증
+    RegionAvailabilityChecker,  # 상세 제어
+)
+
+# 사용 가능한 리전 조회
+available = get_available_regions(session)
+
+# 요청 리전 검증
+available, unavailable = validate_regions(session, ["ap-northeast-2", "me-south-1"])
+for region, reason in unavailable:
+    print(f"{region}: {reason}")  # me-south-1: 옵트인 필요
+```
+
+### 태그 정책 검증 (core.tools)
+
+```python
+from core.tools import (
+    TagPolicyValidator,
+    TagPolicy,
+    TagRule,
+    create_basic_policy,
+    create_cost_allocation_policy,
+)
+
+# 정책 생성
+policy = create_basic_policy(required_tags=["Environment", "Owner"])
+
+# 검증
+validator = TagPolicyValidator(policy)
+result = validator.validate({"Environment": "prod"})
+if not result.is_valid:
+    print(result.get_summary())  # 누락된 필수 태그: Owner
 ```
 
 ### 파일 출력 (core.tools.io)

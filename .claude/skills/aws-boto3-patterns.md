@@ -108,17 +108,88 @@ response = client.describe_instances(
 )
 ```
 
-## 리전 목록 조회
+## 태그 정책 검증
+
+리소스 태그 정책 준수 확인:
 
 ```python
-def get_enabled_regions(session) -> list[str]:
-    """활성화된 리전 목록 조회"""
-    ec2 = session.client('ec2', region_name='us-east-1')
-    response = ec2.describe_regions(
-        Filters=[{'Name': 'opt-in-status', 'Values': ['opt-in-not-required', 'opted-in']}]
-    )
-    return [r['RegionName'] for r in response['Regions']]
+from core.tools import (
+    TagPolicyValidator,
+    TagPolicy,
+    TagRule,
+    create_cost_allocation_policy,
+    create_basic_policy,
+)
+
+# 기본 정책 사용
+policy = create_basic_policy(
+    required_tags=["Name", "Environment", "Owner"],
+    environment_values=["prod", "stg", "dev"],
+)
+
+# 커스텀 정책
+policy = TagPolicy(
+    name="My Policy",
+    rules=[
+        TagRule(key="Environment", required=True, allowed_values=["prod", "dev"]),
+        TagRule(key="CostCenter", required=True, pattern=r"^CC-\d{4}$"),
+        TagRule(key="Owner", required=True, pattern=r"^[a-z]+@company\.com$"),
+    ],
+)
+
+# 검증
+validator = TagPolicyValidator(policy)
+result = validator.validate({"Environment": "prod", "Owner": "john@company.com"})
+
+if not result.is_valid:
+    console.print(result.get_summary())
+    for key in result.missing_required:
+        console.print(f"  누락: {key}")
+
+# 여러 리소스 일괄 검증
+resources = [{"Id": "res-1", "Tags": {"Environment": "prod"}}]
+results = validator.validate_resources(resources)
+compliant, non_compliant, ids = validator.get_compliance_summary(results)
 ```
+
+**사전 정의 정책:**
+- `create_basic_policy()` - 기본 태그 (Name, Environment, Owner)
+- `create_cost_allocation_policy()` - 비용 할당 태그
+- `create_security_policy()` - 보안 태그 (DataClassification 등)
+- `create_map_migration_policy()` - MAP 2.0 마이그레이션 태그
+
+## 리전 가용성 확인
+
+계정에서 접근 가능한 리전 확인 (옵트인 리전 지원):
+
+```python
+from core.region import (
+    get_available_regions,
+    filter_available_regions,
+    validate_regions,
+    RegionAvailabilityChecker,
+)
+
+# 간편 사용
+available = get_available_regions(session)
+
+# 요청 리전 검증
+requested = ["ap-northeast-2", "me-south-1"]
+available, unavailable = validate_regions(session, requested)
+
+for region, reason in unavailable:
+    console.print(f"[yellow]{region}: {reason}[/yellow]")
+
+# 상세 제어
+checker = RegionAvailabilityChecker(session=session)
+opt_in_regions = checker.get_opt_in_regions()  # 옵트인 필요 리전
+enabled_opt_ins = checker.get_enabled_opt_in_regions()  # 활성화된 옵트인 리전
+```
+
+**특징:**
+- 옵트인 리전(me-south-1, af-south-1 등) 자동 처리
+- TTL 기반 캐싱 (1시간)
+- `expand_region_pattern()`과 연동 가능
 
 ## CloudWatch 메트릭 배치 수집
 
