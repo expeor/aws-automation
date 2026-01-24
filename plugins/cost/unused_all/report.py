@@ -40,6 +40,8 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         # Database
         ("DynamoDB", "dynamodb_total", "dynamodb_unused", "dynamodb_monthly_waste"),
         ("ElastiCache", "elasticache_total", "elasticache_unused", "elasticache_monthly_waste"),
+        ("Redshift", "redshift_total", "redshift_unused", "redshift_monthly_waste"),
+        ("OpenSearch", "opensearch_total", "opensearch_unused", "opensearch_monthly_waste"),
         ("RDS Instance", "rds_instance_total", "rds_instance_unused", "rds_instance_monthly_waste"),
         ("RDS Snapshot", "rds_snap_total", "rds_snap_unused", "rds_snap_monthly_waste"),
         # Storage
@@ -69,6 +71,11 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("Log Group", "loggroup_total", "loggroup_unused", "loggroup_monthly_waste"),
         # DNS (Global)
         ("Route53", "route53_total", "route53_unused", "route53_monthly_waste"),
+        # Analytics
+        ("Kinesis Stream", "kinesis_total", "kinesis_unused", "kinesis_monthly_waste"),
+        ("Glue Job", "glue_total", "glue_unused", None),
+        # Security (VPC)
+        ("Security Group", "sg_total", "sg_unused", None),
     ]
 
     summary.add_blank_row()
@@ -103,11 +110,14 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         + s.route53_monthly_waste
         + s.lambda_monthly_waste
         + s.elasticache_monthly_waste
+        + s.redshift_monthly_waste
+        + s.opensearch_monthly_waste
         + s.rds_instance_monthly_waste
         + s.efs_monthly_waste
         + s.dynamodb_monthly_waste
         + s.ec2_instance_monthly_waste
         + s.sagemaker_endpoint_monthly_waste
+        + s.kinesis_monthly_waste
         for s in result.summaries
     )
 
@@ -131,6 +141,8 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     # Database
     _create_dynamodb_sheet(wb, result.dynamodb_results)
     _create_elasticache_sheet(wb, result.elasticache_results)
+    _create_redshift_sheet(wb, result.redshift_results)
+    _create_opensearch_sheet(wb, result.opensearch_results)
     _create_rds_instance_sheet(wb, result.rds_instance_results)
     _create_rds_snap_sheet(wb, result.rds_snap_results)
     # Storage
@@ -155,6 +167,11 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     _create_loggroup_sheet(wb, result.loggroup_results)
     # DNS (Global)
     _create_route53_sheet(wb, result.route53_results)
+    # Analytics
+    _create_kinesis_sheet(wb, result.kinesis_results)
+    _create_glue_sheet(wb, result.glue_results)
+    # Security (VPC)
+    _create_security_group_sheet(wb, result.sg_results)
 
     return str(wb.save_as(output_dir, "Unused_Resources"))
 
@@ -1184,3 +1201,212 @@ def _create_sagemaker_endpoint_sheet(wb: Workbook, results) -> None:
                     ],
                     style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
                 )
+
+
+def _create_redshift_sheet(wb: Workbook, results) -> None:
+    """Redshift 클러스터 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="Cluster ID", width=30, style="data"),
+        ColumnDef(header="Node Type", width=15, style="data"),
+        ColumnDef(header="Nodes", width=8, style="number"),
+        ColumnDef(header="Status", width=12, style="center"),
+        ColumnDef(header="Avg Conn", width=10, style="data"),
+        ColumnDef(header="Avg CPU", width=10, style="data"),
+        ColumnDef(header="Avg IOPS", width=10, style="data"),
+        ColumnDef(header="월간 비용", width=15, style="data"),
+        ColumnDef(header="분석상태", width=12, style="center"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("Redshift", columns=columns)
+
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                c = f.cluster
+                sheet.add_row(
+                    [
+                        c.account_name,
+                        c.region,
+                        c.cluster_id,
+                        c.node_type,
+                        c.num_nodes,
+                        c.status,
+                        f"{c.avg_connections:.1f}",
+                        f"{c.avg_cpu:.1f}%",
+                        f"{c.avg_read_iops + c.avg_write_iops:.1f}",
+                        f"${c.estimated_monthly_cost:.2f}",
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
+                )
+
+
+def _create_opensearch_sheet(wb: Workbook, results) -> None:
+    """OpenSearch 도메인 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="Domain Name", width=30, style="data"),
+        ColumnDef(header="Instance Type", width=18, style="data"),
+        ColumnDef(header="Instances", width=10, style="number"),
+        ColumnDef(header="Storage (GB)", width=12, style="data"),
+        ColumnDef(header="Engine", width=15, style="data"),
+        ColumnDef(header="Avg CPU", width=10, style="data"),
+        ColumnDef(header="Docs", width=12, style="data"),
+        ColumnDef(header="Index Rate", width=12, style="data"),
+        ColumnDef(header="월간 비용", width=15, style="data"),
+        ColumnDef(header="분석상태", width=12, style="center"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("OpenSearch", columns=columns)
+
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                d = f.domain
+                sheet.add_row(
+                    [
+                        d.account_name,
+                        d.region,
+                        d.domain_name,
+                        d.instance_type,
+                        d.instance_count,
+                        f"{d.storage_gb:.0f}",
+                        d.engine_version,
+                        f"{d.avg_cpu:.1f}%",
+                        f"{d.searchable_docs:,.0f}",
+                        f"{d.indexing_rate:.2f}/min",
+                        f"${d.estimated_monthly_cost:.2f}",
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
+                )
+
+
+def _create_kinesis_sheet(wb: Workbook, results) -> None:
+    """Kinesis 스트림 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="Stream Name", width=35, style="data"),
+        ColumnDef(header="Mode", width=12, style="center"),
+        ColumnDef(header="Shards", width=8, style="number"),
+        ColumnDef(header="Retention", width=12, style="data"),
+        ColumnDef(header="Status", width=12, style="center"),
+        ColumnDef(header="Avg Records/Day", width=15, style="data"),
+        ColumnDef(header="Avg Bytes/Day", width=15, style="data"),
+        ColumnDef(header="Consumers", width=10, style="number"),
+        ColumnDef(header="월간 비용", width=15, style="data"),
+        ColumnDef(header="분석상태", width=12, style="center"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("Kinesis", columns=columns)
+
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                s = f.stream
+                sheet.add_row(
+                    [
+                        s.account_name,
+                        s.region,
+                        s.stream_name,
+                        s.stream_mode,
+                        s.shard_count,
+                        f"{s.retention_hours}h",
+                        s.stream_status,
+                        f"{s.incoming_records:,.0f}",
+                        f"{s.incoming_bytes / (1024 * 1024):,.2f} MB",
+                        s.consumer_count,
+                        f"${s.estimated_monthly_cost:.2f}",
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
+                )
+
+
+def _create_glue_sheet(wb: Workbook, results) -> None:
+    """Glue 작업 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="Job Name", width=40, style="data"),
+        ColumnDef(header="Type", width=15, style="center"),
+        ColumnDef(header="Glue Version", width=12, style="data"),
+        ColumnDef(header="Max DPU", width=10, style="data"),
+        ColumnDef(header="Workers", width=12, style="data"),
+        ColumnDef(header="Last Run", width=15, style="data"),
+        ColumnDef(header="Last Status", width=12, style="center"),
+        ColumnDef(header="Runs (30d)", width=12, style="number"),
+        ColumnDef(header="Runs (90d)", width=12, style="number"),
+        ColumnDef(header="분석상태", width=12, style="center"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("Glue", columns=columns)
+
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                j = f.job
+                last_run_str = j.last_run_time.strftime("%Y-%m-%d") if j.last_run_time else "-"
+                workers_str = f"{j.worker_type} x {j.num_workers}" if j.worker_type else "-"
+                sheet.add_row(
+                    [
+                        j.account_name,
+                        j.region,
+                        j.job_name,
+                        j.job_type,
+                        j.glue_version or "-",
+                        f"{j.max_capacity:.1f}",
+                        workers_str,
+                        last_run_str,
+                        j.last_run_status or "-",
+                        j.run_count_30d,
+                        j.run_count_90d,
+                        f.status.value,
+                        f.recommendation,
+                    ],
+                    style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
+                )
+
+
+def _create_security_group_sheet(wb: Workbook, results) -> None:
+    """Security Group 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="SG ID", width=25, style="data"),
+        ColumnDef(header="SG Name", width=30, style="data"),
+        ColumnDef(header="VPC ID", width=25, style="data"),
+        ColumnDef(header="ENI Count", width=10, style="number"),
+        ColumnDef(header="Inbound Rules", width=12, style="number"),
+        ColumnDef(header="Outbound Rules", width=12, style="number"),
+        ColumnDef(header="상태", width=15, style="center"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("Security Group", columns=columns)
+
+    for sg_result in results:
+        # SGAnalysisResult는 SGAnalyzer.analyze()에서 반환되는 개별 결과
+        if sg_result.status.value == "Unused":
+            sg = sg_result.sg
+            sheet.add_row(
+                [
+                    sg.account_name,
+                    sg.region,
+                    sg.sg_id,
+                    sg.sg_name,
+                    sg.vpc_id,
+                    sg.eni_count,
+                    len(sg.inbound_rules),
+                    len(sg.outbound_rules),
+                    sg_result.status.value,
+                    sg_result.action_recommendation,
+                ],
+                style=Styles.danger(),
+            )
