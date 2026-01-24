@@ -277,6 +277,251 @@ python -m py_compile tests/plugins/{service}/test_{module}.py
   pytest tests/plugins/efs/test_unused.py -v
 ```
 
+---
+
+## 테스트 데이터 팩토리
+
+테스트 데이터 생성을 위한 팩토리 패턴을 활용합니다.
+
+### 리소스 팩토리 패턴
+
+```python
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+import random
+import string
+
+
+@dataclass
+class EC2InstanceFactory:
+    """EC2 인스턴스 테스트 데이터 팩토리"""
+
+    instance_id: str = ""
+    instance_type: str = "t3.micro"
+    state: str = "running"
+    launch_time: datetime = field(default_factory=datetime.now)
+    tags: list[dict] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.instance_id:
+            self.instance_id = f"i-{''.join(random.choices(string.hexdigits.lower(), k=17))}"
+
+    def build(self) -> dict:
+        """boto3 응답 형식으로 반환"""
+        return {
+            "InstanceId": self.instance_id,
+            "InstanceType": self.instance_type,
+            "State": {"Name": self.state},
+            "LaunchTime": self.launch_time,
+            "Tags": self.tags,
+        }
+
+    def with_name(self, name: str) -> "EC2InstanceFactory":
+        self.tags.append({"Key": "Name", "Value": name})
+        return self
+
+    def stopped(self) -> "EC2InstanceFactory":
+        self.state = "stopped"
+        return self
+
+    def running(self) -> "EC2InstanceFactory":
+        self.state = "running"
+        return self
+
+
+@dataclass
+class EBSVolumeFactory:
+    """EBS 볼륨 테스트 데이터 팩토리"""
+
+    volume_id: str = ""
+    size: int = 100
+    state: str = "available"
+    attachments: list[dict] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.volume_id:
+            self.volume_id = f"vol-{''.join(random.choices(string.hexdigits.lower(), k=17))}"
+
+    def build(self) -> dict:
+        return {
+            "VolumeId": self.volume_id,
+            "Size": self.size,
+            "State": self.state,
+            "Attachments": self.attachments,
+        }
+
+    def attached_to(self, instance_id: str) -> "EBSVolumeFactory":
+        self.state = "in-use"
+        self.attachments = [{"InstanceId": instance_id, "State": "attached"}]
+        return self
+
+    def unattached(self) -> "EBSVolumeFactory":
+        self.state = "available"
+        self.attachments = []
+        return self
+
+
+# 사용 예시
+def test_with_factory():
+    instance = EC2InstanceFactory().with_name("web-server").running().build()
+    volume = EBSVolumeFactory().unattached().build()
+    attached_vol = EBSVolumeFactory().attached_to(instance["InstanceId"]).build()
+
+    assert instance["State"]["Name"] == "running"
+    assert volume["State"] == "available"
+    assert attached_vol["State"] == "in-use"
+```
+
+### Fixture 기반 팩토리
+
+```python
+@pytest.fixture
+def ec2_instance_factory():
+    """EC2 인스턴스 팩토리 fixture"""
+    return EC2InstanceFactory
+
+
+@pytest.fixture
+def sample_instances(ec2_instance_factory):
+    """샘플 인스턴스 세트"""
+    return [
+        ec2_instance_factory().with_name("web-1").running().build(),
+        ec2_instance_factory().with_name("web-2").running().build(),
+        ec2_instance_factory().with_name("batch").stopped().build(),
+    ]
+```
+
+---
+
+## 성능 벤치마크 테스트
+
+pytest-benchmark를 사용한 성능 측정:
+
+```python
+import pytest
+
+
+class TestPerformanceBenchmarks:
+    """성능 벤치마크 테스트"""
+
+    @pytest.mark.benchmark(group="parallel")
+    def test_parallel_collect_performance(self, benchmark, mock_ctx):
+        """병렬 수집 성능 벤치마크"""
+        from core.parallel import parallel_collect
+
+        def _collect(session, account_id, account_name, region):
+            return [{"id": f"res-{i}"} for i in range(100)]
+
+        result = benchmark(
+            parallel_collect,
+            mock_ctx,
+            _collect,
+            service="ec2"
+        )
+
+        assert result.get_flat_data() is not None
+
+    @pytest.mark.benchmark(group="metrics")
+    def test_batch_metrics_performance(self, benchmark):
+        """배치 메트릭 조회 성능 벤치마크"""
+        from plugins.cloudwatch.common.batch_metrics import (
+            build_lambda_metric_queries,
+        )
+
+        function_names = [f"func-{i}" for i in range(100)]
+
+        queries = benchmark(
+            build_lambda_metric_queries,
+            function_names,
+            ["Invocations", "Errors"]
+        )
+
+        assert len(queries) == 200  # 100 함수 × 2 메트릭
+```
+
+### pytest.ini 벤치마크 설정
+
+```ini
+[tool.pytest.ini_options]
+markers = [
+    "benchmark: 성능 벤치마크 테스트",
+    "memory: 메모리 프로파일링 테스트",
+    "e2e: End-to-End 테스트",
+    "integration: 통합 테스트",
+]
+```
+
+벤치마크 실행:
+```bash
+pytest tests/ -m benchmark --benchmark-only
+```
+
+---
+
+## 메모리 프로파일링
+
+tracemalloc을 사용한 메모리 사용량 테스트:
+
+```python
+import pytest
+import tracemalloc
+
+
+class TestMemoryUsage:
+    """메모리 사용량 테스트"""
+
+    @pytest.mark.memory
+    def test_large_dataset_memory(self):
+        """대용량 데이터 메모리 사용량 테스트"""
+        tracemalloc.start()
+
+        # 대용량 데이터 생성
+        data = [
+            {"id": f"res-{i}", "name": f"resource-{i}", "size": i * 100}
+            for i in range(10000)
+        ]
+
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        # 피크 메모리 200MB 미만
+        assert peak < 200 * 1024 * 1024, f"Peak memory: {peak / 1024 / 1024:.1f}MB"
+
+    @pytest.mark.memory
+    def test_streaming_vs_batch_memory(self):
+        """스트리밍 vs 배치 메모리 비교"""
+        tracemalloc.start()
+
+        # 스트리밍 처리
+        def stream_process():
+            for i in range(10000):
+                yield {"id": i}
+
+        list(stream_process())
+
+        stream_current, stream_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        tracemalloc.start()
+
+        # 배치 처리
+        batch_data = [{"id": i} for i in range(10000)]
+
+        batch_current, batch_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        # 스트리밍이 더 효율적
+        assert stream_peak <= batch_peak
+```
+
+메모리 테스트 실행:
+```bash
+pytest tests/ -m memory
+```
+
+---
+
 ## 참조 파일
 
 - `tests/conftest.py` - 공통 fixture 정의
@@ -289,3 +534,5 @@ python -m py_compile tests/plugins/{service}/test_{module}.py
 2. **import 경로 확인**: 프로젝트 루트 기준 import 사용
 3. **moto 호환성**: moto가 지원하지 않는 서비스는 MagicMock 사용
 4. **fixture 활용**: conftest.py의 fixture 최대한 활용
+5. **팩토리 패턴**: 반복되는 테스트 데이터는 팩토리로 추출
+6. **벤치마크**: 성능 중요 함수는 @pytest.mark.benchmark 추가
