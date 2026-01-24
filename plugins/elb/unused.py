@@ -28,6 +28,12 @@ from plugins.cost.pricing import get_elb_monthly_cost
 
 console = Console()
 
+# 분석 기간 (일) - AWS Trusted Advisor 기준 7일
+ANALYSIS_DAYS = 7
+
+# 유휴 기준: 요청 수 < 100/일 (AWS Trusted Advisor)
+IDLE_REQUESTS_PER_DAY = 100
+
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
     "read": [
@@ -35,6 +41,7 @@ REQUIRED_PERMISSIONS = {
         "elasticloadbalancing:DescribeTargetGroups",
         "elasticloadbalancing:DescribeTargetHealth",
         "elasticloadbalancing:DescribeInstanceHealth",
+        "cloudwatch:GetMetricStatistics",
     ],
 }
 
@@ -48,6 +55,7 @@ class UsageStatus(Enum):
     """사용 상태"""
 
     UNUSED = "unused"  # 미사용 (타겟 없음)
+    IDLE = "idle"  # 유휴 (타겟 있으나 트래픽 없음)
     UNHEALTHY = "unhealthy"  # 모든 타겟 비정상
     NORMAL = "normal"  # 정상 사용
 
@@ -103,6 +111,10 @@ class LoadBalancerInfo:
     # 비용
     monthly_cost: float = 0.0
 
+    # CloudWatch 메트릭 (ALB/NLB)
+    request_count: float = 0.0  # RequestCount (ALB) or ProcessedBytes (NLB)
+    avg_requests_per_day: float = 0.0
+
     @property
     def total_targets(self) -> int:
         """전체 타겟 수"""
@@ -141,11 +153,13 @@ class LBAnalysisResult:
     # 통계
     total_count: int = 0
     unused_count: int = 0
+    idle_count: int = 0
     unhealthy_count: int = 0
     normal_count: int = 0
 
     # 비용
     unused_monthly_cost: float = 0.0
+    idle_monthly_cost: float = 0.0
 
 
 # =============================================================================
@@ -155,12 +169,17 @@ class LBAnalysisResult:
 
 def collect_v2_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
     """ALB/NLB/GWLB 목록 수집"""
+    from datetime import timedelta, timezone
+
     from botocore.exceptions import ClientError
 
     load_balancers = []
+    now = datetime.now(timezone.utc)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         elbv2 = get_client(session, "elbv2", region_name=region)
+        cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
         # Load Balancers 조회
         paginator = elbv2.get_paginator("describe_load_balancers")
@@ -200,6 +219,32 @@ def collect_v2_load_balancers(session, account_id: str, account_name: str, regio
 
                 # 타겟 그룹 조회
                 lb.target_groups = _get_target_groups(elbv2, lb_arn)
+
+                # CloudWatch 메트릭 조회 (AWS Trusted Advisor 기준)
+                try:
+                    # ALB: RequestCount, NLB: ProcessedBytes
+                    metric_name = "RequestCount" if lb_type == "application" else "ProcessedBytes"
+
+                    # ALB/NLB의 ARN suffix 추출 (app/my-lb/123456 or net/my-lb/123456)
+                    arn_parts = lb_arn.split("loadbalancer/")
+                    if len(arn_parts) > 1:
+                        lb_dimension = arn_parts[1]
+
+                        resp = cloudwatch.get_metric_statistics(
+                            Namespace="AWS/ApplicationELB" if lb_type == "application" else "AWS/NetworkELB",
+                            MetricName=metric_name,
+                            Dimensions=[{"Name": "LoadBalancer", "Value": lb_dimension}],
+                            StartTime=start_time,
+                            EndTime=now,
+                            Period=86400,
+                            Statistics=["Sum"],
+                        )
+                        if resp.get("Datapoints"):
+                            lb.request_count = sum(d["Sum"] for d in resp["Datapoints"])
+                            lb.avg_requests_per_day = lb.request_count / ANALYSIS_DAYS
+                except ClientError:
+                    pass
+
                 load_balancers.append(lb)
 
     except ClientError as e:
@@ -354,6 +399,9 @@ def analyze_load_balancers(
         if finding.usage_status == UsageStatus.UNUSED:
             result.unused_count += 1
             result.unused_monthly_cost += lb.monthly_cost
+        elif finding.usage_status == UsageStatus.IDLE:
+            result.idle_count += 1
+            result.idle_monthly_cost += lb.monthly_cost
         elif finding.usage_status == UsageStatus.UNHEALTHY:
             result.unhealthy_count += 1
             result.unused_monthly_cost += lb.monthly_cost  # unhealthy도 낭비
@@ -421,6 +469,16 @@ def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
             recommendation="비정상 타겟 확인",
         )
 
+    # 유휴: 타겟은 있으나 트래픽 없음 (AWS Trusted Advisor 기준)
+    if lb.lb_type != "classic" and lb.avg_requests_per_day < IDLE_REQUESTS_PER_DAY:
+        return LBFinding(
+            lb=lb,
+            usage_status=UsageStatus.IDLE,
+            severity=Severity.MEDIUM,
+            description=f"유휴 - {ANALYSIS_DAYS}일간 일평균 {lb.avg_requests_per_day:.0f} 요청 (${lb.monthly_cost:.2f}/월)",
+            recommendation="사용 여부 확인 또는 삭제 검토",
+        )
+
     # 정상
     return LBFinding(
         lb=lb,
@@ -447,6 +505,7 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
     # 셀 수준 조건부 스타일링용 Fill
     status_fills = {
         UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.IDLE: PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid"),
         UsageStatus.UNHEALTHY: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
     }
 
@@ -499,11 +558,11 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
     ]
     findings_sheet = wb.new_sheet("Findings", findings_columns)
 
-    # 미사용/unhealthy만 표시
+    # 미사용/유휴/unhealthy 표시
     all_findings = []
     for result in results:
         for f in result.findings:
-            if f.usage_status in (UsageStatus.UNUSED, UsageStatus.UNHEALTHY):
+            if f.usage_status in (UsageStatus.UNUSED, UsageStatus.IDLE, UsageStatus.UNHEALTHY):
                 all_findings.append(f)
 
     # 비용순 정렬
@@ -514,7 +573,7 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
         style = None
         if f.usage_status == UsageStatus.UNUSED:
             style = Styles.danger()
-        elif f.usage_status == UsageStatus.UNHEALTHY:
+        elif f.usage_status == UsageStatus.IDLE or f.usage_status == UsageStatus.UNHEALTHY:
             style = Styles.warning()
 
         findings_sheet.add_row(
@@ -574,20 +633,25 @@ def run(ctx) -> None:
     totals = {
         "total": sum(r.total_count for r in all_results),
         "unused": sum(r.unused_count for r in all_results),
+        "idle": sum(r.idle_count for r in all_results),
         "unhealthy": sum(r.unhealthy_count for r in all_results),
         "normal": sum(r.normal_count for r in all_results),
         "unused_cost": sum(r.unused_monthly_cost for r in all_results),
+        "idle_cost": sum(r.idle_monthly_cost for r in all_results),
     }
 
     console.print(f"\n[bold]전체 ELB: {totals['total']}개[/bold]")
     if totals["unused"] > 0:
         console.print(f"  [red bold]미사용: {totals['unused']}개[/red bold]")
+    if totals["idle"] > 0:
+        console.print(f"  [yellow bold]유휴: {totals['idle']}개[/yellow bold]")
     if totals["unhealthy"] > 0:
         console.print(f"  [yellow]Unhealthy: {totals['unhealthy']}개[/yellow]")
     console.print(f"  [green]정상: {totals['normal']}개[/green]")
 
-    if totals["unused_cost"] > 0:
-        console.print(f"\n  [red]미사용 월 비용: ${totals['unused_cost']:.2f}[/red]")
+    total_waste = totals["unused_cost"] + totals["idle_cost"]
+    if total_waste > 0:
+        console.print(f"\n  [red]낭비 비용: ${total_waste:.2f}/월[/red]")
 
     # 보고서
     console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")

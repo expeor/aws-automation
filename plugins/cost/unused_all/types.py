@@ -27,9 +27,13 @@ from plugins.elb.target_group_audit import TargetGroupAnalysisResult
 from plugins.elb.unused import LBAnalysisResult
 from plugins.eventbridge.unused import EventBridgeAnalysisResult
 from plugins.fn.unused import LambdaAnalysisResult
+from plugins.glue.unused import GlueAnalysisResult
+from plugins.kinesis.unused import KinesisAnalysisResult
 from plugins.kms.unused import KMSKeyAnalysisResult
+from plugins.opensearch.unused import OpenSearchAnalysisResult
 from plugins.rds.snapshot_audit import RDSSnapshotAnalysisResult
 from plugins.rds.unused import RDSAnalysisResult as RDSInstanceAnalysisResult
+from plugins.redshift.unused import RedshiftAnalysisResult
 from plugins.route53.empty_zone import Route53AnalysisResult
 from plugins.s3.empty_bucket import S3AnalysisResult
 from plugins.sagemaker.unused import SageMakerAnalysisResult
@@ -38,6 +42,7 @@ from plugins.sns.unused import SNSAnalysisResult
 from plugins.sqs.unused import SQSAnalysisResult
 from plugins.vpc.endpoint_audit import EndpointAnalysisResult
 from plugins.vpc.eni_audit import ENIAnalysisResult
+from plugins.vpc.sg_audit_analysis import SGAnalysisResult
 
 # =============================================================================
 # 리소스 설정 (카테고리별 그룹화)
@@ -180,6 +185,26 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "data_unused": "unused",
         "session": "elasticache_result",
         "final": "elasticache_results",
+        "data_key": "result",
+    },
+    "redshift": {
+        "display": "Redshift",
+        "total": "redshift_total",
+        "unused": "redshift_unused",
+        "waste": "redshift_monthly_waste",
+        "data_unused": "unused",
+        "session": "redshift_result",
+        "final": "redshift_results",
+        "data_key": "result",
+    },
+    "opensearch": {
+        "display": "OpenSearch",
+        "total": "opensearch_total",
+        "unused": "opensearch_unused",
+        "waste": "opensearch_monthly_waste",
+        "data_unused": "unused",
+        "session": "opensearch_result",
+        "final": "opensearch_results",
         "data_key": "result",
     },
     "rds_instance": {
@@ -375,6 +400,42 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "data_key": "result",
         "is_global": True,
     },
+    # =========================================================================
+    # Analytics
+    # =========================================================================
+    "kinesis": {
+        "display": "Kinesis Stream",
+        "total": "kinesis_total",
+        "unused": "kinesis_unused",
+        "waste": "kinesis_monthly_waste",
+        "data_unused": "unused",
+        "session": "kinesis_result",
+        "final": "kinesis_results",
+        "data_key": "result",
+    },
+    "glue": {
+        "display": "Glue Job",
+        "total": "glue_total",
+        "unused": "glue_unused",
+        "waste": None,  # 미사용 작업은 비용 없음 (실행 시에만 과금)
+        "data_unused": "unused",
+        "session": "glue_result",
+        "final": "glue_results",
+        "data_key": "result",
+    },
+    # =========================================================================
+    # Security (VPC)
+    # =========================================================================
+    "security_group": {
+        "display": "Security Group",
+        "total": "sg_total",
+        "unused": "sg_unused",
+        "waste": None,  # 직접 비용 없음 (보안 위험 감소 목적)
+        "data_unused": "unused",
+        "session": "sg_result",
+        "final": "sg_results",
+        "data_key": "result",
+    },
 }
 
 # 비용 추정 가능한 리소스 필드 목록 (total_waste 계산용)
@@ -444,6 +505,14 @@ class UnusedResourceSummary:
     elasticache_unused: int = 0
     elasticache_monthly_waste: float = 0.0
 
+    redshift_total: int = 0
+    redshift_unused: int = 0
+    redshift_monthly_waste: float = 0.0
+
+    opensearch_total: int = 0
+    opensearch_unused: int = 0
+    opensearch_monthly_waste: float = 0.0
+
     rds_instance_total: int = 0
     rds_instance_unused: int = 0
     rds_instance_monthly_waste: float = 0.0
@@ -512,6 +581,18 @@ class UnusedResourceSummary:
     route53_unused: int = 0
     route53_monthly_waste: float = 0.0
 
+    # Analytics
+    kinesis_total: int = 0
+    kinesis_unused: int = 0
+    kinesis_monthly_waste: float = 0.0
+
+    glue_total: int = 0
+    glue_unused: int = 0
+
+    # Security (VPC)
+    sg_total: int = 0
+    sg_unused: int = 0
+
 
 @dataclass
 class SessionCollectionResult:
@@ -538,6 +619,8 @@ class SessionCollectionResult:
     # Database
     dynamodb_result: DynamoDBAnalysisResult | None = None
     elasticache_result: ElastiCacheAnalysisResult | None = None
+    redshift_result: RedshiftAnalysisResult | None = None
+    opensearch_result: OpenSearchAnalysisResult | None = None
     rds_instance_result: RDSInstanceAnalysisResult | None = None
     rds_snap_result: RDSSnapshotAnalysisResult | None = None
 
@@ -570,6 +653,13 @@ class SessionCollectionResult:
     # DNS (Global)
     route53_result: Route53AnalysisResult | None = None
 
+    # Analytics
+    kinesis_result: KinesisAnalysisResult | None = None
+    glue_result: GlueAnalysisResult | None = None
+
+    # Security (VPC)
+    sg_result: list[SGAnalysisResult] | None = None
+
     # 에러 목록
     errors: list[str] = field(default_factory=list)
 
@@ -599,6 +689,8 @@ class UnusedAllResult:
     # Database
     dynamodb_results: list[DynamoDBAnalysisResult] = field(default_factory=list)
     elasticache_results: list[ElastiCacheAnalysisResult] = field(default_factory=list)
+    redshift_results: list[RedshiftAnalysisResult] = field(default_factory=list)
+    opensearch_results: list[OpenSearchAnalysisResult] = field(default_factory=list)
     rds_instance_results: list[RDSInstanceAnalysisResult] = field(default_factory=list)
     rds_snap_results: list[RDSSnapshotAnalysisResult] = field(default_factory=list)
 
@@ -630,3 +722,10 @@ class UnusedAllResult:
 
     # DNS (Global)
     route53_results: list[Route53AnalysisResult] = field(default_factory=list)
+
+    # Analytics
+    kinesis_results: list[KinesisAnalysisResult] = field(default_factory=list)
+    glue_results: list[GlueAnalysisResult] = field(default_factory=list)
+
+    # Security (VPC)
+    sg_results: list[SGAnalysisResult] = field(default_factory=list)

@@ -2,6 +2,20 @@
 
 AWS 운영 자동화 CLI 도구. 미사용 리소스 탐지, 보안 점검, 비용 분석, IAM 감사 등 65개+ 도구 제공.
 
+## Progressive Disclosure
+
+> 상세 정보는 필요할 때만 로드하여 토큰 사용량을 줄입니다.
+
+| 정보 | 위치 | 갱신 방법 |
+|------|------|----------|
+| 플러그인 목록 및 도구 | `.claude/project-index.md` | `/sync-index` |
+| Core API 요약 | `.claude/project-index.md` | `/sync-index` |
+| 최근 변경 파일 | `.claude/project-index.md` | `/sync-index` |
+| 코딩 스타일 가이드 | 아래 참조 | - |
+| 플러그인 작성 패턴 | 아래 참조 | - |
+
+**프로젝트 탐색 시**: `.claude/project-index.md`를 먼저 확인하세요.
+
 ## 아키텍처
 
 ```

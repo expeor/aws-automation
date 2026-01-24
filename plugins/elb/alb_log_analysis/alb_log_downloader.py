@@ -23,12 +23,29 @@ from rich.progress import (
 
 # 콘솔 및 로거 (aa_cli.aa.ui 또는 로컬 생성)
 try:
-    from cli.ui import console, logger
+    from cli.ui import (
+        console,
+        logger,
+        print_sub_info,
+        print_sub_task_done,
+        print_sub_warning,
+    )
 except ImportError:
     import logging
 
     console = Console()
     logger = logging.getLogger(__name__)
+
+    # Fallback functions
+    def print_sub_info(msg: str) -> None:
+        console.print(f"[blue]{msg}[/blue]")
+
+    def print_sub_task_done(msg: str) -> None:
+        console.print(f"[green]✓ {msg}[/green]")
+
+    def print_sub_warning(msg: str) -> None:
+        console.print(f"[yellow]! {msg}[/yellow]")
+
 
 import contextlib
 
@@ -165,7 +182,7 @@ class ALBLogDownloader:
         self.output_dir = _create_report_directory("alb_log", self.session_name)
         self.report_filename = self._generate_report_filename()
 
-        self.console.print(f"분석 기간: {self.start_datetime} ~ {self.end_datetime} ({timezone})")
+        print_sub_info(f"분석 기간: {self.start_datetime} ~ {self.end_datetime} ({timezone})")
 
     def _generate_report_filename(self) -> str:
         """보고서 파일 이름을 생성합니다."""
@@ -550,7 +567,7 @@ class ALBLogDownloader:
             date_prefixes = self._smart_date_range_optimization()
 
             if not date_prefixes:
-                self.console.print("[yellow]⚠️ 생성된 날짜별 접두사가 없습니다.[/yellow]")
+                print_sub_warning("생성된 날짜별 접두사가 없습니다.")
                 return []
 
             # S3에서 로그 파일 검색 및 시간 필터링
@@ -558,31 +575,22 @@ class ALBLogDownloader:
 
             # 전체 발견 파일 수 로그
             if all_log_files:
-                self.console.print(
-                    f"[cyan]✓ S3에서 총 {len(all_log_files)}개 파일 발견, 시간 범위로 필터링 중...[/cyan]"
-                )
+                print_sub_task_done(f"S3에서 총 {len(all_log_files)}개 파일 발견, 시간 범위로 필터링 중...")
 
             filtered_files = self._binary_search_time_filter(all_log_files)
 
             if not filtered_files:
                 # 사용자 친화적 메시지 (가능하면 실제 가능한 범위와 권장 구간 포함)
-                base_msg = f"[yellow]시간 범위 ({self.start_datetime} ~ {self.end_datetime}) 내에 로그 파일이 없습니다.[/yellow]"
-                self.console.print(base_msg)
+                print_sub_warning(f"시간 범위 ({self.start_datetime} ~ {self.end_datetime}) 내에 로그 파일이 없습니다.")
                 if self.available_range_local:
                     earliest_local, latest_local = self.available_range_local
                     try:
                         suggest_start = latest_local - timedelta(minutes=10)
                         suggest_end = latest_local
-                        self.console.print(
-                            f"[yellow]- 실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}[/yellow]"
-                        )
-                        self.console.print(
-                            f"[yellow]- 권장 재시도: {suggest_start} ~ {suggest_end} 또는 범위를 넓혀 재시도[/yellow]"
-                        )
+                        print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")
+                        print_sub_warning(f"권장 재시도: {suggest_start} ~ {suggest_end} 또는 범위를 넓혀 재시도")
                     except Exception:
-                        self.console.print(
-                            f"[yellow]- 실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}[/yellow]"
-                        )
+                        print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")
                 return []
 
             total_files = len(filtered_files)
@@ -592,9 +600,8 @@ class ALBLogDownloader:
             # 적응형 배치 크기 계산
             adaptive_batch_size = self._adaptive_batch_size(total_files, avg_file_size)
 
-            self.console.print(
-                f"[green]✓ 필터링 완료: {total_files}개 파일 다운로드 시작 "
-                f"(총 크기: {total_size / 1024 / 1024:.1f}MB)[/green]"
+            print_sub_task_done(
+                f"필터링 완료: {total_files}개 파일 다운로드 시작 (총 크기: {total_size / 1024 / 1024:.1f}MB)"
             )
 
             # 파일 크기별 정렬 (큰 파일 먼저 - 병렬 처리 효율성 향상)
@@ -653,7 +660,7 @@ class ALBLogDownloader:
             if not downloaded_files:
                 raise LogDownloadError("다운로드된 파일이 없습니다.")
 
-            self.console.print(f"[green]✓ 다운로드 완료: {len(downloaded_files)}개 파일[/green]")
+            print_sub_task_done(f"다운로드 완료: {len(downloaded_files)}개 파일")
             return downloaded_files
 
         except Exception as e:
@@ -848,7 +855,7 @@ class ALBLogDownloader:
 
     def _get_log_files_from_s3(self, date_prefixes: list[str]) -> list[S3LogFile]:
         """S3에서 로그 파일 목록을 간단하게 가져옵니다."""
-        self.console.print("[blue]S3에서 로그 파일 검색 중...[/blue]")
+        print_sub_info("S3에서 로그 파일 검색 중...")
 
         all_log_files = []
 

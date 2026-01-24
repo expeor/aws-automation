@@ -176,13 +176,21 @@ def print_step_header(step: int, message: str) -> None:
     console.print(f"[bold cyan]Step {step}: {message}[/bold cyan]")
 
 
+INDENT = "   "  # Step 내 부작업 들여쓰기 (3칸)
+
+
 def print_sub_task(message: str) -> None:
     """하위 작업 진행 중 출력 (들여쓰기)
 
     Args:
         message: 작업 설명
+
+    Example:
+        print_step_header(1, "데이터 수집 중...")
+        print_sub_task("S3에서 파일 검색 중...")
+        print_sub_task_done("100개 파일 발견")
     """
-    console.print(f"{message}")
+    console.print(f"{INDENT}{message}")
 
 
 def print_sub_task_done(message: str) -> None:
@@ -191,7 +199,34 @@ def print_sub_task_done(message: str) -> None:
     Args:
         message: 완료 메시지
     """
-    console.print(f"[green]{SYMBOL_SUCCESS} {message}[/green]")
+    console.print(f"{INDENT}[green]{SYMBOL_SUCCESS} {message}[/green]")
+
+
+def print_sub_info(message: str) -> None:
+    """하위 작업 정보 출력 (들여쓰기 + 파란색)
+
+    Args:
+        message: 정보 메시지
+    """
+    console.print(f"{INDENT}[blue]{message}[/blue]")
+
+
+def print_sub_warning(message: str) -> None:
+    """하위 작업 경고 출력 (들여쓰기 + 노란색)
+
+    Args:
+        message: 경고 메시지
+    """
+    console.print(f"{INDENT}[yellow]{SYMBOL_WARNING} {message}[/yellow]")
+
+
+def print_sub_error(message: str) -> None:
+    """하위 작업 에러 출력 (들여쓰기 + 빨간색)
+
+    Args:
+        message: 에러 메시지
+    """
+    console.print(f"{INDENT}[red]{SYMBOL_ERROR} {message}[/red]")
 
 
 def print_panel_header(title: str, subtitle: str | None = None) -> None:

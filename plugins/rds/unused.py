@@ -3,10 +3,22 @@ plugins/rds/unused.py - RDS 유휴 인스턴스 분석
 
 유휴/저사용 RDS 인스턴스 탐지 (CloudWatch 지표 기반)
 
+탐지 기준 (AWS Trusted Advisor 기반):
+- 미사용: DatabaseConnections < 1 (7일 평균) AND IOPS 낮음 (< 20/일)
+- 저사용: CPU < 5% AND 낮은 IOPS
+- 정지됨: stopped 상태
+
+참고:
+- AWS Trusted Advisor: No connections (7 days) → Idle DB
+- https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html
+
+CloudWatch 메트릭:
+- Namespace: AWS/RDS
+- 메트릭: DatabaseConnections, CPUUtilization, ReadIOPS, WriteIOPS
+- Dimension: DBInstanceIdentifier
+
 최적화:
 - CloudWatch GetMetricData API 사용 (배치 조회)
-- 기존: 인스턴스당 4 API 호출 → 최적화: 전체 1 API 호출
-- 예: 20개 인스턴스 × 4 메트릭 = 80 API → 1 API
 
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
@@ -24,10 +36,16 @@ from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_m
 
 console = Console()
 
-# 미사용 기준: 7일간 연결 수 평균 0
-UNUSED_DAYS_THRESHOLD = 7
+# 미사용 기준: 7일간 (AWS Trusted Advisor 기준)
+ANALYSIS_DAYS = 7
+# 미사용 기준: 연결 수 평균 < 1
+UNUSED_CONNECTION_THRESHOLD = 1
+# 미사용 기준: IOPS 평균 < 20/일
+UNUSED_IOPS_THRESHOLD = 20
 # 저사용 기준: CPU 평균 5% 미만
 LOW_USAGE_CPU_THRESHOLD = 5.0
+# 저사용 기준: IOPS 평균 < 100/일
+LOW_USAGE_IOPS_THRESHOLD = 100
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -138,7 +156,7 @@ def collect_rds_instances(session, account_id: str, account_name: str, region: s
     instances = []
 
     now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         # 1단계: 인스턴스 목록 수집
@@ -257,28 +275,30 @@ def analyze_instances(
             )
             continue
 
-        # 미사용: 연결 수 평균 0
-        if instance.avg_connections == 0:
+        total_iops = instance.avg_read_iops + instance.avg_write_iops
+
+        # 미사용: 연결 수 < 1 AND IOPS 낮음 (AWS Trusted Advisor 기준)
+        if instance.avg_connections < UNUSED_CONNECTION_THRESHOLD and total_iops < UNUSED_IOPS_THRESHOLD:
             result.unused_instances += 1
             result.unused_monthly_cost += instance.estimated_monthly_cost
             result.findings.append(
                 InstanceFinding(
                     instance=instance,
                     status=InstanceStatus.UNUSED,
-                    recommendation=f"연결 없음 - 삭제 검토 (${instance.estimated_monthly_cost:.2f}/월)",
+                    recommendation=f"미사용 (연결 {instance.avg_connections:.1f}, IOPS {total_iops:.1f}) - 삭제 검토 (${instance.estimated_monthly_cost:.2f}/월)",
                 )
             )
             continue
 
-        # 저사용: CPU 5% 미만
-        if instance.avg_cpu < LOW_USAGE_CPU_THRESHOLD:
+        # 저사용: CPU < 5% AND IOPS 낮음
+        if instance.avg_cpu < LOW_USAGE_CPU_THRESHOLD and total_iops < LOW_USAGE_IOPS_THRESHOLD:
             result.low_usage_instances += 1
             result.low_usage_monthly_cost += instance.estimated_monthly_cost
             result.findings.append(
                 InstanceFinding(
                     instance=instance,
                     status=InstanceStatus.LOW_USAGE,
-                    recommendation=f"저사용 (CPU {instance.avg_cpu:.1f}%) - 다운사이징 검토",
+                    recommendation=f"저사용 (CPU {instance.avg_cpu:.1f}%, IOPS {total_iops:.1f}) - 다운사이징 검토",
                 )
             )
             continue
@@ -357,6 +377,7 @@ def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
         ColumnDef(header="상태", width=12),
         ColumnDef(header="Avg Conn", width=10),
         ColumnDef(header="Avg CPU", width=10),
+        ColumnDef(header="Avg IOPS", width=10),
         ColumnDef(header="월간 비용", width=12),
         ColumnDef(header="권장 조치", width=40),
     ]
@@ -372,6 +393,7 @@ def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
                 elif f.status == InstanceStatus.LOW_USAGE:
                     style = Styles.warning()
 
+                total_iops = inst.avg_read_iops + inst.avg_write_iops
                 detail_sheet.add_row(
                     [
                         inst.account_name,
@@ -384,6 +406,7 @@ def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
                         f.status.value,
                         f"{inst.avg_connections:.1f}",
                         f"{inst.avg_cpu:.1f}%",
+                        f"{total_iops:.1f}",
                         f"${inst.estimated_monthly_cost:.2f}",
                         f.recommendation,
                     ],

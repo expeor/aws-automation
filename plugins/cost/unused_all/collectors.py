@@ -95,7 +95,25 @@ from plugins.eventbridge.unused import (
 )
 from plugins.fn.common.collector import collect_functions_with_metrics
 from plugins.fn.unused import analyze_functions as analyze_lambda_functions
+from plugins.glue.unused import (
+    analyze_jobs as analyze_glue_jobs,
+)
+from plugins.glue.unused import (
+    collect_glue_jobs,
+)
+from plugins.kinesis.unused import (
+    analyze_streams as analyze_kinesis_streams,
+)
+from plugins.kinesis.unused import (
+    collect_kinesis_streams,
+)
 from plugins.kms.unused import analyze_kms_keys, collect_kms_keys
+from plugins.opensearch.unused import (
+    analyze_domains as analyze_opensearch_domains,
+)
+from plugins.opensearch.unused import (
+    collect_opensearch_domains,
+)
 from plugins.rds.snapshot_audit import (
     analyze_rds_snapshots,
     collect_rds_snapshots,
@@ -105,6 +123,12 @@ from plugins.rds.unused import (
 )
 from plugins.rds.unused import (
     collect_rds_instances,
+)
+from plugins.redshift.unused import (
+    analyze_clusters as analyze_redshift_clusters,
+)
+from plugins.redshift.unused import (
+    collect_redshift_clusters,
 )
 from plugins.route53.empty_zone import (
     analyze_hosted_zones,
@@ -139,6 +163,7 @@ from plugins.vpc.endpoint_audit import (
 )
 from plugins.vpc.eni_audit import analyze_enis, collect_enis
 from plugins.vpc.nat_audit_analysis import NATAnalyzer, NATCollector
+from plugins.vpc.sg_audit_analysis import SGAnalyzer, SGCollector, SGStatus
 
 # =============================================================================
 # 개별 리소스 수집/분석 함수 (병렬 실행용)
@@ -684,6 +709,100 @@ def collect_s3(session, account_id: str, account_name: str) -> dict[str, Any]:
         return {"error": f"S3: {e}"}
 
 
+def collect_redshift(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """Redshift 클러스터 수집 및 분석"""
+    try:
+        clusters = collect_redshift_clusters(session, account_id, account_name, region)
+        if not clusters:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_redshift_clusters(clusters, account_id, account_name, region)
+        return {
+            "total": result.total_clusters,
+            "unused": result.unused_clusters + result.low_usage_clusters + result.paused_clusters,
+            "waste": result.unused_monthly_cost + result.low_usage_monthly_cost + result.paused_monthly_cost,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"Redshift: {e}"}
+
+
+def collect_opensearch(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """OpenSearch 도메인 수집 및 분석"""
+    try:
+        domains = collect_opensearch_domains(session, account_id, account_name, region)
+        if not domains:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_opensearch_domains(domains, account_id, account_name, region)
+        return {
+            "total": result.total_domains,
+            "unused": result.unused_domains + result.low_usage_domains,
+            "waste": result.unused_monthly_cost + result.low_usage_monthly_cost,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"OpenSearch: {e}"}
+
+
+def collect_kinesis(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """Kinesis 스트림 수집 및 분석"""
+    try:
+        streams = collect_kinesis_streams(session, account_id, account_name, region)
+        if not streams:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_kinesis_streams(streams, account_id, account_name, region)
+        return {
+            "total": result.total_streams,
+            "unused": result.unused_streams + result.low_usage_streams,
+            "waste": result.unused_monthly_cost + result.low_usage_monthly_cost,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"Kinesis: {e}"}
+
+
+def collect_glue(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """Glue 작업 수집 및 분석"""
+    try:
+        jobs = collect_glue_jobs(session, account_id, account_name, region)
+        if not jobs:
+            return {"total": 0, "unused": 0, "result": None}
+
+        result = analyze_glue_jobs(jobs, account_id, account_name, region)
+        return {
+            "total": result.total_jobs,
+            "unused": result.unused_jobs + result.failed_jobs,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"Glue: {e}"}
+
+
+def collect_security_group(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """Security Group 수집 및 분석"""
+    try:
+        collector = SGCollector()
+        sgs = collector.collect(session, account_id, account_name, region)
+        if not sgs:
+            return {"total": 0, "unused": 0, "result": None}
+
+        analyzer = SGAnalyzer(sgs)
+        sg_results, _ = analyzer.analyze()
+
+        # 미사용 SG 수 계산
+        unused_count = sum(1 for r in sg_results if r.status == SGStatus.UNUSED)
+
+        return {
+            "total": len(sg_results),
+            "unused": unused_count,
+            "result": sg_results,
+        }
+    except Exception as e:
+        return {"error": f"Security Group: {e}"}
+
+
 # =============================================================================
 # 리전별 리소스 수집기 매핑 (카테고리별 정렬)
 # =============================================================================
@@ -705,6 +824,8 @@ REGIONAL_COLLECTORS: dict[str, Callable] = {
     # Database
     "dynamodb": collect_dynamodb,
     "elasticache": collect_elasticache,
+    "redshift": collect_redshift,
+    "opensearch": collect_opensearch,
     "rds_instance": collect_rds_instance,
     "rds_snapshot": collect_rds_snapshot,
     # Storage
@@ -728,6 +849,11 @@ REGIONAL_COLLECTORS: dict[str, Callable] = {
     "codecommit": collect_codecommit,
     # ML
     "sagemaker_endpoint": collect_sagemaker_endpoint,
+    # Analytics
+    "kinesis": collect_kinesis,
+    "glue": collect_glue,
+    # Security (VPC)
+    "security_group": collect_security_group,
 }
 
 # 글로벌 수집기 (DNS)

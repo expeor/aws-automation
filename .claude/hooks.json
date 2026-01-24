@@ -26,6 +26,11 @@
         "event": "Edit",
         "matcher": "plugins/**/__init__.py",
         "command": "python -c \"import sys; p='%FILE%'.replace('\\\\','/'); exec(open(p).read()); valid=all([isinstance(CATEGORY,dict), 'name' in CATEGORY, 'display_name' in CATEGORY, isinstance(TOOLS,list)]); print('[Metadata] ✓ Valid' if valid else '[Metadata] ✗ Invalid')\""
+      },
+      {
+        "event": "Edit",
+        "matcher": "plugins/**/__init__.py",
+        "command": "echo '[Index] Plugin metadata changed. Run /sync-index to update project index.'"
       }
     ],
     "Stop": [

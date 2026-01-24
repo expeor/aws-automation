@@ -21,6 +21,13 @@ venv/
 
 # Claude Code
 .claude/settings.local.json
+.claude/project-index.md
+
+# External Skills (separate git repos)
+.claude/skills/anthropics-skills/
+.claude/skills/obra-superpowers/
+.claude/skills/trailofbits-skills/
+.claude/skills/wshobson-agents/
 
 # Testing
 .coverage

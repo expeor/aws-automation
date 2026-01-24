@@ -12,8 +12,6 @@ from collections import defaultdict
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
-from rich.console import Console
-
 from core.parallel import is_quiet, parallel_collect, quiet_mode, set_quiet
 from core.tools.output import OutputPath, open_in_explorer
 
@@ -30,12 +28,21 @@ from .types import (
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
+from cli.ui import (
+    console,
+    print_error,
+    print_header,
+    print_step_header,
+    print_sub_info,
+    print_sub_task_done,
+    print_sub_warning,
+    print_warning,
+)
+
 try:
     from cli.ui import parallel_progress
 except ImportError:
     parallel_progress = None  # type: ignore[assignment]
-
-console = Console()
 
 
 # =============================================================================
@@ -235,7 +242,7 @@ def collect_options(ctx: ExecutionContext) -> None:
     """
     import questionary
 
-    console.print("\n[bold cyan]미사용 리소스 종합 분석 설정[/bold cyan]")
+    print_header("미사용 리소스 종합 분석 설정")
 
     # 스캔 모드 선택
     scan_mode = questionary.select(
@@ -261,13 +268,13 @@ def collect_options(ctx: ExecutionContext) -> None:
 
         if selected:
             ctx.options["resources"] = selected
-            console.print(f"[green]선택됨: {', '.join(selected)}[/green]")
+            print_sub_task_done(f"선택됨: {', '.join(selected)}")
         else:
-            console.print("[yellow]선택 없음 - 전체 스캔으로 진행합니다.[/yellow]")
+            print_sub_warning("선택 없음 - 전체 스캔으로 진행합니다.")
             ctx.options["resources"] = None
     else:
         ctx.options["resources"] = None
-        console.print("[green]전체 리소스 스캔으로 진행합니다.[/green]")
+        print_sub_task_done("전체 리소스 스캔으로 진행합니다.")
 
 
 # =============================================================================
@@ -292,13 +299,13 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
         selected = set(resources)
         invalid = selected - set(RESOURCE_FIELD_MAP.keys())
         if invalid:
-            console.print(f"[red]알 수 없는 리소스: {', '.join(invalid)}[/red]")
-            console.print(f"[dim]사용 가능: {', '.join(RESOURCE_FIELD_MAP.keys())}[/dim]")
+            print_error(f"알 수 없는 리소스: {', '.join(invalid)}")
+            print_sub_info(f"사용 가능: {', '.join(RESOURCE_FIELD_MAP.keys())}")
             return
-        console.print(f"[bold]선택된 리소스 분석: {', '.join(resources)}[/bold]\n")
+        print_step_header(1, f"선택된 리소스 분석: {', '.join(resources)}")
     else:
         selected = None
-        console.print("[bold]미사용 리소스 종합 분석 시작 (병렬 처리)...[/bold]\n")
+        print_step_header(1, "미사용 리소스 종합 분석 (병렬 처리)")
 
     # 전역 서비스 추적 초기화
     _reset_global_tracking()
@@ -344,15 +351,14 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
             all_errors.append(str(task_result.error))
 
     if not final_result.summaries:
-        console.print("[yellow]분석 결과 없음[/yellow]")
+        print_warning("분석 결과 없음")
         return
 
     # 총 절감 가능 금액 계산 (WASTE_FIELDS 활용)
     total_waste = sum(sum(getattr(s, field, 0) for field in WASTE_FIELDS) for s in final_result.summaries)
 
     # 요약 출력 (RESOURCE_FIELD_MAP 활용)
-    console.print("\n" + "=" * 50)
-    console.print("[bold]종합 결과[/bold]")
+    print_step_header(2, "종합 결과")
     console.print("=" * 50)
 
     for resource_key, cfg in RESOURCE_FIELD_MAP.items():
@@ -371,12 +377,10 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
         console.print(f"\n[bold yellow]총 월간 절감 가능: ${total_waste:,.2f}[/bold yellow]")
 
     # 실행 통계
-    console.print(
-        f"\n[dim]계정/리전: {parallel_result.success_count}개 성공, {parallel_result.error_count}개 실패[/dim]"
-    )
+    print_sub_info(f"계정/리전: {parallel_result.success_count}개 성공, {parallel_result.error_count}개 실패")
 
     # 보고서 생성
-    console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
+    print_step_header(3, "Excel 보고서 생성")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id
@@ -388,7 +392,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
     output_path = OutputPath(identifier).sub("cost", "unused-all").with_date().build()
     filepath = generate_report(final_result, output_path)
 
-    console.print(f"[bold green]완료![/bold green] {filepath}")
+    print_sub_task_done(f"저장 완료: {filepath}")
 
     if all_errors:
         _print_error_summary(all_errors)
@@ -423,7 +427,7 @@ def _print_error_summary(errors: list[str]) -> None:
         error_groups[error_code].append(region)
 
     # 출력
-    console.print(f"\n[yellow]오류 {len(errors)}건[/yellow]")
+    print_warning(f"오류 {len(errors)}건")
 
     for error_code, regions in sorted(error_groups.items(), key=lambda x: -len(x[1])):
         unique_regions = sorted(set(regions))
@@ -431,7 +435,7 @@ def _print_error_summary(errors: list[str]) -> None:
             region_str = ", ".join(unique_regions)
         else:
             region_str = f"{', '.join(unique_regions[:3])} 외 {len(unique_regions) - 3}개"
-        console.print(f"  [dim]{error_code}: {region_str} ({len(regions)}건)[/dim]")
+        print_sub_info(f"{error_code}: {region_str} ({len(regions)}건)")
 
 
 def _print_summary(

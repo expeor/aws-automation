@@ -23,10 +23,17 @@ from plugins.cost.pricing import get_ebs_monthly_cost
 
 console = Console()
 
+# 분석 기간 (일) - AWS Trusted Advisor 기준 7일
+ANALYSIS_DAYS = 7
+
+# 미사용 기준: VolumeReadOps + VolumeWriteOps < 1 ops/day (AWS Trusted Advisor 기준)
+IDLE_IOPS_THRESHOLD = 1
+
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
     "read": [
         "ec2:DescribeVolumes",
+        "cloudwatch:GetMetricStatistics",
     ],
 }
 
@@ -40,6 +47,7 @@ class UsageStatus(Enum):
     """사용 상태"""
 
     UNUSED = "unused"  # 미사용 (available 상태)
+    IDLE = "idle"  # 유휴 (연결됨 but I/O 없음)
     NORMAL = "normal"  # 정상 사용 (in-use)
     PENDING = "pending"  # 확인 필요
 
@@ -80,6 +88,20 @@ class EBSInfo:
     # 비용
     monthly_cost: float = 0.0
 
+    # CloudWatch 메트릭 (I/O 활동)
+    read_ops: float = 0.0  # VolumeReadOps
+    write_ops: float = 0.0  # VolumeWriteOps
+
+    @property
+    def total_ops(self) -> float:
+        """총 I/O 작업 수"""
+        return self.read_ops + self.write_ops
+
+    @property
+    def avg_daily_ops(self) -> float:
+        """일평균 I/O 작업 수"""
+        return self.total_ops / ANALYSIS_DAYS if ANALYSIS_DAYS > 0 else 0
+
     @property
     def is_attached(self) -> bool:
         """연결 여부"""
@@ -116,13 +138,16 @@ class EBSAnalysisResult:
     # 통계
     total_count: int = 0
     unused_count: int = 0
+    idle_count: int = 0
     normal_count: int = 0
     pending_count: int = 0
 
     # 비용
     total_size_gb: int = 0
     unused_size_gb: int = 0
+    idle_size_gb: int = 0
     unused_monthly_cost: float = 0.0
+    idle_monthly_cost: float = 0.0
 
 
 # =============================================================================
@@ -132,12 +157,17 @@ class EBSAnalysisResult:
 
 def collect_ebs(session, account_id: str, account_name: str, region: str) -> list[EBSInfo]:
     """EBS 볼륨 목록 수집"""
+    from datetime import timedelta, timezone
+
     from botocore.exceptions import ClientError
 
     volumes = []
+    now = datetime.now(timezone.utc)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         ec2 = get_client(session, "ec2", region_name=region)
+        cloudwatch = get_client(session, "cloudwatch", region_name=region)
         paginator = ec2.get_paginator("describe_volumes")
 
         for page in paginator.paginate():
@@ -174,6 +204,38 @@ def collect_ebs(session, account_id: str, account_name: str, region: str) -> lis
                     region=region,
                     monthly_cost=monthly_cost,
                 )
+
+                # in-use 볼륨에 대해 CloudWatch 메트릭 수집 (AWS Trusted Advisor 기준)
+                if volume.state == "in-use":
+                    try:
+                        # VolumeReadOps
+                        read_resp = cloudwatch.get_metric_statistics(
+                            Namespace="AWS/EBS",
+                            MetricName="VolumeReadOps",
+                            Dimensions=[{"Name": "VolumeId", "Value": volume.id}],
+                            StartTime=start_time,
+                            EndTime=now,
+                            Period=86400,
+                            Statistics=["Sum"],
+                        )
+                        if read_resp.get("Datapoints"):
+                            volume.read_ops = sum(d["Sum"] for d in read_resp["Datapoints"])
+
+                        # VolumeWriteOps
+                        write_resp = cloudwatch.get_metric_statistics(
+                            Namespace="AWS/EBS",
+                            MetricName="VolumeWriteOps",
+                            Dimensions=[{"Name": "VolumeId", "Value": volume.id}],
+                            StartTime=start_time,
+                            EndTime=now,
+                            Period=86400,
+                            Statistics=["Sum"],
+                        )
+                        if write_resp.get("Datapoints"):
+                            volume.write_ops = sum(d["Sum"] for d in write_resp["Datapoints"])
+                    except ClientError:
+                        pass
+
                 volumes.append(volume)
 
     except ClientError as e:
@@ -206,6 +268,10 @@ def analyze_ebs(volumes: list[EBSInfo], account_id: str, account_name: str, regi
             result.unused_count += 1
             result.unused_size_gb += volume.size_gb
             result.unused_monthly_cost += volume.monthly_cost
+        elif finding.usage_status == UsageStatus.IDLE:
+            result.idle_count += 1
+            result.idle_size_gb += volume.size_gb
+            result.idle_monthly_cost += volume.monthly_cost
         elif finding.usage_status == UsageStatus.NORMAL:
             result.normal_count += 1
         elif finding.usage_status == UsageStatus.PENDING:
@@ -218,8 +284,28 @@ def analyze_ebs(volumes: list[EBSInfo], account_id: str, account_name: str, regi
 def _analyze_single_volume(volume: EBSInfo) -> EBSFinding:
     """개별 볼륨 분석"""
 
-    # 1. 연결됨 = 정상
+    # 1. 연결됨
     if volume.is_attached:
+        # 연결되었지만 I/O 없음 = 유휴 (AWS Trusted Advisor 기준)
+        if volume.avg_daily_ops < IDLE_IOPS_THRESHOLD:
+            # 용량에 따른 심각도
+            if volume.size_gb >= 500:
+                severity = Severity.HIGH
+            elif volume.size_gb >= 100:
+                severity = Severity.MEDIUM
+            else:
+                severity = Severity.LOW
+
+            cost_info = f"월 ${volume.monthly_cost:.2f}" if volume.monthly_cost > 0 else ""
+            return EBSFinding(
+                volume=volume,
+                usage_status=UsageStatus.IDLE,
+                severity=severity,
+                description=f"유휴 볼륨 ({volume.size_gb}GB, 일평균 {volume.avg_daily_ops:.1f} ops) {cost_info}",
+                recommendation=f"인스턴스 {volume.attached_instance_id}에 연결되었으나 {ANALYSIS_DAYS}일간 I/O 없음 - 사용 여부 확인",
+            )
+
+        # 정상 사용
         return EBSFinding(
             volume=volume,
             usage_status=UsageStatus.NORMAL,
@@ -279,21 +365,27 @@ def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
     totals = {
         "total": sum(r.total_count for r in results),
         "unused": sum(r.unused_count for r in results),
+        "idle": sum(r.idle_count for r in results),
         "normal": sum(r.normal_count for r in results),
         "pending": sum(r.pending_count for r in results),
         "total_size": sum(r.total_size_gb for r in results),
         "unused_size": sum(r.unused_size_gb for r in results),
+        "idle_size": sum(r.idle_size_gb for r in results),
         "unused_cost": sum(r.unused_monthly_cost for r in results),
+        "idle_cost": sum(r.idle_monthly_cost for r in results),
     }
 
     summary.add_section("통계")
     summary.add_item("전체 볼륨", totals["total"])
-    summary.add_item("미사용", totals["unused"], highlight="danger" if totals["unused"] > 0 else None)
+    summary.add_item("미사용 (연결안됨)", totals["unused"], highlight="danger" if totals["unused"] > 0 else None)
+    summary.add_item("유휴 (I/O 없음)", totals["idle"], highlight="warning" if totals["idle"] > 0 else None)
     summary.add_item("정상 사용", totals["normal"])
     summary.add_item("확인 필요", totals["pending"], highlight="warning" if totals["pending"] > 0 else None)
     summary.add_item("전체 용량 (GB)", totals["total_size"])
     summary.add_item("미사용 용량 (GB)", totals["unused_size"])
+    summary.add_item("유휴 용량 (GB)", totals["idle_size"])
     summary.add_item("미사용 월 비용 ($)", f"${totals['unused_cost']:.2f}")
+    summary.add_item("유휴 월 비용 ($)", f"${totals['idle_cost']:.2f}")
 
     # Findings sheet
     columns = [
@@ -319,15 +411,16 @@ def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
     # 상태별 스타일
     status_fills = {
         UsageStatus.UNUSED: PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"),
+        UsageStatus.IDLE: PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid"),
         UsageStatus.PENDING: PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid"),
         UsageStatus.NORMAL: PatternFill(start_color="4ECDC4", end_color="4ECDC4", fill_type="solid"),
     }
 
-    # 미사용/확인필요만 표시
+    # 미사용/유휴/확인필요 표시
     all_findings = []
     for result in results:
         for f in result.findings:
-            if f.usage_status in (UsageStatus.UNUSED, UsageStatus.PENDING):
+            if f.usage_status in (UsageStatus.UNUSED, UsageStatus.IDLE, UsageStatus.PENDING):
                 all_findings.append(f)
 
     # 비용순 정렬
@@ -335,7 +428,12 @@ def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
 
     for f in all_findings:
         vol = f.volume
-        style = Styles.danger() if f.usage_status == UsageStatus.UNUSED else Styles.warning()
+        if f.usage_status == UsageStatus.UNUSED:
+            style = Styles.danger()
+        elif f.usage_status == UsageStatus.IDLE:
+            style = Styles.warning()
+        else:
+            style = None
         row_num = sheet.add_row(
             [
                 vol.account_name,
@@ -405,11 +503,13 @@ def run(ctx) -> None:
 
     # 개별 결과 요약
     for r in all_results:
-        if r.unused_count > 0:
-            cost_str = f" (${r.unused_monthly_cost:.2f}/월)" if r.unused_monthly_cost > 0 else ""
-            console.print(
-                f"  {r.account_name}/{r.region}: [red]미사용 {r.unused_count}개 ({r.unused_size_gb}GB){cost_str}[/red]"
-            )
+        if r.unused_count > 0 or r.idle_count > 0:
+            unused_str = f"미사용 {r.unused_count}개" if r.unused_count > 0 else ""
+            idle_str = f"유휴 {r.idle_count}개" if r.idle_count > 0 else ""
+            total_cost = r.unused_monthly_cost + r.idle_monthly_cost
+            cost_str = f" (${total_cost:.2f}/월)" if total_cost > 0 else ""
+            parts = [p for p in [unused_str, idle_str] if p]
+            console.print(f"  {r.account_name}/{r.region}: [red]{' / '.join(parts)}{cost_str}[/red]")
         elif r.pending_count > 0:
             console.print(f"  {r.account_name}/{r.region}: [yellow]확인 필요 {r.pending_count}개[/yellow]")
         elif r.total_count > 0:
@@ -419,17 +519,24 @@ def run(ctx) -> None:
     totals = {
         "total": sum(r.total_count for r in all_results),
         "unused": sum(r.unused_count for r in all_results),
+        "idle": sum(r.idle_count for r in all_results),
         "normal": sum(r.normal_count for r in all_results),
         "pending": sum(r.pending_count for r in all_results),
         "total_size": sum(r.total_size_gb for r in all_results),
         "unused_size": sum(r.unused_size_gb for r in all_results),
+        "idle_size": sum(r.idle_size_gb for r in all_results),
         "unused_cost": sum(r.unused_monthly_cost for r in all_results),
+        "idle_cost": sum(r.idle_monthly_cost for r in all_results),
     }
 
     console.print(f"\n[bold]전체 EBS: {totals['total']}개 ({totals['total_size']}GB)[/bold]")
     if totals["unused"] > 0:
         console.print(
-            f"  [red bold]미사용: {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]"
+            f"  [red bold]미사용 (연결안됨): {totals['unused']}개 ({totals['unused_size']}GB, ${totals['unused_cost']:.2f}/월)[/red bold]"
+        )
+    if totals["idle"] > 0:
+        console.print(
+            f"  [yellow bold]유휴 (I/O없음): {totals['idle']}개 ({totals['idle_size']}GB, ${totals['idle_cost']:.2f}/월)[/yellow bold]"
         )
     if totals["pending"] > 0:
         console.print(f"  [yellow]확인 필요: {totals['pending']}개[/yellow]")

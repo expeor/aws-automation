@@ -30,10 +30,17 @@ from plugins.cost.pricing import get_sagemaker_monthly_cost
 
 console = Console()
 
-# 분석 기간 (일)
+# 분석 기간 (일) - 고비용 리소스이므로 짧은 기간으로 빠르게 탐지
 ANALYSIS_DAYS = 7
+
 # 미사용 기준: Invocations 0회
 UNUSED_INVOCATION_THRESHOLD = 0
+
+# 저사용 기준: 하루 평균 10회 미만
+LOW_USAGE_INVOCATIONS_PER_DAY = 10
+
+# 유휴 기준: CPU 5% 미만 (AWS Cost Optimization Pillar)
+IDLE_CPU_THRESHOLD = 5.0
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -50,6 +57,7 @@ class EndpointStatus(Enum):
 
     NORMAL = "normal"
     UNUSED = "unused"
+    IDLE = "idle"  # 호출은 있으나 CPU 유휴
     LOW_USAGE = "low_usage"
 
 
@@ -72,6 +80,8 @@ class SageMakerEndpointInfo:
     total_invocations: int = 0
     avg_invocations_per_day: float = 0.0
     model_latency_avg_ms: float = 0.0
+    cpu_utilization_avg: float = 0.0  # CPUUtilization (%)
+    memory_utilization_avg: float = 0.0  # MemoryUtilization (%)
 
     @property
     def estimated_monthly_cost(self) -> float:
@@ -105,9 +115,11 @@ class SageMakerAnalysisResult:
     region: str
     total_endpoints: int = 0
     unused_endpoints: int = 0
+    idle_endpoints: int = 0
     low_usage_endpoints: int = 0
     normal_endpoints: int = 0
     unused_monthly_cost: float = 0.0
+    idle_monthly_cost: float = 0.0
     low_usage_monthly_cost: float = 0.0
     findings: list[EndpointFinding] = field(default_factory=list)
 
@@ -232,6 +244,34 @@ def _collect_sagemaker_metrics_batch(
             )
         )
 
+        # CPUUtilization (Average) - AWS Cost Optimization Pillar 기준
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_cpu",
+                namespace="/aws/sagemaker/Endpoints",
+                metric_name="CPUUtilization",
+                dimensions={
+                    "EndpointName": endpoint.endpoint_name,
+                    "VariantName": endpoint.variant_name if endpoint.variant_name else "AllTraffic",
+                },
+                stat="Average",
+            )
+        )
+
+        # MemoryUtilization (Average)
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_memory",
+                namespace="/aws/sagemaker/Endpoints",
+                metric_name="MemoryUtilization",
+                dimensions={
+                    "EndpointName": endpoint.endpoint_name,
+                    "VariantName": endpoint.variant_name if endpoint.variant_name else "AllTraffic",
+                },
+                stat="Average",
+            )
+        )
+
     try:
         # 배치 조회
         results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
@@ -248,6 +288,9 @@ def _collect_sagemaker_metrics_batch(
             endpoint.avg_invocations_per_day = endpoint.total_invocations / days
             # 레이턴시는 마이크로초로 반환되므로 밀리초로 변환
             endpoint.model_latency_avg_ms = results.get(f"{safe_id}_latency", 0.0) / 1000
+            # CPU/Memory Utilization
+            endpoint.cpu_utilization_avg = results.get(f"{safe_id}_cpu", 0.0)
+            endpoint.memory_utilization_avg = results.get(f"{safe_id}_memory", 0.0)
 
     except ClientError:
         # 실패 시 무시 (기본값 0 유지)
@@ -279,8 +322,21 @@ def analyze_endpoints(
             )
             continue
 
+        # 유휴: 호출은 있으나 CPU 5% 미만 (AWS Cost Optimization Pillar)
+        if endpoint.cpu_utilization_avg > 0 and endpoint.cpu_utilization_avg < IDLE_CPU_THRESHOLD:
+            result.idle_endpoints += 1
+            result.idle_monthly_cost += endpoint.estimated_monthly_cost
+            result.findings.append(
+                EndpointFinding(
+                    endpoint=endpoint,
+                    status=EndpointStatus.IDLE,
+                    recommendation=f"유휴 (CPU {endpoint.cpu_utilization_avg:.1f}%) - 인스턴스 축소 또는 Serverless 전환 검토 (${endpoint.estimated_monthly_cost:.2f}/월)",
+                )
+            )
+            continue
+
         # 저사용: 하루 평균 10회 미만
-        if endpoint.avg_invocations_per_day < 10:
+        if endpoint.avg_invocations_per_day < LOW_USAGE_INVOCATIONS_PER_DAY:
             result.low_usage_endpoints += 1
             result.low_usage_monthly_cost += endpoint.estimated_monthly_cost
             result.findings.append(

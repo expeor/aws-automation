@@ -475,10 +475,10 @@ def parallel_progress(
         TextColumn(""),  # Placeholder for SuccessFailColumn
         TextColumn("/"),
         MofNCompleteColumn(),
-        BarColumn(),
+        BarColumn(bar_width=40),
         TimeElapsedColumn(),
         console=cons,
-        expand=True,
+        expand=False,
     )
 
     with progress:
@@ -534,11 +534,11 @@ def step_progress(
     progress = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
+        BarColumn(bar_width=40),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
         console=cons,
-        expand=True,
+        expand=False,
     )
 
     with progress:
@@ -581,11 +581,11 @@ def download_progress(
     progress = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
+        BarColumn(bar_width=40),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
         console=cons,
-        expand=True,
+        expand=False,
     )
 
     with progress:
@@ -630,7 +630,7 @@ def indeterminate_progress(
         TextColumn("[progress.description]{task.description}"),
         TimeElapsedColumn(),
         console=cons,
-        expand=True,
+        expand=False,
     )
 
     with progress:
