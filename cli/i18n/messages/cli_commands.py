@@ -100,6 +100,10 @@ CLI_MESSAGES = {
         "ko": "오류: SSO Session 사용 시 --account 옵션이 필수입니다. (예: --account 111122223333 또는 --account all)",
         "en": "Error: --account option is required when using SSO Session. (e.g., --account 111122223333 or --account all)",
     },
+    "run_multi_profile": {
+        "ko": "{count}개 프로파일 순차 실행",
+        "en": "Running {count} profiles sequentially",
+    },
     "run_group_not_found": {
         "ko": "오류: 그룹을 찾을 수 없습니다: {name}",
         "en": "Error: Group not found: {name}",
