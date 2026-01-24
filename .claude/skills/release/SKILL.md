@@ -222,6 +222,66 @@ fix(core): resolve issue     →  fix(core): resolve issue
 4. **푸시 안함**: 로컬 커밋만 생성, 푸시는 사용자 판단
 5. **Breaking Change 주의**: MAJOR 버전 증가 시 명시적 확인
 
+---
+
+## GitHub Release Notes 생성 (선택)
+
+`--github` 옵션 사용 시 GitHub Release Notes 초안 생성:
+
+### 명령어
+
+```bash
+/release auto --github
+```
+
+### Release Notes 형식
+
+```markdown
+## What's Changed
+
+### New Features
+- feat(plugins): add elasticache unused cluster detection (#45)
+- feat(ec2): add snapshot age analysis (#42)
+- feat(cli): add headless mode support (#40)
+
+### Bug Fixes
+- fix(vpc): handle empty security group rules (#44)
+- fix(iam): correct policy document parsing (#43)
+
+### Other Changes
+- refactor(core): improve parallel execution performance (#41)
+- docs: update README with new examples (#39)
+
+**Full Changelog**: https://github.com/org/repo/compare/v0.1.1...v0.2.0
+```
+
+### 커밋 링크 포함 CHANGELOG
+
+```markdown
+## [0.2.0] - 2026-01-24
+
+### Added
+- feat(plugins): add elasticache unused cluster detection ([#45](https://github.com/org/repo/pull/45))
+- feat(ec2): add snapshot age analysis ([#42](https://github.com/org/repo/pull/42))
+
+### Fixed
+- fix(vpc): handle empty security group rules ([#44](https://github.com/org/repo/pull/44))
+```
+
+### gh CLI 연동
+
+```bash
+# Release 생성 (태그 필요)
+git tag v0.2.0
+git push origin v0.2.0
+
+# GitHub Release 생성
+gh release create v0.2.0 --title "v0.2.0" --notes-file release-notes.md
+
+# 또는 자동 생성
+gh release create v0.2.0 --generate-notes
+```
+
 ## 에러 처리
 
 ### version.txt 없음

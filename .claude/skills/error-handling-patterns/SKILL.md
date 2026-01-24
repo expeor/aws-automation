@@ -51,6 +51,56 @@ def collect_resources(session, account_id: str, account_name: str, region: str):
 | `INFO` | 정보성 (권한 없음 등) | - |
 | `DEBUG` | 개발/디버깅용 | - |
 
+### ErrorSeverity 사용 예시
+
+```python
+from core.parallel.errors import ErrorCollector, ErrorSeverity
+
+errors = ErrorCollector(service="ec2")
+
+# CRITICAL: 필수 API 실패 (전체 도구 실행 불가)
+try:
+    instances = client.describe_instances()
+except ClientError as e:
+    errors.collect(
+        e, account_id, account_name, region,
+        operation="describe_instances",
+        severity=ErrorSeverity.CRITICAL,  # 핵심 기능 실패
+    )
+    return None  # 분석 불가
+
+# WARNING: 부분 실패 (계속 진행 가능)
+try:
+    tags = client.describe_tags(...)
+except ClientError as e:
+    errors.collect(
+        e, account_id, account_name, region,
+        operation="describe_tags",
+        severity=ErrorSeverity.WARNING,  # 태그 없어도 계속 가능
+    )
+    tags = []
+
+# INFO: 예상된 상황 (권한 없음 등)
+# AccessDenied는 자동으로 INFO로 다운그레이드됨
+try:
+    secrets = client.list_secrets()
+except ClientError as e:
+    errors.collect(
+        e, account_id, account_name, region,
+        operation="list_secrets",
+        severity=ErrorSeverity.WARNING,  # AccessDenied면 INFO로 변환
+    )
+
+# DEBUG: 옵션 데이터 (없어도 무관)
+snapshot_count = try_or_default(
+    lambda: len(client.describe_snapshots(...)["Snapshots"]),
+    default=0,
+    collector=errors,
+    operation="describe_snapshots",
+    severity=ErrorSeverity.DEBUG,  # 실패해도 로그만
+)
+```
+
 ### 에러 조회
 
 ```python
@@ -66,6 +116,39 @@ warnings = errors.warning_errors
 by_account = errors.get_by_account()
 for account, account_errors in by_account.items():
     print(f"{account}: {len(account_errors)}건")
+```
+
+### get_by_account() 그룹핑 예시
+
+```python
+def print_error_report(errors: ErrorCollector):
+    """계정별 에러 리포트 출력"""
+    by_account = errors.get_by_account()
+
+    if not by_account:
+        console.print("[green]✓ 에러 없음[/green]")
+        return
+
+    console.print("\n[bold]계정별 에러 요약[/bold]")
+    for account_id, account_errors in by_account.items():
+        console.print(f"\n[cyan]{account_id}[/cyan]")
+
+        # 에러 유형별 그룹화
+        by_category = {}
+        for err in account_errors:
+            cat = err.category.name
+            by_category.setdefault(cat, []).append(err)
+
+        for category, errs in by_category.items():
+            console.print(f"  {category}: {len(errs)}건")
+            for err in errs[:3]:  # 최대 3개만 표시
+                console.print(f"    - {err.operation}: {err.message[:50]}...")
+
+    # 전체 요약
+    console.print(f"\n[bold]총 {errors.error_count}건 에러[/bold]")
+    console.print(f"  CRITICAL: {len(errors.critical_errors)}건")
+    console.print(f"  WARNING: {len(errors.warning_errors)}건")
+    console.print(f"  INFO: {len(errors.info_errors)}건")
 ```
 
 ## try_or_default 함수

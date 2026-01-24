@@ -124,6 +124,85 @@ def run(ctx):
     console.print(f"완료: {success}개 성공, {failed}개 실패 (총 {total}개)")
 ```
 
+### progress_tracker 상세 사용
+
+```python
+from cli.ui import parallel_progress, console
+
+def run(ctx):
+    # 진행 바 컨텍스트 매니저
+    with parallel_progress("VPC 분석") as tracker:
+        # tracker.update(current, total) - 수동 업데이트
+        # tracker.increment() - 1 증가
+        # tracker.set_description("새 설명") - 설명 변경
+
+        with quiet_mode():
+            result = parallel_collect(
+                ctx,
+                _collect_vpcs,
+                progress_tracker=tracker,  # 자동 업데이트
+                service="ec2",
+            )
+
+    # tracker.stats: (success, failed, total) 튜플
+    success, failed, total = tracker.stats
+
+    if failed > 0:
+        console.print(f"[yellow]! 일부 실패: {failed}/{total}[/yellow]")
+    else:
+        console.print(f"[green]✓ 전체 성공: {success}/{total}[/green]")
+```
+
+### quiet_mode() 컨텍스트 매니저
+
+```python
+from core.parallel import quiet_mode, is_quiet, set_quiet
+
+# 컨텍스트 매니저 (권장)
+with quiet_mode():
+    # 이 블록 내에서 로그 출력 억제
+    result = parallel_collect(ctx, callback, service="ec2")
+
+# 수동 제어
+set_quiet(True)   # 조용한 모드 활성화
+set_quiet(False)  # 조용한 모드 비활성화
+
+# 현재 상태 확인
+if is_quiet():
+    # 로그 출력 안함
+    pass
+else:
+    console.print("상세 로그...")
+```
+
+### 다단계 진행 표시
+
+```python
+def run(ctx):
+    console.print("[bold]Step 1: 리소스 수집[/bold]")
+
+    with parallel_progress("VPC 수집") as tracker1:
+        with quiet_mode():
+            vpcs_result = parallel_collect(ctx, _collect_vpcs, progress_tracker=tracker1, service="ec2")
+
+    s1, f1, t1 = tracker1.stats
+    console.print(f"  VPCs: {s1} 성공, {f1} 실패")
+
+    console.print("[bold]Step 2: 보안 그룹 수집[/bold]")
+
+    with parallel_progress("SG 수집") as tracker2:
+        with quiet_mode():
+            sgs_result = parallel_collect(ctx, _collect_sgs, progress_tracker=tracker2, service="ec2")
+
+    s2, f2, t2 = tracker2.stats
+    console.print(f"  SGs: {s2} 성공, {f2} 실패")
+
+    # 전체 요약
+    total_success = s1 + s2
+    total_failed = f1 + f2
+    console.print(f"\n[bold]전체: {total_success} 성공, {total_failed} 실패[/bold]")
+```
+
 ## 상세 제어: ParallelSessionExecutor
 
 더 세밀한 제어가 필요할 때:
