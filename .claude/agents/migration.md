@@ -131,6 +131,143 @@ from core.parallel import get_client
 client = get_client(session, "ec2", region_name=region)
 ```
 
+### 6. HTML Report 패턴
+
+**감지**: HTML 직접 생성 또는 HTML 미지원
+```python
+# 레거시 - HTML 미지원
+wb = Workbook()
+# ... Excel만 생성
+
+# 레거시 - 직접 HTML 생성
+html_content = f"<html><body>{data}</body></html>"
+with open("report.html", "w") as f:
+    f.write(html_content)
+```
+
+**변환**:
+```python
+# 현재 패턴
+from core.tools.io.html import create_aws_report
+
+report = create_aws_report(
+    title="EC2 미사용 리소스",
+    service="EC2",
+    tool_name="unused",
+    ctx=ctx,
+    resources=results,
+    charts=[
+        {"type": "pie", "title": "리전별 분포", "data_key": "region"},
+        {"type": "bar", "title": "계정별 현황", "data_key": "account_name"},
+    ]
+)
+report.save(output_path)
+```
+
+### 7. generate_reports 패턴
+
+**감지**: Excel과 HTML을 별도로 생성
+```python
+# 레거시 - 분리된 출력 로직
+# Excel 생성
+wb = Workbook()
+# ... Excel 로직
+
+# HTML 생성 (별도)
+report = create_aws_report(...)
+```
+
+**변환**:
+```python
+# 현재 패턴 - 통합 출력
+from core.tools.io import generate_reports
+
+generate_reports(
+    ctx,
+    data,
+    columns=[
+        ColumnDef(header="계정 ID", width=15),
+        ColumnDef(header="리소스", width=30),
+    ],
+    charts=[
+        {"type": "pie", "title": "분포", "data_key": "region"},
+    ]
+)
+```
+
+### 8. CloudWatch Batch Metrics 패턴
+
+**감지**: 메트릭당 개별 API 호출 (get_metric_statistics)
+```python
+# 레거시 - N개 메트릭 = N회 API 호출
+for func in functions:
+    response = cw.get_metric_statistics(
+        Namespace="AWS/Lambda",
+        MetricName="Invocations",
+        Dimensions=[{"Name": "FunctionName", "Value": func["FunctionName"]}],
+        ...
+    )
+```
+
+**변환**:
+```python
+# 현재 패턴 - 500개 메트릭 = 1회 API 호출 (85% 감소)
+from plugins.cloudwatch.common.batch_metrics import (
+    batch_get_metrics,
+    build_lambda_metric_queries,
+    MetricQuery,
+)
+
+# 쿼리 빌드
+queries = build_lambda_metric_queries(
+    function_names=[f["FunctionName"] for f in functions],
+    metrics=["Invocations", "Errors", "Duration"]
+)
+
+# 배치 조회
+results = batch_get_metrics(
+    cloudwatch_client=cw,
+    queries=queries,
+    start_time=start,
+    end_time=end,
+    period=86400  # 1일
+)
+# results: {"func1_invocations_sum": 1000, "func1_errors_sum": 5, ...}
+```
+
+### 9. InventoryCollector 패턴
+
+**감지**: 동일 리소스 중복 수집
+```python
+# 레거시 - 여러 도구에서 동일 리소스 반복 조회
+def tool1(ctx):
+    ec2 = session.client("ec2")
+    instances = ec2.describe_instances()  # 첫 번째 조회
+    ...
+
+def tool2(ctx):
+    ec2 = session.client("ec2")
+    instances = ec2.describe_instances()  # 중복 조회!
+    ...
+```
+
+**변환**:
+```python
+# 현재 패턴 - 캐싱된 인벤토리 활용
+from plugins.resource_explorer.common.collector import InventoryCollector
+
+def tool1(ctx):
+    collector = InventoryCollector(ctx)
+    instances = collector.collect_ec2()  # 첫 번째 수집 (캐싱)
+    volumes = collector.collect_ebs_volumes()  # 별도 수집
+    ...
+
+def tool2(ctx):
+    collector = InventoryCollector(ctx)
+    instances = collector.collect_ec2()  # 캐시에서 반환 (API 호출 없음)
+    ...
+```
+
 ## 마이그레이션 프로세스
 
 ### 1. 분석 단계
@@ -215,8 +352,12 @@ pytest tests/plugins/{service}/test_{tool}.py -v
 |---------|------|------|
 | 1 | Error Handling | 에러 가시성 개선 |
 | 2 | Parallel Processing | 성능 개선 |
-| 3 | Output Path | 일관성 |
-| 4 | Excel Output | 코드 간소화 |
+| 3 | CloudWatch Batch | API 호출 85% 감소 |
+| 4 | InventoryCollector | 중복 수집 방지 |
+| 5 | generate_reports | 통합 출력 간소화 |
+| 6 | Output Path | 일관성 |
+| 7 | Excel Output | 코드 간소화 |
+| 8 | HTML Report | 시각화 지원 |
 
 ### 예외 사항
 
