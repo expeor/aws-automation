@@ -53,11 +53,11 @@ class TestRDSInstanceInfo:
             allocated_storage=100,
             created_at=datetime.now(timezone.utc),
         )
-        # db.t3.medium Multi-AZ: $0.068 * 2 * 730 = $99.28
-        # Storage: 100 * $0.115 = $11.50
-        # Total: ~$110.78
+        # db.t3.medium Multi-AZ (ap-northeast-2): $0.073 * 2 * 730 = $106.58
+        # Storage Multi-AZ: 100 * $0.115 * 2 = $23.00
+        # Total: ~$129.58
         cost = instance.estimated_monthly_cost
-        assert 105 < cost < 115
+        assert 125 < cost < 135
 
     def test_default_values(self):
         """기본값 확인"""

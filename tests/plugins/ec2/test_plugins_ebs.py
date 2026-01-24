@@ -73,7 +73,7 @@ class TestAnalyzeSingleVolume:
     """개별 볼륨 분석 테스트"""
 
     def test_attached_volume(self):
-        """연결된 볼륨 = 정상"""
+        """연결된 볼륨 (I/O 있음) = 정상"""
         volume = EBSInfo(
             id="vol-123",
             name="attached",
@@ -92,12 +92,41 @@ class TestAnalyzeSingleVolume:
             account_id="123456789012",
             account_name="test",
             region="ap-northeast-2",
+            read_ops=100,  # I/O 활동 있음 → NORMAL
         )
 
         finding = _analyze_single_volume(volume)
 
         assert finding.usage_status == UsageStatus.NORMAL
         assert finding.severity == Severity.INFO
+
+    def test_attached_volume_idle(self):
+        """연결된 볼륨 (I/O 없음) = IDLE"""
+        volume = EBSInfo(
+            id="vol-123",
+            name="attached-idle",
+            state="in-use",
+            volume_type="gp3",
+            size_gb=100,
+            iops=3000,
+            throughput=125,
+            encrypted=True,
+            kms_key_id="",
+            availability_zone="ap-northeast-2a",
+            create_time=datetime.now(),
+            snapshot_id="",
+            attachments=[{"InstanceId": "i-123"}],
+            tags={},
+            account_id="123456789012",
+            account_name="test",
+            region="ap-northeast-2",
+            read_ops=0,  # I/O 없음 → IDLE
+        )
+
+        finding = _analyze_single_volume(volume)
+
+        assert finding.usage_status == UsageStatus.IDLE
+        assert finding.severity == Severity.MEDIUM  # 100GB = MEDIUM
 
     def test_available_volume_small(self):
         """미사용 소형 볼륨"""
@@ -233,6 +262,7 @@ class TestAnalyzeEBS:
                 account_name="test",
                 region="ap-northeast-2",
                 monthly_cost=10.0,
+                read_ops=100,  # I/O 활동 있음 → NORMAL
             ),
             EBSInfo(
                 id="vol-2",

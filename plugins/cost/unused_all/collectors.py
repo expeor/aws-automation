@@ -95,6 +95,12 @@ from plugins.eventbridge.unused import (
 )
 from plugins.fn.common.collector import collect_functions_with_metrics
 from plugins.fn.unused import analyze_functions as analyze_lambda_functions
+from plugins.fsx.unused import (
+    analyze_filesystems as analyze_fsx_filesystems,
+)
+from plugins.fsx.unused import (
+    collect_filesystems as collect_fsx_filesystems,
+)
 from plugins.glue.unused import (
     analyze_jobs as analyze_glue_jobs,
 )
@@ -156,6 +162,12 @@ from plugins.sqs.unused import (
 )
 from plugins.sqs.unused import (
     collect_sqs_queues,
+)
+from plugins.transfer.unused import (
+    analyze_servers as analyze_transfer_servers,
+)
+from plugins.transfer.unused import (
+    collect_servers as collect_transfer_servers,
 )
 from plugins.vpc.endpoint_audit import (
     analyze_endpoints,
@@ -803,6 +815,42 @@ def collect_security_group(session, account_id: str, account_name: str, region: 
         return {"error": f"Security Group: {e}"}
 
 
+def collect_transfer(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """Transfer Family 서버 수집 및 분석"""
+    try:
+        servers = collect_transfer_servers(session, account_id, account_name, region)
+        if not servers:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_transfer_servers(servers, account_id, account_name, region)
+        return {
+            "total": result.total_servers,
+            "unused": result.unused_servers + result.idle_servers + result.no_users_servers,
+            "waste": result.total_monthly_waste,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"Transfer Family: {e}"}
+
+
+def collect_fsx(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
+    """FSx 파일 시스템 수집 및 분석"""
+    try:
+        filesystems = collect_fsx_filesystems(session, account_id, account_name, region)
+        if not filesystems:
+            return {"total": 0, "unused": 0, "waste": 0.0, "result": None}
+
+        result = analyze_fsx_filesystems(filesystems, account_id, account_name, region)
+        return {
+            "total": result.total_filesystems,
+            "unused": result.unused_filesystems + result.idle_filesystems,
+            "waste": result.total_monthly_waste,
+            "result": result,
+        }
+    except Exception as e:
+        return {"error": f"FSx: {e}"}
+
+
 # =============================================================================
 # 리전별 리소스 수집기 매핑 (카테고리별 정렬)
 # =============================================================================
@@ -854,6 +902,9 @@ REGIONAL_COLLECTORS: dict[str, Callable] = {
     "glue": collect_glue,
     # Security (VPC)
     "security_group": collect_security_group,
+    # File Transfer
+    "transfer": collect_transfer,
+    "fsx": collect_fsx,
 }
 
 # 글로벌 수집기 (DNS)

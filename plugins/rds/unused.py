@@ -87,33 +87,24 @@ class RDSInstanceInfo:
     avg_read_iops: float = 0.0
     avg_write_iops: float = 0.0
 
+    def get_estimated_monthly_cost(self, session=None) -> float:
+        """월간 비용 추정 (Pricing API 사용)"""
+        from plugins.cost.pricing.rds import get_rds_monthly_cost
+
+        return get_rds_monthly_cost(
+            region=self.region,
+            instance_class=self.db_instance_class,
+            engine=self.engine,
+            storage_gb=self.allocated_storage,
+            storage_type=self.storage_type if self.storage_type else "gp3",
+            multi_az=self.multi_az,
+            session=session,
+        )
+
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정"""
-        # 간단한 가격 맵 (db.t3 기준, Multi-AZ 2배)
-        price_map = {
-            "db.t3.micro": 0.017,
-            "db.t3.small": 0.034,
-            "db.t3.medium": 0.068,
-            "db.t3.large": 0.136,
-            "db.t4g.micro": 0.016,
-            "db.t4g.small": 0.032,
-            "db.t4g.medium": 0.065,
-            "db.r5.large": 0.24,
-            "db.r5.xlarge": 0.48,
-            "db.r6g.large": 0.218,
-            "db.m5.large": 0.171,
-            "db.m6g.large": 0.155,
-        }
-        hourly = price_map.get(self.db_instance_class, 0.15)
-        if self.multi_az:
-            hourly *= 2
-        instance_cost = hourly * 730
-
-        # 스토리지 비용 (gp2 기준 약 $0.115/GB)
-        storage_cost = self.allocated_storage * 0.115
-
-        return instance_cost + storage_cost
+        """월간 비용 추정 (후방 호환용)"""
+        return self.get_estimated_monthly_cost()
 
 
 @dataclass

@@ -76,6 +76,9 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         ("Glue Job", "glue_total", "glue_unused", None),
         # Security (VPC)
         ("Security Group", "sg_total", "sg_unused", None),
+        # File Transfer
+        ("Transfer Family", "transfer_total", "transfer_unused", "transfer_monthly_waste"),
+        ("FSx", "fsx_total", "fsx_unused", "fsx_monthly_waste"),
     ]
 
     summary.add_blank_row()
@@ -118,6 +121,8 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
         + s.ec2_instance_monthly_waste
         + s.sagemaker_endpoint_monthly_waste
         + s.kinesis_monthly_waste
+        + s.transfer_monthly_waste
+        + s.fsx_monthly_waste
         for s in result.summaries
     )
 
@@ -172,6 +177,9 @@ def generate_report(result: UnusedAllResult, output_dir: str) -> str:
     _create_glue_sheet(wb, result.glue_results)
     # Security (VPC)
     _create_security_group_sheet(wb, result.sg_results)
+    # File Transfer
+    _create_transfer_sheet(wb, result.transfer_results)
+    _create_fsx_sheet(wb, result.fsx_results)
 
     return str(wb.save_as(output_dir, "Unused_Resources"))
 
@@ -1410,3 +1418,85 @@ def _create_security_group_sheet(wb: Workbook, results) -> None:
                 ],
                 style=Styles.danger(),
             )
+
+
+def _create_transfer_sheet(wb: Workbook, results) -> None:
+    """Transfer Family 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="Server ID", width=25, style="data"),
+        ColumnDef(header="Protocols", width=15, style="data"),
+        ColumnDef(header="Endpoint", width=15, style="data"),
+        ColumnDef(header="State", width=12, style="center"),
+        ColumnDef(header="Users", width=8, style="number"),
+        ColumnDef(header="Files In", width=12, style="number"),
+        ColumnDef(header="Files Out", width=12, style="number"),
+        ColumnDef(header="상태", width=12, style="center"),
+        ColumnDef(header="월간 비용", width=15, style="data"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("Transfer Family", columns=columns)
+
+    for r in results:
+        for f in r.findings:
+            if f.status.value != "normal":
+                s = f.server
+                sheet.add_row(
+                    [
+                        s.account_name,
+                        s.region,
+                        s.server_id,
+                        ", ".join(s.protocols),
+                        s.endpoint_type,
+                        s.state,
+                        s.user_count,
+                        int(s.files_in),
+                        int(s.files_out),
+                        f.status.value,
+                        f"${s.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
+                )
+
+
+def _create_fsx_sheet(wb: Workbook, results) -> None:
+    """FSx 상세 시트 생성"""
+    columns = [
+        ColumnDef(header="Account", width=25, style="data"),
+        ColumnDef(header="Region", width=15, style="data"),
+        ColumnDef(header="File System ID", width=25, style="data"),
+        ColumnDef(header="Type", width=12, style="center"),
+        ColumnDef(header="Storage(GB)", width=12, style="number"),
+        ColumnDef(header="Throughput", width=12, style="number"),
+        ColumnDef(header="Lifecycle", width=12, style="center"),
+        ColumnDef(header="Total Ops", width=12, style="number"),
+        ColumnDef(header="Daily Avg", width=12, style="number"),
+        ColumnDef(header="상태", width=12, style="center"),
+        ColumnDef(header="월간 비용", width=15, style="data"),
+        ColumnDef(header="권장 조치", width=40, style="data"),
+    ]
+    sheet = wb.new_sheet("FSx", columns=columns)
+
+    for r in results:
+        for f in r.findings:
+            if f.status.value not in ("normal", "creating"):
+                fs = f.filesystem
+                sheet.add_row(
+                    [
+                        fs.account_name,
+                        fs.region,
+                        fs.file_system_id,
+                        fs.file_system_type,
+                        fs.storage_capacity_gb,
+                        fs.throughput_capacity,
+                        fs.lifecycle,
+                        int(fs.total_ops),
+                        int(fs.avg_daily_ops),
+                        f.status.value,
+                        f"${fs.estimated_monthly_cost:.2f}",
+                        f.recommendation,
+                    ],
+                    style=Styles.danger() if f.status.value == "unused" else Styles.warning(),
+                )
