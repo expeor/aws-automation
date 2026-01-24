@@ -30,7 +30,7 @@ def make_efs_info(
     size_bytes: int = 1024 * 1024 * 100,  # 100MB
     mount_target_count: int = 1,
     avg_client_connections: float = 1.0,
-    total_io_bytes: float = 1000.0,
+    metered_io_bytes: float = 1000.0,
 ):
     """EFSInfo 테스트 데이터 생성"""
     from plugins.efs.unused import EFSInfo
@@ -48,7 +48,7 @@ def make_efs_info(
         mount_target_count=mount_target_count,
         created_at=datetime.now(timezone.utc),
         avg_client_connections=avg_client_connections,
-        total_io_bytes=total_io_bytes,
+        metered_io_bytes=metered_io_bytes,
     )
 
 
@@ -265,7 +265,7 @@ class TestAnalyzeFilesystems:
         """I/O 없는 파일시스템"""
         from plugins.efs.unused import FileSystemStatus, analyze_filesystems
 
-        filesystems = [make_efs_info(avg_client_connections=0, total_io_bytes=0)]
+        filesystems = [make_efs_info(avg_client_connections=0, metered_io_bytes=0)]
 
         result = analyze_filesystems(
             filesystems,
@@ -314,7 +314,7 @@ class TestAnalyzeFilesystems:
         filesystems = [
             make_efs_info(file_system_id="fs-1"),  # normal
             make_efs_info(file_system_id="fs-2", mount_target_count=0),  # no mount
-            make_efs_info(file_system_id="fs-3", avg_client_connections=0, total_io_bytes=0),  # no I/O
+            make_efs_info(file_system_id="fs-3", avg_client_connections=0, metered_io_bytes=0),  # no I/O
         ]
 
         result = analyze_filesystems(
