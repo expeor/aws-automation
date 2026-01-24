@@ -1,0 +1,110 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature! Please fill out the form below to help us understand your request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What's missing?
+      placeholder: |
+        I'm trying to... but currently I have to...
+        or
+        There's no way to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the feature or solution you'd like
+      placeholder: |
+        I would like to be able to...
+        or
+        Add a command that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: |
+        I've tried... but it doesn't work because...
+        or
+        An alternative would be... but it's not ideal because...
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which area of the project does this relate to?
+      options:
+        - New AWS Service Plugin
+        - Existing Plugin Enhancement
+        - CLI / User Experience
+        - Core Functionality
+        - Documentation
+        - Performance
+        - CI/CD
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: aws-service
+    attributes:
+      label: AWS Service (if applicable)
+      description: If this is about a specific AWS service, which one?
+      options:
+        - N/A
+        - EC2
+        - VPC
+        - Lambda
+        - S3
+        - IAM
+        - RDS
+        - ELB / ALB / NLB
+        - DynamoDB
+        - CloudWatch
+        - CloudTrail
+        - CloudFormation
+        - Route53
+        - ECR / ECS / EKS
+        - KMS
+        - Secrets Manager
+        - ACM
+        - EFS
+        - SNS / SQS
+        - ElastiCache
+        - API Gateway
+        - EventBridge
+        - CodeCommit / CodePipeline
+        - Backup
+        - Cost Explorer
+        - Other (specify in description)
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context, examples, or screenshots
+      placeholder: Add any other context here...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to contribute this feature?
+      options:
+        - label: I would be willing to submit a PR for this feature

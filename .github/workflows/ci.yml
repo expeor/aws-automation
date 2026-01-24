@@ -17,6 +17,30 @@ permissions:
 
 jobs:
   # =============================================================================
+  # PR Title Validation (Conventional Commits)
+  # =============================================================================
+  pr-title:
+    name: PR Title
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            refactor
+            docs
+            test
+            chore
+            ci
+            perf
+            style
+          requireScope: false
+
+  # =============================================================================
   # Linting
   # =============================================================================
   lint:

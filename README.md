@@ -203,6 +203,12 @@ git pull && pip install -e .
 - [IPdeny Country IP Blocks](https://www.ipdeny.com/ipblocks/)
 - [AbuseIPDB Blocklist](https://github.com/borestad/blocklist-abuseipdb)
 
+## Contributing
+
+기여를 환영합니다! 자세한 내용은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## 라이선스
 
 MIT License - [LICENSE](LICENSE)
