@@ -4,6 +4,11 @@
       {
         "event": "Edit",
         "command": "echo 'Editing file...'"
+      },
+      {
+        "event": "Bash",
+        "matcher": "git push*",
+        "command": "python -c \"import subprocess; b=subprocess.check_output(['git','branch','--show-current'],text=True).strip(); print('[ERROR] master/main branch direct push blocked. Use: gh pr create') or exit(1) if b in ['master','main'] else print('[OK] Push allowed')\""
       }
     ],
     "PostToolUse": [

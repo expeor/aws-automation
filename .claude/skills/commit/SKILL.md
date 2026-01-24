@@ -183,6 +183,9 @@ Co-Authored-By: Claude <claude-code@anthropic.com>
 2. **민감 정보 확인**: .env, credentials 파일이 포함되어 있으면 경고
 3. **Pre-commit 훅 실패 시**: 새 커밋 생성 (--amend 사용 금지)
 4. **대용량 변경**: 50개 이상 파일 변경 시 확인 요청
+5. **master 브랜치 직접 push 금지**:
+   - master 브랜치에서 작업 중이면 feature 브랜치 생성 권장
+   - 커밋 후 push 시 `gh pr create`로 PR 생성
 
 ## 참조 파일
 
