@@ -27,6 +27,7 @@ from plugins.elb.target_group_audit import TargetGroupAnalysisResult
 from plugins.elb.unused import LBAnalysisResult
 from plugins.eventbridge.unused import EventBridgeAnalysisResult
 from plugins.fn.unused import LambdaAnalysisResult
+from plugins.fsx.unused import FSxAnalysisResult
 from plugins.glue.unused import GlueAnalysisResult
 from plugins.kinesis.unused import KinesisAnalysisResult
 from plugins.kms.unused import KMSKeyAnalysisResult
@@ -40,6 +41,7 @@ from plugins.sagemaker.unused import SageMakerAnalysisResult
 from plugins.secretsmanager.unused import SecretAnalysisResult
 from plugins.sns.unused import SNSAnalysisResult
 from plugins.sqs.unused import SQSAnalysisResult
+from plugins.transfer.unused import TransferAnalysisResult
 from plugins.vpc.endpoint_audit import EndpointAnalysisResult
 from plugins.vpc.eni_audit import ENIAnalysisResult
 from plugins.vpc.sg_audit_analysis import SGAnalysisResult
@@ -436,6 +438,29 @@ RESOURCE_FIELD_MAP: dict[str, dict[str, Any]] = {
         "final": "sg_results",
         "data_key": "result",
     },
+    # =========================================================================
+    # File Transfer
+    # =========================================================================
+    "transfer": {
+        "display": "Transfer Family",
+        "total": "transfer_total",
+        "unused": "transfer_unused",
+        "waste": "transfer_monthly_waste",
+        "data_unused": "unused",
+        "session": "transfer_result",
+        "final": "transfer_results",
+        "data_key": "result",
+    },
+    "fsx": {
+        "display": "FSx",
+        "total": "fsx_total",
+        "unused": "fsx_unused",
+        "waste": "fsx_monthly_waste",
+        "data_unused": "unused",
+        "session": "fsx_result",
+        "final": "fsx_results",
+        "data_key": "result",
+    },
 }
 
 # 비용 추정 가능한 리소스 필드 목록 (total_waste 계산용)
@@ -593,6 +618,15 @@ class UnusedResourceSummary:
     sg_total: int = 0
     sg_unused: int = 0
 
+    # File Transfer
+    transfer_total: int = 0
+    transfer_unused: int = 0
+    transfer_monthly_waste: float = 0.0
+
+    fsx_total: int = 0
+    fsx_unused: int = 0
+    fsx_monthly_waste: float = 0.0
+
 
 @dataclass
 class SessionCollectionResult:
@@ -659,6 +693,10 @@ class SessionCollectionResult:
 
     # Security (VPC)
     sg_result: list[SGAnalysisResult] | None = None
+
+    # File Transfer
+    transfer_result: TransferAnalysisResult | None = None
+    fsx_result: FSxAnalysisResult | None = None
 
     # 에러 목록
     errors: list[str] = field(default_factory=list)
@@ -729,3 +767,7 @@ class UnusedAllResult:
 
     # Security (VPC)
     sg_results: list[SGAnalysisResult] = field(default_factory=list)
+
+    # File Transfer
+    transfer_results: list[TransferAnalysisResult] = field(default_factory=list)
+    fsx_results: list[FSxAnalysisResult] = field(default_factory=list)
