@@ -383,6 +383,16 @@ aa group
 | `-o, --output` | 출력 파일 경로 |
 | `-q, --quiet` | 최소 출력 모드 |
 
+## Contributing
+
+기여 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요:
+
+- 개발 환경 설정
+- 코드 스타일 (ruff, mypy)
+- 커밋 컨벤션 (Conventional Commits)
+- 브랜치 네이밍
+- PR 프로세스
+
 ## 디펜던시
 
 ### Runtime
