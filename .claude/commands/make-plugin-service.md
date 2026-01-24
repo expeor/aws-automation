@@ -486,6 +486,26 @@ from core.tools.output import ReportType, ToolType
 
 ---
 
+## 검증 체크리스트
+
+### 생성 전 확인
+- [ ] 서비스명이 `core/tools/discovery.py`에 없음 (신규 서비스)
+- [ ] boto3 서비스명 확인 (`aws-documentation` MCP로 검증)
+- [ ] 타입 분류 완료 (ReportType/ToolType 중 선택)
+
+### 생성 후 확인
+- [ ] `plugins/{service}/__init__.py` - CATEGORY, TOOLS 정의
+- [ ] `plugins/{service}/{type}.py` - `run(ctx)` 함수 존재
+- [ ] `core/tools/discovery.py` - `AWS_SERVICE_NAMES`에 추가
+- [ ] 린트 통과: `ruff check plugins/{service}/`
+- [ ] 타입 체크: `mypy plugins/{service}/`
+
+### 테스트 (선택)
+- [ ] `/make-test {service}/{type}` 실행
+- [ ] `pytest tests/plugins/{service}/ -v` 통과
+
+---
+
 ## 참조 파일
 
 생성 전 반드시 확인:
@@ -495,7 +515,12 @@ from core.tools.output import ReportType, ToolType
 - `core/tools/output/report_types.py` - 타입 정의
 - `core/tools/io/config.py` - OutputConfig, OutputFormat
 - `core/tools/io/compat.py` - generate_reports 헬퍼
-- `.claude/skills/output-patterns.md` - 리포트 출력 패턴 가이드
+
+### Skills 참조
+- `.claude/skills/output-patterns/SKILL.md` - 리포트 출력 패턴
+- `.claude/skills/parallel-execution-patterns/SKILL.md` - 병렬 처리 패턴
+- `.claude/skills/error-handling-patterns/SKILL.md` - 에러 핸들링 패턴
+- `.claude/skills/aws-boto3-patterns/SKILL.md` - AWS boto3 패턴
 
 ---
 
