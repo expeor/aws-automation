@@ -2,6 +2,8 @@
 plugins/vpc/ip_search/public_ip/i18n.py - Internationalization for Public IP Search
 """
 
+import contextlib
+
 from cli.i18n import get_lang
 
 # Message definitions with ko/en translations
@@ -15,7 +17,6 @@ MESSAGES = {
         "ko": "IP가 어느 클라우드 소속인지 확인 (AWS, GCP, Azure, Oracle)",
         "en": "Check which cloud provider owns an IP (AWS, GCP, Azure, Oracle)",
     },
-
     # Menu
     "menu_search_ip": {
         "ko": "IP 검색",
@@ -33,7 +34,6 @@ MESSAGES = {
         "ko": "돌아가기",
         "en": "Go Back",
     },
-
     # Prompts
     "prompt_select": {
         "ko": "선택",
@@ -51,13 +51,11 @@ MESSAGES = {
         "ko": "필터 입력 (리전 또는 서비스, 부분 일치)",
         "en": "Enter filter (region or service, partial match)",
     },
-
     # Providers
     "provider_all": {
         "ko": "전체",
         "en": "All",
     },
-
     # Results
     "result_title": {
         "ko": "검색 결과",
@@ -75,7 +73,6 @@ MESSAGES = {
         "ko": "알 수 없는 제공자",
         "en": "Unknown Provider",
     },
-
     # Table headers
     "header_ip": {
         "ko": "IP 주소",
@@ -97,7 +94,6 @@ MESSAGES = {
         "ko": "리전",
         "en": "Region",
     },
-
     # Cache status
     "cache_status_title": {
         "ko": "캐시 상태",
@@ -131,7 +127,6 @@ MESSAGES = {
         "ko": "캐시 새로고침 실패",
         "en": "Cache refresh failed",
     },
-
     # Export options
     "export_title": {
         "ko": "결과 저장",
@@ -161,7 +156,6 @@ MESSAGES = {
         "ko": "클립보드에 복사되었습니다",
         "en": "Copied to clipboard",
     },
-
     # Filter search
     "filter_regions": {
         "ko": "리전 ({count}개)",
@@ -175,7 +169,6 @@ MESSAGES = {
         "ko": "외 {count}개",
         "en": "and {count} more",
     },
-
     # Status messages
     "searching": {
         "ko": "검색 중...",
@@ -219,9 +212,7 @@ def t(key: str, **kwargs) -> str:
     text = msg_dict.get(lang) or msg_dict.get("ko", key)
 
     if kwargs:
-        try:
+        with contextlib.suppress(KeyError, ValueError):
             text = text.format(**kwargs)
-        except (KeyError, ValueError):
-            pass
 
     return text

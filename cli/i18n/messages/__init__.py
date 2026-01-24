@@ -41,13 +41,14 @@ def register_messages(namespace: str, messages: dict[str, MessageDict]) -> None:
 
 
 # Import and register all message modules
-from cli.i18n.messages.common import COMMON_MESSAGES
-from cli.i18n.messages.area import AREA_MESSAGES
-from cli.i18n.messages.menu import MENU_MESSAGES
-from cli.i18n.messages.excel import EXCEL_MESSAGES
-from cli.i18n.messages.runner import RUNNER_MESSAGES
-from cli.i18n.messages.cli_commands import CLI_MESSAGES
-from cli.i18n.messages.flow import FLOW_MESSAGES
+# These imports must come after register_messages is defined
+from cli.i18n.messages.area import AREA_MESSAGES  # noqa: E402
+from cli.i18n.messages.cli_commands import CLI_MESSAGES  # noqa: E402
+from cli.i18n.messages.common import COMMON_MESSAGES  # noqa: E402
+from cli.i18n.messages.excel import EXCEL_MESSAGES  # noqa: E402
+from cli.i18n.messages.flow import FLOW_MESSAGES  # noqa: E402
+from cli.i18n.messages.menu import MENU_MESSAGES  # noqa: E402
+from cli.i18n.messages.runner import RUNNER_MESSAGES  # noqa: E402
 
 register_messages("common", COMMON_MESSAGES)
 register_messages("area", AREA_MESSAGES)

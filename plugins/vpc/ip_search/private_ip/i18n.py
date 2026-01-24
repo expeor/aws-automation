@@ -2,6 +2,8 @@
 plugins/vpc/ip_search/private_ip/i18n.py - Internationalization for Private IP Search
 """
 
+import contextlib
+
 from cli.i18n import get_lang
 
 # Message definitions with ko/en translations
@@ -15,7 +17,6 @@ MESSAGES = {
         "ko": "내부 IP가 어떤 AWS 리소스에 할당되어 있는지 확인",
         "en": "Find which AWS resource an internal IP belongs to",
     },
-
     # Menu
     "menu_search": {
         "ko": "검색",
@@ -37,7 +38,6 @@ MESSAGES = {
         "ko": "돌아가기",
         "en": "Go Back",
     },
-
     # Cache selection
     "cache_available": {
         "ko": "사용 가능한 캐시",
@@ -91,7 +91,6 @@ MESSAGES = {
         "ko": "선택 확인",
         "en": "Confirm Selection",
     },
-
     # Cache creation - profile/region selection
     "cache_select_profile": {
         "ko": "프로파일 선택",
@@ -113,7 +112,6 @@ MESSAGES = {
         "ko": "리전 입력 (쉼표 구분)",
         "en": "Enter regions (comma-separated)",
     },
-
     # Cache creation
     "cache_creating": {
         "ko": "캐시 생성 중...",
@@ -131,7 +129,6 @@ MESSAGES = {
         "ko": "캐시 생성 실패",
         "en": "Cache creation failed",
     },
-
     # Cache deletion
     "cache_delete_confirm": {
         "ko": "선택한 캐시를 삭제하시겠습니까?",
@@ -141,7 +138,6 @@ MESSAGES = {
         "ko": "{count}개 캐시 삭제됨",
         "en": "{count} cache(s) deleted",
     },
-
     # Search
     "search_prompt": {
         "ko": "검색어 입력 (IP, CIDR, VPC ID, 텍스트)",
@@ -155,7 +151,6 @@ MESSAGES = {
         "ko": "검색 중...",
         "en": "Searching...",
     },
-
     # Detail mode
     "detail_mode": {
         "ko": "상세 모드",
@@ -177,7 +172,6 @@ MESSAGES = {
         "ko": "리소스 상세 정보 조회 중...",
         "en": "Fetching resource details...",
     },
-
     # Results
     "result_title": {
         "ko": "검색 결과",
@@ -191,7 +185,6 @@ MESSAGES = {
         "ko": "검색 결과가 없습니다",
         "en": "No results found",
     },
-
     # Table headers
     "header_ip": {
         "ko": "IP 주소",
@@ -225,7 +218,6 @@ MESSAGES = {
         "ko": "Public IP",
         "en": "Public IP",
     },
-
     # Export options
     "export_title": {
         "ko": "결과 저장",
@@ -263,7 +255,6 @@ MESSAGES = {
         "ko": "저장/복사 실패 (필요한 패키지가 설치되지 않았을 수 있습니다)",
         "en": "Save/copy failed (required package may not be installed)",
     },
-
     # Prompts
     "prompt_select": {
         "ko": "선택",
@@ -277,7 +268,6 @@ MESSAGES = {
         "ko": "(y/n)",
         "en": "(y/n)",
     },
-
     # Status messages
     "loading": {
         "ko": "로딩 중...",
@@ -295,7 +285,6 @@ MESSAGES = {
         "ko": "검색을 종료합니다",
         "en": "Exiting search",
     },
-
     # Hints
     "hint_toggle_detail": {
         "ko": "d=상세모드",
@@ -327,9 +316,7 @@ def t(key: str, **kwargs) -> str:
     text = msg_dict.get(lang) or msg_dict.get("ko", key)
 
     if kwargs:
-        try:
+        with contextlib.suppress(KeyError, ValueError):
             text = text.format(**kwargs)
-        except (KeyError, ValueError):
-            pass
 
     return text

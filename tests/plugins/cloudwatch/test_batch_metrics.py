@@ -154,9 +154,7 @@ class TestBatchGetMetrics:
         """단일 쿼리"""
         mock_client = MagicMock()
         mock_client.get_metric_data.return_value = {
-            "MetricDataResults": [
-                {"Id": "test_invocations", "Values": [100, 200, 300]}
-            ]
+            "MetricDataResults": [{"Id": "test_invocations", "Values": [100, 200, 300]}]
         }
 
         queries = [
@@ -221,11 +219,7 @@ class TestBatchGetMetrics:
     def test_empty_values(self):
         """빈 값 처리"""
         mock_client = MagicMock()
-        mock_client.get_metric_data.return_value = {
-            "MetricDataResults": [
-                {"Id": "test_metric", "Values": []}
-            ]
-        }
+        mock_client.get_metric_data.return_value = {"MetricDataResults": [{"Id": "test_metric", "Values": []}]}
 
         queries = [
             MetricQuery(
@@ -248,15 +242,11 @@ class TestBatchGetMetrics:
         mock_client = MagicMock()
         mock_client.get_metric_data.side_effect = [
             {
-                "MetricDataResults": [
-                    {"Id": "test_metric", "Values": [100]}
-                ],
+                "MetricDataResults": [{"Id": "test_metric", "Values": [100]}],
                 "NextToken": "token123",
             },
             {
-                "MetricDataResults": [
-                    {"Id": "test_metric", "Values": [50]}
-                ],
+                "MetricDataResults": [{"Id": "test_metric", "Values": [50]}],
             },
         ]
 
@@ -333,11 +323,8 @@ class TestBatchGetMetrics:
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(days=7)
 
-        with patch("time.sleep"):
-            with pytest.raises(ClientError):
-                batch_get_metrics(
-                    mock_client, queries, start_time, end_time, max_retries=2
-                )
+        with patch("time.sleep"), pytest.raises(ClientError):
+            batch_get_metrics(mock_client, queries, start_time, end_time, max_retries=2)
 
         # 초기 시도 + 2번 재시도 = 3번 호출
         assert mock_client.get_metric_data.call_count == 3
@@ -372,9 +359,7 @@ class TestBuildLambdaMetricQueries:
 
     def test_custom_metrics(self):
         """커스텀 메트릭 지정"""
-        queries = build_lambda_metric_queries(
-            ["test-func"], metrics=["Invocations", "Errors"]
-        )
+        queries = build_lambda_metric_queries(["test-func"], metrics=["Invocations", "Errors"])
 
         # Invocations, Errors 각 1개 = 2개
         assert len(queries) == 2
@@ -397,9 +382,7 @@ class TestBuildRdsMetricQueries:
 
     def test_custom_metrics(self):
         """커스텀 메트릭 지정"""
-        queries = build_rds_metric_queries(
-            ["db-1"], metrics=["DatabaseConnections"]
-        )
+        queries = build_rds_metric_queries(["db-1"], metrics=["DatabaseConnections"])
         assert len(queries) == 1
 
 
@@ -408,9 +391,7 @@ class TestBuildElastiCacheMetricQueries:
 
     def test_redis_cluster(self):
         """Redis 클러스터 (ReplicationGroupId)"""
-        queries = build_elasticache_metric_queries(
-            ["my-redis-cluster"], dimension_name="ReplicationGroupId"
-        )
+        queries = build_elasticache_metric_queries(["my-redis-cluster"], dimension_name="ReplicationGroupId")
 
         # CurrConnections, CPUUtilization = 2개
         assert len(queries) == 2
@@ -420,9 +401,7 @@ class TestBuildElastiCacheMetricQueries:
 
     def test_memcached_cluster(self):
         """Memcached 클러스터 (CacheClusterId)"""
-        queries = build_elasticache_metric_queries(
-            ["my-memcached"], dimension_name="CacheClusterId"
-        )
+        queries = build_elasticache_metric_queries(["my-memcached"], dimension_name="CacheClusterId")
 
         for q in queries:
             assert "CacheClusterId" in q.dimensions
@@ -478,9 +457,7 @@ class TestIntegration:
     def test_large_query_batch(self):
         """대량 쿼리 배치 처리 (500개 단위 분할)"""
         mock_client = MagicMock()
-        mock_client.get_metric_data.return_value = {
-            "MetricDataResults": []
-        }
+        mock_client.get_metric_data.return_value = {"MetricDataResults": []}
 
         # 1000개 쿼리 생성
         queries = [

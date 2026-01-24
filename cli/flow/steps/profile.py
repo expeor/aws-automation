@@ -10,6 +10,7 @@ from rich.console import Console
 
 from cli.i18n import get_lang, t
 from cli.ui.console import clear_screen
+
 from ..context import ExecutionContext, ProviderKind
 
 console = Console()
@@ -186,13 +187,15 @@ class ProfileStep:
         # 화면 클리어
         clear_screen()
 
-        print_box_start(t('flow.select_auth_type'))
+        print_box_start(t("flow.select_auth_type"))
 
         menu_idx = 1
 
         # 저장된 그룹이 있으면 맨 위에 표시
         if saved_groups:
-            print_box_line(f" {menu_idx}) [cyan]★ {t('flow.saved_profile_groups')}[/cyan] [dim]({len(saved_groups)})[/dim]")
+            print_box_line(
+                f" {menu_idx}) [cyan]★ {t('flow.saved_profile_groups')}[/cyan] [dim]({len(saved_groups)})[/dim]"
+            )
             menu_idx += 1
             print_box_line(" ────────────────────────")
 
@@ -244,7 +247,7 @@ class ProfileStep:
 
         kind_labels = {"sso_profile": "SSO", "static": "Key"}
 
-        print_box_start(t('flow.select_profile_group'))
+        print_box_start(t("flow.select_profile_group"))
 
         for idx, g in enumerate(groups, 1):
             kind_label = kind_labels.get(g.kind, g.kind)
@@ -282,7 +285,7 @@ class ProfileStep:
 
         Returns:
             dict: 단일 선택 시
-            List[dict]: 다중 선택 시 (STATIC_CREDENTIALS only)
+            list[dict]: 다중 선택 시 (STATIC_CREDENTIALS only)
         """
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 
@@ -325,7 +328,7 @@ class ProfileStep:
         # 화면 클리어 (프로파일이 2개 이상일 때만)
         clear_screen()
 
-        print_box_start(t('flow.profile_selection', name=name, count=len(sorted_profiles)))
+        print_box_start(t("flow.profile_selection", name=name, count=len(sorted_profiles)))
 
         # 2열 레이아웃
         half = (len(sorted_profiles) + 1) // 2

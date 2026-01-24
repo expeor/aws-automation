@@ -6,7 +6,7 @@ Fuzzy 검색, 별칭 검색, 카테고리 필터 테스트
 
 import pytest
 
-from cli.ui.search import ToolSearchEngine, normalize_text, get_chosung
+from cli.ui.search import ToolSearchEngine, get_chosung, normalize_text
 
 
 # 테스트용 카테고리 데이터
@@ -160,10 +160,9 @@ class TestFuzzySearch:
     def test_typo_inventory(self, search_engine):
         """오타 허용 테스트 - inventory"""
         # "인벤토리" 대신 "인벤톨이" (다른 초성)
-        results = search_engine.search("inventroy")  # 영어 오타 사용
-        # 이 경우 fuzzy 매칭이 되거나 매칭 안됨
+        # 영어 오타 사용 - fuzzy 매칭이 되거나 매칭 안됨
         # 한글 오타는 초성이 같으면 chosung으로 먼저 매칭됨
-        pass
+        _ = search_engine.search("inventroy")  # 결과는 사용하지 않음 (동작 확인만)
 
     def test_fuzzy_category(self, search_engine):
         """카테고리명 fuzzy 매칭"""
@@ -263,11 +262,10 @@ class TestCategoryFilter:
 
     def test_filter_invalid(self, search_engine):
         """잘못된 필터 - invalid:미사용"""
-        results = search_engine.search("invalid:미사용")
         # invalid는 유효하지 않은 카테고리이므로 원본 쿼리로 검색
         # "invalid:미사용" 전체가 검색어로 처리됨
         # 매칭되는 결과가 없거나 있을 수 있음
-        pass  # 동작 확인만
+        _ = search_engine.search("invalid:미사용")  # 동작 확인만
 
     def test_filter_colon_in_query(self, search_engine):
         """콜론이 포함된 일반 쿼리"""
@@ -290,9 +288,8 @@ class TestChosungSearch:
         """초성 + 영문 혼합은 일반 검색"""
         results = search_engine.search("EC2ㅁㅅㅇ")
         # 혼합 쿼리는 초성 검색이 아닌 다른 매칭
-        for r in results:
-            # 초성이 아닌 다른 방식으로 매칭
-            pass
+        # 결과가 있든 없든 동작만 확인
+        _ = results  # 결과는 사용하지 않음
 
 
 class TestSearchPriority:

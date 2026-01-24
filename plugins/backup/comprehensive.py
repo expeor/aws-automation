@@ -27,7 +27,6 @@ AWS Backup + 각 서비스별 자체 자동 백업 현황을 통합 조회합니
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 from botocore.exceptions import ClientError
 from rich.console import Console
@@ -248,9 +247,7 @@ class ComprehensiveBackupResult:
 # ============================================================================
 
 
-def _collect_rds_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_rds_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """RDS/Aurora 백업 상태 수집"""
     results: list[BackupStatus] = []
     rds = get_client(session, "rds", region_name=region)
@@ -348,9 +345,7 @@ def _collect_rds_backup_status(
     return results
 
 
-def _collect_dynamodb_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_dynamodb_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """DynamoDB PITR 상태 수집"""
     results: list[BackupStatus] = []
     dynamodb = get_client(session, "dynamodb", region_name=region)
@@ -362,7 +357,6 @@ def _collect_dynamodb_backup_status(
                 try:
                     backup_info = dynamodb.describe_continuous_backups(TableName=table_name)
                     cb_desc = backup_info.get("ContinuousBackupsDescription", {})
-                    cb_status = cb_desc.get("ContinuousBackupsStatus", "DISABLED")
                     pitr_desc = cb_desc.get("PointInTimeRecoveryDescription", {})
                     pitr_status = pitr_desc.get("PointInTimeRecoveryStatus", "DISABLED")
 
@@ -409,9 +403,7 @@ def _collect_dynamodb_backup_status(
     return results
 
 
-def _collect_efs_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_efs_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """EFS 백업 정책 상태 수집"""
     results: list[BackupStatus] = []
     efs = get_client(session, "efs", region_name=region)
@@ -464,9 +456,7 @@ def _collect_efs_backup_status(
     return results
 
 
-def _collect_fsx_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_fsx_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """FSx 자동 백업 상태 수집"""
     results: list[BackupStatus] = []
     fsx = get_client(session, "fsx", region_name=region)
@@ -560,9 +550,7 @@ def _collect_fsx_backup_status(
     return results
 
 
-def _collect_ec2_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_ec2_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """EC2 인스턴스 백업 상태 수집 (AWS Backup 보호 여부만 체크)"""
     results: list[BackupStatus] = []
     ec2 = get_client(session, "ec2", region_name=region)
@@ -615,9 +603,7 @@ def _collect_ec2_backup_status(
     return results
 
 
-def _collect_documentdb_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_documentdb_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """DocumentDB 클러스터 백업 상태 수집"""
     results: list[BackupStatus] = []
 
@@ -670,9 +656,7 @@ def _collect_documentdb_backup_status(
     return results
 
 
-def _collect_neptune_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_neptune_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """Neptune 클러스터 백업 상태 수집"""
     results: list[BackupStatus] = []
 
@@ -723,9 +707,7 @@ def _collect_neptune_backup_status(
     return results
 
 
-def _collect_redshift_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_redshift_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """Redshift 백업 상태 수집 (Provisioned + Serverless)"""
     results: list[BackupStatus] = []
 
@@ -811,9 +793,7 @@ def _collect_redshift_backup_status(
     return results
 
 
-def _collect_elasticache_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_elasticache_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """ElastiCache 백업 상태 수집 (Redis/Valkey + Memcached)"""
     results: list[BackupStatus] = []
     elasticache = get_client(session, "elasticache", region_name=region)
@@ -933,9 +913,7 @@ def _collect_elasticache_backup_status(
     return results
 
 
-def _collect_memorydb_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_memorydb_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """MemoryDB 백업 상태 수집"""
     results: list[BackupStatus] = []
 
@@ -980,9 +958,7 @@ def _collect_memorydb_backup_status(
     return results
 
 
-def _collect_opensearch_backup_status(
-    session, account_id: str, account_name: str, region: str
-) -> list[BackupStatus]:
+def _collect_opensearch_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
     """OpenSearch 백업 상태 수집 (자동 스냅샷 항상 활성화)"""
     results: list[BackupStatus] = []
 
@@ -1149,9 +1125,7 @@ def _collect_backup_plan_tag_conditions(
 
                         # Selection 상세 조회
                         try:
-                            sel_detail = backup.get_backup_selection(
-                                BackupPlanId=plan_id, SelectionId=sel_id
-                            )
+                            sel_detail = backup.get_backup_selection(BackupPlanId=plan_id, SelectionId=sel_id)
                             selection = sel_detail.get("BackupSelection", {})
                             list_of_tags = selection.get("ListOfTags", [])
                             resources = selection.get("Resources", [])
@@ -1234,9 +1208,7 @@ def _collect_backup_plan_tag_conditions(
     return results
 
 
-def _collect_failed_backup_jobs(
-    session, account_id: str, account_name: str, region: str
-) -> list[FailedBackupJob]:
+def _collect_failed_backup_jobs(session, account_id: str, account_name: str, region: str) -> list[FailedBackupJob]:
     """실패한 AWS Backup 작업 수집"""
     results: list[FailedBackupJob] = []
     backup = get_client(session, "backup", region_name=region)
@@ -1554,27 +1526,29 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
             # Backup Plan 표시
             backup_plan_str = ", ".join(s.backup_plan_names) if s.backup_plan_names else "-"
 
-            row_num = status_sheet.add_row([
-                s.account_name,
-                s.region,
-                s.service,
-                s.resource_type,
-                s.resource_id,
-                s.resource_name,
-                "Yes" if s.backup_enabled else "No",
-                "Yes" if s.aws_backup_protected else "No",
-                s.protection_summary,
-                s.backup_method,
-                s.backup_retention_days,
-                s.last_backup_time.strftime("%Y-%m-%d %H:%M") if s.last_backup_time else "-",
-                s.aws_backup_last_time.strftime("%Y-%m-%d %H:%M") if s.aws_backup_last_time else "-",
-                backup_delayed,
-                failure_count if failure_count > 0 else "-",
-                last_failure.strftime("%Y-%m-%d %H:%M") if last_failure else "-",
-                backup_plan_str,
-                s.status,
-                s.message,
-            ])
+            row_num = status_sheet.add_row(
+                [
+                    s.account_name,
+                    s.region,
+                    s.service,
+                    s.resource_type,
+                    s.resource_id,
+                    s.resource_name,
+                    "Yes" if s.backup_enabled else "No",
+                    "Yes" if s.aws_backup_protected else "No",
+                    s.protection_summary,
+                    s.backup_method,
+                    s.backup_retention_days,
+                    s.last_backup_time.strftime("%Y-%m-%d %H:%M") if s.last_backup_time else "-",
+                    s.aws_backup_last_time.strftime("%Y-%m-%d %H:%M") if s.aws_backup_last_time else "-",
+                    backup_delayed,
+                    failure_count if failure_count > 0 else "-",
+                    last_failure.strftime("%Y-%m-%d %H:%M") if last_failure else "-",
+                    backup_plan_str,
+                    s.status,
+                    s.message,
+                ]
+            )
 
             ws = status_sheet._ws
 
@@ -1623,18 +1597,20 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
         tag_sheet = wb.new_sheet("Backup Plan Tags", tag_columns)
 
         for t in all_tag_conditions:
-            tag_sheet.add_row([
-                t.account_name,
-                t.region,
-                t.plan_id,
-                t.plan_name,
-                t.selection_id,
-                t.selection_name,
-                t.condition_type,
-                t.tag_key,
-                t.tag_value,
-                ", ".join(t.resource_types) if t.resource_types else "*",
-            ])
+            tag_sheet.add_row(
+                [
+                    t.account_name,
+                    t.region,
+                    t.plan_id,
+                    t.plan_name,
+                    t.selection_id,
+                    t.selection_name,
+                    t.condition_type,
+                    t.tag_key,
+                    t.tag_value,
+                    ", ".join(t.resource_types) if t.resource_types else "*",
+                ]
+            )
 
     # ========== Failed Jobs 시트 ==========
     all_failed_jobs = []
@@ -1660,18 +1636,21 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
         all_failed_jobs.sort(key=lambda j: j.creation_date or datetime.min, reverse=True)
 
         for j in all_failed_jobs:
-            row_num = failed_sheet.add_row([
-                j.account_name,
-                j.region,
-                j.job_id,
-                j.status,
-                j.resource_type,
-                j.resource_arn,
-                j.vault_name,
-                j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
-                j.completion_date.strftime("%Y-%m-%d %H:%M") if j.completion_date else "-",
-                j.status_message or "-",
-            ], style=Styles.danger())
+            row_num = failed_sheet.add_row(
+                [
+                    j.account_name,
+                    j.region,
+                    j.job_id,
+                    j.status,
+                    j.resource_type,
+                    j.resource_arn,
+                    j.vault_name,
+                    j.creation_date.strftime("%Y-%m-%d %H:%M") if j.creation_date else "-",
+                    j.completion_date.strftime("%Y-%m-%d %H:%M") if j.completion_date else "-",
+                    j.status_message or "-",
+                ],
+                style=Styles.danger(),
+            )
             failed_sheet._ws.cell(row=row_num, column=4).fill = red_fill
 
     return str(wb.save_as(output_dir, "Comprehensive_Backup"))
@@ -1718,7 +1697,7 @@ def run(ctx) -> None:
     if disabled_resources > 0:
         console.print(f"[yellow]백업 비활성화: {disabled_resources}개[/yellow]")
     else:
-        console.print(f"[green]백업 비활성화: 0개[/green]")
+        console.print("[green]백업 비활성화: 0개[/green]")
 
     if failed_jobs > 0:
         console.print(f"[red]최근 {JOB_DAYS}일 실패 작업: {failed_jobs}건[/red]")

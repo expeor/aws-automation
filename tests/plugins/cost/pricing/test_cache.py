@@ -3,9 +3,7 @@ tests/plugins/cost/pricing/test_cache.py - 캐시 테스트
 """
 
 import json
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest

@@ -63,9 +63,7 @@ class TestSageMakerPricing:
         from plugins.cost.pricing.sagemaker import get_sagemaker_monthly_cost
 
         instance_count = 3
-        monthly_cost = get_sagemaker_monthly_cost(
-            "ml.t3.medium", "ap-northeast-2", instance_count=instance_count
-        )
+        monthly_cost = get_sagemaker_monthly_cost("ml.t3.medium", "ap-northeast-2", instance_count=instance_count)
 
         expected = round(sample_sagemaker_prices["ml.t3.medium"] * HOURS_PER_MONTH * instance_count, 2)
         assert monthly_cost == expected

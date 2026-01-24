@@ -2,8 +2,6 @@
 tests/core/tools/test_tag_validator.py - 태그 정책 검증 테스트
 """
 
-import pytest
-
 from core.tools.tag_validator import (
     TagPolicy,
     TagPolicyValidator,
