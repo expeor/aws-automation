@@ -45,24 +45,6 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-# OpenSearch 인스턴스 타입별 시간당 요금 (us-east-1 기준, On-Demand)
-OPENSEARCH_PRICING = {
-    "t3.small.search": 0.036,
-    "t3.medium.search": 0.073,
-    "m6g.large.search": 0.128,
-    "m6g.xlarge.search": 0.256,
-    "r6g.large.search": 0.167,
-    "r6g.xlarge.search": 0.335,
-    "c6g.large.search": 0.111,
-    "c6g.xlarge.search": 0.222,
-    "i3.large.search": 0.175,
-    "i3.xlarge.search": 0.350,
-}
-
-# EBS 스토리지 비용 ($/GB-month)
-EBS_STORAGE_COST = 0.115
-
-
 class DomainStatus(Enum):
     """도메인 상태"""
 
@@ -92,13 +74,22 @@ class OpenSearchDomainInfo:
     indexing_rate: float = 0.0
     jvm_memory_pressure: float = 0.0
 
+    def get_estimated_monthly_cost(self, session=None) -> float:
+        """월간 비용 추정 (Pricing API 사용)"""
+        from plugins.cost.pricing.opensearch import get_opensearch_monthly_cost
+
+        return get_opensearch_monthly_cost(
+            region=self.region,
+            instance_type=self.instance_type,
+            instance_count=self.instance_count,
+            storage_gb=int(self.storage_gb),
+            session=session,
+        )
+
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정 (인스턴스 + 스토리지)"""
-        hourly = OPENSEARCH_PRICING.get(self.instance_type, 0.1)
-        instance_cost = hourly * 730 * self.instance_count
-        storage_cost = self.storage_gb * EBS_STORAGE_COST
-        return instance_cost + storage_cost
+        """월간 비용 추정 (후방 호환용)"""
+        return self.get_estimated_monthly_cost()
 
 
 @dataclass

@@ -45,11 +45,6 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-# Kinesis 가격 (us-east-1 기준)
-KINESIS_SHARD_HOUR = 0.015  # $/shard-hour (Provisioned)
-KINESIS_ON_DEMAND_STREAM_HOUR = 0.04  # $/stream-hour (On-Demand)
-
-
 class StreamStatus(Enum):
     """스트림 상태"""
 
@@ -78,15 +73,18 @@ class KinesisStreamInfo:
     get_records: float = 0.0
     consumer_count: int = 0
 
+    def get_estimated_monthly_cost(self, session=None) -> float:
+        """월간 비용 추정 (Pricing API 사용)"""
+        from plugins.cost.pricing.kinesis import get_kinesis_monthly_cost
+
+        return get_kinesis_monthly_cost(
+            self.region, self.stream_mode, self.shard_count, session=session
+        )
+
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정"""
-        if self.stream_mode == "ON_DEMAND":
-            # On-Demand: 기본 시간당 비용 (데이터 비용은 제외)
-            return KINESIS_ON_DEMAND_STREAM_HOUR * 730
-        else:
-            # Provisioned: shard 기반 비용
-            return KINESIS_SHARD_HOUR * 730 * self.shard_count
+        """월간 비용 추정 (후방 호환용)"""
+        return self.get_estimated_monthly_cost()
 
 
 @dataclass

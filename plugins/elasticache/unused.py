@@ -78,24 +78,18 @@ class ClusterInfo:
     network_bytes_out: float = 0.0
     cache_hits: float = 0.0
 
+    def get_estimated_monthly_cost(self, session=None) -> float:
+        """월간 비용 추정 (Pricing API 사용)"""
+        from plugins.cost.pricing.elasticache import get_elasticache_monthly_cost
+
+        return get_elasticache_monthly_cost(
+            self.region, self.node_type, self.num_nodes, session=session
+        )
+
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정 (노드 타입별 대략치)"""
-        # 간단한 가격 맵 (실제로는 pricing 모듈 확장 필요)
-        price_map = {
-            "cache.t3.micro": 0.017,
-            "cache.t3.small": 0.034,
-            "cache.t3.medium": 0.068,
-            "cache.t4g.micro": 0.016,
-            "cache.t4g.small": 0.032,
-            "cache.t4g.medium": 0.065,
-            "cache.r6g.large": 0.206,
-            "cache.r6g.xlarge": 0.413,
-            "cache.r7g.large": 0.222,
-            "cache.m6g.large": 0.157,
-        }
-        hourly = price_map.get(self.node_type, 0.10)  # 기본값
-        return hourly * 730 * self.num_nodes  # 월간
+        """월간 비용 추정 (후방 호환용)"""
+        return self.get_estimated_monthly_cost()
 
 
 @dataclass

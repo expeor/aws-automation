@@ -44,18 +44,6 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-# Redshift 노드 타입별 시간당 요금 (us-east-1 기준, On-Demand)
-REDSHIFT_PRICING = {
-    "dc2.large": 0.25,
-    "dc2.8xlarge": 4.80,
-    "ra3.xlplus": 1.086,
-    "ra3.4xlarge": 3.26,
-    "ra3.16xlarge": 13.04,
-    "ds2.xlarge": 0.85,
-    "ds2.8xlarge": 6.80,
-}
-
-
 class ClusterStatus(Enum):
     """클러스터 상태"""
 
@@ -84,11 +72,21 @@ class RedshiftClusterInfo:
     avg_read_iops: float = 0.0
     avg_write_iops: float = 0.0
 
+    def get_estimated_monthly_cost(self, session=None) -> float:
+        """월간 비용 추정 (Pricing API 사용)"""
+        from plugins.cost.pricing.redshift import get_redshift_monthly_cost
+
+        return get_redshift_monthly_cost(
+            region=self.region,
+            node_type=self.node_type,
+            num_nodes=self.num_nodes,
+            session=session,
+        )
+
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정"""
-        hourly = REDSHIFT_PRICING.get(self.node_type, 1.0)
-        return hourly * 730 * self.num_nodes
+        """월간 비용 추정 (후방 호환용)"""
+        return self.get_estimated_monthly_cost()
 
 
 @dataclass

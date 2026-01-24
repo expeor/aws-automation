@@ -77,10 +77,16 @@ class EFSInfo:
     def size_gb(self) -> float:
         return self.size_bytes / (1024**3)
 
+    def get_estimated_monthly_cost(self, session=None) -> float:
+        """월간 비용 추정 (Pricing API 사용)"""
+        from plugins.cost.pricing.efs import get_efs_monthly_cost
+
+        return get_efs_monthly_cost(self.region, self.size_gb, session=session)
+
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (Standard 기준 $0.30/GB)"""
-        return self.size_gb * 0.30
+        """월간 비용 추정 (후방 호환용)"""
+        return self.get_estimated_monthly_cost()
 
 
 @dataclass
