@@ -26,8 +26,11 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-# 미사용 기준: 7일간 요청 0
-UNUSED_DAYS_THRESHOLD = 7
+# 분석 기간 (일) - AWS 권장 14일 이상
+ANALYSIS_DAYS = 14
+
+# 저사용 기준: 하루 평균 1회 미만 (AWS Trusted Advisor 기준)
+LOW_USAGE_REQUESTS_PER_DAY = 1
 
 
 class APIStatus(Enum):
@@ -91,7 +94,7 @@ def collect_rest_apis(session, account_id: str, account_name: str, region: str, 
     apis = []
 
     now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = apigw.get_paginator("get_rest_apis")
@@ -184,7 +187,7 @@ def collect_http_apis(session, account_id: str, account_name: str, region: str, 
     apis = []
 
     now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = apigwv2.get_paginator("get_apis")
@@ -285,9 +288,9 @@ def analyze_apis(apis: list[APIInfo], account_id: str, account_name: str, region
             )
             continue
 
-        # 저사용 (하루 평균 10회 미만)
-        avg_daily = api.total_requests / UNUSED_DAYS_THRESHOLD
-        if avg_daily < 10:
+        # 저사용 (AWS Trusted Advisor 기준: 하루 평균 1회 미만)
+        avg_daily = api.total_requests / ANALYSIS_DAYS
+        if avg_daily < LOW_USAGE_REQUESTS_PER_DAY:
             result.low_usage += 1
             result.findings.append(
                 APIFinding(

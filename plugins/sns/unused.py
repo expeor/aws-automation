@@ -18,8 +18,11 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
-# 미사용 기준: 7일간 메시지 발행 0
-UNUSED_DAYS_THRESHOLD = 7
+# 분석 기간 (일) - AWS 권장 14일 이상
+ANALYSIS_DAYS = 14
+
+# 저사용 기준: 하루 평균 메시지 10개 미만
+LOW_USAGE_MESSAGES_PER_DAY = 10
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -37,6 +40,7 @@ class TopicStatus(Enum):
     NORMAL = "normal"
     NO_SUBSCRIBERS = "no_subscribers"
     NO_MESSAGES = "no_messages"
+    LOW_USAGE = "low_usage"
     UNUSED = "unused"
 
 
@@ -75,6 +79,7 @@ class SNSAnalysisResult:
     total_topics: int = 0
     no_subscribers: int = 0
     no_messages: int = 0
+    low_usage: int = 0
     unused_topics: int = 0
     normal_topics: int = 0
     findings: list[TopicFinding] = field(default_factory=list)
@@ -89,7 +94,7 @@ def collect_sns_topics(session, account_id: str, account_name: str, region: str)
     topics = []
 
     now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = sns.get_paginator("list_topics")
@@ -209,7 +214,20 @@ def analyze_topics(topics: list[SNSTopicInfo], account_id: str, account_name: st
                 TopicFinding(
                     topic=topic,
                     status=TopicStatus.NO_MESSAGES,
-                    recommendation="메시지 발행 없음 - 사용 여부 확인",
+                    recommendation=f"{ANALYSIS_DAYS}일간 메시지 발행 없음 - 사용 여부 확인",
+                )
+            )
+            continue
+
+        # 저사용 (일평균 메시지 수 기준)
+        avg_messages_per_day = topic.messages_published / ANALYSIS_DAYS
+        if avg_messages_per_day < LOW_USAGE_MESSAGES_PER_DAY:
+            result.low_usage += 1
+            result.findings.append(
+                TopicFinding(
+                    topic=topic,
+                    status=TopicStatus.LOW_USAGE,
+                    recommendation=f"저사용 (일평균 {avg_messages_per_day:.1f}건) - 통합 검토",
                 )
             )
             continue

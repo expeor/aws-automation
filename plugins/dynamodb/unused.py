@@ -3,6 +3,17 @@ plugins/dynamodb/unused.py - DynamoDB 미사용 테이블 분석
 
 유휴/저사용 DynamoDB 테이블 탐지 (CloudWatch 지표 기반)
 
+탐지 기준:
+- 미사용: ConsumedReadCapacityUnits = 0 AND ConsumedWriteCapacityUnits = 0 (7-30일)
+- 저사용: Consumed < 30% of Provisioned (AWS nOps 기준)
+- https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html
+- https://www.nops.io/underutilized-30-read-write-dynamodb-tables/
+
+CloudWatch 메트릭:
+- Namespace: AWS/DynamoDB
+- 메트릭: ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ThrottledRequests
+- Dimension: TableName
+
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
 """
@@ -28,10 +39,10 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-# 미사용 기준: 7일간 읽기/쓰기 작업 0
-UNUSED_DAYS_THRESHOLD = 7
-# 저사용 기준: 평균 소비 용량이 프로비저닝의 10% 미만
-LOW_USAGE_THRESHOLD_PERCENT = 10
+# 분석 기간 (일)
+ANALYSIS_DAYS = 7
+# 저사용 기준: 평균 소비 용량이 프로비저닝의 30% 미만 (AWS nOps 기준)
+LOW_USAGE_THRESHOLD_PERCENT = 30
 
 
 class TableStatus(Enum):
@@ -127,7 +138,7 @@ def collect_dynamodb_tables(session, account_id: str, account_name: str, region:
     tables = []
 
     now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = dynamodb.get_paginator("list_tables")

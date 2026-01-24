@@ -3,14 +3,22 @@ plugins/ec2/unused.py - EC2 인스턴스 미사용 분석
 
 유휴/저사용 EC2 인스턴스 탐지 (CloudWatch 지표 기반)
 
-탐지 기준:
-- 미사용: CPU 평균 5% 미만, 14일간 네트워크 트래픽 없음
-- 저사용: CPU 평균 5% 미만
+탐지 기준 (AWS Trusted Advisor / Trend Micro Conformity 기반):
+- 미사용: CPU 평균 < 2%, 네트워크 트래픽 < 5MB, Disk I/O < 100 ops (14일간)
+- 저사용: CPU 평균 < 10%, 네트워크/Disk 활동 있음
 - 정지됨: stopped 상태
+
+참고:
+- AWS Trusted Advisor: CPU < 10%, Network < 5MB (14일)
+- Trend Micro Conformity: CPU < 2%, Network < 5MB (7일)
+
+CloudWatch 메트릭:
+- Namespace: AWS/EC2
+- 메트릭: CPUUtilization, NetworkIn, NetworkOut, DiskReadOps, DiskWriteOps
+- Dimension: InstanceId
 
 최적화:
 - CloudWatch GetMetricData API 사용 (배치 조회)
-- 기존: 인스턴스당 3 API 호출 → 최적화: 전체 1 API 호출
 
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
@@ -29,12 +37,16 @@ from plugins.cost.pricing import get_ec2_monthly_cost
 
 console = Console()
 
-# 분석 기간 (일)
+# 분석 기간 (일) - AWS Trusted Advisor 기준 14일
 ANALYSIS_DAYS = 14
-# 저사용 기준: CPU 평균 5% 미만
-LOW_USAGE_CPU_THRESHOLD = 5.0
-# 미사용 기준: 네트워크 트래픽 바이트
-UNUSED_NETWORK_THRESHOLD = 1024 * 1024  # 1MB
+# 미사용 기준: CPU 평균 2% 미만 (Trend Micro Conformity 기준)
+UNUSED_CPU_THRESHOLD = 2.0
+# 저사용 기준: CPU 평균 10% 미만 (AWS Trusted Advisor 기준)
+LOW_USAGE_CPU_THRESHOLD = 10.0
+# 미사용 기준: 네트워크 트래픽 5MB 미만 (AWS Trusted Advisor 기준)
+UNUSED_NETWORK_THRESHOLD = 5 * 1024 * 1024  # 5MB
+# 미사용 기준: Disk I/O 100 ops 미만
+UNUSED_DISK_OPS_THRESHOLD = 100
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -79,6 +91,8 @@ class EC2InstanceInfo:
     max_cpu: float = 0.0
     total_network_in: float = 0.0
     total_network_out: float = 0.0
+    total_disk_read_ops: float = 0.0
+    total_disk_write_ops: float = 0.0
 
     @property
     def estimated_monthly_cost(self) -> float:
@@ -242,6 +256,28 @@ def _collect_ec2_metrics_batch(
             )
         )
 
+        # DiskReadOps (Sum)
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_disk_read_ops",
+                namespace="AWS/EC2",
+                metric_name="DiskReadOps",
+                dimensions=dimensions,
+                stat="Sum",
+            )
+        )
+
+        # DiskWriteOps (Sum)
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_disk_write_ops",
+                namespace="AWS/EC2",
+                metric_name="DiskWriteOps",
+                dimensions=dimensions,
+                stat="Sum",
+            )
+        )
+
     try:
         # 배치 조회
         results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
@@ -261,6 +297,9 @@ def _collect_ec2_metrics_batch(
             # 네트워크 총량
             instance.total_network_in = results.get(f"{safe_id}_network_in", 0.0)
             instance.total_network_out = results.get(f"{safe_id}_network_out", 0.0)
+            # Disk I/O 총량
+            instance.total_disk_read_ops = results.get(f"{safe_id}_disk_read_ops", 0.0)
+            instance.total_disk_write_ops = results.get(f"{safe_id}_disk_write_ops", 0.0)
 
     except ClientError:
         # 실패 시 무시 (기본값 0 유지)
@@ -297,21 +336,26 @@ def analyze_instances(
             continue
 
         total_network = instance.total_network_in + instance.total_network_out
+        total_disk_ops = instance.total_disk_read_ops + instance.total_disk_write_ops
 
-        # 미사용: CPU 5% 미만 + 네트워크 트래픽 거의 없음
-        if instance.avg_cpu < LOW_USAGE_CPU_THRESHOLD and total_network < UNUSED_NETWORK_THRESHOLD:
+        # 미사용: CPU < 2% AND 네트워크 < 5MB AND Disk I/O < 100 ops
+        is_cpu_idle = instance.avg_cpu < UNUSED_CPU_THRESHOLD
+        is_network_idle = total_network < UNUSED_NETWORK_THRESHOLD
+        is_disk_idle = total_disk_ops < UNUSED_DISK_OPS_THRESHOLD
+
+        if is_cpu_idle and is_network_idle and is_disk_idle:
             result.unused_instances += 1
             result.unused_monthly_cost += instance.estimated_monthly_cost
             result.findings.append(
                 InstanceFinding(
                     instance=instance,
                     status=InstanceStatus.UNUSED,
-                    recommendation=f"미사용 - CPU {instance.avg_cpu:.1f}%, 네트워크 {total_network / (1024 * 1024):.2f}MB - 종료 검토 (${instance.estimated_monthly_cost:.2f}/월)",
+                    recommendation=f"미사용 - CPU {instance.avg_cpu:.1f}%, 네트워크 {total_network / (1024 * 1024):.2f}MB, Disk {total_disk_ops:.0f}ops - 종료 검토 (${instance.estimated_monthly_cost:.2f}/월)",
                 )
             )
             continue
 
-        # 저사용: CPU 5% 미만
+        # 저사용: CPU < 10% (AWS Trusted Advisor 기준)
         if instance.avg_cpu < LOW_USAGE_CPU_THRESHOLD:
             result.low_usage_instances += 1
             result.low_usage_monthly_cost += instance.estimated_monthly_cost
@@ -371,6 +415,7 @@ def generate_report(results: list[EC2AnalysisResult], output_dir: str, ctx=None)
                         "platform": inst.platform,
                         "avg_cpu": f"{inst.avg_cpu:.1f}%",
                         "max_cpu": f"{inst.max_cpu:.1f}%",
+                        "disk_io": f"{inst.total_disk_read_ops + inst.total_disk_write_ops:,.0f} ops",
                         "age_days": inst.age_days,
                     }
                 )
@@ -463,6 +508,7 @@ def _save_excel(results: list[EC2AnalysisResult], output_dir: str) -> str:
         ColumnDef(header="Max CPU", width=10),
         ColumnDef(header="Network In", width=15),
         ColumnDef(header="Network Out", width=15),
+        ColumnDef(header="Disk I/O", width=12),
         ColumnDef(header="Age (days)", width=12, style="number"),
         ColumnDef(header="월간 비용", width=12),
         ColumnDef(header="권장 조치", width=40),
@@ -479,6 +525,7 @@ def _save_excel(results: list[EC2AnalysisResult], output_dir: str) -> str:
                 elif f.status == InstanceStatus.LOW_USAGE:
                     style = Styles.warning()
 
+                total_disk_ops = inst.total_disk_read_ops + inst.total_disk_write_ops
                 detail_sheet.add_row(
                     [
                         inst.account_name,
@@ -492,6 +539,7 @@ def _save_excel(results: list[EC2AnalysisResult], output_dir: str) -> str:
                         f"{inst.max_cpu:.1f}%",
                         f"{inst.total_network_in / (1024 * 1024):.2f} MB",
                         f"{inst.total_network_out / (1024 * 1024):.2f} MB",
+                        f"{total_disk_ops:,.0f} ops",
                         inst.age_days,
                         f"${inst.estimated_monthly_cost:.2f}",
                         f.recommendation,

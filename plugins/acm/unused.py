@@ -26,8 +26,10 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
-# 만료 임박 기준: 30일 이내
-EXPIRING_DAYS_THRESHOLD = 30
+# 만료 임박 기준 (AWS Security Hub 기준)
+CRITICAL_EXPIRING_DAYS = 7  # 7일 이내 = 긴급
+EXPIRING_DAYS_THRESHOLD = 30  # 30일 이내 = 주의
+WARNING_EXPIRING_DAYS = 60  # 60일 이내 = 경고
 
 
 class CertStatus(Enum):
@@ -35,7 +37,9 @@ class CertStatus(Enum):
 
     NORMAL = "normal"
     UNUSED = "unused"
-    EXPIRING = "expiring"
+    CRITICAL_EXPIRING = "critical_expiring"  # 7일 이내
+    EXPIRING = "expiring"  # 30일 이내
+    WARNING_EXPIRING = "warning_expiring"  # 60일 이내
     EXPIRED = "expired"
     PENDING = "pending"
 
@@ -88,7 +92,9 @@ class ACMAnalysisResult:
     region: str
     total_certs: int = 0
     unused_certs: int = 0
-    expiring_certs: int = 0
+    critical_expiring_certs: int = 0  # 7일 이내
+    expiring_certs: int = 0  # 30일 이내
+    warning_expiring_certs: int = 0  # 60일 이내
     expired_certs: int = 0
     pending_certs: int = 0
     normal_certs: int = 0
@@ -184,18 +190,44 @@ def analyze_certificates(certs: list[CertInfo], account_id: str, account_name: s
             )
             continue
 
-        # 만료 임박
+        # 만료 임박 체크 (AWS Security Hub 기준)
         days_left = cert.days_until_expiry
-        if days_left is not None and days_left <= EXPIRING_DAYS_THRESHOLD:
-            result.expiring_certs += 1
-            result.findings.append(
-                CertFinding(
-                    cert=cert,
-                    status=CertStatus.EXPIRING,
-                    recommendation=f"만료 임박 ({days_left}일 남음) - 갱신 필요",
+        if days_left is not None:
+            # 7일 이내 = 긴급
+            if days_left <= CRITICAL_EXPIRING_DAYS:
+                result.critical_expiring_certs += 1
+                result.findings.append(
+                    CertFinding(
+                        cert=cert,
+                        status=CertStatus.CRITICAL_EXPIRING,
+                        recommendation=f"긴급! 만료 {days_left}일 남음 - 즉시 갱신 필요",
+                    )
                 )
-            )
-            continue
+                continue
+
+            # 30일 이내 = 주의
+            if days_left <= EXPIRING_DAYS_THRESHOLD:
+                result.expiring_certs += 1
+                result.findings.append(
+                    CertFinding(
+                        cert=cert,
+                        status=CertStatus.EXPIRING,
+                        recommendation=f"만료 임박 ({days_left}일 남음) - 갱신 필요",
+                    )
+                )
+                continue
+
+            # 60일 이내 = 경고
+            if days_left <= WARNING_EXPIRING_DAYS:
+                result.warning_expiring_certs += 1
+                result.findings.append(
+                    CertFinding(
+                        cert=cert,
+                        status=CertStatus.WARNING_EXPIRING,
+                        recommendation=f"만료 예정 ({days_left}일 남음) - 갱신 준비",
+                    )
+                )
+                continue
 
         # 미사용
         if not cert.is_in_use:

@@ -3,6 +3,18 @@ plugins/efs/unused.py - EFS 미사용 파일시스템 분석
 
 유휴/미사용 EFS 파일시스템 탐지 (마운트 타겟 및 CloudWatch 지표 기반)
 
+탐지 기준 (CloudFix 기반):
+- 미사용: ClientConnections = 0 AND MeteredIOBytes = 0 (30일)
+- 마운트없음: mount_target_count = 0
+- 빈파일: size < 1MB
+- https://docs.aws.amazon.com/efs/latest/ug/efs-metrics.html
+- https://cloudfix.com/blog/delete-idle-volumes-save-on-efs/
+
+CloudWatch 메트릭:
+- Namespace: AWS/EFS
+- 메트릭: ClientConnections, MeteredIOBytes, DataReadIOBytes, DataWriteIOBytes
+- Dimension: FileSystemId
+
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
 """
@@ -18,8 +30,8 @@ from core.tools.output import OutputPath, open_in_explorer
 
 console = Console()
 
-# 미사용 기준: 7일간 I/O 없음
-UNUSED_DAYS_THRESHOLD = 7
+# 분석 기간 (일) - CloudFix 권장 30일
+ANALYSIS_DAYS = 30
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -57,7 +69,9 @@ class EFSInfo:
     created_at: datetime | None
     # CloudWatch 지표
     avg_client_connections: float = 0.0
-    total_io_bytes: float = 0.0
+    metered_io_bytes: float = 0.0  # 과금 대상 I/O (더 정확)
+    data_read_bytes: float = 0.0
+    data_write_bytes: float = 0.0
 
     @property
     def size_gb(self) -> float:
@@ -103,7 +117,7 @@ def collect_efs_filesystems(session, account_id: str, account_name: str, region:
     filesystems = []
 
     now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
+    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = efs.get_paginator("describe_file_systems")
@@ -157,18 +171,44 @@ def collect_efs_filesystems(session, account_id: str, account_name: str, region:
                             conn_resp["Datapoints"]
                         )
 
-                    # TotalIOBytes (읽기+쓰기)
-                    io_resp = cloudwatch.get_metric_statistics(
+                    # MeteredIOBytes (과금 대상 I/O - 더 정확한 사용량 지표)
+                    metered_resp = cloudwatch.get_metric_statistics(
                         Namespace="AWS/EFS",
-                        MetricName="TotalIOBytes",
+                        MetricName="MeteredIOBytes",
                         Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
                         StartTime=start_time,
                         EndTime=now,
                         Period=86400,
                         Statistics=["Sum"],
                     )
-                    if io_resp.get("Datapoints"):
-                        info.total_io_bytes = sum(d["Sum"] for d in io_resp["Datapoints"])
+                    if metered_resp.get("Datapoints"):
+                        info.metered_io_bytes = sum(d["Sum"] for d in metered_resp["Datapoints"])
+
+                    # DataReadIOBytes
+                    read_resp = cloudwatch.get_metric_statistics(
+                        Namespace="AWS/EFS",
+                        MetricName="DataReadIOBytes",
+                        Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
+                        StartTime=start_time,
+                        EndTime=now,
+                        Period=86400,
+                        Statistics=["Sum"],
+                    )
+                    if read_resp.get("Datapoints"):
+                        info.data_read_bytes = sum(d["Sum"] for d in read_resp["Datapoints"])
+
+                    # DataWriteIOBytes
+                    write_resp = cloudwatch.get_metric_statistics(
+                        Namespace="AWS/EFS",
+                        MetricName="DataWriteIOBytes",
+                        Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
+                        StartTime=start_time,
+                        EndTime=now,
+                        Period=86400,
+                        Statistics=["Sum"],
+                    )
+                    if write_resp.get("Datapoints"):
+                        info.data_write_bytes = sum(d["Sum"] for d in write_resp["Datapoints"])
 
                 except ClientError:
                     pass
@@ -217,15 +257,15 @@ def analyze_filesystems(
             )
             continue
 
-        # I/O 없음
-        if fs.total_io_bytes == 0 and fs.avg_client_connections == 0:
+        # I/O 없음 (MeteredIOBytes 사용 - 과금 대상 I/O)
+        if fs.metered_io_bytes == 0 and fs.avg_client_connections == 0:
             result.no_io += 1
             result.unused_monthly_cost += fs.estimated_monthly_cost
             result.findings.append(
                 EFSFinding(
                     efs=fs,
                     status=FileSystemStatus.NO_IO,
-                    recommendation=f"I/O 없음 - 삭제 검토 (${fs.estimated_monthly_cost:.2f}/월)",
+                    recommendation=f"30일간 I/O 없음 - 삭제 검토 (${fs.estimated_monthly_cost:.2f}/월)",
                 )
             )
             continue
@@ -298,7 +338,8 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
         ColumnDef(header="Mode", width=12),
         ColumnDef(header="상태", width=15),
         ColumnDef(header="Avg Conn", width=10),
-        ColumnDef(header="Total I/O", width=12),
+        ColumnDef(header="Metered I/O", width=12),
+        ColumnDef(header="Read/Write", width=15),
         ColumnDef(header="월간 비용", width=12),
         ColumnDef(header="권장 조치", width=35),
     ]
@@ -321,7 +362,8 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
                         fs.throughput_mode,
                         f.status.value,
                         f"{fs.avg_client_connections:.1f}",
-                        f"{fs.total_io_bytes / (1024**2):.1f} MB",
+                        f"{fs.metered_io_bytes / (1024**2):.1f} MB",
+                        f"R:{fs.data_read_bytes / (1024**2):.1f}/W:{fs.data_write_bytes / (1024**2):.1f} MB",
                         f"${fs.estimated_monthly_cost:.2f}",
                         f.recommendation,
                     ],
