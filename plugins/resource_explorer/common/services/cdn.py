@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/cdn.py - CDN/DNS 리소스 수집
 CloudFront Distribution, Route 53 Hosted Zone 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import CloudFrontDistribution, Route53HostedZone
+
+logger = logging.getLogger(__name__)
 
 
 def collect_cloudfront_distributions(
@@ -39,8 +43,8 @@ def collect_cloudfront_distributions(
                 tags_resp = cf.list_tags_for_resource(Resource=dist_arn)
                 for tag in tags_resp.get("Tags", {}).get("Items", []):
                     tags[tag["Key"]] = tag["Value"]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             distributions.append(
                 CloudFrontDistribution(
@@ -100,8 +104,8 @@ def collect_route53_hosted_zones(session, account_id: str, account_name: str, re
                 tags_resp = route53.list_tags_for_resource(ResourceType="hostedzone", ResourceId=zone_id)
                 for tag in tags_resp.get("ResourceTagSet", {}).get("Tags", []):
                     tags[tag["Key"]] = tag["Value"]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             zones.append(
                 Route53HostedZone(
