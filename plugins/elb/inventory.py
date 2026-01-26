@@ -8,9 +8,11 @@ plugins/elb/inventory.py - ELB 인벤토리 조회 (스트리밍 방식)
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.table import Table
@@ -18,6 +20,9 @@ from rich.table import Table
 from core.tools.io.excel import ColumnDef, Workbook
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.resource_explorer.common import InventoryCollector
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -43,7 +48,7 @@ class Stats:
     warnings: list[str] = field(default_factory=list)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """ELB 인벤토리 조회 (스트리밍 방식)"""
     console.print("\n[bold]ELB 인벤토리[/bold]\n")
 

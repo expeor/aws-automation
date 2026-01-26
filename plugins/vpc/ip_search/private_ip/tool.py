@@ -5,8 +5,11 @@ Search AWS ENI cache for private IP addresses.
 Supports multi-profile/multi-account cache management.
 """
 
+from __future__ import annotations
+
 import ipaddress
 import logging
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
@@ -25,6 +28,9 @@ from .cache import (
 )
 from .export import copy_to_clipboard, copy_to_clipboard_simple, export_csv, export_excel
 from .i18n import t
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -496,7 +502,7 @@ def _run_search_loop(
 # =============================================================================
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """
     Private IP Search Tool entry point.
 

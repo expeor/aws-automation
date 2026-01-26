@@ -17,6 +17,8 @@ FSx 비용 계산:
     monthly = get_fsx_monthly_cost("ap-northeast-2", "WINDOWS", storage_gb=1000)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -83,7 +85,7 @@ DEFAULT_PRICES = {
 }
 
 
-def get_fsx_prices_from_api(session: "boto3.Session", region: str, fsx_type: str) -> dict[str, float]:
+def get_fsx_prices_from_api(session: boto3.Session, region: str, fsx_type: str) -> dict[str, float]:
     """Pricing API를 통해 FSx 가격 조회
 
     Args:
@@ -155,7 +157,7 @@ def get_fsx_prices_from_api(session: "boto3.Session", region: str, fsx_type: str
 def get_fsx_prices(
     region: str = "ap-northeast-2",
     fsx_type: str = "WINDOWS",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float]:
     """FSx 가격 조회
 
@@ -186,7 +188,7 @@ def get_fsx_gb_price(
     region: str = "ap-northeast-2",
     fsx_type: str = "WINDOWS",
     storage_type: str = "SSD",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """FSx GB당 월 가격
 
@@ -213,7 +215,7 @@ def get_fsx_monthly_cost(
     fsx_type: str = "WINDOWS",
     storage_gb: int = 0,
     storage_type: str = "SSD",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """FSx 월간 비용 계산
 
@@ -235,7 +237,7 @@ def estimate_savings(
     filesystems: list[dict],
     region: str = "ap-northeast-2",
     months: int = 12,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float | int | str]:
     """FSx 파일시스템 제거 시 예상 절감액 계산
 

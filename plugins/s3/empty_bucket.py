@@ -7,14 +7,20 @@ plugins/s3/empty_bucket.py - 빈 S3 버킷 탐지
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -400,7 +406,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_buckets(buckets, account_id, account_name)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """빈 S3 버킷 분석"""
     console.print("[bold]S3 빈 버킷 분석 시작...[/bold]\n")
 

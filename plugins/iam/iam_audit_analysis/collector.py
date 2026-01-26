@@ -9,6 +9,8 @@ IAM 데이터 수집기
 - AWS Config (Role-Resource 관계)
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -88,13 +90,13 @@ class IAMUser:
     password_last_changed: datetime | None = None
     password_next_rotation: datetime | None = None
     # Access Keys
-    access_keys: list["IAMAccessKey"] = field(default_factory=list)
+    access_keys: list[IAMAccessKey] = field(default_factory=list)
     active_key_count: int = 0
     # Git Credentials (CodeCommit)
-    git_credentials: list["GitCredential"] = field(default_factory=list)
+    git_credentials: list[GitCredential] = field(default_factory=list)
     active_git_credential_count: int = 0
     # Change History (AWS Config)
-    change_history: list["IAMUserChangeHistory"] = field(default_factory=list)
+    change_history: list[IAMUserChangeHistory] = field(default_factory=list)
     # Groups & Policies
     groups: list[str] = field(default_factory=list)
     attached_policies: list[str] = field(default_factory=list)
@@ -129,7 +131,7 @@ class IAMRole:
     attached_policies: list[str] = field(default_factory=list)
     inline_policies: list[str] = field(default_factory=list)
     # Connected Resources (AWS Config)
-    connected_resources: list["RoleResourceRelation"] = field(default_factory=list)
+    connected_resources: list[RoleResourceRelation] = field(default_factory=list)
     # 분석용 플래그
     is_service_linked: bool = False
     is_aws_managed: bool = False

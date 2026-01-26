@@ -12,6 +12,8 @@ Critical Ports 정의 - AWS Trusted Advisor 기준
 Risk Level 결정은 포트 + Source 복합 조건으로 analyzer.py에서 수행
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 

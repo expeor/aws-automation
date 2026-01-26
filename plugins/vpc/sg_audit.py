@@ -8,12 +8,19 @@ SG 현황 및 미사용 SG/규칙 분석
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 from .sg_audit_analysis import SGAnalyzer, SGCollector, SGExcelReporter
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -34,7 +41,7 @@ def _collect_sgs(session, account_id: str, account_name: str, region: str) -> li
     return sgs if sgs else None
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """Security Group Audit 실행"""
     console.print("[bold]Security Group Audit 시작...[/bold]")
 

@@ -10,6 +10,8 @@ get_metric_data()는 최대 500개 메트릭을 1회 호출로 조회 가능.
     Lambda 50개 함수 × 6개 메트릭 = 300 API 호출 → 1회 호출로 감소
 """
 
+from __future__ import annotations
+
 import logging
 import re
 import time

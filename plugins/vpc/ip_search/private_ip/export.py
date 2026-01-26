@@ -4,6 +4,8 @@ plugins/vpc/ip_search/private_ip/export.py - Export Utilities
 Export search results to CSV, Excel, or Clipboard.
 """
 
+from __future__ import annotations
+
 import csv
 import os
 from datetime import datetime
@@ -66,7 +68,7 @@ def get_headers(lang: str = "ko") -> list[str]:
         ]
 
 
-def result_to_row(r: "PrivateIPResult") -> list[str]:
+def result_to_row(r: PrivateIPResult) -> list[str]:
     """Convert a PrivateIPResult to a row of values."""
     return [
         r.ip_address,
@@ -91,7 +93,7 @@ def result_to_row(r: "PrivateIPResult") -> list[str]:
 
 
 def export_csv(
-    results: list["PrivateIPResult"],
+    results: list[PrivateIPResult],
     session_name: str,
     lang: str = "ko",
 ) -> str:
@@ -126,7 +128,7 @@ def export_csv(
 
 
 def export_excel(
-    results: list["PrivateIPResult"],
+    results: list[PrivateIPResult],
     session_name: str,
     lang: str = "ko",
 ) -> str:
@@ -181,7 +183,7 @@ def export_excel(
 
 
 def copy_to_clipboard(
-    results: list["PrivateIPResult"],
+    results: list[PrivateIPResult],
     lang: str = "ko",
 ) -> bool:
     """
@@ -214,7 +216,7 @@ def copy_to_clipboard(
 
 
 def copy_to_clipboard_simple(
-    results: list["PrivateIPResult"],
+    results: list[PrivateIPResult],
     lang: str = "ko",
 ) -> bool:
     """

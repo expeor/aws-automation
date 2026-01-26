@@ -11,9 +11,12 @@ Lambda 함수 종합 분석:
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
@@ -33,6 +36,9 @@ from .common.runtime_eol import (
     get_recommended_upgrade,
     get_runtime_info,
 )
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -639,7 +645,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_comprehensive(functions, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """Lambda 종합 분석 실행"""
     console.print("[bold]Lambda 종합 분석 시작...[/bold]\n")
 

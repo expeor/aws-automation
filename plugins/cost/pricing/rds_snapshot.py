@@ -17,6 +17,8 @@ PricingService를 사용하여 캐시와 API를 통합 관리합니다.
     monthly = get_rds_snapshot_monthly_cost("ap-northeast-2", size_gb=100, is_aurora=True)
 """
 
+from __future__ import annotations
+
 import logging
 
 from .utils import pricing_service

@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/cdn.py - CDN/DNS 리소스 수집
 CloudFront Distribution, Route 53 Hosted Zone 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

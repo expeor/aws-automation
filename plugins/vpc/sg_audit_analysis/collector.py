@@ -7,6 +7,8 @@ Security Group 데이터 수집기
 - VPCs (Default VPC 판단용)
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from typing import Any

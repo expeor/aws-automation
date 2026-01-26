@@ -10,15 +10,21 @@ KMS 키 보안 감사:
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -482,7 +488,7 @@ def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
     return str(wb.save_as(output_dir, "KMS_Audit"))
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """KMS 감사 보고서"""
     console.print("[bold]KMS 감사 시작...[/bold]\n")
     console.print("[dim]분석 항목: 키 로테이션, 키 정책, 권한 부여(Grants)[/dim]\n")

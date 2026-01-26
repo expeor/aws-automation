@@ -10,16 +10,21 @@ plugins/ec2/ebs_audit.py - EBS 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
 from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_ebs_monthly_cost
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -475,7 +480,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_ebs(volumes, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """EBS 미사용 분석 실행 (병렬 처리)"""
     console.print("[bold]EBS 미사용 분석 시작...[/bold]")
 

@@ -15,12 +15,18 @@ plugins/kms/key_usage.py - CMK 사용처 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -1191,7 +1197,7 @@ def generate_report(results: list[KMSUsageResult], output_dir: str) -> str:
     return str(wb.save_as(output_dir, "KMS_Usage"))
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """CMK 사용처 분석"""
     console.print("[bold]CMK 사용처 분석 시작...[/bold]\n")
     console.print(

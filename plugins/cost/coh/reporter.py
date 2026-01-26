@@ -12,6 +12,8 @@ plugins/cost/coh/reporter.py - Cost Optimization Hub 리포트 생성기
     reporter.print_summary()
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from pathlib import Path

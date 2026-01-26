@@ -2,6 +2,8 @@
 plugins/vpc/ip_search/public_ip/i18n.py - Internationalization for Public IP Search
 """
 
+from __future__ import annotations
+
 import contextlib
 
 from cli.i18n import get_lang

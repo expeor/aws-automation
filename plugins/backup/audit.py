@@ -7,14 +7,20 @@ Backup Vault, Plan, 최근 작업 현황을 분석합니다.
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -390,7 +396,7 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
     return str(wb.save_as(output_dir, "AWS_Backup"))
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """AWS Backup 현황 분석"""
     console.print("[bold]AWS Backup 현황 분석 시작...[/bold]\n")
     console.print(f"[dim]최근 {JOB_DAYS}일 작업 현황 포함[/dim]\n")

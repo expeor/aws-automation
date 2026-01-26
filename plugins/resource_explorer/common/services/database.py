@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/database.py - Database/Storage 리소�
 RDS Instance, S3 Bucket, DynamoDB Table, ElastiCache Cluster 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

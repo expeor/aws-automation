@@ -17,6 +17,8 @@ PricingService를 사용하여 캐시와 API를 통합 관리합니다.
     total = get_secret_monthly_cost("ap-northeast-2", secret_count=10)
 """
 
+from __future__ import annotations
+
 import logging
 
 from .utils import pricing_service

@@ -12,8 +12,10 @@ IAM Identity Center(SSO) 보안 감사:
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError
 from rich.console import Console
@@ -23,6 +25,9 @@ from core.parallel import get_client
 from core.tools.output import OutputPath, open_in_explorer
 
 from .sso_audit_analysis import SSOAnalyzer, SSOCollector, SSOExcelReporter
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,7 @@ REQUIRED_PERMISSIONS = {
 }
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """IAM Identity Center 종합 점검 실행"""
     console.print("[bold]IAM Identity Center 종합 점검 시작...[/bold]")
 

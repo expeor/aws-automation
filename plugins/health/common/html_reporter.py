@@ -14,6 +14,8 @@ AWS Health 이벤트를 CloudScape UI 스타일의 HTML 대시보드로 생성�
     dashboard.generate("output/health_dashboard.html")
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from calendar import monthcalendar

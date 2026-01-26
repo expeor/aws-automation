@@ -11,6 +11,8 @@ Security Group Audit Excel 보고서 생성기
 7. Rules - 전체 SGR + Stale 판단 근거
 """
 
+from __future__ import annotations
+
 import os
 from datetime import datetime
 

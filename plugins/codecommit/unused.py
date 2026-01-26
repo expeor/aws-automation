@@ -10,6 +10,8 @@ plugins/codecommit/unused.py - CodeCommit 미사용 리포지토리 분석
     result = analyze_repos(repos, account_id, account_name, region)
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime

@@ -10,6 +10,8 @@ IPDeny (국가별 IP 블록) + AbuseIPDB (악성 IP) 데이터를 통합 관리�
     IPIntelligence     - 통합 IP 인텔리전스 (국가 매핑 + 악성 IP 체크)
 """
 
+from __future__ import annotations
+
 import contextlib
 import ipaddress
 import json

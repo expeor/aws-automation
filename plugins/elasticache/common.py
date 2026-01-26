@@ -4,6 +4,8 @@ plugins/elasticache/common.py - ElastiCache 공통 유틸리티
 Redis, Memcached에서 공유하는 데이터 구조와 헬퍼 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum

@@ -12,7 +12,9 @@ IAM 보안 감사 및 모범 사례 점검:
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -20,6 +22,9 @@ from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 
 from .iam_audit_analysis import IAMAnalyzer, IAMCollector, IAMExcelReporter
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -52,7 +57,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return (analysis_result, stats)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """IAM 종합 점검 실행"""
     console.print("[bold]IAM 종합 점검 시작...[/bold]")
 

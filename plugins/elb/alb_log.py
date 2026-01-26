@@ -6,10 +6,12 @@ core/tools/analysis/log/alb_analyzer.py - ALB 로그 분석 도구 진입점
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytz  # type: ignore[import-untyped]
 import questionary
@@ -27,6 +29,9 @@ from core.auth import get_context_session
 from core.parallel import get_client
 from core.tools.cache import get_cache_dir
 from core.tools.output import open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +77,7 @@ def collect_options(ctx) -> None:
     ctx.options["timezone"] = timezone
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """ALB 로그 분석 실행
 
     Args:

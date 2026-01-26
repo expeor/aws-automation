@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/monitoring.py - Monitoring 리소스 �
 CloudWatch Alarm, CloudWatch Log Group 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

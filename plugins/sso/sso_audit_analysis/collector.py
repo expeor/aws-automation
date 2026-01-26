@@ -7,6 +7,8 @@ SSO Collector - IAM Identity Center 데이터 수집
 - MFA 설정 상태
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any

@@ -18,6 +18,8 @@ OpenSearch 비용 계산:
     )
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -75,7 +77,7 @@ DEFAULT_INSTANCE_PRICE = 0.20
 DEFAULT_STORAGE_PRICE = 0.115
 
 
-def get_opensearch_prices_from_api(session: "boto3.Session", region: str) -> dict[str, float]:
+def get_opensearch_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
     """Pricing API를 통해 OpenSearch 가격 조회"""
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
@@ -121,7 +123,7 @@ def get_opensearch_prices_from_api(session: "boto3.Session", region: str) -> dic
 
 def get_opensearch_prices(
     region: str = "ap-northeast-2",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float]:
     """OpenSearch 가격 조회"""
     if session:
@@ -135,7 +137,7 @@ def get_opensearch_prices(
 def get_opensearch_instance_price(
     region: str = "ap-northeast-2",
     instance_type: str = "m6g.large.search",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """OpenSearch 인스턴스 시간당 가격"""
     prices = get_opensearch_prices(region, session)
@@ -144,7 +146,7 @@ def get_opensearch_instance_price(
 
 def get_opensearch_storage_price(
     region: str = "ap-northeast-2",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """OpenSearch 스토리지 GB당 월 가격"""
     if session:
@@ -160,7 +162,7 @@ def get_opensearch_monthly_cost(
     instance_type: str = "m6g.large.search",
     instance_count: int = 1,
     storage_gb: int = 0,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """OpenSearch 월간 비용 계산"""
     instance_hourly = get_opensearch_instance_price(region, instance_type, session)

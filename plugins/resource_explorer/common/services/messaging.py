@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/messaging.py - Integration/Messaging �
 SNS Topic, SQS Queue, EventBridge Rule, Step Functions, API Gateway 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

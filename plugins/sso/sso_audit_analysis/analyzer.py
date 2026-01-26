@@ -8,6 +8,8 @@ SSO Analyzer - IAM Identity Center 보안 분석
 4. MFA 설정 현황 (Identity Center 설정 기반)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any

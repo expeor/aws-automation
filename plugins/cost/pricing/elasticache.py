@@ -12,6 +12,8 @@ ElastiCache 비용 계산:
     monthly = get_elasticache_monthly_cost("ap-northeast-2", "cache.r6g.large", num_nodes=2)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -62,7 +64,7 @@ ELASTICACHE_PRICES: dict[str, dict[str, float]] = {
 DEFAULT_NODE_PRICE = 0.20  # 알 수 없는 노드 타입용 기본값
 
 
-def get_elasticache_prices_from_api(session: "boto3.Session", region: str) -> dict[str, float]:
+def get_elasticache_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
     """Pricing API를 통해 ElastiCache 가격 조회"""
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
@@ -107,7 +109,7 @@ def get_elasticache_prices_from_api(session: "boto3.Session", region: str) -> di
     return {}
 
 
-def get_elasticache_prices(region: str = "ap-northeast-2", session: "boto3.Session | None" = None) -> dict[str, float]:
+def get_elasticache_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
     """ElastiCache 가격 조회"""
     if session:
         api_prices = get_elasticache_prices_from_api(session, region)
@@ -120,7 +122,7 @@ def get_elasticache_prices(region: str = "ap-northeast-2", session: "boto3.Sessi
 def get_elasticache_hourly_price(
     region: str = "ap-northeast-2",
     node_type: str = "cache.t3.medium",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """ElastiCache 노드 시간당 가격"""
     prices = get_elasticache_prices(region, session)
@@ -131,7 +133,7 @@ def get_elasticache_monthly_cost(
     region: str = "ap-northeast-2",
     node_type: str = "cache.t3.medium",
     num_nodes: int = 1,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """ElastiCache 월간 비용 계산"""
     hourly_price = get_elasticache_hourly_price(region, node_type, session)

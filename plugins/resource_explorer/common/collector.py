@@ -20,6 +20,8 @@ plugins/resource_explorer/common/collector.py - 인벤토리 수집기
 - Backup: BackupVault, BackupPlan
 """
 
+from __future__ import annotations
+
 from core.parallel import parallel_collect
 
 from .services import (

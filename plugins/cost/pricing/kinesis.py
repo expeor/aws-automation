@@ -16,6 +16,8 @@ Kinesis 비용 계산:
     monthly = get_kinesis_monthly_cost("ap-northeast-2", mode="ON_DEMAND")
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -71,7 +73,7 @@ DEFAULT_PRICES = {
 }
 
 
-def get_kinesis_prices_from_api(session: "boto3.Session", region: str) -> dict[str, float]:
+def get_kinesis_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
     """Pricing API를 통해 Kinesis 가격 조회"""
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
@@ -113,7 +115,7 @@ def get_kinesis_prices_from_api(session: "boto3.Session", region: str) -> dict[s
     return {}
 
 
-def get_kinesis_prices(region: str = "ap-northeast-2", session: "boto3.Session | None" = None) -> dict[str, float]:
+def get_kinesis_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
     """Kinesis 가격 조회"""
     if session:
         api_prices = get_kinesis_prices_from_api(session, region)
@@ -125,7 +127,7 @@ def get_kinesis_prices(region: str = "ap-northeast-2", session: "boto3.Session |
 
 def get_kinesis_shard_hour_price(
     region: str = "ap-northeast-2",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """Kinesis Shard-hour 가격 (Provisioned)"""
     prices = get_kinesis_prices(region, session)
@@ -137,7 +139,7 @@ def get_kinesis_monthly_cost(
     shard_count: int = 1,
     mode: str = "PROVISIONED",
     extended_retention_hours: int = 0,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """Kinesis 월간 비용 계산
 

@@ -6,6 +6,9 @@
 기존 인터페이스와 완전 호환성을 유지합니다.
 """
 
+from __future__ import annotations
+
+import contextlib
 import os
 import re
 import shutil
@@ -46,8 +49,6 @@ except ImportError:
     def print_sub_task_done(msg: str) -> None:
         console.print(f"[green]✓ {msg}[/green]")
 
-
-import contextlib
 
 from core.tools.cache import get_cache_dir
 

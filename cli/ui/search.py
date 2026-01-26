@@ -22,14 +22,28 @@ class SearchResult:
     """검색 결과 항목"""
 
     tool_name: str
+    tool_name_en: str
     tool_module: str
     category: str  # 폴더명 (CLI 명령어)
     category_display: str  # UI 표시용 이름
     category_desc: str
     description: str
+    description_en: str
     permission: str
     score: float  # 매칭 점수 (0-1)
     match_type: str  # exact, prefix, contains, fuzzy
+
+    def get_name(self, lang: str = "ko") -> str:
+        """언어에 따른 도구 이름 반환"""
+        if lang == "en":
+            return self.tool_name_en or self.tool_name
+        return self.tool_name
+
+    def get_description(self, lang: str = "ko") -> str:
+        """언어에 따른 설명 반환"""
+        if lang == "en":
+            return self.description_en or self.description
+        return self.description
 
 
 # 한글 초성 매핑
@@ -139,8 +153,10 @@ class ToolSearchEngine:
 
             for tool in cat.get("tools", []):
                 tool_name = tool.get("name", "")
+                tool_name_en = tool.get("name_en", "")
                 tool_module = tool.get("module", "")
                 tool_desc = tool.get("description", "")
+                tool_desc_en = tool.get("description_en", "")
                 permission = tool.get("permission", "read")
 
                 # 별칭 및 sub_services 정규화
@@ -154,12 +170,16 @@ class ToolSearchEngine:
                     "category_display": cat_display,
                     "category_desc": cat_desc,
                     "tool_name": tool_name,
+                    "tool_name_en": tool_name_en,
                     "tool_module": tool_module,
                     "description": tool_desc,
+                    "description_en": tool_desc_en,
                     "permission": permission,
                     # 검색용 정규화 텍스트
                     "norm_name": normalize_text(tool_name),
+                    "norm_name_en": normalize_text(tool_name_en),
                     "norm_desc": normalize_text(tool_desc),
+                    "norm_desc_en": normalize_text(tool_desc_en),
                     "norm_cat": normalize_text(cat_name),
                     "norm_cat_desc": normalize_text(cat_desc),
                     # 별칭 (정규화)
@@ -230,11 +250,13 @@ class ToolSearchEngine:
         return [
             SearchResult(
                 tool_name=entry["tool_name"],
+                tool_name_en=entry["tool_name_en"],
                 tool_module=entry["tool_module"],
                 category=entry["category"],
                 category_display=entry["category_display"],
                 category_desc=entry["category_desc"],
                 description=entry["description"],
+                description_en=entry["description_en"],
                 permission=entry["permission"],
                 score=score,
                 match_type=match_type,
@@ -315,23 +337,25 @@ class ToolSearchEngine:
         9. 부분 매칭 (0.3)
         """
         name = entry["norm_name"]
+        name_en = entry.get("norm_name_en", "")
         cat = entry["norm_cat"]
         cat_desc = entry["norm_cat_desc"]
         desc = entry["norm_desc"]
+        desc_en = entry.get("norm_desc_en", "")
         aliases = entry.get("norm_aliases", [])
         chosung_name = entry["chosung_name"]
         chosung_cat = entry["chosung_cat"]
 
-        # 1. 도구명 정확히 일치
-        if norm_query == name:
+        # 1. 도구명 정확히 일치 (한글/영어)
+        if norm_query in (name, name_en):
             return 1.0, "exact"
 
-        # 2. 도구명 시작
-        if name.startswith(norm_query):
+        # 2. 도구명 시작 (한글/영어)
+        if name.startswith(norm_query) or (name_en and name_en.startswith(norm_query)):
             return 0.95, "prefix"
 
-        # 3. 도구명 포함
-        if norm_query in name:
+        # 3. 도구명 포함 (한글/영어)
+        if norm_query in name or (name_en and norm_query in name_en):
             return 0.85, "contains"
 
         # 4. 별칭 매칭
@@ -354,8 +378,8 @@ class ToolSearchEngine:
         if fuzzy_cat_score > 0:
             return fuzzy_cat_score * 0.9, "fuzzy_cat"  # 카테고리 fuzzy는 약간 낮게
 
-        # 7. 설명 포함
-        if norm_query in desc:
+        # 7. 설명 포함 (한글/영어)
+        if norm_query in desc or (desc_en and norm_query in desc_en):
             return 0.6, "description"
 
         # 8. 초성 매칭 (한글 쿼리인 경우)
@@ -365,10 +389,10 @@ class ToolSearchEngine:
             if chosung_query in chosung_cat:
                 return 0.45, "chosung_cat"
 
-        # 9. 단어별 부분 매칭
+        # 9. 단어별 부분 매칭 (한글/영어)
         query_words = norm_query.split()
         if len(query_words) > 1:
-            match_count = sum(1 for w in query_words if w in name or w in desc)
+            match_count = sum(1 for w in query_words if w in name or w in desc or w in name_en or w in desc_en)
             if match_count > 0:
                 ratio = match_count / len(query_words)
                 return 0.3 * ratio, "partial"

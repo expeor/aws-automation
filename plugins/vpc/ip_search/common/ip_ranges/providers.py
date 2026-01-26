@@ -10,6 +10,8 @@ Features:
 - CIDR 및 단일 IP 검색
 """
 
+from __future__ import annotations
+
 import ipaddress
 import json
 import logging

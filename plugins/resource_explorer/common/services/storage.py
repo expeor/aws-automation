@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/storage.py - Storage 리소스 수집
 EFS File System, FSx File System 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

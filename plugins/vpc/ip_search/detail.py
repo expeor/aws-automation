@@ -5,6 +5,8 @@ AWS API를 호출하여 ENI에 연결된 리소스의 상세 정보를 조회합
 캐시 기반 빠른 검색과 달리, 정확한 실시간 정보를 제공합니다.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed

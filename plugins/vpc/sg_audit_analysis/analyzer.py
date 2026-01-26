@@ -8,6 +8,8 @@ Security Group 분석기
 - Risk Level 판단 (AWS Trusted Advisor 복합 조건 기반)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any

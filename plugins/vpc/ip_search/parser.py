@@ -5,6 +5,8 @@ Single source of truth for ENI description -> resource mapping.
 Consolidates parsing logic from private.py and detail.py.
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from re import Pattern

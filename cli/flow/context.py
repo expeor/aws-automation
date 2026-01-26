@@ -60,10 +60,12 @@ Usage:
     target_accounts = ctx.get_target_accounts()
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
@@ -118,6 +120,10 @@ class RoleSelection:
     skipped_accounts: list[str] = field(default_factory=list)
 
 
+# 권한 타입 별칭
+PermissionType = Literal["read", "write", "delete"]
+
+
 @dataclass
 class ToolInfo:
     """도구 정보"""
@@ -125,13 +131,13 @@ class ToolInfo:
     name: str
     description: str
     category: str
-    permission: str  # "read", "write", "delete"
+    permission: PermissionType
 
     # 도구 실행 함수
-    runner: Callable[["ExecutionContext"], Any] | None = None
+    runner: Callable[[ExecutionContext], None] | None = None
 
     # 도구별 추가 옵션 수집 함수 (Optional)
-    options_collector: Callable[["ExecutionContext"], dict[str, Any]] | None = None
+    options_collector: Callable[[ExecutionContext], dict[str, Any]] | None = None
 
     # 선택 제약 옵션
     supports_single_region_only: bool = False  # 단일 리전만 지원
@@ -159,9 +165,9 @@ class AuthContext:
     profile_name: str | None = None
     profiles: list[str] = field(default_factory=list)
     provider_kind: ProviderKind | None = None
-    provider: "Provider | None" = None
+    provider: Provider | None = None
     role_selection: RoleSelection | None = None
-    accounts: list["AccountInfo"] = field(default_factory=list)
+    accounts: list[AccountInfo] = field(default_factory=list)
     regions: list[str] = field(default_factory=list)
 
     def is_sso(self) -> bool:
@@ -215,7 +221,7 @@ class AuthContext:
 
         return None
 
-    def get_target_accounts(self) -> list["AccountInfo"]:
+    def get_target_accounts(self) -> list[AccountInfo]:
         """실제 실행 대상 계정 목록 반환"""
         if not self.role_selection:
             return self.accounts
@@ -268,7 +274,7 @@ class ExecutionContext:
     lang: str = "ko"
 
     # Output configuration
-    output_config: "OutputConfig | None" = None
+    output_config: OutputConfig | None = None
 
     # Step 1: 카테고리/도구 선택
     category: str | None = None
@@ -278,13 +284,13 @@ class ExecutionContext:
     profile_name: str | None = None  # SSO: 단일 프로파일
     profiles: list[str] = field(default_factory=list)  # Static/Multi: 다중 프로파일
     provider_kind: ProviderKind | None = None
-    provider: "Provider | None" = None  # SSO용 Provider
+    provider: Provider | None = None  # SSO용 Provider
 
     # Step 3: Role 선택 (SSO 전용)
     role_selection: RoleSelection | None = None
 
     # 대상 계정 목록 (SSO 인증 후 설정)
-    accounts: list["AccountInfo"] = field(default_factory=list)
+    accounts: list[AccountInfo] = field(default_factory=list)
 
     # Step 4: 리전 선택
     regions: list[str] = field(default_factory=list)
@@ -293,7 +299,7 @@ class ExecutionContext:
     options: dict[str, Any] = field(default_factory=dict)
 
     # Step 6: 계정 필터 (Headless CLI용)
-    target_filter: "AccountFilter | None" = None
+    target_filter: AccountFilter | None = None
 
     # 실행 결과
     result: Any | None = None
@@ -369,7 +375,7 @@ class ExecutionContext:
 
         return None
 
-    def get_target_accounts(self) -> list["AccountInfo"]:
+    def get_target_accounts(self) -> list[AccountInfo]:
         """실제 실행 대상 계정 목록 반환 (스킵 계정 + 필터 적용)
 
         적용 순서:
@@ -389,7 +395,7 @@ class ExecutionContext:
 
         return accounts
 
-    def get_inventory(self) -> "InventoryCollector":
+    def get_inventory(self) -> InventoryCollector:
         """Get or create inventory collector for this context
 
         Returns:
@@ -426,7 +432,7 @@ class ExecutionContext:
 
         return self.output_config.should_output_html()
 
-    def get_output_config(self) -> "OutputConfig":
+    def get_output_config(self) -> OutputConfig:
         """출력 설정 반환 (없으면 기본값 생성)"""
         if self.output_config is None:
             from core.tools.io.config import OutputConfig

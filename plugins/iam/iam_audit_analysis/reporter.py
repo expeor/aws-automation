@@ -12,6 +12,8 @@ IAM Audit Excel 보고서 생성기
 8. User Changes - IAM User 변경 이력 (AWS Config History)
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 from core.tools.io.excel import ColumnDef, Workbook

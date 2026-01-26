@@ -12,6 +12,8 @@ Redshift 비용 계산:
     monthly = get_redshift_monthly_cost("ap-northeast-2", "ra3.xlplus", num_nodes=2)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -71,7 +73,7 @@ DEFAULT_NODE_PRICE = 1.00
 DEFAULT_STORAGE_PRICE = 0.024
 
 
-def get_redshift_prices_from_api(session: "boto3.Session", region: str) -> dict[str, float]:
+def get_redshift_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
     """Pricing API를 통해 Redshift 가격 조회"""
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
@@ -114,7 +116,7 @@ def get_redshift_prices_from_api(session: "boto3.Session", region: str) -> dict[
 
 def get_redshift_prices(
     region: str = "ap-northeast-2",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float]:
     """Redshift 가격 조회"""
     if session:
@@ -128,7 +130,7 @@ def get_redshift_prices(
 def get_redshift_node_price(
     region: str = "ap-northeast-2",
     node_type: str = "dc2.large",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """Redshift 노드 시간당 가격"""
     prices = get_redshift_prices(region, session)
@@ -137,7 +139,7 @@ def get_redshift_node_price(
 
 def get_redshift_storage_price(
     region: str = "ap-northeast-2",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """Redshift Managed Storage GB당 월 가격 (RA3 노드용)"""
     if session:
@@ -153,7 +155,7 @@ def get_redshift_monthly_cost(
     node_type: str = "dc2.large",
     num_nodes: int = 1,
     managed_storage_gb: int = 0,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """Redshift 월간 비용 계산
 

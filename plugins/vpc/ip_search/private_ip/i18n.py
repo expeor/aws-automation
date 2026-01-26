@@ -2,6 +2,8 @@
 plugins/vpc/ip_search/private_ip/i18n.py - Internationalization for Private IP Search
 """
 
+from __future__ import annotations
+
 import contextlib
 
 from cli.i18n import get_lang
