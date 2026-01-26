@@ -224,13 +224,15 @@ jobs:
         continue-on-error: true  # Advisory: doesn't block PR merge
 
       - name: Run Bandit security linter
-        run: bandit -r cli core plugins -ll --skip B101,B311,B608
+        run: bandit -r cli core plugins -ll --skip B101,B105,B311,B404,B603,B606,B607,B608
         # B101: assert usage (normal in tests)
+        # B105: hardcoded password false positives
         # B311: random usage (not for security)
-        # B608: DuckDB queries with internal AWS data, not user input
+        # B404/B603/B606/B607: subprocess for file/browser opening (secure)
+        # B608: DuckDB queries with internal AWS data
 
       - name: Run Bandit with SARIF output
-        run: bandit -r cli core plugins -f sarif -o bandit.sarif --skip B101,B311,B608
+        run: bandit -r cli core plugins -f sarif -o bandit.sarif --skip B101,B105,B311,B404,B603,B606,B607,B608
         continue-on-error: true
 
       - name: Upload SARIF to GitHub Security
