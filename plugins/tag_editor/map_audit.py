@@ -5,6 +5,7 @@ AWS 리소스의 map-migrated 태그 현황을 분석하고 리포트 생성
 
 분석 기준:
 - ResourceGroupsTaggingAPI로 전체 리소스 스캔
+- Native API로 CloudWatch Logs, S3 버킷 태그 수집 (Tagging API가 불완전한 서비스)
 - map-migrated 태그 유무 확인
 - 리소스 타입별 통계 집계
 
@@ -24,6 +25,7 @@ from rich.table import Table
 
 from core.parallel import get_client, parallel_collect
 
+from .native_api import NATIVE_API_RESOURCE_TYPES, collect_log_group_tags, collect_s3_bucket_tags
 from .report import generate_audit_report
 from .types import (
     MAP_TAG_KEY,
@@ -41,6 +43,13 @@ if TYPE_CHECKING:
 REQUIRED_PERMISSIONS = {
     "read": [
         "tag:GetResources",
+        # CloudWatch Logs Native API
+        "logs:DescribeLogGroups",
+        "logs:ListTagsForResource",
+        # S3 Native API
+        "s3:ListAllMyBuckets",
+        "s3:GetBucketLocation",
+        "s3:GetBucketTagging",
     ],
 }
 
@@ -199,9 +208,82 @@ def collect_resources_with_tags(
 # =============================================================================
 
 
+def _aggregate_stats(result: MapTagAnalysisResult) -> None:
+    """리소스 목록에서 통계 재계산"""
+    # 기존 통계 초기화
+    result.total_resources = 0
+    result.tagged_resources = 0
+    result.untagged_resources = 0
+    result.type_stats = []
+
+    # 리소스 타입별 통계
+    type_counts: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "tagged": 0})
+
+    for res in result.resources:
+        result.total_resources += 1
+        if res.has_map_tag:
+            result.tagged_resources += 1
+            type_counts[res.resource_type]["tagged"] += 1
+        else:
+            result.untagged_resources += 1
+        type_counts[res.resource_type]["total"] += 1
+
+    # 리소스 타입별 통계 객체 생성
+    for res_type, counts in type_counts.items():
+        # 표시 이름 생성 (ec2:instance -> EC2 Instance)
+        parts = res_type.split(":")
+        display_name = " ".join(p.capitalize() for p in parts)
+
+        result.type_stats.append(
+            ResourceTypeStats(
+                resource_type=res_type,
+                display_name=display_name,
+                total=counts["total"],
+                tagged=counts["tagged"],
+                untagged=counts["total"] - counts["tagged"],
+            )
+        )
+
+    # 정렬 (total 내림차순)
+    result.type_stats.sort(key=lambda x: x.total, reverse=True)
+
+
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> MapTagAnalysisResult:
-    """단일 계정/리전의 MAP 태그 분석 (병렬 실행용)"""
-    return collect_resources_with_tags(session, account_id, account_name, region)
+    """단일 계정/리전의 MAP 태그 분석 (병렬 실행용)
+
+    하이브리드 수집 전략:
+    1. ResourceGroupsTaggingAPI로 일반 리소스 수집
+    2. CloudWatch Logs Native API로 로그 그룹 태그 수집
+    3. S3 Native API로 버킷 태그 수집 (us-east-1에서만)
+
+    Native API 수집 결과는 Tagging API 결과를 대체합니다.
+    """
+    # 1. Tagging API로 기본 수집
+    result = collect_resources_with_tags(session, account_id, account_name, region)
+
+    # 2. Native API 리소스 제거 (중복 방지)
+    # Tagging API가 불완전하게 반환하는 리소스 타입 제거
+    result.resources = [r for r in result.resources if r.resource_type not in NATIVE_API_RESOURCE_TYPES]
+
+    # 3. CloudWatch Logs Native API로 로그 그룹 수집
+    try:
+        log_resources = collect_log_group_tags(session, account_id, account_name, region)
+        result.resources.extend(log_resources)
+    except Exception as e:
+        logger.debug(f"{account_name}/{region}: CloudWatch Logs 수집 오류 - {e}")
+
+    # 4. S3 Native API로 버킷 수집 (us-east-1에서만, 또는 해당 리전 버킷만)
+    # S3는 글로벌 서비스이므로 리전별로 실행하되, 해당 리전의 버킷만 수집
+    try:
+        s3_resources = collect_s3_bucket_tags(session, account_id, account_name, region, target_region=region)
+        result.resources.extend(s3_resources)
+    except Exception as e:
+        logger.debug(f"{account_name}/{region}: S3 수집 오류 - {e}")
+
+    # 5. 통계 재계산
+    _aggregate_stats(result)
+
+    return result
 
 
 def _print_summary_table(results: list[MapTagAnalysisResult]) -> None:

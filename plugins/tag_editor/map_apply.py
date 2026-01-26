@@ -3,6 +3,11 @@ plugins/tag_editor/map_apply.py - MAP 태그 적용
 
 AWS 리소스에 map-migrated 태그 일괄 적용
 
+하이브리드 적용 전략:
+- ResourceGroupsTaggingAPI: 일반 리소스 태그 적용
+- CloudWatch Logs Native API: 로그 그룹 태그 적용
+- S3 Native API: 버킷 태그 적용 (기존 태그 보존!)
+
 안전장치:
 - Dry-run 모드 기본 활성화
 - 적용 전 확인 프롬프트
@@ -24,7 +29,14 @@ from rich.table import Table
 
 from core.parallel import get_client, parallel_collect
 
-from .map_audit import collect_resources_with_tags
+from .map_audit import _aggregate_stats, collect_resources_with_tags
+from .native_api import (
+    NATIVE_API_RESOURCE_TYPES,
+    apply_log_group_tag,
+    apply_s3_bucket_tag,
+    collect_log_group_tags,
+    collect_s3_bucket_tags,
+)
 from .report import generate_apply_report
 from .types import (
     MAP_TAG_KEY,
@@ -44,9 +56,20 @@ if TYPE_CHECKING:
 REQUIRED_PERMISSIONS = {
     "read": [
         "tag:GetResources",
+        # CloudWatch Logs Native API
+        "logs:DescribeLogGroups",
+        "logs:ListTagsForResource",
+        # S3 Native API
+        "s3:ListAllMyBuckets",
+        "s3:GetBucketLocation",
+        "s3:GetBucketTagging",
     ],
     "write": [
         "tag:TagResources",
+        # CloudWatch Logs Native API
+        "logs:TagResource",
+        # S3 Native API
+        "s3:PutBucketTagging",
     ],
 }
 
@@ -58,31 +81,24 @@ console = Console()
 # =============================================================================
 
 
-def apply_map_tag(
+def _apply_via_tagging_api(
     session,
     account_id: str,
     account_name: str,
     region: str,
     resources: list[ResourceTagInfo],
     tag_value: str,
-    dry_run: bool = True,
-) -> MapTagApplyResult:
-    """리소스에 MAP 태그 적용"""
-    result = MapTagApplyResult(
-        account_id=account_id,
-        account_name=account_name,
-        region=region,
-        tag_value=tag_value,
-        total_targeted=len(resources),
-    )
-
+    dry_run: bool,
+    result: MapTagApplyResult,
+) -> None:
+    """ResourceGroupsTaggingAPI로 일반 리소스에 태그 적용"""
     if not resources:
-        return result
+        return
 
     try:
         client = get_client(session, "resourcegroupstaggingapi", region_name=region)
     except Exception as e:
-        logger.warning(f"{account_name}/{region}: API 접근 오류 - {e}")
+        logger.warning(f"{account_name}/{region}: Tagging API 접근 오류 - {e}")
         for res in resources:
             result.operation_logs.append(
                 TagOperationLog(
@@ -97,7 +113,7 @@ def apply_map_tag(
                 )
             )
             result.failed_count += 1
-        return result
+        return
 
     # 배치 처리 (최대 20개씩)
     batch_size = 20
@@ -180,6 +196,96 @@ def apply_map_tag(
                         )
                     )
                     result.failed_count += 1
+
+
+def apply_map_tag(
+    session,
+    account_id: str,
+    account_name: str,
+    region: str,
+    resources: list[ResourceTagInfo],
+    tag_value: str,
+    dry_run: bool = True,
+) -> MapTagApplyResult:
+    """리소스에 MAP 태그 적용 (하이브리드)
+
+    리소스 타입에 따라 적절한 API 사용:
+    - logs:log-group: CloudWatch Logs Native API
+    - s3:bucket: S3 Native API (기존 태그 보존!)
+    - 기타: ResourceGroupsTaggingAPI
+    """
+    result = MapTagApplyResult(
+        account_id=account_id,
+        account_name=account_name,
+        region=region,
+        tag_value=tag_value,
+        total_targeted=len(resources),
+    )
+
+    if not resources:
+        return result
+
+    # 리소스 타입별 분류
+    logs_resources = [r for r in resources if r.resource_type == "logs:log-group"]
+    s3_resources = [r for r in resources if r.resource_type == "s3:bucket"]
+    tagging_api_resources = [r for r in resources if r.resource_type not in NATIVE_API_RESOURCE_TYPES]
+
+    # 1. ResourceGroupsTaggingAPI로 일반 리소스 적용
+    _apply_via_tagging_api(session, account_id, account_name, region, tagging_api_resources, tag_value, dry_run, result)
+
+    # 2. CloudWatch Logs Native API로 로그 그룹 적용
+    if logs_resources:
+        try:
+            logs_result = apply_log_group_tag(
+                session, account_id, account_name, region, logs_resources, tag_value, dry_run
+            )
+            # 결과 병합
+            result.operation_logs.extend(logs_result.operation_logs)
+            result.success_count += logs_result.success_count
+            result.failed_count += logs_result.failed_count
+            result.skipped_count += logs_result.skipped_count
+        except Exception as e:
+            logger.warning(f"{account_name}/{region}: CloudWatch Logs 태그 적용 오류 - {e}")
+            for res in logs_resources:
+                result.operation_logs.append(
+                    TagOperationLog(
+                        resource_arn=res.resource_arn,
+                        resource_type=res.resource_type,
+                        resource_id=res.resource_id,
+                        name=res.name,
+                        operation="add",
+                        result=TagOperationResult.FAILED,
+                        error_message=str(e),
+                        new_value=tag_value,
+                    )
+                )
+                result.failed_count += 1
+
+    # 3. S3 Native API로 버킷 적용 (기존 태그 보존!)
+    if s3_resources:
+        try:
+            s3_result = apply_s3_bucket_tag(session, account_id, account_name, region, s3_resources, tag_value, dry_run)
+            # 결과 병합
+            result.operation_logs.extend(s3_result.operation_logs)
+            result.success_count += s3_result.success_count
+            result.failed_count += s3_result.failed_count
+            result.skipped_count += s3_result.skipped_count
+        except Exception as e:
+            logger.warning(f"{account_name}/{region}: S3 태그 적용 오류 - {e}")
+            for res in s3_resources:
+                result.operation_logs.append(
+                    TagOperationLog(
+                        resource_arn=res.resource_arn,
+                        resource_type=res.resource_type,
+                        resource_id=res.resource_id,
+                        name=res.name,
+                        operation="add",
+                        result=TagOperationResult.FAILED,
+                        error_message=str(e),
+                        new_value=tag_value,
+                    )
+                )
+                result.failed_count += 1
 
     return result
 
@@ -285,12 +391,40 @@ def _collect_and_apply(
     untagged_only: bool,
     dry_run: bool,
 ) -> MapTagApplyResult:
-    """단일 계정/리전의 MAP 태그 적용"""
-    # 1. 리소스 수집
+    """단일 계정/리전의 MAP 태그 적용 (하이브리드 수집)
+
+    하이브리드 수집 전략:
+    1. ResourceGroupsTaggingAPI로 일반 리소스 수집
+    2. CloudWatch Logs Native API로 로그 그룹 수집
+    3. S3 Native API로 버킷 수집 (리전별)
+    """
+    # 1. Tagging API로 기본 수집
     audit_result = collect_resources_with_tags(session, account_id, account_name, region)
 
-    # 2. 대상 필터링
-    targets = [r for r in audit_result.resources if not r.has_map_tag] if untagged_only else audit_result.resources
+    # 2. Native API 리소스 제거 (중복 방지)
+    audit_result.resources = [r for r in audit_result.resources if r.resource_type not in NATIVE_API_RESOURCE_TYPES]
+
+    # 3. CloudWatch Logs Native API로 로그 그룹 수집
+    try:
+        log_resources = collect_log_group_tags(session, account_id, account_name, region)
+        audit_result.resources.extend(log_resources)
+    except Exception as e:
+        logger.debug(f"{account_name}/{region}: CloudWatch Logs 수집 오류 - {e}")
+
+    # 4. S3 Native API로 버킷 수집 (해당 리전의 버킷만)
+    try:
+        s3_resources = collect_s3_bucket_tags(session, account_id, account_name, region, target_region=region)
+        audit_result.resources.extend(s3_resources)
+    except Exception as e:
+        logger.debug(f"{account_name}/{region}: S3 수집 오류 - {e}")
+
+    # 5. 통계 재계산
+    _aggregate_stats(audit_result)
+
+    # 6. 대상 필터링
+    targets = (
+        [r for r in audit_result.resources if not r.has_map_tag] if untagged_only else audit_result.resources
+    )
 
     if not targets:
         return MapTagApplyResult(
@@ -300,7 +434,7 @@ def _collect_and_apply(
             tag_value=tag_value,
         )
 
-    # 3. 태그 적용
+    # 7. 태그 적용 (하이브리드)
     return apply_map_tag(session, account_id, account_name, region, targets, tag_value, dry_run)
 
 
