@@ -61,7 +61,7 @@ def get_client(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]  # pyright: ignore[reportArgumentType]
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # pyright: ignore[reportArgumentType]
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
     )
@@ -105,7 +105,7 @@ def get_resource(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]  # pyright: ignore[reportArgumentType]
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # pyright: ignore[reportArgumentType]
     )
 
     if "config" in kwargs:
