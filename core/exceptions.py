@@ -223,8 +223,9 @@ class APICallError(ToolExecutionError):
         error_message = None
 
         # ClientError 형식 파싱
-        if hasattr(client_error, "response"):
-            error_info = client_error.response.get("Error", {})
+        response = getattr(client_error, "response", None)
+        if response is not None:
+            error_info = response.get("Error", {})
             error_code = error_info.get("Code")
             error_message = error_info.get("Message")
 
@@ -347,8 +348,9 @@ def is_access_denied(error: Exception) -> bool:
         )
 
     # botocore ClientError 직접 확인
-    if hasattr(error, "response"):
-        error_code = error.response.get("Error", {}).get("Code", "")
+    response = getattr(error, "response", None)
+    if response is not None:
+        error_code = response.get("Error", {}).get("Code", "")
         return error_code in (
             "AccessDenied",
             "AccessDeniedException",
@@ -378,8 +380,9 @@ def is_throttling(error: Exception) -> bool:
     if isinstance(error, APICallError):
         return error.error_code in throttling_codes
 
-    if hasattr(error, "response"):
-        error_code = error.response.get("Error", {}).get("Code", "")
+    response = getattr(error, "response", None)
+    if response is not None:
+        error_code = response.get("Error", {}).get("Code", "")
         return error_code in throttling_codes
 
     return False
@@ -405,8 +408,9 @@ def is_not_found(error: Exception) -> bool:
     if isinstance(error, APICallError):
         return error.error_code in not_found_codes
 
-    if hasattr(error, "response"):
-        error_code = error.response.get("Error", {}).get("Code", "")
+    response = getattr(error, "response", None)
+    if response is not None:
+        error_code = response.get("Error", {}).get("Code", "")
         return error_code in not_found_codes
 
     return False

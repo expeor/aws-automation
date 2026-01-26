@@ -11,6 +11,7 @@ Note:
 
 from __future__ import annotations
 
+import copy
 import csv
 import logging
 from dataclasses import dataclass, field
@@ -45,31 +46,31 @@ from .styles import (
 def _get_align_center() -> Alignment:
     from .styles import ALIGN_CENTER
 
-    return ALIGN_CENTER
+    return ALIGN_CENTER  # pyright: ignore[returnType]
 
 
 def _get_align_center_wrap() -> Alignment:
     from .styles import ALIGN_CENTER_WRAP
 
-    return ALIGN_CENTER_WRAP
+    return ALIGN_CENTER_WRAP  # pyright: ignore[returnType]
 
 
 def _get_align_left() -> Alignment:
     from .styles import ALIGN_LEFT
 
-    return ALIGN_LEFT
+    return ALIGN_LEFT  # pyright: ignore[returnType]
 
 
 def _get_align_right_wrap() -> Alignment:
     from .styles import ALIGN_RIGHT_WRAP
 
-    return ALIGN_RIGHT_WRAP
+    return ALIGN_RIGHT_WRAP  # pyright: ignore[returnType]
 
 
 def _get_align_wrap() -> Alignment:
     from .styles import ALIGN_WRAP
 
-    return ALIGN_WRAP
+    return ALIGN_WRAP  # pyright: ignore[returnType]
 
 
 logger = logging.getLogger(__name__)
@@ -794,10 +795,10 @@ def apply_worksheet_settings(
 
         for row in worksheet.iter_rows():
             for cell in row:
-                alignment = cell.alignment.copy()
+                alignment = copy.copy(cell.alignment)
                 alignment.wrap_text = wrap_text
                 alignment.vertical = "center"
-                cell.alignment = alignment
+                cell.alignment = alignment  # pyright: ignore[reportAttributeAccessIssue]
 
         for row_dim in worksheet.row_dimensions.values():
             row_dim.height = None

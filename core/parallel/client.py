@@ -60,11 +60,12 @@ def get_client(
     """
     from botocore.config import Config
 
+    retry_config: dict[str, int | str] = {
+        "max_attempts": max_attempts,
+        "mode": retry_mode,
+    }
     config = Config(
-        retries={
-            "max_attempts": max_attempts,
-            "mode": retry_mode,
-        },
+        retries=retry_config,  # type: ignore[arg-type]  # _RetryDict is compatible
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
     )
@@ -74,12 +75,13 @@ def get_client(
         existing = kwargs.pop("config")
         config = config.merge(existing)
 
+    # session.client은 문자열 서비스명을 받지만 boto3-stubs는 Literal 타입 요구
     return session.client(
         service_name,
         region_name=region_name,
         config=config,
         **kwargs,
-    )
+    )  # type: ignore[call-overload]
 
 
 def get_resource(
@@ -105,20 +107,22 @@ def get_resource(
     """
     from botocore.config import Config
 
+    retry_config: dict[str, int | str] = {
+        "max_attempts": max_attempts,
+        "mode": retry_mode,
+    }
     config = Config(
-        retries={
-            "max_attempts": max_attempts,
-            "mode": retry_mode,
-        }
+        retries=retry_config,  # type: ignore[arg-type]  # _RetryDict is compatible
     )
 
     if "config" in kwargs:
         existing = kwargs.pop("config")
         config = config.merge(existing)
 
+    # session.resource은 문자열 서비스명을 받지만 boto3-stubs는 Literal 타입 요구
     return session.resource(
         service_name,
         region_name=region_name,
         config=config,
         **kwargs,
-    )
+    )  # type: ignore[call-overload]

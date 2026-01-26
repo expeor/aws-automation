@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from mypy_boto3_pricing import PricingClient as PricingClient
     from mypy_boto3_rds import RDSClient as RDSClient
     from mypy_boto3_redshift import RedshiftClient as RedshiftClient
-    from mypy_boto3_resource_explorer_2 import ResourceExplorer2Client as ResourceExplorer2Client
+    from mypy_boto3_resource_explorer_2 import ResourceExplorerClient as ResourceExplorerClient
     from mypy_boto3_route53 import Route53Client as Route53Client
     from mypy_boto3_s3 import S3Client as S3Client
     from mypy_boto3_sagemaker import SageMakerClient as SageMakerClient

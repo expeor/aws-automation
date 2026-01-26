@@ -201,8 +201,8 @@ class SSOSessionProvider(BaseProvider):
                     clientSecret=client_secret,
                 )
 
-                # 토큰 캐시 저장
-                self._save_token_cache(token_response, client_id, client_secret)
+                # 토큰 캐시 저장 (boto3-stubs TypedDict는 dict와 호환)
+                self._save_token_cache(dict(token_response), client_id, client_secret)
                 return
 
             except self._sso_oidc_client.exceptions.AuthorizationPendingException:
@@ -263,7 +263,7 @@ class SSOSessionProvider(BaseProvider):
             )
 
             self._save_token_cache(
-                token_response,
+                dict(token_response),
                 self._token_cache.client_id,
                 self._token_cache.client_secret,
             )
@@ -312,25 +312,28 @@ class SSOSessionProvider(BaseProvider):
             )
 
         # 새 자격증명 획득
+        assert self._access_token is not None, "인증이 필요합니다"
         try:
-            credentials = self._sso_client.get_role_credentials(
+            response = self._sso_client.get_role_credentials(
                 roleName=role_name,
                 accountId=account_id,
                 accessToken=self._access_token,
-            )["roleCredentials"]
+            )
+            # TypedDict를 dict로 변환하여 안전하게 접근
+            credentials = dict(response["roleCredentials"])
 
             # 캐시 저장
-            creds_dict = {
-                "access_key_id": credentials["accessKeyId"],
-                "secret_access_key": credentials["secretAccessKey"],
-                "session_token": credentials["sessionToken"],
+            creds_dict: dict[str, str] = {
+                "access_key_id": str(credentials["accessKeyId"]),
+                "secret_access_key": str(credentials["secretAccessKey"]),
+                "session_token": str(credentials["sessionToken"]),
             }
             self._cache_credentials(account_id, role_name, creds_dict)
 
             return self._create_session(
-                credentials["accessKeyId"],
-                credentials["secretAccessKey"],
-                credentials["sessionToken"],
+                str(credentials["accessKeyId"]),
+                str(credentials["secretAccessKey"]),
+                str(credentials["sessionToken"]),
                 region or self._default_region,
             )
 
@@ -383,21 +386,25 @@ class SSOSessionProvider(BaseProvider):
             return cached_accounts
 
         accounts = {}
+        assert self._access_token is not None, "인증이 필요합니다"
 
         try:
             paginator = self._sso_client.get_paginator("list_accounts")
 
             for page in paginator.paginate(accessToken=self._access_token):
                 for account in page.get("accountList", []):
-                    account_id = account["accountId"]
+                    # TypedDict fields accessed with explicit str conversion
+                    acct = dict(account)  # Convert TypedDict to regular dict
+                    account_id = str(acct.get("accountId", ""))
 
                     # 역할 목록 조회
                     roles = self._list_account_roles(account_id)
 
+                    email_value = acct.get("emailAddress")
                     account_info = AccountInfo(
                         id=account_id,
-                        name=account.get("accountName", f"account-{account_id}"),
-                        email=account.get("emailAddress"),
+                        name=str(acct.get("accountName", f"account-{account_id}")),
+                        email=str(email_value) if email_value else None,
                         roles=roles,
                     )
                     accounts[account_id] = account_info
@@ -431,12 +438,15 @@ class SSOSessionProvider(BaseProvider):
 
     def _list_account_roles(self, account_id: str) -> list[str]:
         """특정 계정의 역할 목록 조회"""
+        if self._access_token is None:
+            return []
         try:
             response = self._sso_client.list_account_roles(
                 accessToken=self._access_token,
                 accountId=account_id,
             )
-            return [role["roleName"] for role in response.get("roleList", [])]
+            # Convert TypedDict role entries to strings
+            return [str(dict(role).get("roleName", "")) for role in response.get("roleList", [])]
         except Exception:
             return []  # Return empty list on API failure
 

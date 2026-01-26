@@ -455,9 +455,9 @@ def load_tool(category_name: str, tool_name: str) -> dict[str, Any] | None:
         return _load_referenced_tool(tool_meta)
 
     # 모듈 로드
+    module_name = tool_meta.get("module", tool_name)
+    full_module_path = f"{category['module_path']}.{module_name}"
     try:
-        module_name = tool_meta.get("module", tool_name)
-        full_module_path = f"{category['module_path']}.{module_name}"
         module = importlib.import_module(full_module_path)
 
         # run 함수 (필수)
@@ -524,8 +524,8 @@ def _load_referenced_tool(tool_meta: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     # 원본 도구 로드
+    full_module_path = f"{original_category['module_path']}.{ref_module}"
     try:
-        full_module_path = f"{original_category['module_path']}.{ref_module}"
         module = importlib.import_module(full_module_path)
 
         run_func_name = original_tool.get("function", "run")
