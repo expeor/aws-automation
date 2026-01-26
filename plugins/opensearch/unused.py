@@ -45,6 +45,7 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
+
 class DomainStatus(Enum):
     """도메인 상태"""
 

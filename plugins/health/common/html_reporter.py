@@ -606,12 +606,12 @@ class HealthDashboard:
             <div class="cs-metric-card critical">
                 <div class="cs-metric-label"><i class="fa-solid fa-circle-exclamation"></i> 긴급 (3일 이내)</div>
                 <div class="cs-metric-value">{critical}</div>
-                <div class="cs-metric-detail">{critical_services or '-'}</div>
+                <div class="cs-metric-detail">{critical_services or "-"}</div>
             </div>
             <div class="cs-metric-card high">
                 <div class="cs-metric-label"><i class="fa-solid fa-triangle-exclamation"></i> 높음 (7일 이내)</div>
                 <div class="cs-metric-value">{high}</div>
-                <div class="cs-metric-detail">{high_services or '-'}</div>
+                <div class="cs-metric-detail">{high_services or "-"}</div>
             </div>
             <div class="cs-metric-card medium">
                 <div class="cs-metric-label"><i class="fa-solid fa-circle-info"></i> 중간 (14일 이내)</div>
@@ -749,9 +749,9 @@ class HealthDashboard:
                     if len(day_patches) > 2:
                         html += f'<div class="cs-calendar-more">+{len(day_patches) - 2} more</div>'
 
-                    html += '</div>'
+                    html += "</div>"
 
-        html += '</div>'
+        html += "</div>"
         return html
 
     def _build_events_section(self) -> str:
@@ -774,7 +774,9 @@ class HealthDashboard:
         rows_html = ""
         for patch in self.result.patches:
             urgency_class = patch.urgency
-            urgency_text = {"critical": "긴급", "high": "높음", "medium": "중간", "low": "낮음"}.get(patch.urgency, patch.urgency)
+            urgency_text = {"critical": "긴급", "high": "높음", "medium": "중간", "low": "낮음"}.get(
+                patch.urgency, patch.urgency
+            )
 
             scheduled_date = patch.scheduled_date.strftime("%Y-%m-%d") if patch.scheduled_date else "-"
             d_day = f"D-{patch.event.days_until_start}" if patch.event.days_until_start is not None else "-"
@@ -1012,7 +1014,9 @@ class HealthDashboard:
             action = patch.action_required
             action_counts[action] = action_counts.get(action, 0) + 1
 
-        data = [{"name": action, "value": count} for action, count in sorted(action_counts.items(), key=lambda x: -x[1])]
+        data = [
+            {"name": action, "value": count} for action, count in sorted(action_counts.items(), key=lambda x: -x[1])
+        ]
 
         return data if data else [{"name": "없음", "value": 0}]
 

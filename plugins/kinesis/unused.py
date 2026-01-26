@@ -45,6 +45,7 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
+
 class StreamStatus(Enum):
     """스트림 상태"""
 
@@ -77,9 +78,7 @@ class KinesisStreamInfo:
         """월간 비용 추정 (Pricing API 사용)"""
         from plugins.cost.pricing.kinesis import get_kinesis_monthly_cost
 
-        return get_kinesis_monthly_cost(
-            self.region, self.stream_mode, self.shard_count, session=session
-        )
+        return get_kinesis_monthly_cost(self.region, self.stream_mode, self.shard_count, session=session)
 
     @property
     def estimated_monthly_cost(self) -> float:

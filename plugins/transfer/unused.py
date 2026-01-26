@@ -351,9 +351,7 @@ def generate_report(results: list[TransferAnalysisResult], output_dir: str) -> s
     return str(wb.save_as(output_dir, "Transfer_Unused"))
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> TransferAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> TransferAnalysisResult | None:
     """단일 계정/리전의 Transfer Family 서버 수집 및 분석 (병렬 실행용)"""
     servers = collect_servers(session, account_id, account_name, region)
     if not servers:

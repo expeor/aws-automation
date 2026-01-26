@@ -82,9 +82,7 @@ class ClusterInfo:
         """월간 비용 추정 (Pricing API 사용)"""
         from plugins.cost.pricing.elasticache import get_elasticache_monthly_cost
 
-        return get_elasticache_monthly_cost(
-            self.region, self.node_type, self.num_nodes, session=session
-        )
+        return get_elasticache_monthly_cost(self.region, self.node_type, self.num_nodes, session=session)
 
     @property
     def estimated_monthly_cost(self) -> float:
