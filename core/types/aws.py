@@ -25,96 +25,50 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
 # =============================================================================
 
 if TYPE_CHECKING:
-    # boto3-stubs가 설치된 경우 정확한 타입 사용
-    try:
-        from mypy_boto3_acm import ACMClient
-        from mypy_boto3_apigateway import APIGatewayClient
-        from mypy_boto3_apigatewayv2 import ApiGatewayV2Client
-        from mypy_boto3_backup import BackupClient
-        from mypy_boto3_ce import CostExplorerClient
-        from mypy_boto3_cloudformation import CloudFormationClient
-        from mypy_boto3_cloudtrail import CloudTrailClient
-        from mypy_boto3_cloudwatch import CloudWatchClient
-        from mypy_boto3_codecommit import CodeCommitClient
-        from mypy_boto3_dynamodb import DynamoDBClient
-        from mypy_boto3_ec2 import EC2Client
-        from mypy_boto3_ecr import ECRClient
-        from mypy_boto3_efs import EFSClient
-        from mypy_boto3_elasticache import ElastiCacheClient
-        from mypy_boto3_elb import ElasticLoadBalancingClient
-        from mypy_boto3_elbv2 import ElasticLoadBalancingv2Client
-        from mypy_boto3_events import EventBridgeClient
-        from mypy_boto3_fsx import FSxClient
-        from mypy_boto3_glue import GlueClient
-        from mypy_boto3_health import HealthClient
-        from mypy_boto3_iam import IAMClient
-        from mypy_boto3_kinesis import KinesisClient
-        from mypy_boto3_kms import KMSClient
-        from mypy_boto3_lambda import LambdaClient
-        from mypy_boto3_logs import CloudWatchLogsClient
-        from mypy_boto3_opensearch import OpenSearchServiceClient
-        from mypy_boto3_organizations import OrganizationsClient
-        from mypy_boto3_pricing import PricingClient
-        from mypy_boto3_rds import RDSClient
-        from mypy_boto3_redshift import RedshiftClient
-        from mypy_boto3_resource_explorer_2 import ResourceExplorer2Client
-        from mypy_boto3_route53 import Route53Client
-        from mypy_boto3_s3 import S3Client
-        from mypy_boto3_sagemaker import SageMakerClient
-        from mypy_boto3_secretsmanager import SecretsManagerClient
-        from mypy_boto3_service_quotas import ServiceQuotasClient
-        from mypy_boto3_sns import SNSClient
-        from mypy_boto3_sqs import SQSClient
-        from mypy_boto3_sso import SSOClient
-        from mypy_boto3_sso_admin import SSOAdminClient
-        from mypy_boto3_sso_oidc import SSOOIDCClient
-        from mypy_boto3_sts import STSClient
-        from mypy_boto3_transfer import TransferClient
-    except ImportError:
-        # boto3-stubs가 설치되지 않은 경우 Any 사용
-        EC2Client: TypeAlias = Any  # type: ignore[misc]
-        S3Client: TypeAlias = Any  # type: ignore[misc]
-        IAMClient: TypeAlias = Any  # type: ignore[misc]
-        STSClient: TypeAlias = Any  # type: ignore[misc]
-        RDSClient: TypeAlias = Any  # type: ignore[misc]
-        LambdaClient: TypeAlias = Any  # type: ignore[misc]
-        CloudWatchClient: TypeAlias = Any  # type: ignore[misc]
-        CloudWatchLogsClient: TypeAlias = Any  # type: ignore[misc]
-        CloudFormationClient: TypeAlias = Any  # type: ignore[misc]
-        CloudTrailClient: TypeAlias = Any  # type: ignore[misc]
-        DynamoDBClient: TypeAlias = Any  # type: ignore[misc]
-        ElastiCacheClient: TypeAlias = Any  # type: ignore[misc]
-        ElasticLoadBalancingClient: TypeAlias = Any  # type: ignore[misc]
-        ElasticLoadBalancingv2Client: TypeAlias = Any  # type: ignore[misc]
-        KMSClient: TypeAlias = Any  # type: ignore[misc]
-        SNSClient: TypeAlias = Any  # type: ignore[misc]
-        SQSClient: TypeAlias = Any  # type: ignore[misc]
-        SecretsManagerClient: TypeAlias = Any  # type: ignore[misc]
-        Route53Client: TypeAlias = Any  # type: ignore[misc]
-        ACMClient: TypeAlias = Any  # type: ignore[misc]
-        APIGatewayClient: TypeAlias = Any  # type: ignore[misc]
-        ApiGatewayV2Client: TypeAlias = Any  # type: ignore[misc]
-        BackupClient: TypeAlias = Any  # type: ignore[misc]
-        CostExplorerClient: TypeAlias = Any  # type: ignore[misc]
-        CodeCommitClient: TypeAlias = Any  # type: ignore[misc]
-        ECRClient: TypeAlias = Any  # type: ignore[misc]
-        EFSClient: TypeAlias = Any  # type: ignore[misc]
-        EventBridgeClient: TypeAlias = Any  # type: ignore[misc]
-        FSxClient: TypeAlias = Any  # type: ignore[misc]
-        GlueClient: TypeAlias = Any  # type: ignore[misc]
-        HealthClient: TypeAlias = Any  # type: ignore[misc]
-        KinesisClient: TypeAlias = Any  # type: ignore[misc]
-        OpenSearchServiceClient: TypeAlias = Any  # type: ignore[misc]
-        OrganizationsClient: TypeAlias = Any  # type: ignore[misc]
-        PricingClient: TypeAlias = Any  # type: ignore[misc]
-        RedshiftClient: TypeAlias = Any  # type: ignore[misc]
-        ResourceExplorer2Client: TypeAlias = Any  # type: ignore[misc]
-        SageMakerClient: TypeAlias = Any  # type: ignore[misc]
-        ServiceQuotasClient: TypeAlias = Any  # type: ignore[misc]
-        SSOClient: TypeAlias = Any  # type: ignore[misc]
-        SSOAdminClient: TypeAlias = Any  # type: ignore[misc]
-        SSOOIDCClient: TypeAlias = Any  # type: ignore[misc]
-        TransferClient: TypeAlias = Any  # type: ignore[misc]
+    # boto3-stubs 타입 사용 (개발 의존성으로 설치됨)
+    from mypy_boto3_acm import ACMClient as ACMClient
+    from mypy_boto3_apigateway import APIGatewayClient as APIGatewayClient
+    from mypy_boto3_apigatewayv2 import ApiGatewayV2Client as ApiGatewayV2Client
+    from mypy_boto3_backup import BackupClient as BackupClient
+    from mypy_boto3_ce import CostExplorerClient as CostExplorerClient
+    from mypy_boto3_cloudformation import CloudFormationClient as CloudFormationClient
+    from mypy_boto3_cloudtrail import CloudTrailClient as CloudTrailClient
+    from mypy_boto3_cloudwatch import CloudWatchClient as CloudWatchClient
+    from mypy_boto3_codecommit import CodeCommitClient as CodeCommitClient
+    from mypy_boto3_dynamodb import DynamoDBClient as DynamoDBClient
+    from mypy_boto3_ec2 import EC2Client as EC2Client
+    from mypy_boto3_ecr import ECRClient as ECRClient
+    from mypy_boto3_efs import EFSClient as EFSClient
+    from mypy_boto3_elasticache import ElastiCacheClient as ElastiCacheClient
+    from mypy_boto3_elb import ElasticLoadBalancingClient as ElasticLoadBalancingClient
+    from mypy_boto3_elbv2 import ElasticLoadBalancingv2Client as ElasticLoadBalancingv2Client
+    from mypy_boto3_events import EventBridgeClient as EventBridgeClient
+    from mypy_boto3_fsx import FSxClient as FSxClient
+    from mypy_boto3_glue import GlueClient as GlueClient
+    from mypy_boto3_health import HealthClient as HealthClient
+    from mypy_boto3_iam import IAMClient as IAMClient
+    from mypy_boto3_kinesis import KinesisClient as KinesisClient
+    from mypy_boto3_kms import KMSClient as KMSClient
+    from mypy_boto3_lambda import LambdaClient as LambdaClient
+    from mypy_boto3_logs import CloudWatchLogsClient as CloudWatchLogsClient
+    from mypy_boto3_opensearch import OpenSearchServiceClient as OpenSearchServiceClient
+    from mypy_boto3_organizations import OrganizationsClient as OrganizationsClient
+    from mypy_boto3_pricing import PricingClient as PricingClient
+    from mypy_boto3_rds import RDSClient as RDSClient
+    from mypy_boto3_redshift import RedshiftClient as RedshiftClient
+    from mypy_boto3_resource_explorer_2 import ResourceExplorer2Client as ResourceExplorer2Client
+    from mypy_boto3_route53 import Route53Client as Route53Client
+    from mypy_boto3_s3 import S3Client as S3Client
+    from mypy_boto3_sagemaker import SageMakerClient as SageMakerClient
+    from mypy_boto3_secretsmanager import SecretsManagerClient as SecretsManagerClient
+    from mypy_boto3_service_quotas import ServiceQuotasClient as ServiceQuotasClient
+    from mypy_boto3_sns import SNSClient as SNSClient
+    from mypy_boto3_sqs import SQSClient as SQSClient
+    from mypy_boto3_sso import SSOClient as SSOClient
+    from mypy_boto3_sso_admin import SSOAdminClient as SSOAdminClient
+    from mypy_boto3_sso_oidc import SSOOIDCClient as SSOOIDCClient
+    from mypy_boto3_sts import STSClient as STSClient
+    from mypy_boto3_transfer import TransferClient as TransferClient
 
 
 # =============================================================================
