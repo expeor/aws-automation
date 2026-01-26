@@ -60,12 +60,8 @@ def get_client(
     """
     from botocore.config import Config
 
-    retry_config: dict[str, int | str] = {
-        "max_attempts": max_attempts,
-        "mode": retry_mode,
-    }
     config = Config(
-        retries=retry_config,  # type: ignore[arg-type]  # _RetryDict is compatible
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
     )
@@ -107,12 +103,8 @@ def get_resource(
     """
     from botocore.config import Config
 
-    retry_config: dict[str, int | str] = {
-        "max_attempts": max_attempts,
-        "mode": retry_mode,
-    }
     config = Config(
-        retries=retry_config,  # type: ignore[arg-type]  # _RetryDict is compatible
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]
     )
 
     if "config" in kwargs:
