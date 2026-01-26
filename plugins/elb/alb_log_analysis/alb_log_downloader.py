@@ -590,7 +590,9 @@ class ALBLogDownloader:
                         print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")
                         print_sub_warning(f"권장 재시도: {suggest_start} ~ {suggest_end} 또는 범위를 넓혀 재시도")
                     except Exception:
-                        print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")  # Fallback
+                        print_sub_warning(
+                            f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}"
+                        )  # Fallback
                 return []
 
             total_files = len(filtered_files)
