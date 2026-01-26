@@ -6,12 +6,19 @@ AWS 인증 프로파일을 선택하고 Provider를 생성.
 2단계 선택: 인증 타입 → 프로파일
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 
 from cli.i18n import get_lang, t
 from cli.ui.console import clear_screen
 
 from ..context import ExecutionContext, ProviderKind
+
+if TYPE_CHECKING:
+    from core.tools.history.profile_groups import ProfileGroup
 
 console = Console()
 
@@ -242,7 +249,7 @@ class ProfileStep:
             except ValueError:
                 console.print(f"[dim]{t('flow.enter_number')}[/dim]")
 
-    def _select_profile_group(self, groups):
+    def _select_profile_group(self, groups: list[ProfileGroup]) -> ProfileGroup | None:
         """프로파일 그룹 선택"""
         from cli.ui.console import print_box_end, print_box_line, print_box_start
 

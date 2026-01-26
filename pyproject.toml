@@ -43,6 +43,10 @@ dev = [
     "safety>=3.3.0",
     "pre-commit>=4.0.0",
 ]
+performance = [
+    # Radix Tree for O(1) CIDR lookups (625x faster than linear search)
+    "pytricia>=1.0.0",
+]
 types = [
     # boto3-stubs with essential services
     "boto3-stubs[essential]>=1.42.0",

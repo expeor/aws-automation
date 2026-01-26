@@ -139,7 +139,7 @@ class BaseTracker:
                 collect_enis(progress_callback=tracker.as_callback())
         """
         # Check if the tracker has its own advance method (e.g., DownloadTracker)
-        has_own_advance = hasattr(self, "advance") and callable(self.advance)
+        has_own_advance = hasattr(self, "advance") and callable(getattr(self, "advance", None))
 
         if include_status:
             # (message: str, done: bool) -> None
@@ -330,7 +330,7 @@ class StepTracker(BaseTracker):
             yield tracker
         finally:
             # Clean up the sub-task
-            success, failed, total = tracker.stats
+            success, _failed, total = tracker.stats
             final_desc = f"[green]  {description} ({success}/{total} 성공)"
             self._progress.update(sub_task_id, description=final_desc, visible=False)
 
@@ -492,7 +492,7 @@ def parallel_progress(
             yield tracker
         finally:
             # Update final status
-            success, failed, total = tracker.stats
+            _success, failed, total = tracker.stats
             if total > 0:
                 if failed == 0:
                     final_desc = f"[green]{description} 완료"

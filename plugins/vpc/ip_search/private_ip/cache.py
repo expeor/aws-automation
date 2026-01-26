@@ -21,7 +21,7 @@ from typing import Any
 import msgpack
 from botocore.exceptions import ClientError
 
-from core.parallel import get_client
+from core.parallel import ErrorCollector, ErrorSeverity, get_client, safe_collect
 
 logger = logging.getLogger(__name__)
 
@@ -552,15 +552,38 @@ def _eni_to_result(ip: str, eni: dict[str, Any], profile_name: str) -> PrivateIP
 # =============================================================================
 
 
+@dataclass
+class ENIFetchResult:
+    """Result of fetching ENIs from an account"""
+
+    interfaces: list[dict[str, Any]]
+    errors: ErrorCollector
+
+
 def fetch_enis_from_account(
     session,
     account_id: str,
     account_name: str,
     regions: list[str],
     progress_callback=None,
+    error_collector: ErrorCollector | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch ENI list from an account."""
-    interfaces = []
+    """
+    Fetch ENI list from an account.
+
+    Args:
+        session: boto3 session
+        account_id: AWS account ID
+        account_name: Display name for account
+        regions: List of regions to scan
+        progress_callback: Optional callback for progress updates
+        error_collector: Optional ErrorCollector for structured error handling
+
+    Returns:
+        List of ENI dictionaries
+    """
+    interfaces: list[dict[str, Any]] = []
+    collector = error_collector or ErrorCollector("ec2")
 
     for region in regions:
         try:
@@ -604,14 +627,60 @@ def fetch_enis_from_account(
                 progress_callback(region)
 
         except ClientError as e:
-            code = e.response["Error"]["Code"]
-            if code == "UnauthorizedOperation":
-                continue
+            safe_collect(
+                collector,
+                e,
+                account_id=account_id,
+                account_name=account_name,
+                region=region,
+                operation="describe_network_interfaces",
+                severity=ErrorSeverity.INFO,  # Access denied is common
+            )
         except Exception as e:
+            collector.collect_generic(
+                error_code="UnexpectedError",
+                error_message=str(e),
+                account_id=account_id,
+                account_name=account_name,
+                region=region,
+                operation="describe_network_interfaces",
+                severity=ErrorSeverity.WARNING,
+            )
             logger.debug("Failed to fetch ENIs from region %s: %s", region, e)
-            continue
 
     return interfaces
+
+
+def fetch_enis_from_account_with_errors(
+    session,
+    account_id: str,
+    account_name: str,
+    regions: list[str],
+    progress_callback=None,
+) -> ENIFetchResult:
+    """
+    Fetch ENI list from an account with detailed error information.
+
+    Args:
+        session: boto3 session
+        account_id: AWS account ID
+        account_name: Display name for account
+        regions: List of regions to scan
+        progress_callback: Optional callback for progress updates
+
+    Returns:
+        ENIFetchResult with interfaces and error collector
+    """
+    collector = ErrorCollector("ec2")
+    interfaces = fetch_enis_from_account(
+        session=session,
+        account_id=account_id,
+        account_name=account_name,
+        regions=regions,
+        progress_callback=progress_callback,
+        error_collector=collector,
+    )
+    return ENIFetchResult(interfaces=interfaces, errors=collector)
 
 
 def build_cache(

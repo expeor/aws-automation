@@ -140,6 +140,8 @@ def _display_results_table(results: list[PublicIPResult]) -> None:
             "GCP": "bold blue",
             "Azure": "bold cyan",
             "Oracle": "bold red",
+            "Cloudflare": "bold bright_yellow",
+            "Fastly": "bold magenta",
             "Unknown": "dim",
         }.get(r.provider, "white")
 
@@ -262,14 +264,16 @@ def _search_by_filter(session_name: str) -> None:
     console.print("  (2) GCP")
     console.print("  (3) Azure")
     console.print("  (4) Oracle")
+    console.print("  (5) Cloudflare")
+    console.print("  (6) Fastly")
     console.print(f"  (0) {t('menu_back')}")
 
-    provider_choice = Prompt.ask(t("prompt_select"), choices=["0", "1", "2", "3", "4"], default="1")
+    provider_choice = Prompt.ask(t("prompt_select"), choices=["0", "1", "2", "3", "4", "5", "6"], default="1")
 
     if provider_choice == "0":
         return
 
-    providers = {"1": "aws", "2": "gcp", "3": "azure", "4": "oracle"}
+    providers = {"1": "aws", "2": "gcp", "3": "azure", "4": "oracle", "5": "cloudflare", "6": "fastly"}
     provider = providers[provider_choice]
 
     # Show available filters

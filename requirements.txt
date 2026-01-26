@@ -27,3 +27,7 @@ cryptography>=46.0.0
 
 # Search
 rapidfuzz>=3.14.0
+
+# IP Range Optimization (optional - provides Radix Tree for O(1) CIDR lookups)
+# Install with: pip install pytricia
+# Falls back to binary search if not installed

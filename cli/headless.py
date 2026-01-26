@@ -47,6 +47,9 @@ from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
 
 if TYPE_CHECKING:
     from cli.flow.context import RoleSelection
+    from core.auth.config.loader import ParsedConfig
+    from core.auth.types.types import Provider
+
 from cli.i18n import t
 from core.filter import expand_region_pattern
 
@@ -236,7 +239,7 @@ class HeadlessRunner:
 
         return True
 
-    def _setup_sso_session(self, config) -> bool:
+    def _setup_sso_session(self, config: ParsedConfig) -> bool:
         """SSO Session 인증 설정 (멀티 계정 지원)"""
         from core.auth.provider import SSOSessionProvider
         from core.auth.provider.sso_session import SSOSessionConfig
@@ -310,7 +313,7 @@ class HeadlessRunner:
 
         return True
 
-    def _setup_role_selection(self, accounts: list, provider) -> RoleSelection | None:
+    def _setup_role_selection(self, accounts: list[str], provider: Provider) -> RoleSelection | None:
         """Role 선택 설정"""
         from collections import defaultdict
 
