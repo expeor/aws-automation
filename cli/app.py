@@ -483,8 +483,8 @@ def list_tools_command(category: str | None, as_json: bool) -> None:
         table.add_column(t("cli.col_permission"), style="yellow")
 
         for cat in categories:
-            tools_list: list[dict[str, Any]] = cat.get("tools", [])
-            for tool in tools_list:
+            tools = cat.get("tools", [])
+            for tool in tools:
                 path: str = f"{cat.get('name', '')}/{tool.get('module', '')}"
                 tool_name: str = str(tool.get("name", ""))
                 perm: str = str(tool.get("permission", "read"))

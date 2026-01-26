@@ -43,6 +43,54 @@ dev = [
     "safety>=3.3.0",
     "pre-commit>=4.0.0",
 ]
+types = [
+    # boto3-stubs with essential services
+    "boto3-stubs[essential]>=1.42.0",
+    # Additional service stubs for all plugins
+    "types-boto3-acm>=1.42.0",
+    "types-boto3-apigateway>=1.42.0",
+    "types-boto3-apigatewayv2>=1.42.0",
+    "types-boto3-backup>=1.42.0",
+    "types-boto3-cloudformation>=1.42.0",
+    "types-boto3-cloudtrail>=1.42.0",
+    "types-boto3-cloudwatch>=1.42.0",
+    "types-boto3-codecommit>=1.42.0",
+    "types-boto3-ce>=1.42.0",
+    "types-boto3-dynamodb>=1.42.0",
+    "types-boto3-ec2>=1.42.0",
+    "types-boto3-ecr>=1.42.0",
+    "types-boto3-efs>=1.42.0",
+    "types-boto3-elasticache>=1.42.0",
+    "types-boto3-elb>=1.42.0",
+    "types-boto3-elbv2>=1.42.0",
+    "types-boto3-events>=1.42.0",
+    "types-boto3-fsx>=1.42.0",
+    "types-boto3-glue>=1.42.0",
+    "types-boto3-health>=1.42.0",
+    "types-boto3-iam>=1.42.0",
+    "types-boto3-kinesis>=1.42.0",
+    "types-boto3-kms>=1.42.0",
+    "types-boto3-lambda>=1.42.0",
+    "types-boto3-logs>=1.42.0",
+    "types-boto3-opensearch>=1.42.0",
+    "types-boto3-organizations>=1.42.0",
+    "types-boto3-pricing>=1.42.0",
+    "types-boto3-rds>=1.42.0",
+    "types-boto3-redshift>=1.42.0",
+    "types-boto3-resource-explorer-2>=1.42.0",
+    "types-boto3-route53>=1.42.0",
+    "types-boto3-s3>=1.42.0",
+    "types-boto3-sagemaker>=1.42.0",
+    "types-boto3-secretsmanager>=1.42.0",
+    "types-boto3-service-quotas>=1.42.0",
+    "types-boto3-sns>=1.42.0",
+    "types-boto3-sqs>=1.42.0",
+    "types-boto3-sso>=1.42.0",
+    "types-boto3-sso-admin>=1.42.0",
+    "types-boto3-sso-oidc>=1.42.0",
+    "types-boto3-sts>=1.42.0",
+    "types-boto3-transfer>=1.42.0",
+]
 
 [tool.setuptools]
 packages = {find = {exclude = ["tests*", "scripts*", "output*"]}}
@@ -85,9 +133,14 @@ no_implicit_optional = true
 
 [tool.bandit]
 exclude_dirs = ["tests"]
-skips = ["B101", "B311", "B608"]
+skips = ["B101", "B105", "B311", "B404", "B603", "B606", "B607", "B608"]
 # B101: assert usage (normal in tests)
+# B105: hardcoded password false positives (variable names containing "password")
 # B311: random usage (not for security)
+# B404: subprocess import (intentional for file/browser opening)
+# B603: subprocess without shell (intentional for secure OS commands)
+# B606: start_process_with_no_shell (intentional for secure OS commands)
+# B607: partial path (open/xdg-open are standard system commands)
 # B608: DuckDB queries with internal AWS data, not user input
 
 [tool.coverage.run]
