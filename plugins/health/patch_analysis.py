@@ -2,19 +2,24 @@
 plugins/health/patch_analysis.py - 필수 패치 분석
 
 예정된 패치/유지보수 이벤트 분석 보고서 (월별 일정표 포함)
+HTML 대시보드 + Excel 보고서 생성
 
 플러그인 규약:
     - run(ctx): 필수. 실행 함수.
 """
 
+from pathlib import Path
 from typing import Any
 
 from core.auth.session import get_context_session
 from core.tools.output import OutputPath
 
-from .analyzer import REQUIRED_PERMISSIONS  # noqa: F401
-from .collector import HealthCollector
-from .reporter import PatchReporter
+from .common import (  # noqa: F401
+    REQUIRED_PERMISSIONS,
+    HealthCollector,
+    HealthDashboard,
+    PatchReporter,
+)
 
 
 def run(ctx) -> dict[str, Any]:
@@ -32,16 +37,23 @@ def run(ctx) -> dict[str, Any]:
     identifier = ctx.profile_name or "default"
     output_dir = OutputPath(identifier).sub("health", "compliance").with_date().build()
 
-    output_path = reporter.generate_report(
+    # Excel 보고서 생성
+    excel_path = reporter.generate_report(
         output_dir=output_dir,
         file_prefix="patch_analysis",
         include_calendar=True,
     )
+
+    # HTML 대시보드 생성
+    html_path = Path(output_dir) / "health_dashboard.html"
+    dashboard = HealthDashboard(result)
+    dashboard.generate(html_path, auto_open=True)
 
     return {
         "patch_count": result.patch_count,
         "critical_count": result.critical_count,
         "high_count": result.high_count,
         "affected_resources": result.affected_resource_count,
-        "report_path": str(output_path),
+        "excel_report": str(excel_path),
+        "html_dashboard": str(html_path),
     }

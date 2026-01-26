@@ -12,9 +12,7 @@ from typing import Any
 from core.auth.session import get_context_session
 from core.tools.output import OutputPath
 
-from .analyzer import REQUIRED_PERMISSIONS  # noqa: F401
-from .collector import HealthCollector
-from .reporter import PatchReporter
+from .common import REQUIRED_PERMISSIONS, HealthCollector, PatchReporter  # noqa: F401
 
 
 def run(ctx) -> dict[str, Any]:
