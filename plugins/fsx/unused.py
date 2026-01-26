@@ -374,9 +374,7 @@ def generate_report(results: list[FSxAnalysisResult], output_dir: str) -> str:
     return str(wb.save_as(output_dir, "FSx_Unused"))
 
 
-def _collect_and_analyze(
-    session, account_id: str, account_name: str, region: str
-) -> FSxAnalysisResult | None:
+def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> FSxAnalysisResult | None:
     """단일 계정/리전의 FSx 파일 시스템 수집 및 분석 (병렬 실행용)"""
     filesystems = collect_filesystems(session, account_id, account_name, region)
     if not filesystems:
@@ -405,7 +403,7 @@ def run(ctx) -> None:
 
     console.print("\n[bold]종합 결과[/bold]")
     console.print(
-        f"미사용: [red]{total_unused}개[/red] ({total_unused_gb:,} GB) / " f"저사용: [yellow]{total_idle}개[/yellow]"
+        f"미사용: [red]{total_unused}개[/red] ({total_unused_gb:,} GB) / 저사용: [yellow]{total_idle}개[/yellow]"
     )
     console.print(f"예상 월 낭비: [red]${total_waste:,.2f}[/red]")
 

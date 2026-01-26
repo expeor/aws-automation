@@ -1,11 +1,11 @@
 # AWS Automation Toolkit - Dependencies (Python >=3.10)
 
 # AWS (항상 최신 버전 사용 - 새 서비스/기능 지원)
-boto3
+boto3>=1.42.0
 
 # CLI & UI
-click>=8.1.0
-rich>=13.9.0,<15.0.0  # 14.x 호환 유지
+click>=8.3.0
+rich>=14.0.0,<15.0.0
 questionary>=2.1.0
 
 # Data
@@ -13,17 +13,17 @@ openpyxl>=3.1.5
 msgpack>=1.1.0
 chardet>=5.2.0
 python-dateutil>=2.9.0
-duckdb>=1.2.0
+duckdb>=1.4.0
 
 # Network
 requests>=2.32.0
 
 # Utils
-pytz>=2024.2
-filelock>=3.16.0
+pytz>=2025.1
+filelock>=3.20.0
 
 # Security
-cryptography>=44.0.0
+cryptography>=46.0.0
 
 # Search
-rapidfuzz>=3.0.0
+rapidfuzz>=3.14.0

@@ -44,6 +44,7 @@ REQUIRED_PERMISSIONS = {
     ],
 }
 
+
 class ClusterStatus(Enum):
     """클러스터 상태"""
 
