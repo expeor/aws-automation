@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from core.tools.output.builder import OutputPath
@@ -288,12 +288,56 @@ def _show_cache_menu() -> None:
 
 
 # =============================================================================
+# Auto Cache Management
+# =============================================================================
+
+
+def _ensure_cache_ready() -> bool:
+    """Check cache status and auto-refresh if needed. Returns True if cache is ready."""
+    status = get_public_cache_status()
+
+    # Check if any cache exists and is valid
+    has_valid_cache = any(info.get("cached") and info.get("valid") for info in status["providers"].values())
+
+    if has_valid_cache:
+        return True
+
+    # Check if cache exists but expired
+    has_expired_cache = any(info.get("cached") and not info.get("valid") for info in status["providers"].values())
+
+    if has_expired_cache:
+        console.print(f"\n[yellow]{t('cache_expired_auto')}[/yellow]")
+    else:
+        console.print(f"\n[yellow]{t('cache_none_auto')}[/yellow]")
+
+    # Ask user to refresh
+    if Confirm.ask(t("cache_refresh_confirm"), default=True):
+        with console.status(f"[bold yellow]{t('cache_refreshing')}[/bold yellow]"):
+            result = refresh_public_cache()
+
+        if result["success"]:
+            counts = ", ".join(f"{p}: {result['counts'].get(p, 0)}" for p in result["success"])
+            console.print(f"[green]{t('cache_refresh_done')}[/green]")
+            console.print(f"  [dim]{counts}[/dim]")
+            return True
+        else:
+            console.print(f"[red]{t('cache_refresh_all_failed')}[/red]")
+            return False
+    else:
+        return False
+
+
+# =============================================================================
 # Search Functions
 # =============================================================================
 
 
 def _search_by_ip(session_name: str) -> None:
     """Search IP addresses in cloud provider ranges."""
+    # Auto-check and refresh cache if needed
+    if not _ensure_cache_ready():
+        return
+
     console.print(f"\n[dim]{t('prompt_enter_ip')} | ?={t('help_shortcut_help').split(' - ')[1]}[/dim]")
     ip_input = Prompt.ask(f"[bold cyan]{t('header_ip')}[/bold cyan]").strip()
 

@@ -587,8 +587,21 @@ def run(ctx: ExecutionContext) -> None:
             # Search with all valid caches by default
             valid_caches = [c for c in available_caches if c.is_valid]
             if not valid_caches:
-                console.print(f"\n[yellow]{t('cache_none_available')}[/yellow]")
-                continue
+                # Auto-offer to create cache
+                if available_caches:
+                    console.print(f"\n[yellow]{t('cache_expired_auto')}[/yellow]")
+                else:
+                    console.print(f"\n[yellow]{t('cache_none_auto')}[/yellow]")
+
+                if Confirm.ask(t("cache_create_confirm"), default=True):
+                    _create_cache(ctx)
+                    # Refresh cache list and try again
+                    available_caches = list_available_caches()
+                    valid_caches = [c for c in available_caches if c.is_valid]
+                    if not valid_caches:
+                        continue
+                else:
+                    continue
 
             loaded_caches = _load_selected_caches(valid_caches)
             if loaded_caches:

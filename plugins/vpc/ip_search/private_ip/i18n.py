@@ -53,6 +53,18 @@ MESSAGES = {
         "ko": "사용 가능한 캐시가 없습니다. 먼저 캐시를 생성하세요.",
         "en": "No caches available. Create a cache first.",
     },
+    "cache_none_auto": {
+        "ko": "캐시가 없습니다. 검색을 위해 캐시를 생성해야 합니다.",
+        "en": "No cache found. Cache needs to be created for search.",
+    },
+    "cache_expired_auto": {
+        "ko": "모든 캐시가 만료되었습니다. 새 캐시를 생성해야 합니다.",
+        "en": "All caches have expired. Need to create a new cache.",
+    },
+    "cache_create_confirm": {
+        "ko": "지금 캐시를 생성할까요?",
+        "en": "Create cache now?",
+    },
     "cache_profile": {
         "ko": "프로파일",
         "en": "Profile",

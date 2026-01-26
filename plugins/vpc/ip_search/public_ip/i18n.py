@@ -129,6 +129,22 @@ MESSAGES = {
         "ko": "캐시 새로고침 실패",
         "en": "Cache refresh failed",
     },
+    "cache_expired_auto": {
+        "ko": "캐시가 만료되었습니다. 새로고침이 필요합니다.",
+        "en": "Cache has expired. Refresh is needed.",
+    },
+    "cache_none_auto": {
+        "ko": "캐시가 없습니다. 먼저 캐시를 생성해야 합니다.",
+        "en": "No cache found. Cache needs to be created first.",
+    },
+    "cache_refresh_confirm": {
+        "ko": "캐시를 새로고침할까요?",
+        "en": "Refresh cache now?",
+    },
+    "cache_refresh_all_failed": {
+        "ko": "모든 캐시 새로고침에 실패했습니다",
+        "en": "All cache refresh failed",
+    },
     # Export options
     "export_title": {
         "ko": "결과 저장",

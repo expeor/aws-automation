@@ -430,9 +430,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
             if method_totals:
                 sorted_methods = sorted(method_totals.items(), key=lambda x: -x[1])
                 if sorted_methods:
-                    method_data: list[tuple[str, int | float]] = [
-                        (m, c) for m, c in sorted_methods if m.strip()
-                    ]
+                    method_data: list[tuple[str, int | float]] = [(m, c) for m, c in sorted_methods if m.strip()]
                     if method_data:
                         report.add_pie_chart("HTTP 메서드 분포", method_data, doughnut=True)
 
