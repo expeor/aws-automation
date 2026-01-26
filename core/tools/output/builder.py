@@ -206,9 +206,9 @@ def open_in_explorer(path: str) -> bool:
         if sys.platform == "win32":
             os.startfile(path)  # noqa: S606
         elif sys.platform == "darwin":
-            subprocess.run(["open", path], check=False)
+            subprocess.run(["open", path], check=False)  # noqa: S603, S607
         else:
-            subprocess.run(["xdg-open", path], check=False)
+            subprocess.run(["xdg-open", path], check=False)  # noqa: S603, S607
         return True
     except Exception as e:
         logger.debug("Failed to open directory: %s", e)
@@ -231,9 +231,9 @@ def open_file(filepath: str) -> bool:
         if sys.platform == "win32":
             os.startfile(filepath)  # noqa: S606
         elif sys.platform == "darwin":
-            subprocess.run(["open", filepath], check=False)
+            subprocess.run(["open", filepath], check=False)  # noqa: S603, S607
         else:
-            subprocess.run(["xdg-open", filepath], check=False)
+            subprocess.run(["xdg-open", filepath], check=False)  # noqa: S603, S607
         return True
     except Exception as e:
         logger.debug("Failed to open file: %s", e)

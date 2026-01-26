@@ -442,7 +442,7 @@ class ALBLogAnalyzer:
                 self.loaded_log_files_paths = log_files
                 self.loaded_log_directory = log_directory
             except Exception:
-                pass  # Non-critical metadata assignment
+                pass  # nosec B110 - Non-critical metadata assignment
 
             # 파일 리스트를 DuckDB가 이해할 수 있는 리스트 리터럴로 변환
             backslash = "\\"
@@ -1185,7 +1185,7 @@ class ALBLogAnalyzer:
                 if alb_name_row and alb_name_row[0]:
                     analysis_results["alb_name"] = alb_name_row[0]
             except Exception:
-                pass  # ALB name extraction is optional
+                pass  # nosec B110 - ALB name extraction is optional
 
             # 상태 코드별 로그 데이터 추가
             analysis_results.update(status_code_logs)
@@ -1426,7 +1426,7 @@ class ALBLogAnalyzer:
                     if not os.listdir(self.duckdb_dir):
                         os.rmdir(self.duckdb_dir)
                 except Exception:
-                    pass  # Directory cleanup is best-effort
+                    pass  # nosec B110 - Directory cleanup is best-effort
 
             # 기존에 전달된 디렉토리도 정리
             already_cleaned = []

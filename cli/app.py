@@ -49,7 +49,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 import click  # noqa: E402
-from click import Context, HelpFormatter  # noqa: E402
+from click import Command, Context, HelpFormatter  # noqa: E402
 
 from cli.i18n import t  # noqa: E402
 
@@ -84,7 +84,7 @@ class GroupedCommandsGroup(click.Group):
 
     def format_commands(self, ctx: Context, formatter: HelpFormatter) -> None:
         """명령어를 그룹화해서 표시"""
-        commands = []
+        commands: list[tuple[str, Command]] = []
         for subcommand in self.list_commands(ctx):
             cmd = self.get_command(ctx, subcommand)
             if cmd is None or cmd.hidden:
@@ -95,11 +95,11 @@ class GroupedCommandsGroup(click.Group):
             return
 
         # 명령어 분류
-        utility_cmds = []
-        service_cmds = []
+        utility_cmds: list[tuple[str, str]] = []
+        service_cmds: list[tuple[str, str]] = []
 
         for name, cmd in commands:
-            help_text = cmd.get_short_help_str(limit=formatter.width)
+            help_text: str = cmd.get_short_help_str(limit=formatter.width)
             if name in UTILITY_COMMANDS:
                 utility_cmds.append((name, help_text))
             else:
@@ -192,7 +192,7 @@ def _build_help_text(lang: str = "ko") -> str:
     help="UI 언어 설정 / UI language (ko: 한국어, en: English)",
 )
 @click.pass_context
-def cli(ctx, lang):
+def cli(ctx: Context, lang: str) -> None:
     """AA - AWS Automation CLI"""
     # Set language for i18n
     from cli.i18n import set_lang
@@ -287,8 +287,18 @@ cli.help = _build_help_text()
     help="최소 출력 모드",
 )
 def run_command(
-    tool_path, profiles, profile_group, sso_session, accounts, role, fallback_role, region, format, output, quiet
-):
+    tool_path: str,
+    profiles: tuple[str, ...],
+    profile_group: str | None,
+    sso_session: str | None,
+    accounts: tuple[str, ...],
+    role: str | None,
+    fallback_role: str | None,
+    region: tuple[str, ...],
+    format: str,
+    output: str | None,
+    quiet: bool,
+) -> None:
     """비대화형 도구 실행 (CI/CD용)
 
     SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.
@@ -423,7 +433,7 @@ def run_command(
     is_flag=True,
     help="JSON 형식으로 출력",
 )
-def list_tools_command(category, as_json):
+def list_tools_command(category: str | None, as_json: bool) -> None:
     """사용 가능한 도구 목록
 
     \b
@@ -433,12 +443,13 @@ def list_tools_command(category, as_json):
         aa list-tools --json       # JSON 출력
     """
     import json as json_module
+    from typing import Any
 
     from rich.table import Table
 
     from core.tools.discovery import discover_categories
 
-    categories = discover_categories(include_aws_services=True)
+    categories: list[dict[str, Any]] = discover_categories(include_aws_services=True)
 
     if category:
         categories = [c for c in categories if c["name"] == category]
@@ -447,19 +458,19 @@ def list_tools_command(category, as_json):
             raise SystemExit(1)
 
     if as_json:
-        output_data = []
+        output_data: list[dict[str, str]] = []
         for cat in categories:
-            for tool in cat.get("tools", []):
-                if isinstance(tool, dict):
-                    output_data.append(
-                        {
-                            "category": cat["name"],
-                            "module": tool.get("module", ""),
-                            "name": tool.get("name", ""),
-                            "description": tool.get("description", ""),
-                            "permission": tool.get("permission", "read"),
-                        }
-                    )
+            tools_list: list[dict[str, Any]] = cat.get("tools", [])
+            for tool in tools_list:
+                output_data.append(
+                    {
+                        "category": str(cat.get("name", "")),
+                        "module": str(tool.get("module", "")),
+                        "name": str(tool.get("name", "")),
+                        "description": str(tool.get("description", "")),
+                        "permission": str(tool.get("permission", "read")),
+                    }
+                )
         click.echo(json_module.dumps(output_data, ensure_ascii=False, indent=2))
     else:
         from rich.console import Console
@@ -472,13 +483,13 @@ def list_tools_command(category, as_json):
         table.add_column(t("cli.col_permission"), style="yellow")
 
         for cat in categories:
-            for tool in cat.get("tools", []):
-                if isinstance(tool, dict):
-                    path = f"{cat['name']}/{tool.get('module', '')}"
-                    name = tool.get("name", "")
-                    perm = tool.get("permission", "read")
-                    perm_str = {"read": "R", "write": "W", "delete": "D"}.get(perm, perm)
-                    table.add_row(path, name, perm_str)
+            tools_list: list[dict[str, Any]] = cat.get("tools", [])
+            for tool in tools_list:
+                path: str = f"{cat.get('name', '')}/{tool.get('module', '')}"
+                tool_name: str = str(tool.get("name", ""))
+                perm: str = str(tool.get("permission", "read"))
+                perm_str: str = {"read": "R", "write": "W", "delete": "D"}.get(perm, perm)
+                table.add_row(path, tool_name, perm_str)
 
         console.print(table)
         console.print()
@@ -514,7 +525,7 @@ def group_cmd():
     is_flag=True,
     help="JSON 형식으로 출력",
 )
-def group_list(as_json):
+def group_list(as_json: bool) -> None:
     """저장된 프로파일 그룹 목록"""
     import json as json_module
 
@@ -536,9 +547,9 @@ def group_list(as_json):
         return
 
     if as_json:
-        output = []
+        output_list: list[dict[str, str | list[str]]] = []
         for g in groups:
-            output.append(
+            output_list.append(
                 {
                     "name": g.name,
                     "kind": g.kind,
@@ -546,7 +557,7 @@ def group_list(as_json):
                     "added_at": g.added_at,
                 }
             )
-        click.echo(json_module.dumps(output, ensure_ascii=False, indent=2))
+        click.echo(json_module.dumps(output_list, ensure_ascii=False, indent=2))
     else:
         kind_labels = {"sso_profile": "SSO", "static": "Key"}
 
@@ -568,7 +579,7 @@ def group_list(as_json):
 
 @group_cmd.command("show")
 @click.argument("name")
-def group_show(name):
+def group_show(name: str) -> None:
     """그룹 상세 보기"""
     from rich.console import Console
     from rich.panel import Panel
@@ -619,8 +630,8 @@ def group_create():
     kind = "sso_profile" if choice == 1 else "static"
 
     # 2. 해당 타입의 프로파일 목록 가져오기
-    available = _get_profiles_by_kind(kind)
-    type_label = t("cli.sso_profile") if kind == "sso_profile" else t("cli.iam_access_key")
+    available: list[str] = _get_profiles_by_kind(kind)
+    type_label: str = t("cli.sso_profile") if kind == "sso_profile" else t("cli.iam_access_key")
 
     if not available:
         console.print(f"\n[red]{t('cli.no_profiles_available', type=type_label)}[/red]")
@@ -628,19 +639,19 @@ def group_create():
 
     # 3. 프로파일 선택 (멀티, 2개 이상)
     console.print(f"\n[bold]{t('cli.select_profiles_title', type=type_label)}[/bold] {t('cli.select_2_or_more')}\n")
-    for i, p in enumerate(available, 1):
-        console.print(f"  [cyan]{i:2})[/cyan] {p}")
+    for i, profile in enumerate(available, 1):
+        console.print(f"  [cyan]{i:2})[/cyan] {profile}")
     console.print()
     console.print(f"[dim]{t('cli.selection_hint')}[/dim]")
 
-    selection = click.prompt(t("cli.select_prompt"))
-    selected = _parse_selection(selection, len(available))
+    selection: str = click.prompt(t("cli.select_prompt"))
+    selected: list[int] = _parse_selection(selection, len(available))
 
     if len(selected) < 2:
         console.print(f"[red]{t('cli.min_2_profiles')}[/red]")
         raise SystemExit(1)
 
-    selected_profiles = [available[i] for i in selected]
+    selected_profiles: list[str] = [available[idx] for idx in selected]
 
     # 4. 그룹 이름 입력
     console.print(f"\n{t('cli.selected_profiles')} {', '.join(selected_profiles)}\n")
@@ -655,9 +666,9 @@ def group_create():
         raise SystemExit(1)
 
 
-def _parse_selection(selection: str, max_count: int) -> list:
+def _parse_selection(selection: str, max_count: int) -> list[int]:
     """선택 문자열 파싱 (1 2 3, 1,2,3, 1-3 지원)"""
-    result = set()
+    result: set[int] = set()
     selection = selection.strip()
 
     # 공백 또는 콤마로 분리
@@ -686,7 +697,7 @@ def _parse_selection(selection: str, max_count: int) -> list:
     return sorted(result)
 
 
-def _get_profiles_by_kind(kind: str) -> list:
+def _get_profiles_by_kind(kind: str) -> list[str]:
     """인증 타입별 프로파일 목록 조회
 
     Args:
@@ -698,7 +709,7 @@ def _get_profiles_by_kind(kind: str) -> list:
     from core.auth import detect_provider_type, list_profiles, load_config
     from core.auth.types import ProviderType
 
-    result = []
+    result: list[str] = []
     try:
         config_data = load_config()
 
@@ -714,7 +725,7 @@ def _get_profiles_by_kind(kind: str) -> list:
             ):
                 result.append(profile_name)
     except Exception:
-        pass  # Config parsing errors are non-critical
+        pass  # nosec B110 - Config parsing errors are non-critical
 
     return result
 
@@ -722,7 +733,7 @@ def _get_profiles_by_kind(kind: str) -> list:
 @group_cmd.command("delete")
 @click.argument("name")
 @click.option("-y", "--yes", is_flag=True, help="확인 없이 삭제")
-def group_delete(name, yes):
+def group_delete(name: str, yes: bool) -> None:
     """그룹 삭제"""
     from rich.console import Console
 
@@ -768,28 +779,31 @@ def _register_category_commands():
         logging.getLogger(__name__).warning(f"카테고리 검색 실패: {e}")
         return
 
+    from collections.abc import Callable
+    from typing import Any
+
     # 등록된 명령어 추적 (중복 방지)
-    registered_commands = set()
+    registered_commands: set[str] = set()
 
     for cat in categories:
-        name = cat.get("name", "")
-        desc = cat.get("description", "")
-        tools = cat.get("tools", [])
-        aliases = cat.get("aliases", [])
-        sub_services = cat.get("sub_services", [])
+        name: str = cat.get("name", "")
+        desc: str = cat.get("description", "")
+        tools: list[dict[str, Any]] = cat.get("tools", [])
+        aliases: list[str] = cat.get("aliases", [])
+        sub_services: list[str] = cat.get("sub_services", [])
 
         # 도구 목록으로 help 텍스트 생성 (\b로 줄바꿈 유지)
-        tool_lines = [desc, "", "\b", t("cli.tool_list")]
+        tool_lines: list[str] = [desc, "", "\b", t("cli.tool_list")]
         for tool in tools:
-            perm = tool.get("permission", "read")
+            perm: str = tool.get("permission", "read")
             perm_marker = " [!]" if perm in ("write", "delete") else ""
             tool_lines.append(f"  - {tool.get('name', '')}{perm_marker}")
         help_text = "\n".join(tool_lines)
 
         # 클로저로 카테고리명 캡처 (전체 도구)
-        def make_cmd(category_name):
+        def make_cmd(category_name: str) -> Callable[[], None]:
             @click.pass_context
-            def cmd(ctx):
+            def cmd(ctx: Context) -> None:
                 from cli.flow import create_flow_runner
 
                 runner = create_flow_runner()
@@ -798,9 +812,9 @@ def _register_category_commands():
             return cmd
 
         # 클로저로 하위 서비스명 캡처 (필터링된 도구)
-        def make_sub_service_cmd(sub_service_name):
+        def make_sub_service_cmd(sub_service_name: str) -> Callable[[], None]:
             @click.pass_context
-            def cmd(ctx):
+            def cmd(ctx: Context) -> None:
                 from cli.flow import create_flow_runner
 
                 runner = create_flow_runner()
