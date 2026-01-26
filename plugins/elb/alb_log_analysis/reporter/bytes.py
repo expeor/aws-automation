@@ -62,7 +62,7 @@ class BytesSheetWriter(BaseSheetWriter):
             # Finalize
             self._apply_column_widths(ws, headers)
             ws.row_dimensions[1].height = SheetConfig.HEADER_ROW_HEIGHT
-            ws.freeze_panes = ws.cell(row=2, column=1)
+            ws.freeze_panes = ws.cell(row=2, column=1)  # pyright: ignore[reportAttributeAccessIssue]
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE
 
         except Exception as e:

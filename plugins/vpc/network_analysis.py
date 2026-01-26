@@ -208,7 +208,7 @@ def run(ctx: ExecutionContext) -> None:
     analysis_result = NetworkAnalysisResult()
 
     for data in result_data.get_data():
-        if data is None:
+        if data is None:  # pyright: ignore[reportUnnecessaryComparison]
             continue
 
         account_id = data["account_id"]

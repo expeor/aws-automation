@@ -417,7 +417,7 @@ class ClientStatusSheetWriter(BaseSheetWriter):
             ws.column_dimensions[get_column_letter(len(headers))].width = 10
 
             # Finalize
-            ws.freeze_panes = ws.cell(row=2, column=1)
+            ws.freeze_panes = ws.cell(row=2, column=1)  # pyright: ignore[reportAttributeAccessIssue]
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE
 
         except Exception as e:
@@ -512,7 +512,7 @@ class TargetStatusSheetWriter(BaseSheetWriter):
                 ws.column_dimensions[get_column_letter(col_idx)].width = 10
 
             # Finalize
-            ws.freeze_panes = ws.cell(row=2, column=1)
+            ws.freeze_panes = ws.cell(row=2, column=1)  # pyright: ignore[reportAttributeAccessIssue]
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE
 
         except Exception as e:

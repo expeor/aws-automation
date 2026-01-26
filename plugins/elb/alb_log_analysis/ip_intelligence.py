@@ -483,7 +483,7 @@ class IPIntelligence:
 
         return best_country
 
-    def _get_special_ip_type(self, ip: ipaddress._BaseAddress) -> str:
+    def _get_special_ip_type(self, ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
         """특수 IP 타입 반환"""
         if ip.is_loopback:
             return "LOOPBACK"

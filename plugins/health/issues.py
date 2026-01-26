@@ -29,7 +29,7 @@ def run(ctx: ExecutionContext) -> None:
 
     if not issues:
         print("현재 진행 중인 서비스 장애가 없습니다.")
-        return {"issue_count": 0, "issues": []}
+        return
 
     print(f"\n현재 {len(issues)}개의 서비스 장애가 진행 중입니다:\n")
 
@@ -41,8 +41,3 @@ def run(ctx: ExecutionContext) -> None:
             desc = event.description[:100] + "..." if len(event.description) > 100 else event.description
             print(f"    설명: {desc}")
         print()
-
-    return {
-        "issue_count": len(issues),
-        "issues": [e.to_dict() for e in issues],
-    }

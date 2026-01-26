@@ -6,10 +6,9 @@ import gc
 import gzip
 import os
 import shutil
-from collections import namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytz  # type: ignore[import-untyped]
 from botocore.exceptions import ClientError
@@ -39,14 +38,14 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
     # Fallback functions
-    def print_sub_info(msg: str) -> None:
-        console.print(f"[blue]{msg}[/blue]")
+    def print_sub_info(message: str) -> None:
+        console.print(f"[blue]{message}[/blue]")
 
-    def print_sub_task_done(msg: str) -> None:
-        console.print(f"[green]✓ {msg}[/green]")
+    def print_sub_task_done(message: str) -> None:
+        console.print(f"[green]✓ {message}[/green]")
 
-    def print_sub_warning(msg: str) -> None:
-        console.print(f"[yellow]! {msg}[/yellow]")
+    def print_sub_warning(message: str) -> None:
+        console.print(f"[yellow]! {message}[/yellow]")
 
 
 import contextlib
@@ -71,7 +70,11 @@ class LogDownloadError(Exception):
 
 
 # 경량화된 S3 객체 정보 (캐시 제거)
-S3LogFile = namedtuple("S3LogFile", ["key", "last_modified", "size", "timestamp"])
+class S3LogFile(NamedTuple):
+    key: str
+    last_modified: datetime
+    size: int
+    timestamp: datetime | None
 
 
 class ALBLogDownloader:
@@ -372,8 +375,12 @@ class ALBLogDownloader:
         if files_without_timestamp:
             logger.debug(f"타임스탬프 추출 실패한 파일 {len(files_without_timestamp)}개도 포함합니다.")
 
-        # 타임스탬프로 정렬
-        files_with_timestamp.sort(key=lambda x: x.timestamp)
+        # 타임스탬프로 정렬 (timestamp is guaranteed non-None in files_with_timestamp)
+        def get_timestamp(f: S3LogFile) -> datetime:
+            assert f.timestamp is not None  # Guaranteed by filter above
+            return f.timestamp
+
+        files_with_timestamp.sort(key=get_timestamp)
 
         # 타임스탬프 범위 정보 출력 및 사용자 타임존 범위 저장
         if files_with_timestamp:
@@ -381,9 +388,11 @@ class ALBLogDownloader:
             latest_timestamp = files_with_timestamp[-1].timestamp
             logger.debug(f"파일 타임스탬프 범위: {earliest_timestamp} ~ {latest_timestamp}")
             try:
-                earliest_local = earliest_timestamp.astimezone(self.timezone)
-                latest_local = latest_timestamp.astimezone(self.timezone)
-                self.available_range_local = (earliest_local, latest_local)
+                # timestamps are guaranteed non-None in files_with_timestamp
+                if earliest_timestamp is not None and latest_timestamp is not None:
+                    earliest_local = earliest_timestamp.astimezone(self.timezone)
+                    latest_local = latest_timestamp.astimezone(self.timezone)
+                    self.available_range_local = (earliest_local, latest_local)
             except Exception:
                 self.available_range_local = None  # Timezone conversion fallback
 
@@ -398,9 +407,9 @@ class ALBLogDownloader:
         logger.debug(f"ALB 특성 고려 확장: {extended_start_datetime_utc} ~ {extended_end_datetime_utc} (±10분)")
 
         # 바이너리 서치로 시작/끝 인덱스 찾기 (10분 확장된 범위 사용)
-        start_idx = bisect.bisect_left(files_with_timestamp, extended_start_datetime_utc, key=lambda x: x.timestamp)
+        start_idx = bisect.bisect_left(files_with_timestamp, extended_start_datetime_utc, key=get_timestamp)
 
-        end_idx = bisect.bisect_right(files_with_timestamp, extended_end_datetime_utc, key=lambda x: x.timestamp)
+        end_idx = bisect.bisect_right(files_with_timestamp, extended_end_datetime_utc, key=get_timestamp)
 
         logger.debug(f"바이너리 서치 결과: {start_idx} ~ {end_idx} (선택: {end_idx - start_idx}개)")
 
@@ -416,17 +425,20 @@ class ALBLogDownloader:
             logger.error("❌ 요청 범위에 해당하는 ALB 로그 파일을 찾지 못했습니다.")
             logger.error(f"   요청 범위({self.timezone.zone}): {self.start_datetime} ~ {self.end_datetime}")
             if files_with_timestamp:
-                earliest_local = files_with_timestamp[0].timestamp.astimezone(self.timezone)
-                latest_local = files_with_timestamp[-1].timestamp.astimezone(self.timezone)
-                self.available_range_local = (earliest_local, latest_local)
-                # 가장 최근 파일 시각 기준 권장 구간 제안 (최근 10분)
-                try:
-                    suggest_start = latest_local - timedelta(minutes=10)
-                    suggest_end = latest_local
-                    logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")
-                    logger.error(f"   권장: 최근 유효 시각 근처로 재시도 (예: {suggest_start} ~ {suggest_end})")
-                except Exception:
-                    logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")  # Fallback message
+                earliest_ts = files_with_timestamp[0].timestamp
+                latest_ts = files_with_timestamp[-1].timestamp
+                if earliest_ts is not None and latest_ts is not None:
+                    earliest_local = earliest_ts.astimezone(self.timezone)
+                    latest_local = latest_ts.astimezone(self.timezone)
+                    self.available_range_local = (earliest_local, latest_local)
+                    # 가장 최근 파일 시각 기준 권장 구간 제안 (최근 10분)
+                    try:
+                        suggest_start = latest_local - timedelta(minutes=10)
+                        suggest_end = latest_local
+                        logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")
+                        logger.error(f"   권장: 최근 유효 시각 근처로 재시도 (예: {suggest_start} ~ {suggest_end})")
+                    except Exception:
+                        logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")  # Fallback message
             logger.error(
                 "   참고: ALB는 5분 단위 파일을 생성하며, 트래픽 0 또는 전송 지연 시 해당 구간 파일이 생성되지 않습니다."
             )
@@ -781,7 +793,7 @@ class ALBLogDownloader:
                         gzip.open(gz_file_path, "rb") as gz_file,
                         open(log_file_path, "wb") as log_file,
                     ):
-                        shutil.copyfileobj(gz_file, log_file)
+                        shutil.copyfileobj(gz_file, log_file)  # pyright: ignore[reportArgumentType]
 
                     # 개별 파일 로그를 DEBUG로 변경 (터미널 출력 정리)
                     logger.debug(

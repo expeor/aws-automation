@@ -63,6 +63,9 @@ class TagSyncResult:
 class SyncSummary:
     """동기화 요약"""
 
+    account_id: str = ""
+    account_name: str = ""
+    region: str = ""
     total_instances: int = 0
     total_volumes: int = 0
     total_tags_applied: int = 0
@@ -262,6 +265,9 @@ class EC2ToEBSTagSync:
 
 # 리포트 컬럼 정의
 COLUMNS_SYNC_RESULTS = [
+    ColumnDef(header="Account ID", width=15, style="data"),
+    ColumnDef(header="Account Name", width=20, style="data"),
+    ColumnDef(header="Region", width=15, style="data"),
     ColumnDef(header="Instance ID", width=20, style="data"),
     ColumnDef(header="Instance Name", width=25, style="data"),
     ColumnDef(header="Volume IDs", width=40, style="data"),
@@ -270,12 +276,41 @@ COLUMNS_SYNC_RESULTS = [
     ColumnDef(header="Error", width=30, style="data"),
 ]
 
+COLUMNS_ACCOUNT_SUMMARY = [
+    ColumnDef(header="Account ID", width=15, style="data"),
+    ColumnDef(header="Account Name", width=20, style="data"),
+    ColumnDef(header="Region", width=15, style="data"),
+    ColumnDef(header="Instances", width=12, style="center"),
+    ColumnDef(header="Volumes", width=12, style="center"),
+    ColumnDef(header="Tags Applied", width=12, style="center"),
+    ColumnDef(header="Success", width=10, style="center"),
+    ColumnDef(header="Failed", width=10, style="center"),
+    ColumnDef(header="Skipped", width=10, style="center"),
+]
+
 
 class TagSyncReporter:
-    """태그 동기화 결과 리포터"""
+    """태그 동기화 결과 리포터 (멀티 계정 지원)"""
 
-    def __init__(self, summary: SyncSummary):
-        self.summary = summary
+    def __init__(self, summaries: list[SyncSummary]):
+        """초기화
+
+        Args:
+            summaries: 계정/리전별 동기화 요약 목록
+        """
+        self.summaries = summaries
+        self._aggregate_totals()
+
+    def _aggregate_totals(self) -> None:
+        """전체 합계 계산"""
+        self.total_instances = sum(s.total_instances for s in self.summaries)
+        self.total_volumes = sum(s.total_volumes for s in self.summaries)
+        self.total_tags_applied = sum(s.total_tags_applied for s in self.summaries)
+        self.total_success = sum(s.success_count for s in self.summaries)
+        self.total_failed = sum(s.failed_count for s in self.summaries)
+        self.total_skipped = sum(s.skipped_count for s in self.summaries)
+        self.total_accounts = len({s.account_id for s in self.summaries if s.account_id})
+        self.total_regions = len({s.region for s in self.summaries if s.region})
 
     def generate_report(
         self,
@@ -287,6 +322,10 @@ class TagSyncReporter:
 
         # 요약 시트
         self._create_summary_sheet(wb)
+
+        # 계정별 요약 시트
+        if self.total_accounts > 1 or self.total_regions > 1:
+            self._create_account_summary_sheet(wb)
 
         # 상세 결과 시트
         self._create_results_sheet(wb)
@@ -305,55 +344,87 @@ class TagSyncReporter:
 
         summary_sheet.add_title("EC2 → EBS 태그 동기화 결과")
 
+        summary_sheet.add_section("처리 범위")
+        summary_sheet.add_item("계정 수", f"{self.total_accounts}개")
+        summary_sheet.add_item("리전 수", f"{self.total_regions}개")
+
+        summary_sheet.add_blank_row()
+
         summary_sheet.add_section("처리 현황")
-        summary_sheet.add_item("처리된 인스턴스", f"{self.summary.total_instances}개")
-        summary_sheet.add_item("태그 적용된 볼륨", f"{self.summary.total_volumes}개")
-        summary_sheet.add_item("적용된 태그 수", f"{self.summary.total_tags_applied}개")
+        summary_sheet.add_item("처리된 인스턴스", f"{self.total_instances}개")
+        summary_sheet.add_item("태그 적용된 볼륨", f"{self.total_volumes}개")
+        summary_sheet.add_item("적용된 태그 수", f"{self.total_tags_applied}개")
 
         summary_sheet.add_blank_row()
 
         summary_sheet.add_section("결과 상태")
         summary_sheet.add_item(
             "성공",
-            f"{self.summary.success_count}건",
-            highlight="success" if self.summary.success_count > 0 else None,
+            f"{self.total_success}건",
+            highlight="success" if self.total_success > 0 else None,
         )
         summary_sheet.add_item(
             "실패",
-            f"{self.summary.failed_count}건",
-            highlight="danger" if self.summary.failed_count > 0 else None,
+            f"{self.total_failed}건",
+            highlight="danger" if self.total_failed > 0 else None,
         )
-        summary_sheet.add_item("건너뜀", f"{self.summary.skipped_count}건")
+        summary_sheet.add_item("건너뜀", f"{self.total_skipped}건")
 
         summary_sheet.add_blank_row()
 
         summary_sheet.add_section("리포트 정보")
         summary_sheet.add_item("생성 일시", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
+    def _create_account_summary_sheet(self, wb: Workbook) -> None:
+        """계정별 요약 시트"""
+        sheet = wb.new_sheet(name="계정별 요약", columns=COLUMNS_ACCOUNT_SUMMARY)
+
+        for summary in self.summaries:
+            row = [
+                summary.account_id,
+                summary.account_name,
+                summary.region,
+                summary.total_instances,
+                summary.total_volumes,
+                summary.total_tags_applied,
+                summary.success_count,
+                summary.failed_count,
+                summary.skipped_count,
+            ]
+            sheet.add_row(row)
+
     def _create_results_sheet(self, wb: Workbook) -> None:
         """결과 상세 시트"""
         sheet = wb.new_sheet(name="상세 결과", columns=COLUMNS_SYNC_RESULTS)
 
-        for result in self.summary.results:
-            row = [
-                result.instance_id,
-                result.instance_name,
-                ", ".join(result.volume_ids),
-                len(result.tags_applied),
-                result.status,
-                result.error,
-            ]
-            sheet.add_row(row)
+        for summary in self.summaries:
+            for result in summary.results:
+                row = [
+                    summary.account_id,
+                    summary.account_name,
+                    summary.region,
+                    result.instance_id,
+                    result.instance_name,
+                    ", ".join(result.volume_ids),
+                    len(result.tags_applied),
+                    result.status,
+                    result.error,
+                ]
+                sheet.add_row(row)
 
     def print_summary(self) -> None:
         """콘솔에 요약 출력"""
         print("\n=== EC2 → EBS 태그 동기화 결과 ===")
-        print(f"처리된 인스턴스: {self.summary.total_instances}개")
-        print(f"태그 적용된 볼륨: {self.summary.total_volumes}개")
-        print(f"적용된 태그 수: {self.summary.total_tags_applied}개")
-        print(f"성공: {self.summary.success_count}건")
-        print(f"실패: {self.summary.failed_count}건")
-        print(f"건너뜀: {self.summary.skipped_count}건")
+        if self.total_accounts > 1:
+            print(f"처리된 계정: {self.total_accounts}개")
+        if self.total_regions > 1:
+            print(f"처리된 리전: {self.total_regions}개")
+        print(f"처리된 인스턴스: {self.total_instances}개")
+        print(f"태그 적용된 볼륨: {self.total_volumes}개")
+        print(f"적용된 태그 수: {self.total_tags_applied}개")
+        print(f"성공: {self.total_success}건")
+        print(f"실패: {self.total_failed}건")
+        print(f"건너뜀: {self.total_skipped}건")
 
 
 def sync_tags(
@@ -362,6 +433,8 @@ def sync_tags(
     instance_ids: list[str] | None = None,
     tag_keys: list[str] | None = None,
     dry_run: bool = False,
+    account_id: str = "",
+    account_name: str = "",
 ) -> SyncSummary:
     """EC2 태그를 EBS에 동기화 (편의 함수)
 
@@ -371,17 +444,60 @@ def sync_tags(
         instance_ids: 특정 인스턴스만 처리
         tag_keys: 특정 태그 키만 동기화
         dry_run: True면 시뮬레이션
+        account_id: 계정 ID (멀티 계정용)
+        account_name: 계정 이름 (멀티 계정용)
 
     Returns:
         SyncSummary
     """
     syncer = EC2ToEBSTagSync(session, region, dry_run)
-    return syncer.sync_all(instance_ids, tag_keys)
+    summary = syncer.sync_all(instance_ids, tag_keys)
+    summary.account_id = account_id
+    summary.account_name = account_name
+    summary.region = region or ""
+    return summary
+
+
+def _collect_and_sync(
+    session,
+    account_id: str,
+    account_name: str,
+    region: str,
+    *,
+    instance_ids: list[str] | None = None,
+    tag_keys: list[str] | None = None,
+    dry_run: bool = False,
+) -> SyncSummary:
+    """parallel_collect 콜백 - 단일 계정/리전 처리
+
+    Args:
+        session: boto3.Session
+        account_id: 계정 ID
+        account_name: 계정 이름
+        region: 리전
+        instance_ids: 특정 인스턴스만 처리
+        tag_keys: 특정 태그 키만 동기화
+        dry_run: True면 시뮬레이션
+
+    Returns:
+        SyncSummary
+    """
+    return sync_tags(
+        session=session,
+        region=region,
+        instance_ids=instance_ids,
+        tag_keys=tag_keys,
+        dry_run=dry_run,
+        account_id=account_id,
+        account_name=account_name,
+    )
 
 
 def run_sync(ctx) -> dict[str, Any] | None:
-    """EC2 태그를 EBS에 동기화 (CLI 진입점)"""
-    from core.auth.session import get_context_session
+    """EC2 태그를 EBS에 동기화 (CLI 진입점) - 멀티 계정 지원"""
+    from functools import partial
+
+    from core.parallel import parallel_collect
     from core.tools.output import OutputPath
 
     # 옵션에서 파라미터 추출
@@ -389,18 +505,47 @@ def run_sync(ctx) -> dict[str, Any] | None:
     tag_keys = ctx.options.get("tag_keys")
     dry_run = ctx.options.get("dry_run", False)
 
-    # 첫 번째 리전에서 세션 획득
-    region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
-    session = get_context_session(ctx, region)
+    # parallel_collect 콜백 생성
+    callback = partial(
+        _collect_and_sync,
+        instance_ids=instance_ids,
+        tag_keys=tag_keys,
+        dry_run=dry_run,
+    )
 
-    syncer = EC2ToEBSTagSync(session, region, dry_run)
-    summary = syncer.sync_all(instance_ids, tag_keys)
+    # 멀티 계정/리전 병렬 처리
+    result = parallel_collect(ctx, callback, service="ec2")
 
-    reporter = TagSyncReporter(summary)
+    # 결과 수집
+    all_summaries: list[SyncSummary] = result.get_flat_data()
+
+    # 에러 출력
+    if result.error_count > 0:
+        print(f"일부 오류 발생: {result.error_count}건")
+        print(result.get_error_summary())
+
+    # 빈 결과 제외 (인스턴스가 없는 경우)
+    all_summaries = [s for s in all_summaries if s.total_instances > 0 or s.results]
+
+    if not all_summaries:
+        print("\n처리할 인스턴스가 없습니다.")
+        return {"total_instances": 0, "message": "No instances found"}
+
+    # 리포트 생성
+    reporter = TagSyncReporter(all_summaries)
     reporter.print_summary()
 
-    if summary.results:
-        identifier = ctx.profile_name or "default"
+    # 결과가 있는 경우에만 리포트 파일 생성
+    has_results = any(s.results for s in all_summaries)
+    if has_results:
+        # 식별자 결정 (SSO 세션이면 첫 계정 ID, 아니면 프로파일 이름)
+        if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
+            identifier = ctx.accounts[0].id
+        elif ctx.profile_name:
+            identifier = ctx.profile_name
+        else:
+            identifier = "default"
+
         output_dir = OutputPath(identifier).sub("tag", "compliance").with_date().build()
 
         output_path = reporter.generate_report(
@@ -408,16 +553,18 @@ def run_sync(ctx) -> dict[str, Any] | None:
             file_prefix="ec2_to_ebs_tags",
         )
         return {
-            "total_instances": summary.total_instances,
-            "total_volumes": summary.total_volumes,
-            "total_tags_applied": summary.total_tags_applied,
-            "success": summary.success_count,
-            "failed": summary.failed_count,
-            "skipped": summary.skipped_count,
+            "total_accounts": reporter.total_accounts,
+            "total_regions": reporter.total_regions,
+            "total_instances": reporter.total_instances,
+            "total_volumes": reporter.total_volumes,
+            "total_tags_applied": reporter.total_tags_applied,
+            "success": reporter.total_success,
+            "failed": reporter.total_failed,
+            "skipped": reporter.total_skipped,
             "report_path": str(output_path),
         }
 
     return {
-        "total_instances": summary.total_instances,
+        "total_instances": reporter.total_instances,
         "message": "No tags synced",
     }
