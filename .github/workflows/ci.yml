@@ -217,7 +217,7 @@ jobs:
           enable-cache: true
 
       - name: Install security tools
-        run: uv pip install --system pip-audit bandit
+        run: uv pip install --system pip-audit "bandit[sarif]"
 
       - name: Check dependencies for vulnerabilities
         run: pip-audit -r requirements.txt --desc on
