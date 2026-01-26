@@ -192,6 +192,77 @@ MESSAGES = {
         "ko": "검색을 종료합니다",
         "en": "Exiting search",
     },
+    # Validation errors
+    "validation_invalid_ip": {
+        "ko": "'{ip}' - 올바르지 않은 IP 형식",
+        "en": "'{ip}' - Invalid IP format",
+    },
+    "validation_errors_found": {
+        "ko": "입력 오류 {count}개 발견:",
+        "en": "{count} input error(s) found:",
+    },
+    "validation_valid_ips": {
+        "ko": "유효한 IP {count}개로 검색합니다",
+        "en": "Searching with {count} valid IP(s)",
+    },
+    "validation_no_valid_ips": {
+        "ko": "유효한 IP가 없습니다. 올바른 IP 형식으로 입력하세요.",
+        "en": "No valid IPs. Please enter IPs in correct format.",
+    },
+    # Detailed error messages
+    "result_no_match_detail": {
+        "ko": "검색 결과가 없습니다",
+        "en": "No results found",
+    },
+    "result_no_match_hint_public": {
+        "ko": "• {ip}는 알려진 클라우드 프로바이더 IP 범위에 속하지 않습니다",
+        "en": "• {ip} is not in known cloud provider IP ranges",
+    },
+    "result_no_match_hint_private": {
+        "ko": "• 프라이빗 IP인 경우 'Private IP Search'를 사용하세요",
+        "en": "• For private IPs, use 'Private IP Search'",
+    },
+    "result_no_match_hint_check": {
+        "ko": "• IP 주소가 정확한지 확인하세요",
+        "en": "• Please verify the IP address is correct",
+    },
+    # Help
+    "help_title": {
+        "ko": "IP Search 도움말",
+        "en": "IP Search Help",
+    },
+    "help_input_format": {
+        "ko": "입력 형식:",
+        "en": "Input Format:",
+    },
+    "help_single_ip": {
+        "ko": "• 단일 IP: 52.94.76.1",
+        "en": "• Single IP: 52.94.76.1",
+    },
+    "help_multi_ip": {
+        "ko": "• 다중 IP: 52.94.76.1, 8.8.8.8 (쉼표, 공백, 줄바꿈 구분)",
+        "en": "• Multiple IPs: 52.94.76.1, 8.8.8.8 (comma, space, or newline)",
+    },
+    "help_shortcuts": {
+        "ko": "단축키:",
+        "en": "Shortcuts:",
+    },
+    "help_shortcut_help": {
+        "ko": "• ?  - 도움말 표시",
+        "en": "• ?  - Show help",
+    },
+    "help_shortcut_export": {
+        "ko": "• e  - 결과 내보내기",
+        "en": "• e  - Export results",
+    },
+    "help_shortcut_back": {
+        "ko": "• 0  - 돌아가기",
+        "en": "• 0  - Go back",
+    },
+    "help_providers": {
+        "ko": "지원 프로바이더: AWS, GCP, Azure, Oracle, Cloudflare, Fastly",
+        "en": "Supported providers: AWS, GCP, Azure, Oracle, Cloudflare, Fastly",
+    },
 }
 
 

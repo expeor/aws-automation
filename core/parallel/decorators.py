@@ -103,8 +103,9 @@ def categorize_error(error: Exception) -> ErrorCategory:
         return ErrorCategory.NOT_FOUND
 
     # ClientError 상세 분류
-    if hasattr(error, "response"):
-        error_code = error.response.get("Error", {}).get("Code", "")
+    response = getattr(error, "response", None)
+    if response is not None:
+        error_code = response.get("Error", {}).get("Code", "")
 
         if "Timeout" in error_code:
             return ErrorCategory.TIMEOUT
@@ -128,8 +129,9 @@ def get_error_code(error: Exception) -> str:
     Returns:
         에러 코드 문자열
     """
-    if hasattr(error, "response"):
-        code: str = error.response.get("Error", {}).get("Code", "Unknown")
+    response = getattr(error, "response", None)
+    if response is not None:
+        code: str = response.get("Error", {}).get("Code", "Unknown")
         return code
     return error.__class__.__name__
 
@@ -143,8 +145,9 @@ def is_retryable(error: Exception) -> bool:
     Returns:
         재시도 가능하면 True
     """
-    if hasattr(error, "response"):
-        error_code = error.response.get("Error", {}).get("Code", "")
+    response = getattr(error, "response", None)
+    if response is not None:
+        error_code = response.get("Error", {}).get("Code", "")
         return error_code in RETRYABLE_ERROR_CODES
 
     return isinstance(error, (ConnectionError, TimeoutError, OSError))

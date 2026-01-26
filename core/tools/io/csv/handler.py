@@ -16,6 +16,7 @@ try:
 
     CHARDET_AVAILABLE = True
 except ImportError:
+    chardet = None  # type: ignore[assignment]  # Optional dependency
     CHARDET_AVAILABLE = False
 
 logger = logging.getLogger(__name__)

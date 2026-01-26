@@ -323,12 +323,12 @@ class ServiceQuotaChecker:
         dimensions: list[dict[str, str]] | None = None,
     ) -> float | None:
         """CloudWatch 메트릭 현재 값 조회"""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         try:
             cw = self._get_cloudwatch_client()
 
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             start_time = end_time - timedelta(hours=1)
 
             params: dict[str, Any] = {

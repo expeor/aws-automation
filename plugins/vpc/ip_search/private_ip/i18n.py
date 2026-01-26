@@ -296,6 +296,89 @@ MESSAGES = {
         "ko": "0=돌아가기",
         "en": "0=Back",
     },
+    # Validation errors
+    "validation_invalid_query": {
+        "ko": "'{query}' - 올바르지 않은 형식",
+        "en": "'{query}' - Invalid format",
+    },
+    "validation_errors_found": {
+        "ko": "입력 오류:",
+        "en": "Input error:",
+    },
+    # Detailed error messages
+    "result_no_match_detail": {
+        "ko": "검색 결과가 없습니다",
+        "en": "No results found",
+    },
+    "result_no_match_hint_cache": {
+        "ko": "• 캐시에 해당 IP가 존재하지 않습니다",
+        "en": "• IP not found in cache",
+    },
+    "result_no_match_hint_refresh": {
+        "ko": "• 캐시를 새로고침하거나 다른 리전의 캐시를 생성해 보세요",
+        "en": "• Try refreshing cache or creating cache for other regions",
+    },
+    "result_no_match_hint_public": {
+        "ko": "• 퍼블릭 IP인 경우 'Public IP Search'를 사용하세요",
+        "en": "• For public IPs, use 'Public IP Search'",
+    },
+    "result_no_match_hint_format": {
+        "ko": "• 지원 형식: IP, CIDR, VPC ID, ENI ID, 텍스트",
+        "en": "• Supported formats: IP, CIDR, VPC ID, ENI ID, text",
+    },
+    # Help
+    "help_title": {
+        "ko": "Private IP Search 도움말",
+        "en": "Private IP Search Help",
+    },
+    "help_input_format": {
+        "ko": "입력 형식:",
+        "en": "Input Format:",
+    },
+    "help_ip": {
+        "ko": "• IP: 10.0.1.50",
+        "en": "• IP: 10.0.1.50",
+    },
+    "help_cidr": {
+        "ko": "• CIDR: 10.0.0.0/24",
+        "en": "• CIDR: 10.0.0.0/24",
+    },
+    "help_vpc": {
+        "ko": "• VPC ID: vpc-abc123",
+        "en": "• VPC ID: vpc-abc123",
+    },
+    "help_eni": {
+        "ko": "• ENI ID: eni-abc123",
+        "en": "• ENI ID: eni-abc123",
+    },
+    "help_text": {
+        "ko": "• 텍스트: 이름, 설명 등으로 검색",
+        "en": "• Text: Search by name, description, etc.",
+    },
+    "help_shortcuts": {
+        "ko": "단축키:",
+        "en": "Shortcuts:",
+    },
+    "help_shortcut_help": {
+        "ko": "• ?  - 도움말 표시",
+        "en": "• ?  - Show help",
+    },
+    "help_shortcut_detail": {
+        "ko": "• d  - 상세 모드 토글 (API 호출로 리소스 정보 조회)",
+        "en": "• d  - Toggle detail mode (fetch resource info via API)",
+    },
+    "help_shortcut_back": {
+        "ko": "• 0  - 돌아가기",
+        "en": "• 0  - Go back",
+    },
+    "help_note_cache": {
+        "ko": "참고: 검색은 로컬 캐시를 사용합니다. 캐시를 먼저 생성하세요.",
+        "en": "Note: Search uses local cache. Create a cache first.",
+    },
+    "hint_help": {
+        "ko": "?=도움말",
+        "en": "?=Help",
+    },
 }
 
 

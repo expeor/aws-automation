@@ -31,7 +31,8 @@ def get_all_regions() -> list[str]:
     ec2 = boto3.client("ec2", region_name="us-east-1")
     response = ec2.describe_regions(AllRegions=True)
 
-    regions = sorted([r["RegionName"] for r in response["Regions"]])
+    # Convert TypedDict region entries to strings
+    regions = sorted([str(dict(r).get("RegionName", "")) for r in response.get("Regions", [])])
     return regions
 
 

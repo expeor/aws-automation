@@ -191,8 +191,10 @@ class ToolSearchEngine:
 
                 self._index.append(entry)
 
-                # 초성 인덱스 구축
-                for chosung in [entry["chosung_name"], entry["chosung_cat"]]:
+                # 초성 인덱스 구축 (chosung_* 필드는 항상 str)
+                chosung_name = str(entry["chosung_name"])
+                chosung_cat = str(entry["chosung_cat"])
+                for chosung in [chosung_name, chosung_cat]:
                     if chosung not in self._chosung_index:
                         self._chosung_index[chosung] = []
                     self._chosung_index[chosung].append(idx)

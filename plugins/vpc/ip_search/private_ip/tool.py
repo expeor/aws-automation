@@ -12,6 +12,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from rich.console import Console
+from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
@@ -215,6 +216,31 @@ def _delete_caches_menu() -> None:
             if delete_cache(cache.profile_name, cache.account_id):
                 count += 1
         console.print(f"[green]{t('cache_deleted', count=count)}[/green]")
+
+
+# =============================================================================
+# Help Display
+# =============================================================================
+
+
+def _show_help() -> None:
+    """Display help information for private IP search."""
+    help_lines = [
+        f"[bold]{t('help_input_format')}[/bold]",
+        f"  {t('help_ip')}",
+        f"  {t('help_cidr')}",
+        f"  {t('help_vpc')}",
+        f"  {t('help_eni')}",
+        f"  {t('help_text')}",
+        "",
+        f"[bold]{t('help_shortcuts')}[/bold]",
+        f"  {t('help_shortcut_help')}",
+        f"  {t('help_shortcut_detail')}",
+        f"  {t('help_shortcut_back')}",
+        "",
+        f"[dim]{t('help_note_cache')}[/dim]",
+    ]
+    console.print(Panel("\n".join(help_lines), title=t("help_title"), border_style="cyan"))
 
 
 # =============================================================================
@@ -451,13 +477,17 @@ def _run_search_loop(
         detail_hint = (
             f"[magenta]{t('detail_mode_on')}[/magenta]" if detail_mode else f"[dim]{t('hint_toggle_detail')}[/dim]"
         )
-        console.print(f"[dim]{detail_hint} | {t('hint_back')}[/dim]")
+        console.print(f"[dim]{detail_hint} | {t('hint_help')} | {t('hint_back')}[/dim]")
 
         query = Prompt.ask(f"[bold cyan]{t('menu_search')}[/bold cyan]").strip()
 
         # Handle commands
         if not query or query == "0":
             break
+
+        if query == "?":
+            _show_help()
+            continue
 
         if query.lower() == "d":
             detail_mode = not detail_mode
@@ -480,7 +510,19 @@ def _run_search_loop(
             results = _search(searcher, query)
 
         if not results:
-            console.print(f"\n[yellow]{t('result_no_match')}[/yellow]")
+            # Show detailed error message
+            console.print(f"\n[yellow]{t('result_no_match_detail')}[/yellow]")
+            query_type, _ = _parse_query(query)
+            console.print(f"  [dim]{t('result_no_match_hint_cache')}[/dim]")
+            console.print(f"  [dim]{t('result_no_match_hint_refresh')}[/dim]")
+            # Check if it might be a public IP
+            if query_type == "ip":
+                try:
+                    ip = ipaddress.ip_address(query)
+                    if not ip.is_private:
+                        console.print(f"  [dim]{t('result_no_match_hint_public')}[/dim]")
+                except ValueError:
+                    pass
             continue
 
         # Enrich with details if enabled
@@ -526,6 +568,7 @@ def run(ctx: ExecutionContext) -> None:
         print_box_line(f"  2) {t('menu_cache_select')} [dim]({cache_count} available)[/dim]")
         print_box_line(f"  3) {t('menu_cache_create')}")
         print_box_line(f"  4) {t('menu_cache_delete')}")
+        print_box_line(f"  ?) {t('help_shortcut_help').split(' - ')[1]}")
         print_box_line(f"  0) {t('menu_back')}")
         print_box_end()
 
@@ -534,6 +577,9 @@ def run(ctx: ExecutionContext) -> None:
         if choice == "0":
             console.print(f"\n[dim]{t('exit_message')}[/dim]")
             break
+
+        elif choice == "?":
+            _show_help()
 
         elif choice == "1":
             # Search with all valid caches by default

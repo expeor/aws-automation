@@ -166,9 +166,9 @@ class FlowRunner:
 
             for cat in discover_categories(include_aws_services=True):
                 if cat["name"] == ctx.category:
-                    for t in cat.get("tools", []):
-                        if isinstance(t, dict) and t.get("name") == ctx.tool.name:
-                            tool_module = t.get("module", "")
+                    for tool in cat.get("tools", []):
+                        if isinstance(tool, dict) and tool.get("name") == ctx.tool.name:
+                            tool_module = tool.get("module", "")
                             break
                     break
 

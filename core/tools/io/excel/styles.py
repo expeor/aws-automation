@@ -511,8 +511,11 @@ _FILL_NAMES = {
 }
 
 
-def __getattr__(name: str) -> object:
-    """Lazy loading for module-level constants"""
+def __getattr__(name: str) -> Any:
+    """Lazy loading for module-level constants
+
+    Returns Alignment for ALIGN_* names, PatternFill for FILL_* names.
+    """
     if name in _ALIGNMENT_NAMES:
         return _get_alignment(name)
     if name in _FILL_NAMES:

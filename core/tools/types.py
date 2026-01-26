@@ -8,7 +8,7 @@ UI 레이어(main_menu, category step)는 이 모듈을 import해서 사용.
 from typing import TypedDict
 
 
-class AreaInfo(TypedDict, total=False):
+class AreaInfo(TypedDict):
     """Area 메타데이터"""
 
     key: str  # 내부 키 (security, cost 등)

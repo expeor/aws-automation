@@ -485,9 +485,9 @@ class HTMLReport:
         Note:
             - scrollable=None이고 카테고리가 30개 이상이면 자동으로 dataZoom 활성화
         """
-        series_list = []
+        series_list: list[dict[str, Any]] = []
         for name, values in series:
-            s = {
+            s: dict[str, Any] = {
                 "name": name,
                 "type": "line",
                 "data": values,
@@ -500,7 +500,7 @@ class HTMLReport:
         # 대용량 데이터 시 스크롤 활성화
         enable_scroll = scrollable if scrollable is not None else len(categories) >= 30
 
-        option = {
+        option: dict[str, Any] = {
             "title": {"text": title},
             "tooltip": {"trigger": "axis"},
             "legend": {"top": 30},
