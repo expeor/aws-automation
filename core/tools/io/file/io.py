@@ -3,8 +3,11 @@ pkg/io/file/io.py - 파일 I/O 유틸리티
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -37,7 +40,8 @@ def read_file(
     try:
         filepath = Path(filepath)
         return filepath.read_text(encoding=encoding)
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to read file %s: %s", filepath, e)
         return None
 
 
@@ -61,7 +65,8 @@ def write_file(
         filepath.parent.mkdir(parents=True, exist_ok=True)
         filepath.write_text(content, encoding=encoding)
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to write file %s: %s", filepath, e)
         return False
 
 
@@ -79,7 +84,8 @@ def read_json(filepath: str | Path) -> Any | None:
         if content:
             return json.loads(content)
         return None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to read JSON file %s: %s", filepath, e)
         return None
 
 
@@ -101,5 +107,6 @@ def write_json(
     try:
         content = json.dumps(data, ensure_ascii=False, indent=indent)
         return write_file(filepath, content)
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to write JSON file %s: %s", filepath, e)
         return False

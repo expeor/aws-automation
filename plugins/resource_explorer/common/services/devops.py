@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/devops.py - DevOps 리소스 수집
 CloudFormation Stack, CodePipeline, CodeBuild Project 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import CloudFormationStack, CodeBuildProject, CodePipeline
+
+logger = logging.getLogger(__name__)
 
 
 def collect_cloudformation_stacks(
@@ -70,8 +74,8 @@ def collect_codepipelines(session, account_id: str, account_name: str, region: s
                     try:
                         tags_resp = codepipeline.list_tags_for_resource(resourceArn=pipeline_arn)
                         tags = {tag["key"]: tag["value"] for tag in tags_resp.get("tags", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get tags: %s", e)
 
                     pipelines.append(
                         CodePipeline(
@@ -90,10 +94,10 @@ def collect_codepipelines(session, account_id: str, account_name: str, region: s
                             tags=tags,
                         )
                     )
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    logger.debug("Failed to get details: %s", e)
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return pipelines
 
@@ -149,9 +153,9 @@ def collect_codebuild_projects(session, account_id: str, account_name: str, regi
                             tags=tags,
                         )
                     )
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                logger.debug("Failed to get project details: %s", e)
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return projects

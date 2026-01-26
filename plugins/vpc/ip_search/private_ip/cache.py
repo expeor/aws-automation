@@ -6,6 +6,7 @@ Supports searching across multiple cache files.
 """
 
 import ipaddress
+import logging
 import os
 import re
 import threading
@@ -19,6 +20,8 @@ import msgpack
 from botocore.exceptions import ClientError
 
 from core.parallel import get_client
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Structures
@@ -166,7 +169,8 @@ def list_available_caches(expiry_hours: int = 24) -> list[CacheInfo]:
                     regions=sorted(regions),
                 )
             )
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load cache %s: %s", filename, e)
             continue
 
     # Sort by profile name, then account
@@ -184,8 +188,8 @@ def delete_cache(profile_name: str, account_id: str) -> bool:
         try:
             os.remove(filepath)
             return True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to delete cache %s: %s", filepath, e)
     return False
 
 
@@ -202,8 +206,8 @@ def delete_all_caches() -> int:
             try:
                 os.remove(os.path.join(cache_dir, filename))
                 count += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to delete %s: %s", filename, e)
 
     return count
 
@@ -267,7 +271,8 @@ class ENICache:
             }
 
             self._rebuild_indices()
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load cache: %s", e)
             self.cache = {}
 
     def _rebuild_indices(self) -> None:
@@ -600,7 +605,8 @@ def fetch_enis_from_account(
             code = e.response["Error"]["Code"]
             if code == "UnauthorizedOperation":
                 continue
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to fetch ENIs from region %s: %s", region, e)
             continue
 
     return interfaces

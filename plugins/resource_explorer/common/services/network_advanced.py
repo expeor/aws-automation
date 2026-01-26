@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/network_advanced.py - 고급 네트워
 Transit Gateway, VPN, Network ACL, VPC Peering 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import (
@@ -15,6 +17,8 @@ from ..types import (
     VPNGateway,
 )
 from .helpers import parse_tags
+
+logger = logging.getLogger(__name__)
 
 
 def collect_transit_gateways(session, account_id: str, account_name: str, region: str) -> list[TransitGateway]:
@@ -49,8 +53,8 @@ def collect_transit_gateways(session, account_id: str, account_name: str, region
                         tags=tags,
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to collect resources: %s", e)
 
     return tgws
 
@@ -84,8 +88,8 @@ def collect_transit_gateway_attachments(
                         tags=tags,
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to collect resources: %s", e)
 
     return attachments
 
@@ -120,8 +124,8 @@ def collect_vpn_gateways(session, account_id: str, account_name: str, region: st
                     tags=tags,
                 )
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to collect resources: %s", e)
 
     return gateways
 
@@ -153,8 +157,8 @@ def collect_vpn_connections(session, account_id: str, account_name: str, region:
                     tags=tags,
                 )
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to collect resources: %s", e)
 
     return connections
 

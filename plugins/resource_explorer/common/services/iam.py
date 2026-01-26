@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/iam.py - IAM/Security 리소스 수집
 IAM Role, IAM User, IAM Policy, ACM Certificate, WAF WebACL 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import ACMCertificate, IAMPolicy, IAMRole, IAMUser, WAFWebACL
+
+logger = logging.getLogger(__name__)
 
 
 def collect_iam_roles(session, account_id: str, account_name: str, region: str) -> list[IAMRole]:
@@ -30,8 +34,8 @@ def collect_iam_roles(session, account_id: str, account_name: str, region: str) 
                 last_used = detail.get("Role", {}).get("RoleLastUsed", {})
                 last_used_date = last_used.get("LastUsedDate")
                 last_used_region = last_used.get("Region", "")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 연결된 정책 수
             attached_count = 0
@@ -41,16 +45,16 @@ def collect_iam_roles(session, account_id: str, account_name: str, region: str) 
                 attached_count = len(attached_resp.get("AttachedPolicies", []))
                 inline_resp = iam.list_role_policies(RoleName=role_name)
                 inline_count = len(inline_resp.get("PolicyNames", []))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 태그
             tags = {}
             try:
                 tags_resp = iam.list_role_tags(RoleName=role_name)
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             roles.append(
                 IAMRole(
@@ -95,32 +99,32 @@ def collect_iam_users(session, account_id: str, account_name: str, region: str) 
                 keys_resp = iam.list_access_keys(UserName=user_name)
                 access_key_count = len(keys_resp.get("AccessKeyMetadata", []))
                 has_access_keys = access_key_count > 0
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # MFA 정보
             mfa_enabled = False
             try:
                 mfa_resp = iam.list_mfa_devices(UserName=user_name)
                 mfa_enabled = len(mfa_resp.get("MFADevices", [])) > 0
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # Login Profile (Console Access)
             has_console_access = False
             try:
                 iam.get_login_profile(UserName=user_name)
                 has_console_access = True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 그룹 목록
             groups = []
             try:
                 groups_resp = iam.list_groups_for_user(UserName=user_name)
                 groups = [g.get("GroupName", "") for g in groups_resp.get("Groups", [])]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 정책 수
             attached_count = 0
@@ -130,16 +134,16 @@ def collect_iam_users(session, account_id: str, account_name: str, region: str) 
                 attached_count = len(attached_resp.get("AttachedPolicies", []))
                 inline_resp = iam.list_user_policies(UserName=user_name)
                 inline_count = len(inline_resp.get("PolicyNames", []))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 태그
             tags = {}
             try:
                 tags_resp = iam.list_user_tags(UserName=user_name)
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             users.append(
                 IAMUser(
@@ -184,8 +188,8 @@ def collect_iam_policies(session, account_id: str, account_name: str, region: st
             try:
                 tags_resp = iam.list_policy_tags(PolicyArn=policy_arn)
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             policies.append(
                 IAMPolicy(
@@ -231,8 +235,8 @@ def collect_acm_certificates(session, account_id: str, account_name: str, region
                     try:
                         tags_resp = acm.list_tags_for_certificate(CertificateArn=cert_arn)
                         tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get ACM certificate tags: %s", e)
 
                     certificates.append(
                         ACMCertificate(
@@ -254,10 +258,10 @@ def collect_acm_certificates(session, account_id: str, account_name: str, region
                             tags=tags,
                         )
                     )
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return certificates
 
@@ -286,8 +290,8 @@ def collect_waf_web_acls(session, account_id: str, account_name: str, region: st
                     tags_resp = wafv2.list_tags_for_resource(ResourceARN=acl_arn)
                     tag_info = tags_resp.get("TagInfoForResource", {})
                     tags = {tag["Key"]: tag["Value"] for tag in tag_info.get("TagList", [])}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
                 default_action = web_acl.get("DefaultAction", {})
                 action_type = "Allow" if "Allow" in default_action else "Block"
@@ -310,10 +314,10 @@ def collect_waf_web_acls(session, account_id: str, account_name: str, region: st
                         tags=tags,
                     )
                 )
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     # CloudFront WebACLs (us-east-1에서만)
     if region == "us-east-1":
@@ -333,8 +337,8 @@ def collect_waf_web_acls(session, account_id: str, account_name: str, region: st
                         tags_resp = wafv2.list_tags_for_resource(ResourceARN=acl_arn)
                         tag_info = tags_resp.get("TagInfoForResource", {})
                         tags = {tag["Key"]: tag["Value"] for tag in tag_info.get("TagList", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get WAF tags: %s", e)
 
                     default_action = web_acl.get("DefaultAction", {})
                     action_type = "Allow" if "Allow" in default_action else "Block"
@@ -357,9 +361,9 @@ def collect_waf_web_acls(session, account_id: str, account_name: str, region: st
                             tags=tags,
                         )
                     )
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
+        except Exception as e:
+            logger.debug("Failed to process item: %s", e)
 
     return web_acls

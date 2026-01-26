@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/messaging.py - Integration/Messaging �
 SNS Topic, SQS Queue, EventBridge Rule, Step Functions, API Gateway 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import APIGatewayAPI, EventBridgeRule, SNSTopic, SQSQueue, StepFunction
+
+logger = logging.getLogger(__name__)
 
 
 def collect_sns_topics(session, account_id: str, account_name: str, region: str) -> list[SNSTopic]:
@@ -31,8 +35,8 @@ def collect_sns_topics(session, account_id: str, account_name: str, region: str)
                 try:
                     tags_resp = sns.list_tags_for_resource(ResourceArn=topic_arn)
                     tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
                 topics.append(
                     SNSTopic(
@@ -50,8 +54,8 @@ def collect_sns_topics(session, account_id: str, account_name: str, region: str)
                         tags=tags,
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
     return topics
 
@@ -79,8 +83,8 @@ def collect_sqs_queues(session, account_id: str, account_name: str, region: str)
                     try:
                         tags_resp = sqs.list_queue_tags(QueueUrl=queue_url)
                         tags = tags_resp.get("Tags", {})
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get details: %s", e)
 
                     queues.append(
                         SQSQueue(
@@ -103,10 +107,10 @@ def collect_sqs_queues(session, account_id: str, account_name: str, region: str)
                             tags=tags,
                         )
                     )
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return queues
 
@@ -123,8 +127,8 @@ def collect_eventbridge_rules(session, account_id: str, account_name: str, regio
         for bus in bus_resp.get("EventBuses", []):
             if bus.get("Name") != "default":
                 event_buses.append(bus.get("Name", ""))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     for bus_name in event_buses:
         try:
@@ -138,8 +142,8 @@ def collect_eventbridge_rules(session, account_id: str, account_name: str, regio
                     try:
                         targets_resp = events.list_targets_by_rule(Rule=rule_name, EventBusName=bus_name)
                         target_count = len(targets_resp.get("Targets", []))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get details: %s", e)
 
                     # 태그 조회
                     tags = {}
@@ -148,8 +152,8 @@ def collect_eventbridge_rules(session, account_id: str, account_name: str, regio
                         try:
                             tags_resp = events.list_tags_for_resource(ResourceARN=rule_arn)
                             tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Failed to get EventBridge rule tags: %s", e)
 
                     rules.append(
                         EventBridgeRule(
@@ -168,8 +172,8 @@ def collect_eventbridge_rules(session, account_id: str, account_name: str, regio
                             tags=tags,
                         )
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to process rules: %s", e)
 
     return rules
 
@@ -194,8 +198,8 @@ def collect_step_functions(session, account_id: str, account_name: str, region: 
                     try:
                         tags_resp = sfn.list_tags_for_resource(resourceArn=sm_arn)
                         tags = {tag["key"]: tag["value"] for tag in tags_resp.get("tags", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get details: %s", e)
 
                     logging_config = detail.get("loggingConfiguration", {})
                     tracing_config = detail.get("tracingConfiguration", {})
@@ -216,10 +220,10 @@ def collect_step_functions(session, account_id: str, account_name: str, region: 
                             tags=tags,
                         )
                     )
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return state_machines
 
@@ -262,8 +266,8 @@ def collect_api_gateway_apis(session, account_id: str, account_name: str, region
                         tags=tags,
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     # HTTP/WebSocket API (API Gateway v2)
     try:
@@ -292,7 +296,7 @@ def collect_api_gateway_apis(session, account_id: str, account_name: str, region
                         tags=api.get("Tags", {}),
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return apis

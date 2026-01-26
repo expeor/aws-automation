@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/database.py - Database/Storage 리소�
 RDS Instance, S3 Bucket, DynamoDB Table, ElastiCache Cluster 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import DynamoDBTable, ElastiCacheCluster, RDSCluster, RDSInstance, RedshiftCluster, S3Bucket
+
+logger = logging.getLogger(__name__)
 
 
 def collect_rds_instances(session, account_id: str, account_name: str, region: str) -> list[RDSInstance]:
@@ -22,8 +26,8 @@ def collect_rds_instances(session, account_id: str, account_name: str, region: s
             try:
                 tags_resp = rds.list_tags_for_resource(ResourceName=db["DBInstanceArn"])
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("TagList", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # Endpoint 정보
             endpoint = db.get("Endpoint", {})
@@ -83,7 +87,8 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
             try:
                 loc_resp = s3.get_bucket_location(Bucket=bucket_name)
                 bucket_region = loc_resp.get("LocationConstraint") or "us-east-1"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get bucket location: %s", e)
                 bucket_region = "unknown"
 
             # 버저닝 상태
@@ -91,8 +96,8 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
             try:
                 ver_resp = s3.get_bucket_versioning(Bucket=bucket_name)
                 versioning_status = ver_resp.get("Status", "Disabled")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 암호화 설정
             encryption_type = ""
@@ -101,8 +106,8 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
                 rules = enc_resp.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
                 if rules:
                     encryption_type = rules[0].get("ApplyServerSideEncryptionByDefault", {}).get("SSEAlgorithm", "")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # Public Access Block
             public_access_block = True
@@ -117,32 +122,32 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
                         config.get("RestrictPublicBuckets", False),
                     ]
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 로깅 설정
             logging_enabled = False
             try:
                 log_resp = s3.get_bucket_logging(Bucket=bucket_name)
                 logging_enabled = bool(log_resp.get("LoggingEnabled"))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 수명 주기 규칙
             lifecycle_rules_count = 0
             try:
                 lc_resp = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
                 lifecycle_rules_count = len(lc_resp.get("Rules", []))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # 태그
             tags = {}
             try:
                 tags_resp = s3.get_bucket_tagging(Bucket=bucket_name)
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("TagSet", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             buckets.append(
                 S3Bucket(
@@ -160,8 +165,8 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
                 )
             )
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return buckets
 
@@ -208,8 +213,8 @@ def collect_dynamodb_tables(session, account_id: str, account_name: str, region:
             try:
                 tags_resp = dynamodb.list_tags_of_resource(ResourceArn=table["TableArn"])
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             tables.append(
                 DynamoDBTable(
@@ -232,8 +237,8 @@ def collect_dynamodb_tables(session, account_id: str, account_name: str, region:
                     tags=tags,
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to process item: %s", e)
 
     return tables
 
@@ -256,8 +261,8 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
                 if arn:
                     tags_resp = elasticache.list_tags_for_resource(ResourceName=arn)
                     tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("TagList", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             clusters.append(
                 ElastiCacheCluster(
@@ -298,8 +303,8 @@ def collect_rds_clusters(session, account_id: str, account_name: str, region: st
             try:
                 tags_resp = rds.list_tags_for_resource(ResourceName=cluster["DBClusterArn"])
                 tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("TagList", [])}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             # VPC 정보
             vpc_id = ""

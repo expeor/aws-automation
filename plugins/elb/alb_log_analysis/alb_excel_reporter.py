@@ -198,7 +198,7 @@ class ALBExcelReporter:
                 if len(parts) >= 3:
                     account_id, region = parts[0], parts[2]
             except Exception:
-                pass
+                pass  # S3 URI parsing fallback to defaults
 
         alb_name = str(data.get("alb_name") or "alb").strip().replace("/", "-").replace("\\", "-")
         return str(Path(self.output_dir) / f"{account_id}_{region}_{alb_name}_report_{token_hex(4)}.xlsx")

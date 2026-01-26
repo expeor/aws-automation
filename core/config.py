@@ -266,7 +266,7 @@ def get_version() -> str:
         try:
             return version_file.read_text(encoding="utf-8").strip()
         except Exception:
-            pass
+            pass  # Fall through to importlib.metadata
 
     # Fallback: importlib.metadata
     try:

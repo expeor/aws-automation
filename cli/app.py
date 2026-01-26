@@ -714,7 +714,7 @@ def _get_profiles_by_kind(kind: str) -> list:
             ):
                 result.append(profile_name)
     except Exception:
-        pass
+        pass  # Config parsing errors are non-critical
 
     return result
 

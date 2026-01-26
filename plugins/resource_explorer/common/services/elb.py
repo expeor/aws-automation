@@ -2,10 +2,14 @@
 plugins/resource_explorer/common/services/elb.py - ELB 리소스 수집
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import LoadBalancer, TargetGroup
 from .helpers import parse_tags
+
+logger = logging.getLogger(__name__)
 
 
 def collect_load_balancers(
@@ -114,8 +118,8 @@ def _populate_lb_details(elbv2, load_balancers: list[LoadBalancer]) -> None:
                 if arn in lb_map:
                     tags = parse_tags(tag_desc.get("Tags"))
                     lb_map[arn].tags = tags
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to get resource details: %s", e)
 
     # Access Logs 속성 조회 (개별 조회 필요)
     for arn, lb in lb_map.items():
@@ -125,8 +129,8 @@ def _populate_lb_details(elbv2, load_balancers: list[LoadBalancer]) -> None:
                 if attr.get("Key") == "access_logs.s3.enabled":
                     lb.access_logs_enabled = attr.get("Value", "false").lower() == "true"
                     break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to get resource details: %s", e)
 
 
 def collect_target_groups(session, account_id: str, account_name: str, region: str) -> list[TargetGroup]:
@@ -153,8 +157,8 @@ def collect_target_groups(session, account_id: str, account_name: str, region: s
                         healthy += 1
                     elif state == "unhealthy":
                         unhealthy += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get target health: %s", e)
 
             # Health check 설정 추출
             health_check_path = tg.get("HealthCheckPath", "")
@@ -216,8 +220,8 @@ def _populate_tg_details(elbv2, target_groups: list[TargetGroup]) -> None:
                 if arn in tg_map:
                     tags = parse_tags(tag_desc.get("Tags"))
                     tg_map[arn].tags = tags
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to get resource details: %s", e)
 
     # Deregistration delay 속성 조회 (개별 조회 필요)
     for arn, tg in tg_map.items():
@@ -227,5 +231,5 @@ def _populate_tg_details(elbv2, target_groups: list[TargetGroup]) -> None:
                 if attr.get("Key") == "deregistration_delay.timeout_seconds":
                     tg.deregistration_delay = int(attr.get("Value", 300))
                     break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to get resource details: %s", e)

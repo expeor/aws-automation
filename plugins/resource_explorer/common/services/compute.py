@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/compute.py - Compute 리소스 수집
 EBS Volume, Lambda Function, ECS Cluster/Service, ASG, Launch Template, EKS, AMI, Snapshot 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import (
@@ -19,6 +21,8 @@ from ..types import (
     Snapshot,
 )
 from .helpers import parse_tags
+
+logger = logging.getLogger(__name__)
 
 
 def collect_ebs_volumes(session, account_id: str, account_name: str, region: str) -> list[EBSVolume]:
@@ -84,8 +88,8 @@ def collect_lambda_functions(session, account_id: str, account_name: str, region
             try:
                 tags_resp = lambda_client.list_tags(Resource=func["FunctionArn"])
                 tags = tags_resp.get("Tags", {})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             functions.append(
                 LambdaFunction(
@@ -153,8 +157,8 @@ def collect_ecs_clusters(session, account_id: str, account_name: str, region: st
                         tags=tags,
                     )
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to process batch: %s", e)
 
     return clusters
 
@@ -177,7 +181,8 @@ def collect_ecs_services(session, account_id: str, account_name: str, region: st
             paginator = ecs.get_paginator("list_services")
             for page in paginator.paginate(cluster=cluster_arn):
                 service_arns.extend(page.get("serviceArns", []))
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to process item: %s", e)
             continue
 
         if not service_arns:
@@ -211,8 +216,8 @@ def collect_ecs_services(session, account_id: str, account_name: str, region: st
                             tags=tags,
                         )
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
     return services
 
@@ -295,8 +300,8 @@ def collect_launch_templates(session, account_id: str, account_name: str, region
                     ami_id = data.get("ImageId", "")
                     key_name = data.get("KeyName", "")
                     security_group_ids = data.get("SecurityGroupIds", [])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             templates.append(
                 LaunchTemplate(
@@ -332,7 +337,8 @@ def collect_eks_clusters(session, account_id: str, account_name: str, region: st
         paginator = eks.get_paginator("list_clusters")
         for page in paginator.paginate():
             cluster_names.extend(page.get("clusters", []))
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to list EKS clusters: %s", e)
         return clusters
 
     # 각 클러스터 상세 정보
@@ -364,8 +370,8 @@ def collect_eks_clusters(session, account_id: str, account_name: str, region: st
                     tags=cluster.get("tags", {}),
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to process batch: %s", e)
 
     return clusters
 
@@ -381,7 +387,8 @@ def collect_eks_node_groups(session, account_id: str, account_name: str, region:
         paginator = eks.get_paginator("list_clusters")
         for page in paginator.paginate():
             cluster_names.extend(page.get("clusters", []))
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to list EKS clusters: %s", e)
         return node_groups
 
     # 각 클러스터의 노드 그룹
@@ -419,10 +426,10 @@ def collect_eks_node_groups(session, account_id: str, account_name: str, region:
                             tags=ng.get("tags", {}),
                         )
                     )
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    logger.debug("Failed to get nodegroup details: %s", e)
+        except Exception as e:
+            logger.debug("Failed to process batch: %s", e)
 
     return node_groups
 
@@ -457,8 +464,8 @@ def collect_amis(session, account_id: str, account_name: str, region: str) -> li
                     tags=tags,
                 )
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list resources: %s", e)
 
     return amis
 

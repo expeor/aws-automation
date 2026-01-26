@@ -249,7 +249,8 @@ def _get_ecs_info(session, eni_id: str, region: str) -> str | None:
                             service_name = group.split("service:")[1] if group.startswith("service:") else "Unknown"
                             cluster_name = cluster.split("/")[-1]
                             return f"ECS: {service_name} (Cluster: {cluster_name})"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get details: %s", e)
                 continue
 
         return "ECS Task"
@@ -275,7 +276,8 @@ def _get_eks_fargate_info(session, eni: dict[str, Any], region: str) -> str | No
                     if eni.get("SubnetId") in profile_details.get("subnets", []):
                         namespaces = [s.get("namespace") for s in profile_details.get("selectors", [])]
                         return f"EKS Fargate: {cluster_name}/{profile} (NS: {', '.join(namespaces)})"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get details: %s", e)
                 continue
 
         return "EKS Fargate Pod"
@@ -371,7 +373,8 @@ def _get_opensearch_info(session, eni: dict[str, Any], region: str) -> str | Non
 
                 engine_version = detail.get("EngineVersion", "").replace("OpenSearch_", "")
                 return f"OpenSearch: {domain_name} (v{engine_version})"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get details: %s", e)
                 continue
 
         return "OpenSearch Domain"
@@ -411,7 +414,8 @@ def _get_elasticache_info(session, eni: dict[str, Any], region: str) -> str | No
                     continue
 
                 return f"ElastiCache: {cluster_id} ({engine})"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get details: %s", e)
                 continue
 
         return "ElastiCache Cluster"
@@ -511,7 +515,8 @@ def _get_route53_resolver_info(session, eni: dict[str, Any], region: str) -> str
                 for ip_addr in ip_addresses:
                     if ip_addr.get("SubnetId") == eni_subnet_id:
                         return f"Route53 Resolver: {endpoint_name} ({direction.lower()})"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get details: %s", e)
                 continue
 
         return "Route53 Resolver"
@@ -537,7 +542,8 @@ def _get_efs_info(session, eni_id: str, description: str, region: str) -> str | 
                 size = fs_info.get("SizeInBytes", {}).get("Value", 0) / (1024**3)
                 display = name or fs_id
                 return f"EFS: {display} ({size:.1f} GB)"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get EFS details: %s", e)
                 return f"EFS: {fs_id}"
 
         return "EFS"
@@ -559,7 +565,8 @@ def _get_fsx_info(session, eni_id: str, description: str, region: str) -> str | 
                 fs_type = fs_info.get("FileSystemType", "Unknown")
                 storage = fs_info.get("StorageCapacity", 0)
                 return f"FSx ({fs_type}): {fs_id} ({storage} GB)"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get FSx details: %s", e)
                 return f"FSx: {fs_id}"
 
         return "FSx"

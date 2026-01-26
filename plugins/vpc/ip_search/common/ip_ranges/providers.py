@@ -12,12 +12,15 @@ Features:
 
 import ipaddress
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Structures
@@ -66,7 +69,8 @@ def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:
         with open(cache_file, encoding="utf-8") as f:
             data: dict[Any, Any] = json.load(f)
             return data
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to load cache %s: %s", name, e)
         return None
 
 
@@ -76,8 +80,8 @@ def _save_to_cache(name: str, data: dict) -> None:
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Cache operation failed: %s", e)
 
 
 def clear_public_cache() -> int:
@@ -90,8 +94,8 @@ def clear_public_cache() -> int:
             try:
                 os.remove(cache_file)
                 count += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Cache delete failed: %s", e)
     return count
 
 
@@ -140,7 +144,8 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
                 result["counts"][provider.upper()] = count
             else:
                 result["failed"].append(provider.upper())
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to refresh %s: %s", provider, e)
             result["failed"].append(provider.upper())
 
     return result
@@ -154,8 +159,8 @@ def _fetch_and_cache(name: str, url: str) -> dict[Any, Any] | None:
             data: dict[Any, Any] = response.json()
             _save_to_cache(name, data)
             return data
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Cache operation failed: %s", e)
     return None
 
 
@@ -179,7 +184,8 @@ def _fetch_azure_fresh() -> dict[Any, Any] | None:
                     if data.get("values"):
                         _save_to_cache("azure", data)
                         return data
-            except Exception:
+            except Exception as e:
+                logger.debug("Network operation failed: %s", e)
                 continue
 
     return None
@@ -221,7 +227,8 @@ def get_public_cache_status() -> dict[str, Any]:
                     "count": count,
                 }
                 status["total_files"] += 1
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to read cache status for %s: %s", name, e)
                 status["providers"][name.upper()] = {"cached": False}
         else:
             status["providers"][name.upper()] = {"cached": False}
@@ -245,7 +252,8 @@ def get_aws_ip_ranges() -> dict[str, Any]:
         data: dict[str, Any] = response.json()
         _save_to_cache("aws", data)
         return data
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to fetch AWS IP ranges: %s", e)
         return {"prefixes": [], "ipv6_prefixes": []}
 
 
@@ -260,7 +268,8 @@ def get_gcp_ip_ranges() -> dict[str, Any]:
         data: dict[str, Any] = response.json()
         _save_to_cache("gcp", data)
         return data
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to fetch GCP IP ranges: %s", e)
         return {"prefixes": []}
 
 
@@ -288,7 +297,8 @@ def get_azure_ip_ranges() -> dict[str, Any]:
                     if data.get("values"):
                         _save_to_cache("azure", data)
                         return data
-            except Exception:
+            except Exception as e:
+                logger.debug("Network operation failed: %s", e)
                 continue
 
     return {"values": []}
@@ -305,7 +315,8 @@ def get_oracle_ip_ranges() -> dict[str, Any]:
         data: dict[str, Any] = response.json()
         _save_to_cache("oracle", data)
         return data
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to fetch Oracle IP ranges: %s", e)
         return {"regions": []}
 
 
@@ -466,7 +477,8 @@ def load_ip_ranges_parallel(target_providers: set[str]) -> dict[str, dict[str, A
             provider = futures[future]
             try:
                 data_sources[provider] = future.result()
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to load %s IP ranges: %s", provider, e)
                 data_sources[provider] = {}
 
     return data_sources

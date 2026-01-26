@@ -15,6 +15,7 @@ plugins/rds/snapshot_audit.py - RDS Snapshot 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -25,6 +26,7 @@ from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_rds_snapshot_monthly_cost
 
+logger = logging.getLogger(__name__)
 console = Console()
 
 # 필요한 AWS 권한 목록
@@ -230,7 +232,8 @@ def _parse_rds_snapshot(data: dict, rds, account_id: str, account_name: str, reg
             region=region,
             monthly_cost=monthly_cost,
         )
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to parse RDS snapshot: %s", e)
         return None
 
 
@@ -268,7 +271,8 @@ def _parse_aurora_snapshot(data: dict, rds, account_id: str, account_name: str, 
             region=region,
             monthly_cost=monthly_cost,
         )
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to parse Aurora snapshot: %s", e)
         return None
 
 

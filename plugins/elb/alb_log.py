@@ -6,6 +6,7 @@ core/tools/analysis/log/alb_analyzer.py - ALB 로그 분석 도구 진입점
     - collect_options(ctx): 선택. 추가 옵션 수집.
 """
 
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Any
@@ -26,6 +27,8 @@ from core.auth import get_context_session
 from core.parallel import get_client
 from core.tools.cache import get_cache_dir
 from core.tools.output import open_in_explorer
+
+logger = logging.getLogger(__name__)
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -844,7 +847,8 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
                 attr["Key"] == "access_logs.s3.enabled" and attr["Value"] == "true" for attr in attrs["Attributes"]
             )
             status = "[green]✓[/green]" if log_enabled else "[red]✗[/red]"
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get ALB log status: %s", e)
             status = "[dim]?[/dim]"
 
         alb_list.append(
@@ -893,7 +897,8 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
         try:
             sts = get_client(session, "sts")
             account_id = sts.get_caller_identity()["Account"]
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get account ID: %s", e)
             account_id = "unknown"
 
         # 리전 추출
@@ -1123,7 +1128,8 @@ def _generate_report_filename(analyzer, analysis_results: dict[str, Any]) -> str
         random_suffix = secrets.token_hex(4)
         return f"{account_id}_{region}_{alb_name}_report_{random_suffix}.xlsx"
 
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to generate report filename: %s", e)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"ALB_Log_Analysis_{timestamp}.xlsx"
 
@@ -1144,8 +1150,8 @@ def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None
                     filepath = os.path.join(gz_directory, filename)
                     if os.path.isfile(filepath):
                         os.remove(filepath)
-            except Exception:
-                pass  # 조용히 실패 처리
+            except Exception as e:
+                logger.debug("Failed to clean gz directory: %s", e)
 
         # 3. log 디렉토리 내부 파일 삭제
         if isinstance(log_directory, str) and os.path.exists(log_directory):
@@ -1154,10 +1160,10 @@ def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None
                     filepath = os.path.join(log_directory, filename)
                     if os.path.isfile(filepath):
                         os.remove(filepath)
-            except Exception:
-                pass  # 조용히 실패 처리
+            except Exception as e:
+                logger.debug("Failed to clean log directory: %s", e)
 
         print_sub_task_done("임시 파일 정리 완료")
 
-    except Exception:
-        pass  # 정리 실패는 무시
+    except Exception as e:
+        logger.debug("Failed to cleanup temp files: %s", e)

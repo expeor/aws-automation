@@ -442,7 +442,7 @@ class ALBLogAnalyzer:
                 self.loaded_log_files_paths = log_files
                 self.loaded_log_directory = log_directory
             except Exception:
-                pass
+                pass  # Non-critical metadata assignment
 
             # 파일 리스트를 DuckDB가 이해할 수 있는 리스트 리터럴로 변환
             backslash = "\\"
@@ -748,16 +748,16 @@ class ALBLogAnalyzer:
                             try:
                                 request_url_details[url]["unique_ips"] = int(uniq or 0)
                             except Exception:
-                                request_url_details[url]["unique_ips"] = 0
+                                request_url_details[url]["unique_ips"] = 0  # Type conversion fallback
 
                     for url, avg_rt in avg_rt_rows:
                         if url in request_url_details:
                             try:
                                 request_url_details[url]["avg_response_time"] = float(avg_rt or 0.0)
                             except Exception:
-                                request_url_details[url]["avg_response_time"] = 0.0
+                                request_url_details[url]["avg_response_time"] = 0.0  # Type conversion fallback
             except Exception:
-                # 세부 URL 통계는 선택 항목이므로 실패해도 전체 분석을 계속
+                # 세부 URL 통계는 선택 항목이므로 실패해도 전체 분석을 계속 (optional stats)
                 request_url_details = {}
 
             # 3) 느린 응답/바이트 계산
@@ -813,7 +813,7 @@ class ALBLogAnalyzer:
                 ).fetchone()
                 long_response_count_val = long_resp_count_row[0] if long_resp_count_row else 0
             except Exception:
-                long_response_count_val = 0
+                long_response_count_val = 0  # Query fallback
 
             # 응답 시간 백분위수 (P50, P90, P95, P99)
             response_time_percentiles: dict[str, float] = {}
@@ -1185,7 +1185,7 @@ class ALBLogAnalyzer:
                 if alb_name_row and alb_name_row[0]:
                     analysis_results["alb_name"] = alb_name_row[0]
             except Exception:
-                pass
+                pass  # ALB name extraction is optional
 
             # 상태 코드별 로그 데이터 추가
             analysis_results.update(status_code_logs)
@@ -1426,7 +1426,7 @@ class ALBLogAnalyzer:
                     if not os.listdir(self.duckdb_dir):
                         os.rmdir(self.duckdb_dir)
                 except Exception:
-                    pass
+                    pass  # Directory cleanup is best-effort
 
             # 기존에 전달된 디렉토리도 정리
             already_cleaned = []

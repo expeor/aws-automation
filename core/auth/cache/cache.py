@@ -129,7 +129,7 @@ class TokenEncryption:
             decrypted: bytes = self._fernet.decrypt(decoded)
             return decrypted.decode()
         except Exception:
-            # 복호화 실패 시 평문으로 간주
+            # 복호화 실패 시 평문으로 간주 (expected for unencrypted data)
             return data
 
 

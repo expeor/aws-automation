@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/monitoring.py - Monitoring 리소스 �
 CloudWatch Alarm, CloudWatch Log Group 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import CloudWatchAlarm, CloudWatchLogGroup
+
+logger = logging.getLogger(__name__)
 
 
 def collect_cloudwatch_alarms(session, account_id: str, account_name: str, region: str) -> list[CloudWatchAlarm]:
@@ -25,8 +29,8 @@ def collect_cloudwatch_alarms(session, account_id: str, account_name: str, regio
                 try:
                     tags_resp = cw.list_tags_for_resource(ResourceARN=alarm_arn)
                     tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
             alarms.append(
                 CloudWatchAlarm(
@@ -73,8 +77,8 @@ def collect_cloudwatch_log_groups(session, account_id: str, account_name: str, r
             try:
                 tags_resp = logs.list_tags_for_resource(resourceArn=log_group_arn)
                 tags = tags_resp.get("tags", {})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get resource details: %s", e)
 
             log_groups.append(
                 CloudWatchLogGroup(

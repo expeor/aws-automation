@@ -279,9 +279,9 @@ class Loader:
 
             except ConfigurationError:
                 raise
-            except Exception:
+            except Exception as e:
                 # 개별 섹션 파싱 오류는 경고만 하고 계속 진행
-                pass
+                logger.debug("Failed to parse section %s: %s", section, e)
 
     def _parse_profile_section(
         self,

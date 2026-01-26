@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/backup.py - Backup 리소스 수집
 Backup Vault, Backup Plan 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import BackupPlan, BackupVault
+
+logger = logging.getLogger(__name__)
 
 
 def collect_backup_vaults(session, account_id: str, account_name: str, region: str) -> list[BackupVault]:
@@ -26,8 +30,8 @@ def collect_backup_vaults(session, account_id: str, account_name: str, region: s
                 try:
                     tags_resp = backup.list_tags(ResourceArn=vault_arn)
                     tags = tags_resp.get("Tags", {})
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
                 vaults.append(
                     BackupVault(
@@ -46,8 +50,8 @@ def collect_backup_vaults(session, account_id: str, account_name: str, region: s
                         tags=tags,
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list backup resources: %s", e)
 
     return vaults
 
@@ -72,16 +76,16 @@ def collect_backup_plans(session, account_id: str, account_name: str, region: st
                     plan_detail = detail.get("BackupPlan", {})
                     rule_count = len(plan_detail.get("Rules", []))
                     advanced_settings = bool(plan_detail.get("AdvancedBackupSettings"))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
                 # 태그 조회
                 tags = {}
                 try:
                     tags_resp = backup.list_tags(ResourceArn=plan_arn)
                     tags = tags_resp.get("Tags", {})
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
                 plans.append(
                     BackupPlan(
@@ -100,7 +104,7 @@ def collect_backup_plans(session, account_id: str, account_name: str, region: st
                         tags=tags,
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list backup resources: %s", e)
 
     return plans

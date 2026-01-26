@@ -166,7 +166,8 @@ class PriceCache:
                             "item_count": len(data.get("prices", {})),
                         }
                     )
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to parse cache file %s: %s", f.name, e)
                     files.append({"name": f.name, "error": True})
 
         return info

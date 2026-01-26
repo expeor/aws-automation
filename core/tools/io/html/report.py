@@ -54,7 +54,8 @@ def open_in_browser(filepath: str) -> bool:
         try:
             webbrowser.open(f"file://{Path(filepath).resolve()}")
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to open in browser: %s", e)
             return False
 
 

@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/storage.py - Storage 리소스 수집
 EFS File System, FSx File System 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import EFSFileSystem, FSxFileSystem
+
+logger = logging.getLogger(__name__)
 
 
 def collect_efs_file_systems(session, account_id: str, account_name: str, region: str) -> list[EFSFileSystem]:
@@ -25,8 +29,8 @@ def collect_efs_file_systems(session, account_id: str, account_name: str, region
             try:
                 mt_resp = efs.describe_mount_targets(FileSystemId=fs["FileSystemId"])
                 mount_target_count = len(mt_resp.get("MountTargets", []))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to describe mount targets: %s", e)
 
             file_systems.append(
                 EFSFileSystem(
@@ -83,7 +87,7 @@ def collect_fsx_file_systems(session, account_id: str, account_name: str, region
                         tags=tags,
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list FSx file systems: %s", e)
 
     return file_systems

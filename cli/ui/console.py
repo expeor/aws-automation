@@ -466,7 +466,7 @@ def wait_for_any_key(prompt: str | None = None) -> None:
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     except Exception:
-        # fallback: 일반 input() 사용 (Enter 필요)
+        # fallback: 일반 input() 사용 (Enter 필요) - tty not available
         console.input("")
         return
 

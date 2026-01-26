@@ -163,7 +163,8 @@ class ListenerRulesAnalyzer:
         try:
             listeners_resp = self.elbv2.describe_listeners(LoadBalancerArn=lb_arn)
             listeners = listeners_resp.get("Listeners", [])
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to describe listeners for %s: %s", lb_arn, e)
             return results
 
         for listener in listeners:
@@ -184,7 +185,8 @@ class ListenerRulesAnalyzer:
         try:
             rules_resp = self.elbv2.describe_rules(ListenerArn=listener_arn)
             rules = rules_resp.get("Rules", [])
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to describe rules for %s: %s", listener_arn, e)
             return None
 
         if not rules:

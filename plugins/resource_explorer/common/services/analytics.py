@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/analytics.py - Analytics 리소스 수
 Kinesis Stream, Kinesis Firehose, Glue Database 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import GlueDatabase, KinesisFirehose, KinesisStream
+
+logger = logging.getLogger(__name__)
 
 
 def collect_kinesis_streams(session, account_id: str, account_name: str, region: str) -> list[KinesisStream]:
@@ -30,8 +34,8 @@ def collect_kinesis_streams(session, account_id: str, account_name: str, region:
                     try:
                         tags_resp = kinesis.list_tags_for_stream(StreamName=stream_name)
                         tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get tags for stream %s: %s", stream_name, e)
 
                     streams.append(
                         KinesisStream(
@@ -50,10 +54,10 @@ def collect_kinesis_streams(session, account_id: str, account_name: str, region:
                             tags=tags,
                         )
                     )
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    logger.debug("Failed to describe stream %s: %s", stream_name, e)
+    except Exception as e:
+        logger.debug("Failed to list Kinesis streams: %s", e)
 
     return streams
 
@@ -121,8 +125,8 @@ def collect_kinesis_firehoses(session, account_id: str, account_name: str, regio
                 try:
                     tags_resp = firehose.list_tags_for_delivery_stream(DeliveryStreamName=stream_name)
                     tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags for delivery stream %s: %s", stream_name, e)
 
                 delivery_streams.append(
                     KinesisFirehose(
@@ -141,10 +145,10 @@ def collect_kinesis_firehoses(session, account_id: str, account_name: str, regio
                         tags=tags,
                     )
                 )
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                logger.debug("Failed to describe delivery stream %s: %s", stream_name, e)
+    except Exception as e:
+        logger.debug("Failed to list Firehose delivery streams: %s", e)
 
     return delivery_streams
 
@@ -169,8 +173,8 @@ def collect_glue_databases(session, account_id: str, account_name: str, region: 
                     table_count = len(tables_resp.get("TableList", []))
                     if tables_resp.get("NextToken"):
                         table_count = -1  # 1개 이상
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tables for database %s: %s", db_name, e)
 
                 databases.append(
                     GlueDatabase(
@@ -186,7 +190,7 @@ def collect_glue_databases(session, account_id: str, account_name: str, region: 
                         tags={},  # Glue Database는 태그 API가 다름
                     )
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list Glue databases: %s", e)
 
     return databases

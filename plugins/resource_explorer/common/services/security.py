@@ -4,9 +4,13 @@ plugins/resource_explorer/common/services/security.py - Security 리소스 수�
 KMS Key, Secrets Manager Secret 수집.
 """
 
+import logging
+
 from core.parallel import get_client
 
 from ..types import KMSKey, Secret
+
+logger = logging.getLogger(__name__)
 
 
 def collect_kms_keys(session, account_id: str, account_name: str, region: str) -> list[KMSKey]:
@@ -22,8 +26,8 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
             for alias in page.get("Aliases", []):
                 if alias.get("TargetKeyId"):
                     alias_map[alias["TargetKeyId"]] = alias.get("AliasName", "")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list aliases: %s", e)
 
     # Key 목록 조회
     paginator = kms.get_paginator("list_keys")
@@ -45,8 +49,8 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
                 try:
                     tags_resp = kms.list_resource_tags(KeyId=key_id)
                     tags = {tag["TagKey"]: tag["TagValue"] for tag in tags_resp.get("Tags", [])}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get tags: %s", e)
 
                 keys.append(
                     KMSKey(
@@ -68,8 +72,8 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
                         tags=tags,
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get KMS key details: %s", e)
 
     return keys
 
