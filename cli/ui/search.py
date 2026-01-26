@@ -337,23 +337,25 @@ class ToolSearchEngine:
         9. 부분 매칭 (0.3)
         """
         name = entry["norm_name"]
+        name_en = entry.get("norm_name_en", "")
         cat = entry["norm_cat"]
         cat_desc = entry["norm_cat_desc"]
         desc = entry["norm_desc"]
+        desc_en = entry.get("norm_desc_en", "")
         aliases = entry.get("norm_aliases", [])
         chosung_name = entry["chosung_name"]
         chosung_cat = entry["chosung_cat"]
 
-        # 1. 도구명 정확히 일치
-        if norm_query == name:
+        # 1. 도구명 정확히 일치 (한글/영어)
+        if norm_query in (name, name_en):
             return 1.0, "exact"
 
-        # 2. 도구명 시작
-        if name.startswith(norm_query):
+        # 2. 도구명 시작 (한글/영어)
+        if name.startswith(norm_query) or (name_en and name_en.startswith(norm_query)):
             return 0.95, "prefix"
 
-        # 3. 도구명 포함
-        if norm_query in name:
+        # 3. 도구명 포함 (한글/영어)
+        if norm_query in name or (name_en and norm_query in name_en):
             return 0.85, "contains"
 
         # 4. 별칭 매칭
@@ -376,8 +378,8 @@ class ToolSearchEngine:
         if fuzzy_cat_score > 0:
             return fuzzy_cat_score * 0.9, "fuzzy_cat"  # 카테고리 fuzzy는 약간 낮게
 
-        # 7. 설명 포함
-        if norm_query in desc:
+        # 7. 설명 포함 (한글/영어)
+        if norm_query in desc or (desc_en and norm_query in desc_en):
             return 0.6, "description"
 
         # 8. 초성 매칭 (한글 쿼리인 경우)
@@ -387,10 +389,12 @@ class ToolSearchEngine:
             if chosung_query in chosung_cat:
                 return 0.45, "chosung_cat"
 
-        # 9. 단어별 부분 매칭
+        # 9. 단어별 부분 매칭 (한글/영어)
         query_words = norm_query.split()
         if len(query_words) > 1:
-            match_count = sum(1 for w in query_words if w in name or w in desc)
+            match_count = sum(
+                1 for w in query_words if w in name or w in desc or w in name_en or w in desc_en
+            )
             if match_count > 0:
                 ratio = match_count / len(query_words)
                 return 0.3 * ratio, "partial"

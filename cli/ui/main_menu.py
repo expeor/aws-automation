@@ -407,11 +407,13 @@ class MainMenu:
         table.add_column(t("menu.header_description"), style="dim")
 
         for i, r in enumerate(results, 1):
+            name = r.get_name(self.lang)
+            desc = r.get_description(self.lang)
             table.add_row(
                 str(i),
                 r.category_display.upper(),
-                r.tool_name,
-                r.description[:50] if r.description else "",  # 35 → 50
+                name,
+                desc[:50] if desc else "",
             )
 
         self.console.print(table)
