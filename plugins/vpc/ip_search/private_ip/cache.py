@@ -5,6 +5,8 @@ Cache file naming: {profile_name}_{account_id}_eni.msgpack
 Supports searching across multiple cache files.
 """
 
+from __future__ import annotations
+
 import ipaddress
 import logging
 import os

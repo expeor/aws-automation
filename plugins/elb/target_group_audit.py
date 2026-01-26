@@ -7,13 +7,19 @@ ELB에 연결되지 않은 Target Group 탐지
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -304,7 +310,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_target_groups(target_groups, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """Target Group 미사용 분석"""
     console.print("[bold]Target Group 분석 시작...[/bold]\n")
 

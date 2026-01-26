@@ -5,8 +5,11 @@ Search cloud provider IP ranges (AWS, GCP, Azure, Oracle).
 No AWS authentication required.
 """
 
+from __future__ import annotations
+
 import os
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.prompt import Prompt
@@ -23,6 +26,9 @@ from plugins.vpc.ip_search.common.ip_ranges import (
 )
 
 from .i18n import t
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -321,7 +327,7 @@ def _search_by_filter(session_name: str) -> None:
 # =============================================================================
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """
     Public IP Search Tool entry point.
 

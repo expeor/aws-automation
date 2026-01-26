@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/security.py - Security 리소스 수�
 KMS Key, Secrets Manager Secret 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

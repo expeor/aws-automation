@@ -8,9 +8,12 @@ plugins/resource_explorer/inventory.py - 종합 인벤토리 조회 (스트리�
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.table import Table
@@ -19,6 +22,9 @@ from core.tools.io.excel import ColumnDef, Workbook
 from core.tools.output import OutputPath, open_in_explorer
 
 from .common import InventoryCollector
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -50,7 +56,7 @@ class CategoryStats:
     warnings: list[str] = field(default_factory=list)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """종합 리소스 인벤토리 조회 (스트리밍 방식)"""
     console.print("\n[bold]AWS 종합 리소스 인벤토리[/bold]\n")
 

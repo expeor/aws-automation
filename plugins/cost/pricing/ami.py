@@ -12,6 +12,8 @@ AMI 비용 계산:
     monthly = get_ami_monthly_cost("ap-northeast-2", total_snapshot_gb=50)
 """
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def get_ami_snapshot_price(
     region: str = "ap-northeast-2",
-    session: "boto3.Session | None" = None,  # noqa: ARG001
+    session: boto3.Session | None = None,  # noqa: ARG001
 ) -> float:
     """AMI 스냅샷 GB당 월 가격 (EBS Snapshot 가격과 동일)"""
     return get_snapshot_price(region)
@@ -34,7 +36,7 @@ def get_ami_snapshot_price(
 def get_ami_monthly_cost(
     region: str = "ap-northeast-2",
     total_snapshot_gb: float = 0,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """AMI 월간 비용 계산
 
@@ -54,7 +56,7 @@ def estimate_savings(
     amis: list[dict],
     region: str = "ap-northeast-2",
     months: int = 12,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float | int | str]:
     """AMI 제거 시 예상 절감액 계산
 

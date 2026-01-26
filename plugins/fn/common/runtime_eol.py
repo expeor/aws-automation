@@ -5,6 +5,8 @@ AWS Lambda 런타임 지원 종료 일정 관리
 https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum

@@ -12,6 +12,8 @@ NAT Gateway 데이터 수집기
 - 예: 50개 NAT × 6 메트릭 = 300 API → 1 API
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone

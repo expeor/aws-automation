@@ -13,6 +13,8 @@ EFS 비용 계산:
     monthly = get_efs_monthly_cost("ap-northeast-2", storage_gb=100)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -43,7 +45,7 @@ EFS_PRICES: dict[str, dict[str, float]] = {
 DEFAULT_PRICES = {"standard": 0.30, "ia": 0.016, "archive": 0.008}
 
 
-def get_efs_prices_from_api(session: "boto3.Session", region: str) -> dict[str, float]:
+def get_efs_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
     """Pricing API를 통해 EFS 가격 조회"""
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
@@ -86,7 +88,7 @@ def get_efs_prices_from_api(session: "boto3.Session", region: str) -> dict[str, 
     return {}
 
 
-def get_efs_prices(region: str = "ap-northeast-2", session: "boto3.Session | None" = None) -> dict[str, float]:
+def get_efs_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
     """EFS 가격 조회"""
     if session:
         api_prices = get_efs_prices_from_api(session, region)
@@ -99,7 +101,7 @@ def get_efs_prices(region: str = "ap-northeast-2", session: "boto3.Session | Non
 def get_efs_storage_price(
     region: str = "ap-northeast-2",
     storage_class: str = "standard",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """EFS GB당 월 가격"""
     prices = get_efs_prices(region, session)
@@ -110,7 +112,7 @@ def get_efs_monthly_cost(
     region: str = "ap-northeast-2",
     storage_gb: float = 0,
     storage_class: str = "standard",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """EFS 월간 비용 계산"""
     price = get_efs_storage_price(region, storage_class, session)

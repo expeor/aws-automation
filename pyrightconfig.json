@@ -1,0 +1,32 @@
+{
+    "include": ["cli", "core", "plugins"],
+    "exclude": [
+        "tests",
+        "**/__pycache__",
+        "build",
+        "dist",
+        ".eggs",
+        "output",
+        "temp",
+        "**/*.egg-info"
+    ],
+    "pythonVersion": "3.10",
+    "pythonPlatform": "All",
+    "typeCheckingMode": "strict",
+    "reportMissingTypeStubs": false,
+    "reportUnknownMemberType": "warning",
+    "reportUnknownArgumentType": "warning",
+    "reportUnknownVariableType": "warning",
+    "reportUnknownParameterType": "warning",
+    "reportMissingParameterType": "error",
+    "reportMissingTypeArgument": "warning",
+    "reportUnnecessaryTypeIgnoreComment": "warning",
+    "reportPrivateUsage": "warning",
+    "reportConstantRedefinition": "error",
+    "reportIncompatibleMethodOverride": "error",
+    "reportIncompatibleVariableOverride": "error",
+    "reportImportCycles": "warning",
+    "stubPath": "typings",
+    "venvPath": ".",
+    "venv": ".venv"
+}

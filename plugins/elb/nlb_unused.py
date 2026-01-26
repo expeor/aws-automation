@@ -15,6 +15,10 @@ plugins/elb/nlb_unused.py - NLB 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 
 from core.parallel import parallel_collect
@@ -26,6 +30,9 @@ from .common import (
     collect_v2_load_balancers,
     generate_unused_report,
 )
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -48,7 +55,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_load_balancers(nlbs, account_id, account_name, region, lb_type_filter="network")
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """NLB 미사용 분석 실행"""
     console.print("[bold]NLB 미사용 분석 시작...[/bold]")
 

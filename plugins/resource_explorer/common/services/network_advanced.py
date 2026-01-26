@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/network_advanced.py - 고급 네트워
 Transit Gateway, VPN, Network ACL, VPC Peering 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

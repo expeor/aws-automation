@@ -25,6 +25,8 @@ PricingService를 사용하여 캐시와 API를 통합 관리합니다.
 주의: 파일명이 lambda_.py인 이유는 'lambda'가 Python 예약어이기 때문입니다.
 """
 
+from __future__ import annotations
+
 import logging
 
 from .constants import (

@@ -65,7 +65,7 @@ class CollectedError:
         loc = f"{self.account_name}/{self.region}"
         return f"[{self.severity.value.upper()}] {loc} - {self.service}.{self.operation}: {self.error_code}"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str | None]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "account_id": self.account_id,

@@ -18,6 +18,8 @@ NAT Gateway 비용 계산:
     total = get_nat_monthly_cost("ap-northeast-2", data_processed_gb=100)
 """
 
+from __future__ import annotations
+
 import logging
 
 logger = logging.getLogger(__name__)

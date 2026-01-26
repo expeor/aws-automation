@@ -8,6 +8,8 @@ AWS 인증 모듈의 핵심 타입 정의
 - 에러 클래스들
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,7 +17,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    pass
+    import boto3
 
 
 # =============================================================================
@@ -163,7 +165,7 @@ class Provider(ABC):
         account_id: str | None = None,
         role_name: str | None = None,
         region: str | None = None,
-    ) -> Any:  # boto3.Session
+    ) -> boto3.Session:
         """지정된 계정/역할/리전에 대한 boto3 Session을 반환합니다.
 
         Args:
@@ -186,7 +188,7 @@ class Provider(ABC):
         account_id: str | None = None,
         role_name: str | None = None,
         region: str | None = None,
-    ) -> Any:  # botocore.config.Config or aws.Config equivalent
+    ) -> dict[str, Any]:
         """지정된 계정/역할/리전에 대한 AWS Config를 반환합니다.
 
         boto3 Session의 _session.get_config()와 유사한 설정 객체를 반환합니다.
@@ -197,7 +199,7 @@ class Provider(ABC):
             region: AWS 리전
 
         Returns:
-            AWS 설정 정보를 담은 dict 또는 Config 객체
+            AWS 설정 정보를 담은 dict
         """
         pass
 

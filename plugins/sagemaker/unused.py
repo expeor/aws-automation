@@ -17,9 +17,12 @@ plugins/sagemaker/unused.py - SageMaker Endpoint 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
@@ -27,6 +30,9 @@ from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
 from plugins.cost.pricing import get_sagemaker_monthly_cost
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -457,7 +463,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_endpoints(endpoints, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """SageMaker Endpoint 미사용 분석"""
     console.print("[bold]SageMaker Endpoint 미사용 분석 시작...[/bold]\n")
 

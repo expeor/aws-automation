@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/compute.py - Compute 리소스 수집
 EBS Volume, Lambda Function, ECS Cluster/Service, ASG, Launch Template, EKS, AMI, Snapshot 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

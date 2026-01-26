@@ -8,8 +8,10 @@ HTML 대시보드 + Excel 보고서 생성
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 from core.auth.session import get_context_session
 from core.tools.output import OutputPath
@@ -21,8 +23,11 @@ from .common import (  # noqa: F401
     PatchReporter,
 )
 
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
-def run(ctx) -> dict[str, Any]:
+
+def run(ctx: ExecutionContext) -> None:
     """필수 패치 분석 보고서 생성"""
     # AWS Health API는 us-east-1에서만 사용 가능
     session = get_context_session(ctx, "us-east-1")

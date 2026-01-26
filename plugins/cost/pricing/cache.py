@@ -11,6 +11,8 @@ plugins/cost/pricing/cache.py - 가격 정보 로컬 캐시
 - 읽기는 락 없이 수행 (성능 최적화)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime, timedelta

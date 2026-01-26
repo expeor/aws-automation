@@ -19,6 +19,8 @@ RDS 비용 계산:
     )
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -78,7 +80,7 @@ DEFAULT_INSTANCE_PRICE = 0.20
 DEFAULT_STORAGE_PRICES = {"gp2": 0.115, "gp3": 0.095, "io1": 0.125, "magnetic": 0.10}
 
 
-def get_rds_prices_from_api(session: "boto3.Session", region: str, engine: str = "mysql") -> dict[str, float]:
+def get_rds_prices_from_api(session: boto3.Session, region: str, engine: str = "mysql") -> dict[str, float]:
     """Pricing API를 통해 RDS 가격 조회"""
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
@@ -141,7 +143,7 @@ def get_rds_prices_from_api(session: "boto3.Session", region: str, engine: str =
 def get_rds_prices(
     region: str = "ap-northeast-2",
     engine: str = "mysql",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float]:
     """RDS 가격 조회"""
     if session:
@@ -156,7 +158,7 @@ def get_rds_instance_price(
     region: str = "ap-northeast-2",
     instance_class: str = "db.t3.medium",
     engine: str = "mysql",
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """RDS 인스턴스 시간당 가격"""
     prices = get_rds_prices(region, engine, session)
@@ -179,7 +181,7 @@ def get_rds_monthly_cost(
     storage_gb: int = 20,
     storage_type: str = "gp3",
     multi_az: bool = False,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """RDS 월간 비용 계산"""
     instance_hourly = get_rds_instance_price(region, instance_class, engine, session)

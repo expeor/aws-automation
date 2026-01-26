@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/iam.py - IAM/Security 리소스 수집
 IAM Role, IAM User, IAM Policy, ACM Certificate, WAF WebACL 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

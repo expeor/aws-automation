@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
 """
 🚀 DuckDB 기반 ALB 로그 분석기

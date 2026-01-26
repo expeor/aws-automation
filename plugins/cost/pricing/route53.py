@@ -17,6 +17,8 @@ PricingService를 사용하여 캐시와 API를 통합 관리합니다.
     total = get_hosted_zone_monthly_cost(zone_count=30)
 """
 
+from __future__ import annotations
+
 import logging
 
 from .utils import pricing_service

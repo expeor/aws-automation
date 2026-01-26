@@ -18,6 +18,8 @@ PricingService를 사용하여 캐시와 API를 통합 관리합니다.
     total = get_kms_key_monthly_cost("ap-northeast-2", key_count=5)
 """
 
+from __future__ import annotations
+
 import logging
 
 from .utils import pricing_service

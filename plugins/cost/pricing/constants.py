@@ -5,6 +5,8 @@ plugins/cost/pricing/constants.py - 가격 모듈 상수 및 기본값
 API 실패 시 fallback으로 사용됩니다.
 """
 
+from __future__ import annotations
+
 # 월간 시간 상수
 HOURS_PER_MONTH = 730
 

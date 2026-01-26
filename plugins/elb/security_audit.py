@@ -29,16 +29,21 @@ ELB의 보안 설정을 종합 분석하여 취약점을 탐지합니다.
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
 from core.config import settings
 from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -1031,7 +1036,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_all(all_lbs, session, region, account_id, account_name)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """ELB 보안 감사 실행"""
     console.print("[bold]ELB Security Audit 시작...[/bold]")
     console.print("[dim]SSL/TLS, WAF, 액세스 로그, 삭제 보호, 인증서 만료 분석[/dim]\n")

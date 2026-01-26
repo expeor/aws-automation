@@ -13,6 +13,8 @@ plugins/health/reporter.py - AWS Health 패치 보고서 생성기
     reporter.generate_report(output_dir, "patch_analysis")
 """
 
+from __future__ import annotations
+
 import logging
 from calendar import monthcalendar
 from datetime import datetime

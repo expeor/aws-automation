@@ -14,10 +14,13 @@ plugins/ec2/ami_audit.py - AMI 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from dateutil.parser import parse
 from rich.console import Console
@@ -25,6 +28,9 @@ from rich.console import Console
 from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from plugins.cost.pricing import get_snapshot_monthly_cost
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -444,7 +450,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_amis(amis, used_ami_ids, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """AMI 미사용 분석 실행"""
     console.print("[bold]AMI 미사용 분석 시작...[/bold]")
     console.print(f"  [dim]기준: {RECENT_DAYS}일 이내 생성은 제외[/dim]")

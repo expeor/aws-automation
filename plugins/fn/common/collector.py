@@ -9,6 +9,8 @@ Lambda 함수 정보 및 CloudWatch 메트릭 수집 공통 로직
 - 예: 50개 함수 × 6 메트릭 = 300 API → 1 API
 """
 
+from __future__ import annotations
+
 import contextlib
 import logging
 from dataclasses import dataclass, field

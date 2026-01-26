@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/analytics.py - Analytics 리소스 수
 Kinesis Stream, Kinesis Firehose, Glue Database 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

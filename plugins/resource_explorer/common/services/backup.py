@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/backup.py - Backup 리소스 수집
 Backup Vault, Backup Plan 수집.
 """
 
+from __future__ import annotations
+
 import logging
 
 from core.parallel import get_client

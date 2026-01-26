@@ -25,13 +25,19 @@ AWS Backup + 각 서비스별 자체 자동 백업 현황을 통합 조회합니
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import ClientError
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -1661,7 +1667,7 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
 # ============================================================================
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """통합 백업 현황 분석"""
     from core.tools.output import OutputPath, open_in_explorer
 

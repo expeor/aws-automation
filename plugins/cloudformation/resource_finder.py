@@ -15,6 +15,8 @@ plugins/cloudformation/resource_finder.py - CloudFormation Stack 리소스 검�
     results = finder.search(physical_id="i-1234567890abcdef0")
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime

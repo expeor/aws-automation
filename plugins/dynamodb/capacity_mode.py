@@ -7,9 +7,12 @@ Provisioned vs On-Demand 용량 모드 최적화 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
@@ -19,6 +22,9 @@ from plugins.cost.pricing.dynamodb import (
     estimate_ondemand_cost,
     get_dynamodb_monthly_cost,
 )
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -481,7 +487,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_capacity(tables, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """DynamoDB 용량 모드 분석"""
     console.print("[bold]DynamoDB 용량 모드 분석 시작...[/bold]\n")
 

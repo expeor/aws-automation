@@ -8,6 +8,8 @@ boto3 클라이언트:
     - CLB: elb 클라이언트
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -24,7 +26,7 @@ class LBType(Enum):
     CLB = "classic"
 
     @classmethod
-    def from_string(cls, value: str) -> "LBType":
+    def from_string(cls, value: str) -> LBType:
         """문자열에서 LBType 변환"""
         mapping = {
             "application": cls.ALB,

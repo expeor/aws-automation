@@ -14,6 +14,8 @@ PricingService를 사용하여 캐시와 API를 통합 관리합니다.
     monthly = get_ec2_monthly_cost("t3.medium", "ap-northeast-2")
 """
 
+from __future__ import annotations
+
 import logging
 
 from .constants import HOURS_PER_MONTH

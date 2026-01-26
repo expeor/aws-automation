@@ -20,6 +20,8 @@ Note:
     )
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -158,7 +160,7 @@ class Recommendation:
     last_refresh_timestamp: str | None = None
 
     @classmethod
-    def from_api_response(cls, item: dict[str, Any]) -> "Recommendation":
+    def from_api_response(cls, item: dict[str, Any]) -> Recommendation:
         """API 응답에서 Recommendation 객체 생성"""
         tags_list = item.get("tags", [])
         tags_dict = {tag["key"]: tag["value"] for tag in tags_list}

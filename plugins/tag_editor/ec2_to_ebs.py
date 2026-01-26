@@ -14,6 +14,8 @@ EC2 인스턴스의 태그를 연결된 EBS 볼륨에 일괄 적용합니다.
     result = sync_tags(session, region="ap-northeast-2")
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime

@@ -30,7 +30,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    import boto3
+
+    from core.types.aws import Boto3Session
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class ServiceQuotaChecker:
         quota = checker.get_quota("ec2", "Running On-Demand Standard instances")
     """
 
-    session: Any  # boto3.Session
+    session: Boto3Session
     region: str
     cache_ttl: float = DEFAULT_CACHE_TTL
     _cache: dict[str, _CacheEntry] = field(default_factory=dict)
@@ -432,7 +433,7 @@ _checker_lock = threading.Lock()
 
 
 def get_quota_checker(
-    session: boto3.Session,
+    session: Boto3Session,
     region: str,
     cache_ttl: float = DEFAULT_CACHE_TTL,
 ) -> ServiceQuotaChecker:

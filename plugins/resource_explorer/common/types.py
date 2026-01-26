@@ -12,6 +12,8 @@ plugins/resource_explorer/common/types.py - 리소스 타입 정의
 - Load Balancing: LoadBalancer, TargetGroup
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 

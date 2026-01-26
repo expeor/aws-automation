@@ -20,6 +20,8 @@ Note:
     )
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -124,7 +126,7 @@ class AffectedEntity:
     tags: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_api_response(cls, item: dict[str, Any]) -> "AffectedEntity":
+    def from_api_response(cls, item: dict[str, Any]) -> AffectedEntity:
         """API 응답에서 AffectedEntity 객체 생성"""
         tags_list = item.get("tags", {})
         tags_dict = tags_list if isinstance(tags_list, dict) else {}
@@ -206,7 +208,7 @@ class HealthEvent:
         cls,
         event_item: dict[str, Any],
         detail_item: dict[str, Any] | None = None,
-    ) -> "HealthEvent":
+    ) -> HealthEvent:
         """API 응답에서 HealthEvent 객체 생성"""
         description = ""
         if detail_item:

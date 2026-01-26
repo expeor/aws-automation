@@ -15,7 +15,7 @@ Consolidates: nat_audit + endpoint_audit + eni_audit
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -27,6 +27,9 @@ from .endpoint_audit import generate_report as generate_endpoint_report
 from .eni_audit import ENIAnalysisResult, analyze_enis, collect_enis
 from .eni_audit import generate_report as generate_eni_report
 from .nat_audit_analysis import NATAnalyzer, NATCollector, NATExcelReporter
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -193,7 +196,7 @@ def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> 
     return str(wb.save_as(output_dir, "Network_Analysis"))
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """Run consolidated network resource analysis"""
     console.print("[bold]Network Resource Analysis (NAT/Endpoint/ENI)[/bold]\n")
 

@@ -22,14 +22,28 @@ class SearchResult:
     """검색 결과 항목"""
 
     tool_name: str
+    tool_name_en: str
     tool_module: str
     category: str  # 폴더명 (CLI 명령어)
     category_display: str  # UI 표시용 이름
     category_desc: str
     description: str
+    description_en: str
     permission: str
     score: float  # 매칭 점수 (0-1)
     match_type: str  # exact, prefix, contains, fuzzy
+
+    def get_name(self, lang: str = "ko") -> str:
+        """언어에 따른 도구 이름 반환"""
+        if lang == "en":
+            return self.tool_name_en or self.tool_name
+        return self.tool_name
+
+    def get_description(self, lang: str = "ko") -> str:
+        """언어에 따른 설명 반환"""
+        if lang == "en":
+            return self.description_en or self.description
+        return self.description
 
 
 # 한글 초성 매핑
@@ -139,8 +153,10 @@ class ToolSearchEngine:
 
             for tool in cat.get("tools", []):
                 tool_name = tool.get("name", "")
+                tool_name_en = tool.get("name_en", "")
                 tool_module = tool.get("module", "")
                 tool_desc = tool.get("description", "")
+                tool_desc_en = tool.get("description_en", "")
                 permission = tool.get("permission", "read")
 
                 # 별칭 및 sub_services 정규화
@@ -154,12 +170,16 @@ class ToolSearchEngine:
                     "category_display": cat_display,
                     "category_desc": cat_desc,
                     "tool_name": tool_name,
+                    "tool_name_en": tool_name_en,
                     "tool_module": tool_module,
                     "description": tool_desc,
+                    "description_en": tool_desc_en,
                     "permission": permission,
                     # 검색용 정규화 텍스트
                     "norm_name": normalize_text(tool_name),
+                    "norm_name_en": normalize_text(tool_name_en),
                     "norm_desc": normalize_text(tool_desc),
+                    "norm_desc_en": normalize_text(tool_desc_en),
                     "norm_cat": normalize_text(cat_name),
                     "norm_cat_desc": normalize_text(cat_desc),
                     # 별칭 (정규화)
@@ -230,11 +250,13 @@ class ToolSearchEngine:
         return [
             SearchResult(
                 tool_name=entry["tool_name"],
+                tool_name_en=entry["tool_name_en"],
                 tool_module=entry["tool_module"],
                 category=entry["category"],
                 category_display=entry["category_display"],
                 category_desc=entry["category_desc"],
                 description=entry["description"],
+                description_en=entry["description_en"],
                 permission=entry["permission"],
                 score=score,
                 match_type=match_type,

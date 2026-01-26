@@ -8,6 +8,8 @@ NAT Gateway 분석기
 4. 신뢰도 분류 (확실히 미사용 / 아마 미사용 / 검토 필요)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any

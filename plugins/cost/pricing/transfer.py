@@ -14,6 +14,8 @@ Transfer Family 비용 계산:
     monthly = get_transfer_monthly_cost("ap-northeast-2", protocols=["SFTP", "FTPS"])
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -66,7 +68,7 @@ DEFAULT_PRICES = {"hourly": 0.30}
 HOURS_PER_MONTH = 730
 
 
-def get_transfer_prices_from_api(session: "boto3.Session", region: str) -> dict[str, float]:
+def get_transfer_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
     """Pricing API를 통해 Transfer Family 가격 조회
 
     Args:
@@ -115,7 +117,7 @@ def get_transfer_prices_from_api(session: "boto3.Session", region: str) -> dict[
     return {}
 
 
-def get_transfer_prices(region: str = "ap-northeast-2", session: "boto3.Session | None" = None) -> dict[str, float]:
+def get_transfer_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
     """Transfer Family 가격 조회
 
     Args:
@@ -135,7 +137,7 @@ def get_transfer_prices(region: str = "ap-northeast-2", session: "boto3.Session 
     return TRANSFER_PRICES.get(region, DEFAULT_PRICES)
 
 
-def get_transfer_hourly_price(region: str = "ap-northeast-2", session: "boto3.Session | None" = None) -> float:
+def get_transfer_hourly_price(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> float:
     """Transfer Family 프로토콜 엔드포인트 시간당 가격
 
     Args:
@@ -153,7 +155,7 @@ def get_transfer_monthly_cost(
     region: str = "ap-northeast-2",
     protocols: list[str] | None = None,
     hours: int = HOURS_PER_MONTH,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> float:
     """Transfer Family 월간 비용 계산
 
@@ -178,7 +180,7 @@ def estimate_savings(
     region: str = "ap-northeast-2",
     protocols_per_server: int = 1,
     months: int = 12,
-    session: "boto3.Session | None" = None,
+    session: boto3.Session | None = None,
 ) -> dict[str, float | int | str]:
     """Transfer Family 서버 제거 시 예상 절감액 계산
 

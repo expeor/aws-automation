@@ -10,15 +10,21 @@ Lambda Version/Alias 관리:
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -468,7 +474,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_versions(functions, account_id, account_name, region)
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """Version/Alias 감사 실행"""
     console.print("[bold]Lambda Version/Alias 감사 시작...[/bold]\n")
 

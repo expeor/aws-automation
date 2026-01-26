@@ -4,6 +4,8 @@ plugins/resource_explorer/common/services/helpers.py - 공통 헬퍼 함수
 태그 파싱, 이름 추출 등 공통 유틸리티.
 """
 
+from __future__ import annotations
+
 
 def parse_tags(tags: list | None, exclude_aws: bool = True) -> dict[str, str]:
     """

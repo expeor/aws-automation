@@ -7,14 +7,19 @@ plugins/health/issues.py - 서비스 장애 현황 조회
     - run(ctx): 필수. 실행 함수.
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from core.auth.session import get_context_session
 
 from .common import REQUIRED_PERMISSIONS, HealthCollector  # noqa: F401
 
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
-def run(ctx) -> dict[str, Any]:
+
+def run(ctx: ExecutionContext) -> None:
     """서비스 장애 현황 조회"""
     # AWS Health API는 us-east-1에서만 사용 가능
     session = get_context_session(ctx, "us-east-1")

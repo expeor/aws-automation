@@ -12,14 +12,19 @@ plugins/cloudtrail/trail_audit.py - CloudTrail 전체 계정 보고서
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.parallel import get_client, parallel_collect
 from core.tools.io.excel import ColumnDef, Workbook
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +320,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_trails(trails, account_id, account_name, region)
 
 
-def run(ctx) -> dict[str, Any]:
+def run(ctx: ExecutionContext) -> None:
     """CloudTrail 전체 계정 보고서 생성"""
     from rich.console import Console
 

@@ -14,16 +14,21 @@ Usage:
     run(ctx)
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.parallel import get_client
 from core.tools.base import BaseToolRunner
 from core.tools.io.excel import save_dict_list_to_excel
 from core.tools.output import OutputPath
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -695,7 +700,7 @@ class ToolRunner(BaseToolRunner):
             console.print(f"\n[bold green]보고서 저장: {output_path}[/bold green]")
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """Entry point"""
     runner = ToolRunner(ctx=ctx)
     runner._run_analysis()

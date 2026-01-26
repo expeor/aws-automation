@@ -72,6 +72,18 @@ class MainMenu:
         self._favorites: FavoritesManager | None = None
         self._initialized = False
 
+    def _get_tool_name(self, tool: dict) -> str:
+        """언어 설정에 따라 도구 이름 반환"""
+        if self.lang == "en":
+            return tool.get("name_en") or tool.get("name", "")
+        return tool.get("name", "")
+
+    def _get_tool_desc(self, tool: dict) -> str:
+        """언어 설정에 따라 도구 설명 반환"""
+        if self.lang == "en":
+            return tool.get("description_en") or tool.get("description", "")
+        return tool.get("description", "")
+
     def _ensure_initialized(self) -> None:
         """지연 초기화 (첫 호출 시)"""
         if self._initialized:
@@ -472,8 +484,8 @@ class MainMenu:
             table.add_row(
                 str(i),
                 tool.get("category_display", tool.get("category", "")).upper(),
-                tool.get("name", ""),
-                (tool.get("description", "") or "")[:55],  # 40 → 55
+                self._get_tool_name(tool),
+                (self._get_tool_desc(tool) or "")[:55],
             )
 
         self.console.print(table)
@@ -553,8 +565,8 @@ class MainMenu:
                 table.add_row(
                     str(idx),
                     tool.get("category_display", tool["category"]).upper(),
-                    tool.get("name", ""),
-                    tool.get("description", "")[:55],  # 40 → 55
+                    self._get_tool_name(tool),
+                    self._get_tool_desc(tool)[:55],
                 )
 
             self.console.print(table)
@@ -678,8 +690,8 @@ class MainMenu:
             table.add_row(
                 str(orig_idx),
                 tool.get("category_display", tool["category"]).upper(),
-                tool.get("name", ""),
-                tool.get("description", "")[:55],  # 40 → 55
+                self._get_tool_name(tool),
+                self._get_tool_desc(tool)[:55],
             )
 
         self.console.print(table)
@@ -1117,9 +1129,9 @@ class MainMenu:
                 table.add_row(
                     str(i),
                     tool.get("category_display", tool["category"]).upper(),
-                    tool.get("name", ""),
+                    self._get_tool_name(tool),
                     f"[{perm_color}]{perm}[/{perm_color}]",
-                    (tool.get("description", "") or "")[:50],  # 35 → 50
+                    (self._get_tool_desc(tool) or "")[:50],
                 )
 
             self.console.print(table)
@@ -1176,9 +1188,11 @@ class MainMenu:
             table.add_column(t("menu.header_tools"), width=6, justify="right")
 
             for i, cat in enumerate(aws_categories, 1):
+                # 언어에 따라 영어 또는 한국어만 표시
+                cat_name = cat["name"] if self.lang == "en" else cat["name_ko"]
                 table.add_row(
                     str(i),
-                    f"{cat['name']} ({cat['name_ko']})",
+                    cat_name,
                     str(len(cat["plugins"])),
                     str(cat["tool_count"]),
                 )
@@ -1219,8 +1233,10 @@ class MainMenu:
             clear_screen()
 
             self.console.print()
+            # 언어에 따라 영어 또는 한국어만 표시
+            cat_title = aws_category["name"] if self.lang == "en" else aws_category["name_ko"]
             table = Table(
-                title=f"[bold]{aws_category['name']}[/bold] ({aws_category['name_ko']})",
+                title=f"[bold]{cat_title}[/bold]",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -1300,10 +1316,10 @@ class MainMenu:
 
                 table.add_row(
                     str(i),
-                    tool.get("name", ""),
+                    self._get_tool_name(tool),
                     f"[{perm_color}]{perm}[/{perm_color}]",
                     f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
-                    (tool.get("description", "") or "")[:50],  # 35 → 50
+                    (self._get_tool_desc(tool) or "")[:50],
                 )
 
             self.console.print(table)

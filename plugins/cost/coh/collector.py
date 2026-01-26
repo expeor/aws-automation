@@ -20,6 +20,8 @@ Cost Optimization Hub에서 권장사항을 수집하고 필터링합니다.
     AA_COH_EXCLUDE_ACCOUNT_NAME_REGEX: 제외할 계정 이름 정규식
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import re
@@ -42,7 +44,7 @@ class AccountFilter:
     include_ids: set[str] = field(default_factory=set)
 
     @classmethod
-    def from_env(cls) -> "AccountFilter":
+    def from_env(cls) -> AccountFilter:
         """환경변수에서 AccountFilter 생성"""
         exclude_ids = set()
         exclude_names = set()

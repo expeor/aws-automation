@@ -14,6 +14,10 @@ plugins/elb/clb_unused.py - CLB 미사용 분석
     - run(ctx): 필수. 실행 함수.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 
 from core.parallel import parallel_collect
@@ -25,6 +29,9 @@ from .common import (
     collect_classic_load_balancers,
     generate_unused_report,
 )
+
+if TYPE_CHECKING:
+    from cli.flow.context import ExecutionContext
 
 console = Console()
 
@@ -46,7 +53,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
     return analyze_load_balancers(clbs, account_id, account_name, region, lb_type_filter="classic")
 
 
-def run(ctx) -> None:
+def run(ctx: ExecutionContext) -> None:
     """CLB 미사용 분석 실행"""
     console.print("[bold]CLB 미사용 분석 시작...[/bold]")
 

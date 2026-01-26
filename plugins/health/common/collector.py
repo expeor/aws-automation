@@ -13,6 +13,8 @@ Health 이벤트를 수집하고 패치/유지보수 중심으로 분류합니�
     result = collector.collect_patches()
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -38,7 +40,7 @@ class PatchItem:
     description_summary: str
 
     @classmethod
-    def from_event(cls, event: HealthEvent) -> "PatchItem":
+    def from_event(cls, event: HealthEvent) -> PatchItem:
         """HealthEvent에서 PatchItem 생성"""
         # 설명에서 요약 추출 (첫 200자)
         summary = event.description[:200] + "..." if len(event.description) > 200 else event.description
