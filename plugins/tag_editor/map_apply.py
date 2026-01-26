@@ -422,9 +422,7 @@ def _collect_and_apply(
     _aggregate_stats(audit_result)
 
     # 6. 대상 필터링
-    targets = (
-        [r for r in audit_result.resources if not r.has_map_tag] if untagged_only else audit_result.resources
-    )
+    targets = [r for r in audit_result.resources if not r.has_map_tag] if untagged_only else audit_result.resources
 
     if not targets:
         return MapTagApplyResult(
