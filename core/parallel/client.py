@@ -15,7 +15,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     import boto3
@@ -61,7 +61,7 @@ def get_client(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]  # pyright: ignore[reportArgumentType]
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
     )
@@ -72,8 +72,9 @@ def get_client(
         config = config.merge(existing)
 
     # session.client은 문자열 서비스명을 받지만 boto3-stubs는 Literal 타입 요구
-    return session.client(
-        service_name,
+    # cast to Any to bypass boto3-stubs Literal type requirements
+    return session.client(  # pyright: ignore[reportCallIssue]
+        cast(Any, service_name),
         region_name=region_name,
         config=config,
         **kwargs,
@@ -104,7 +105,7 @@ def get_resource(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]  # pyright: ignore[reportArgumentType]
     )
 
     if "config" in kwargs:
@@ -112,8 +113,9 @@ def get_resource(
         config = config.merge(existing)
 
     # session.resource은 문자열 서비스명을 받지만 boto3-stubs는 Literal 타입 요구
-    return session.resource(
-        service_name,
+    # cast to Any to bypass boto3-stubs Literal type requirements
+    return session.resource(  # pyright: ignore[reportCallIssue]
+        cast(Any, service_name),
         region_name=region_name,
         config=config,
         **kwargs,

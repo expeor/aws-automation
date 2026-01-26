@@ -164,6 +164,8 @@ def _create_cache(ctx) -> ENICache | None:
         regions = auth_ctx.regions
 
         # Create session
+        if profile_name is None:
+            return None
         session = get_session(profile_name, regions[0])
 
         # Get account info

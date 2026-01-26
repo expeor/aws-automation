@@ -53,12 +53,3 @@ def run(ctx: ExecutionContext) -> None:
     html_path = Path(output_dir) / "health_dashboard.html"
     dashboard = HealthDashboard(result)
     dashboard.generate(html_path, auto_open=True)
-
-    return {
-        "patch_count": result.patch_count,
-        "critical_count": result.critical_count,
-        "high_count": result.high_count,
-        "affected_resources": result.affected_resource_count,
-        "excel_report": str(excel_path),
-        "html_dashboard": str(html_path),
-    }

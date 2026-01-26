@@ -338,7 +338,7 @@ def run(ctx: ExecutionContext) -> None:
 
     if not results:
         console.print("\n[yellow]분석 결과 없음[/yellow]")
-        return {"trail_count": 0, "message": "No trails found"}
+        return
 
     reporter = TrailAuditReporter(results)
     reporter.print_summary()
@@ -356,9 +356,3 @@ def run(ctx: ExecutionContext) -> None:
 
     console.print(f"\n[bold green]완료![/bold green] {output_path}")
     open_in_explorer(output_dir)
-
-    return {
-        "trail_count": sum(r.total_count for r in results),
-        "logging_enabled": sum(r.logging_enabled_count for r in results),
-        "report_path": str(output_path),
-    }

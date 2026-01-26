@@ -65,13 +65,14 @@ def run(ctx: ExecutionContext) -> None:
             if collected:
                 break
 
+            # Initialize account_name before try block
+            account_name = identifier
             try:
                 # STS로 Account ID 조회
                 sts = get_client(session, "sts")
                 account_id = sts.get_caller_identity()["Account"]
 
-                # Account Name 결정
-                account_name = identifier
+                # Account Name 결정 (override if found in ctx.accounts)
                 if hasattr(ctx, "accounts") and ctx.accounts:
                     for acc in ctx.accounts:
                         if acc.id == account_id:

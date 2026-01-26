@@ -306,7 +306,7 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
         # 3. 시간대별 요청 트렌드 (라인 차트) - CloudWatch 스타일 적응형 해상도
         # 타임스탬프와 에러 플래그 수집
         all_timestamps: list[datetime] = []
-        is_error_list: list[int] = []  # 1 if error, 0 otherwise
+        is_error_list: list[int | float] = []  # 1 if error, 0 otherwise
 
         for key in ["ELB 2xx Count", "ELB 3xx Count", "ELB 4xx Count", "ELB 5xx Count"]:
             log_data = analysis_results.get(key, {})
@@ -319,13 +319,14 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                         is_error_list.append(is_error)
 
         if all_timestamps:
+            values: dict[str, list[int | float]] = {
+                "전체 요청": [1] * len(all_timestamps),
+                "에러 (4xx+5xx)": is_error_list,
+            }
             report.add_time_series_chart(
                 "시간대별 요청 트렌드",
                 timestamps=all_timestamps,
-                values={
-                    "전체 요청": [1] * len(all_timestamps),
-                    "에러 (4xx+5xx)": is_error_list,
-                },
+                values=values,
                 aggregation="sum",
                 area=True,
             )
@@ -368,11 +369,11 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
             if sorted_urls:
                 # URL 길이 제한
                 urls = [url[:60] + "..." if len(url) > 60 else url for url, _ in sorted_urls]
-                counts = [count for _, count in sorted_urls]
+                url_counts_list = [count for _, count in sorted_urls]
                 report.add_bar_chart(
                     "Top 요청 URL",
                     categories=urls,
-                    series=[("요청 수", counts)],
+                    series=[("요청 수", url_counts_list)],
                     horizontal=True,
                 )
 
@@ -406,11 +407,12 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
                 top_codes = sorted(status_totals.items(), key=lambda x: -x[1])[:10]
                 if top_codes:
                     codes = [str(code) for code, _ in top_codes]
-                    counts = [count for _, count in top_codes]
+                    status_counts: list[int | float] = [count for _, count in top_codes]
+                    status_series: list[tuple[str, list[int | float]]] = [("요청 수", status_counts)]
                     report.add_bar_chart(
                         "클라이언트 상태 코드 분포",
                         categories=codes,
-                        series=[("요청 수", counts)],
+                        series=status_series,
                     )
 
         # 9. HTTP 메서드 분포 (클라이언트 상태 코드 옆에 배치)
@@ -428,7 +430,9 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
             if method_totals:
                 sorted_methods = sorted(method_totals.items(), key=lambda x: -x[1])
                 if sorted_methods:
-                    method_data = [(m, c) for m, c in sorted_methods if m.strip()]
+                    method_data: list[tuple[str, int | float]] = [
+                        (m, c) for m, c in sorted_methods if m.strip()
+                    ]
                     if method_data:
                         report.add_pie_chart("HTTP 메서드 분포", method_data, doughnut=True)
 
@@ -558,16 +562,17 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
 
         if error_timestamps:
             # 에러 타입별 값 리스트 생성
-            is_4xx = [1 if t == "4xx" else 0 for t in error_types]
-            is_5xx = [1 if t == "5xx" else 0 for t in error_types]
+            is_4xx: list[int | float] = [1 if t == "4xx" else 0 for t in error_types]
+            is_5xx: list[int | float] = [1 if t == "5xx" else 0 for t in error_types]
 
+            error_values: dict[str, list[int | float]] = {
+                "4xx 에러": is_4xx,
+                "5xx 에러": is_5xx,
+            }
             report.add_time_series_chart(
                 "시간대별 에러 트렌드",
                 timestamps=error_timestamps,
-                values={
-                    "4xx 에러": is_4xx,
-                    "5xx 에러": is_5xx,
-                },
+                values=error_values,
                 aggregation="sum",
                 area=True,
             )

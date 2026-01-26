@@ -58,7 +58,7 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
                 last_col = get_column_letter(len(headers))
                 ws.auto_filter.ref = f"A1:{last_col}{len(filtered_logs) + 1}"
 
-            ws.freeze_panes = ws.cell(row=2, column=1)
+            ws.freeze_panes = ws.cell(row=2, column=1)  # pyright: ignore[reportAttributeAccessIssue]
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE
 
         except Exception as e:

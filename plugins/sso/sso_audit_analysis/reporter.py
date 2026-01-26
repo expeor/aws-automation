@@ -67,26 +67,31 @@ class SSOExcelReporter:
     @property
     def HEADER_FILL(self) -> PatternFill:
         self._init_styles()
+        assert self._HEADER_FILL is not None
         return self._HEADER_FILL
 
     @property
     def HEADER_FONT(self) -> Font:
         self._init_styles()
+        assert self._HEADER_FONT is not None
         return self._HEADER_FONT
 
     @property
     def THIN_BORDER(self) -> Border:
         self._init_styles()
+        assert self._THIN_BORDER is not None
         return self._THIN_BORDER
 
     @property
     def CENTER_ALIGN(self) -> Alignment:
         self._init_styles()
+        assert self._CENTER_ALIGN is not None
         return self._CENTER_ALIGN
 
     @property
     def LEFT_ALIGN(self) -> Alignment:
         self._init_styles()
+        assert self._LEFT_ALIGN is not None
         return self._LEFT_ALIGN
 
     @property
@@ -112,7 +117,9 @@ class SSOExcelReporter:
         from datetime import datetime
 
         # 기본 시트 제거
-        self.wb.remove(self.wb.active)
+        active = self.wb.active
+        if active is not None:
+            self.wb.remove(active)
 
         # 시트 생성
         self._create_summary_sheet()
