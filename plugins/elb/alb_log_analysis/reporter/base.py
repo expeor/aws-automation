@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -80,7 +81,7 @@ class BaseSheetWriter:
         ws.row_dimensions[1].height = self.config.HEADER_ROW_HEIGHT
         if data_count > 0:
             ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{data_count + 1}"
-        ws.freeze_panes = ws.cell(row=2, column=1)
+        ws.freeze_panes = ws.cell(row=2, column=1)  # pyright: ignore[reportAttributeAccessIssue]
         ws.sheet_view.zoomScale = self.config.ZOOM_SCALE
 
     def _apply_column_widths(self, ws: Worksheet, headers: list[str] | tuple[str, ...]) -> None:
@@ -164,9 +165,11 @@ class BaseSheetWriter:
             for row in range(2, ws.max_row + 1):
                 cell = ws.cell(row=row, column=col)
                 if cell.alignment:
-                    cell.alignment = cell.alignment.copy(wrap_text=True)
+                    alignment = copy.copy(cell.alignment)
+                    alignment.wrap_text = True  # pyright: ignore[reportAttributeAccessIssue]
+                    cell.alignment = alignment  # pyright: ignore[reportAttributeAccessIssue]
                 else:
-                    cell.alignment = Alignment(horizontal=h_align, vertical="center", wrap_text=True)
+                    cell.alignment = Alignment(horizontal=h_align, vertical="center", wrap_text=True)  # pyright: ignore[reportAttributeAccessIssue]
 
     def convert_status_code(self, code: Any) -> int | str:
         if code is None or code == "" or code == "-":

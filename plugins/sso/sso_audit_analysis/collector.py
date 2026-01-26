@@ -310,7 +310,7 @@ class SSOCollector:
                 for page in paginator.paginate(InstanceArn=instance_arn, PermissionSetArn=ps_arn):
                     for account_id in page.get("AccountIds", []):
                         ps.assigned_accounts.append(account_id)
-                        ps.assigned_account_names.append(self._account_name_cache.get(account_id, account_id))
+                        ps.assigned_account_names.append(self._account_name_cache.get(account_id) or account_id)
             except ClientError:
                 pass
 

@@ -16,7 +16,7 @@ import time
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import msgpack
 from botocore.exceptions import ClientError
@@ -150,10 +150,10 @@ def list_available_caches(expiry_hours: int = 24) -> list[CacheInfo]:
 
             # Load to get ENI count and regions
             with open(filepath, "rb") as f:
-                data = msgpack.load(f)
+                data = cast(dict[str, Any], msgpack.load(f))
 
             eni_count = len(data)
-            regions = set()
+            regions: set[str] = set()
             for entry in data.values():
                 for eni in entry.get("interfaces", []):
                     region = eni.get("Region")
@@ -261,7 +261,7 @@ class ENICache:
 
         try:
             with open(self.cache_file, "rb") as f:
-                data = msgpack.load(f)
+                data = cast(dict[str, Any], msgpack.load(f))
 
             current = time.time()
             expiry_secs = self.expiry.total_seconds()

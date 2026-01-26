@@ -43,11 +43,11 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
     # Fallback functions
-    def print_sub_info(msg: str) -> None:
-        console.print(f"[blue]{msg}[/blue]")
+    def print_sub_info(message: str) -> None:
+        console.print(f"[blue]{message}[/blue]")
 
-    def print_sub_task_done(msg: str) -> None:
-        console.print(f"[green]✓ {msg}[/green]")
+    def print_sub_task_done(message: str) -> None:
+        console.print(f"[green]✓ {message}[/green]")
 
 
 from core.tools.cache import get_cache_dir

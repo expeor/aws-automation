@@ -386,7 +386,9 @@ def analyze_instances(
     return result
 
 
-def generate_report(results: list[EC2AnalysisResult], output_dir: str, ctx=None) -> dict[str, str]:
+def generate_report(
+    results: list[EC2AnalysisResult], output_dir: str, ctx: ExecutionContext | None = None
+) -> dict[str, str]:
     """Excel + HTML 보고서 생성
 
     Args:
@@ -433,6 +435,7 @@ def generate_report(results: list[EC2AnalysisResult], output_dir: str, ctx=None)
     total_stopped = sum(r.stopped_instances for r in results)
     total_savings = sum(r.unused_monthly_cost + r.low_usage_monthly_cost for r in results)
 
+    assert ctx is not None, "ctx is required for generate_reports"
     return generate_reports(
         ctx,
         data=flat_data,

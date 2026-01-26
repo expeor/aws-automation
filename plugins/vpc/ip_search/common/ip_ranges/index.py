@@ -33,11 +33,12 @@ logger = logging.getLogger(__name__)
 # Try to import pytricia for Radix Tree support
 _HAS_PYTRICIA = False
 try:
-    import pytricia
+    import pytricia  # pyright: ignore[reportMissingImports]
 
     _HAS_PYTRICIA = True
     logger.debug("pytricia available, using Radix Tree for IP lookup")
 except ImportError:
+    pytricia = None  # type: ignore[misc]
     logger.debug("pytricia not available, falling back to binary search")
 
 

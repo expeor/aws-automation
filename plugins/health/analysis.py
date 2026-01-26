@@ -35,14 +35,7 @@ def run(ctx: ExecutionContext) -> None:
     identifier = ctx.profile_name or "default"
     output_dir = OutputPath(identifier).sub("health", "inventory").with_date().build()
 
-    output_path = reporter.generate_report(
+    reporter.generate_report(
         output_dir=output_dir,
         file_prefix="phd_events",
     )
-
-    return {
-        "total_events": result.total_count,
-        "patch_count": result.patch_count,
-        "critical_count": result.critical_count,
-        "report_path": str(output_path),
-    }
