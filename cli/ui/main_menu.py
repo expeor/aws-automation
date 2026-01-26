@@ -72,17 +72,17 @@ class MainMenu:
         self._favorites: FavoritesManager | None = None
         self._initialized = False
 
-    def _get_tool_name(self, tool: dict) -> str:
+    def _get_tool_name(self, tool: dict[str, Any]) -> str:
         """언어 설정에 따라 도구 이름 반환"""
         if self.lang == "en":
-            return tool.get("name_en") or tool.get("name", "")
-        return tool.get("name", "")
+            return str(tool.get("name_en") or tool.get("name", ""))
+        return str(tool.get("name", ""))
 
-    def _get_tool_desc(self, tool: dict) -> str:
+    def _get_tool_desc(self, tool: dict[str, Any]) -> str:
         """언어 설정에 따라 도구 설명 반환"""
         if self.lang == "en":
-            return tool.get("description_en") or tool.get("description", "")
-        return tool.get("description", "")
+            return str(tool.get("description_en") or tool.get("description", ""))
+        return str(tool.get("description", ""))
 
     def _ensure_initialized(self) -> None:
         """지연 초기화 (첫 호출 시)"""

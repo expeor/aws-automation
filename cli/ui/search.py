@@ -392,9 +392,7 @@ class ToolSearchEngine:
         # 9. 단어별 부분 매칭 (한글/영어)
         query_words = norm_query.split()
         if len(query_words) > 1:
-            match_count = sum(
-                1 for w in query_words if w in name or w in desc or w in name_en or w in desc_en
-            )
+            match_count = sum(1 for w in query_words if w in name or w in desc or w in name_en or w in desc_en)
             if match_count > 0:
                 ratio = match_count / len(query_words)
                 return 0.3 * ratio, "partial"

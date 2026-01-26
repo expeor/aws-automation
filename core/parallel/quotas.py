@@ -30,7 +30,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-
     from core.types.aws import Boto3Session
 
 logger = logging.getLogger(__name__)
