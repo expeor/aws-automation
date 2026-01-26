@@ -11,8 +11,7 @@ from typing import Any
 
 from core.auth.session import get_context_session
 
-from .analyzer import REQUIRED_PERMISSIONS  # noqa: F401
-from .collector import HealthCollector
+from .common import REQUIRED_PERMISSIONS, HealthCollector  # noqa: F401
 
 
 def run(ctx) -> dict[str, Any]:
