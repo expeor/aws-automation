@@ -235,8 +235,8 @@ def collect_acm_certificates(session, account_id: str, account_name: str, region
                     try:
                         tags_resp = acm.list_tags_for_certificate(CertificateArn=cert_arn)
                         tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get ACM certificate tags: %s", e)
 
                     certificates.append(
                         ACMCertificate(
@@ -337,8 +337,8 @@ def collect_waf_web_acls(session, account_id: str, account_name: str, region: st
                         tags_resp = wafv2.list_tags_for_resource(ResourceARN=acl_arn)
                         tag_info = tags_resp.get("TagInfoForResource", {})
                         tags = {tag["Key"]: tag["Value"] for tag in tag_info.get("TagList", [])}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to get WAF tags: %s", e)
 
                     default_action = web_acl.get("DefaultAction", {})
                     action_type = "Allow" if "Allow" in default_action else "Block"

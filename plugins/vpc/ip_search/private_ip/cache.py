@@ -271,7 +271,8 @@ class ENICache:
             }
 
             self._rebuild_indices()
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load cache: %s", e)
             self.cache = {}
 
     def _rebuild_indices(self) -> None:

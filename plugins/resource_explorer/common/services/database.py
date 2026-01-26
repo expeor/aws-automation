@@ -87,7 +87,8 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
             try:
                 loc_resp = s3.get_bucket_location(Bucket=bucket_name)
                 bucket_region = loc_resp.get("LocationConstraint") or "us-east-1"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get bucket location: %s", e)
                 bucket_region = "unknown"
 
             # 버저닝 상태

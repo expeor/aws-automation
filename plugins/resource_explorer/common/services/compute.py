@@ -337,7 +337,8 @@ def collect_eks_clusters(session, account_id: str, account_name: str, region: st
         paginator = eks.get_paginator("list_clusters")
         for page in paginator.paginate():
             cluster_names.extend(page.get("clusters", []))
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to list EKS clusters: %s", e)
         return clusters
 
     # 각 클러스터 상세 정보
@@ -386,7 +387,8 @@ def collect_eks_node_groups(session, account_id: str, account_name: str, region:
         paginator = eks.get_paginator("list_clusters")
         for page in paginator.paginate():
             cluster_names.extend(page.get("clusters", []))
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to list EKS clusters: %s", e)
         return node_groups
 
     # 각 클러스터의 노드 그룹
@@ -424,8 +426,8 @@ def collect_eks_node_groups(session, account_id: str, account_name: str, region:
                             tags=ng.get("tags", {}),
                         )
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get nodegroup details: %s", e)
         except Exception as e:
             logger.debug("Failed to process batch: %s", e)
 

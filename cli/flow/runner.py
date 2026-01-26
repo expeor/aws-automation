@@ -5,6 +5,7 @@ Flow Runner - CLI Flow의 전체 실행을 관리하는 핵심 모듈.
 discovery 기반으로 도구를 자동 발견하고 실행합니다.
 """
 
+import logging
 import sys
 import traceback
 from typing import Any
@@ -17,6 +18,7 @@ from cli.ui.console import clear_screen
 from .context import ExecutionContext, FlowResult, ToolInfo
 from .steps import AccountStep, CategoryStep, ProfileStep, RegionStep, RoleStep
 
+logger = logging.getLogger(__name__)
 console = Console()
 
 
@@ -367,8 +369,8 @@ class FlowRunner:
         try:
             if hasattr(error, "response"):
                 error_code = getattr(error, "response", {}).get("Error", {}).get("Code")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to extract error code: %s", e)
 
         # AccessDenied 관련 오류인 경우에만 권한 안내
         access_denied_codes = {

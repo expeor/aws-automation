@@ -5,10 +5,13 @@ Account Alias, Account ID, Account Name 조회 및 표시용 식별자 생성.
 모든 도구에서 공통으로 사용.
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
+
+logger = logging.getLogger(__name__)
 
 
 def get_account_display_name(session, fallback: str = "unknown") -> str:
@@ -41,7 +44,8 @@ def get_account_display_name(session, fallback: str = "unknown") -> str:
         sts = session.client("sts")
         account_id: str = sts.get_caller_identity()["Account"]
         return account_id
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get account display name: %s", e)
         return fallback
 
 
@@ -95,7 +99,8 @@ def get_account_id(session, fallback: str = "unknown") -> str:
         sts = session.client("sts")
         account_id: str = sts.get_caller_identity()["Account"]
         return account_id
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get account ID: %s", e)
         return fallback
 
 
@@ -112,7 +117,8 @@ def get_account_alias(session) -> str | None:
         iam = session.client("iam")
         aliases = iam.list_account_aliases().get("AccountAliases", [])
         return aliases[0] if aliases else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get account alias: %s", e)
         return None
 
 
@@ -133,16 +139,16 @@ def get_account_info(session, fallback: str = "unknown") -> tuple[str, str | Non
     try:
         sts = session.client("sts")
         account_id = sts.get_caller_identity()["Account"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to get account ID: %s", e)
 
     try:
         iam = session.client("iam")
         aliases = iam.list_account_aliases().get("AccountAliases", [])
         if aliases:
             account_alias = aliases[0]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to get account alias: %s", e)
 
     return account_id, account_alias
 

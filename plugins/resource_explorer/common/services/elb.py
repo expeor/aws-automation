@@ -157,8 +157,8 @@ def collect_target_groups(session, account_id: str, account_name: str, region: s
                         healthy += 1
                     elif state == "unhealthy":
                         unhealthy += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get target health: %s", e)
 
             # Health check 설정 추출
             health_check_path = tg.get("HealthCheckPath", "")

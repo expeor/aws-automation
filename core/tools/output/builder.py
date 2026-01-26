@@ -2,6 +2,7 @@
 pkg/output/builder.py - 출력 경로 빌더 구현
 """
 
+import logging
 import os
 import subprocess
 import sys
@@ -9,6 +10,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
+
+logger = logging.getLogger(__name__)
 
 
 class DatePattern(str, Enum):
@@ -207,7 +210,8 @@ def open_in_explorer(path: str) -> bool:
         else:
             subprocess.run(["xdg-open", path], check=False)
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to open directory: %s", e)
         return False
 
 
@@ -231,7 +235,8 @@ def open_file(filepath: str) -> bool:
         else:
             subprocess.run(["xdg-open", filepath], check=False)
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to open file: %s", e)
         return False
 
 

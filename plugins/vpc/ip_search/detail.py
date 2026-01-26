@@ -542,7 +542,8 @@ def _get_efs_info(session, eni_id: str, description: str, region: str) -> str | 
                 size = fs_info.get("SizeInBytes", {}).get("Value", 0) / (1024**3)
                 display = name or fs_id
                 return f"EFS: {display} ({size:.1f} GB)"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get EFS details: %s", e)
                 return f"EFS: {fs_id}"
 
         return "EFS"
@@ -564,7 +565,8 @@ def _get_fsx_info(session, eni_id: str, description: str, region: str) -> str | 
                 fs_type = fs_info.get("FileSystemType", "Unknown")
                 storage = fs_info.get("StorageCapacity", 0)
                 return f"FSx ({fs_type}): {fs_id} ({storage} GB)"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get FSx details: %s", e)
                 return f"FSx: {fs_id}"
 
         return "FSx"

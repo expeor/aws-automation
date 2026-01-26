@@ -152,8 +152,8 @@ def collect_eventbridge_rules(session, account_id: str, account_name: str, regio
                         try:
                             tags_resp = events.list_tags_for_resource(ResourceARN=rule_arn)
                             tags = {tag["Key"]: tag["Value"] for tag in tags_resp.get("Tags", [])}
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Failed to get EventBridge rule tags: %s", e)
 
                     rules.append(
                         EventBridgeRule(

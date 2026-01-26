@@ -7,24 +7,27 @@ cli/ui/main_menu.py - 메인 메뉴 UI (V2)
 - 통합 입력 (번호/키워드)
 """
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
 from cli.i18n import t
 from cli.ui.banner import print_banner
-
-if TYPE_CHECKING:
-    from cli.ui.search import ToolSearchEngine
-    from core.auth.config.loader import AWSProfile
-    from core.tools.history import FavoritesManager, RecentHistory
-    from core.tools.types import AreaInfo
 from cli.ui.console import (
     clear_screen,
     wait_for_any_key,
 )
 from cli.ui.console import console as default_console
 from core.tools.types import AREA_COMMANDS, AREA_KEYWORDS, AREA_REGISTRY
+
+if TYPE_CHECKING:
+    from cli.ui.search import ToolSearchEngine
+    from core.auth.config.loader import AWSProfile
+    from core.tools.history import FavoritesManager, RecentHistory
+    from core.tools.types import AreaInfo
+
+logger = logging.getLogger(__name__)
 
 # 권한별 색상
 PERMISSION_COLORS = {
@@ -1354,8 +1357,8 @@ class MainMenu:
                     or (kind == "static" and provider_type == ProviderType.STATIC_CREDENTIALS)
                 ):
                     result.append(profile_name)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to list profiles: %s", e)
 
         return result
 

@@ -153,8 +153,8 @@ def collect_codebuild_projects(session, account_id: str, account_name: str, regi
                             tags=tags,
                         )
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get project details: %s", e)
     except Exception as e:
         logger.debug("Failed to list resources: %s", e)
 

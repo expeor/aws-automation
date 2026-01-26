@@ -438,7 +438,7 @@ class SSOSessionProvider(BaseProvider):
             )
             return [role["roleName"] for role in response.get("roleList", [])]
         except Exception:
-            return []
+            return []  # Return empty list on API failure
 
     def supports_multi_account(self) -> bool:
         """멀티 계정 지원 여부"""

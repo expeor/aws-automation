@@ -219,7 +219,8 @@ class SummarySheetWriter(BaseSheetWriter):
 
             matching_abuse_ips = self.get_matching_abuse_ips()
             return sum(int(client_ip_counts.get(ip, 0) or 0) for ip in matching_abuse_ips)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to calculate abuse IP requests: %s", e)
             return 0
 
     def _add_status_code_statistics(self, helper: SummarySheetHelper) -> None:

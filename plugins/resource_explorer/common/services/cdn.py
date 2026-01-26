@@ -95,8 +95,8 @@ def collect_route53_hosted_zones(session, account_id: str, account_name: str, re
                     detail_resp = route53.get_hosted_zone(Id=zone_id)
                     for vpc in detail_resp.get("VPCs", []):
                         vpc_ids.append(vpc.get("VPCId", ""))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to get hosted zone details: %s", e)
 
             # 태그 조회
             tags = {}

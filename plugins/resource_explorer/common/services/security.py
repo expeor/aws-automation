@@ -72,8 +72,8 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
                         tags=tags,
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get KMS key details: %s", e)
 
     return keys
 

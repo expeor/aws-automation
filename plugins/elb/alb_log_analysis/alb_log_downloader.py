@@ -222,7 +222,7 @@ class ALBLogDownloader:
             return f"{aws_account_id}_{region}_alb_{suffix}.xlsx"
 
         except Exception:
-            # 오류 발생 시 기본 파일명 반환
+            # 오류 발생 시 기본 파일명 반환 (filename generation fallback)
             suffix = token_hex(4)
             return f"alb_{suffix}.xlsx"
 
@@ -383,7 +383,7 @@ class ALBLogDownloader:
                 latest_local = latest_timestamp.astimezone(self.timezone)
                 self.available_range_local = (earliest_local, latest_local)
             except Exception:
-                self.available_range_local = None
+                self.available_range_local = None  # Timezone conversion fallback
 
         # 🎯 ALB 5분 단위 적재 특성에 맞춘 10분 확장 (여유있게)
         # ALB는 5분 구간 로그를 구간 끝 시간에 저장 (예: 08:00~08:05 → T0805Z 파일)
@@ -424,7 +424,7 @@ class ALBLogDownloader:
                     logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")
                     logger.error(f"   권장: 최근 유효 시각 근처로 재시도 (예: {suggest_start} ~ {suggest_end})")
                 except Exception:
-                    logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")
+                    logger.error(f"   S3 실제 로그 범위: {earliest_local} ~ {latest_local}")  # Fallback message
             logger.error(
                 "   참고: ALB는 5분 단위 파일을 생성하며, 트래픽 0 또는 전송 지연 시 해당 구간 파일이 생성되지 않습니다."
             )
@@ -590,7 +590,7 @@ class ALBLogDownloader:
                         print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")
                         print_sub_warning(f"권장 재시도: {suggest_start} ~ {suggest_end} 또는 범위를 넓혀 재시도")
                     except Exception:
-                        print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")
+                        print_sub_warning(f"실제 로그 범위({self.timezone.zone}): {earliest_local} ~ {latest_local}")  # Fallback
                 return []
 
             total_files = len(filtered_files)

@@ -4,11 +4,14 @@ cli/ui/banner.py - ASCII 아트 배너 및 컨텍스트 표시
 화려한 ASCII 아트와 현재 설정 정보 표시
 """
 
+import logging
 from pathlib import Path
 
 from rich.console import Console
 
 from cli.i18n import t
+
+logger = logging.getLogger(__name__)
 
 
 def get_version() -> str:
@@ -23,8 +26,8 @@ def get_version() -> str:
             if version_file.exists():
                 with open(version_file, encoding="utf-8") as f:
                     return f.read().strip()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to read version file: %s", e)
     return "0.0.1"
 
 
@@ -62,8 +65,8 @@ def get_current_context() -> str:
                 return f"[green]Single[/] [dim]|[/] [white]{profile}[/]"
             elif profile:
                 return f"[white]{profile}[/]"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to get current context: %s", e)
     return f"[dim]{t('common.profile_not_set')}[/]"
 
 
