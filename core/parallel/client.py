@@ -61,7 +61,7 @@ def get_client(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]
+        retries={"max_attempts": max_attempts, "mode": retry_mode},
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
     )
@@ -77,7 +77,7 @@ def get_client(
         region_name=region_name,
         config=config,
         **kwargs,
-    )  # type: ignore[call-overload]
+    )
 
 
 def get_resource(
@@ -104,7 +104,7 @@ def get_resource(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},  # type: ignore[typeddict-item]
+        retries={"max_attempts": max_attempts, "mode": retry_mode},
     )
 
     if "config" in kwargs:
@@ -117,4 +117,4 @@ def get_resource(
         region_name=region_name,
         config=config,
         **kwargs,
-    )  # type: ignore[call-overload]
+    )
