@@ -1,0 +1,137 @@
+company_name: "기본"
+company_name_en: "Default"
+
+cycles:
+  D:
+    display_name: "일간 작업"
+    display_name_en: "Daily Operations"
+    color: "red"
+    icon: "🕕"
+    tasks:
+      # 점검 (read)
+      - id: "D-001"
+        name: "Health 이벤트 현황"
+        name_en: "Health Event Status"
+        description: "AWS Health 이벤트, PHD 공지사항"
+        description_en: "AWS Health events, PHD announcements"
+        tool_ref: "health/analysis"
+        permission: "read"
+        supports_regions: false
+
+  1M:
+    display_name: "월간 작업"
+    display_name_en: "Monthly Operations"
+    color: "yellow"
+    icon: "📅"
+    tasks:
+      # 점검 (read)
+      - id: "1M-001"
+        name: "미사용 리소스 종합"
+        name_en: "Unused Resources Summary"
+        description: "NAT, EBS, EIP, Snapshot 등 미사용 리소스"
+        description_en: "Unused NAT, EBS, EIP, Snapshots, etc."
+        tool_ref: "cost_dashboard/orchestrator"
+        permission: "read"
+        supports_regions: true
+      - id: "1M-002"
+        name: "Backup 태그 누락"
+        name_en: "Backup Tag Missing"
+        description: "AWS Backup 태그 미적용 리소스"
+        description_en: "Resources missing AWS Backup tags"
+        tool_ref: "backup/audit"
+        permission: "read"
+        supports_regions: true
+      # 적용 (write)
+      - id: "1M-003"
+        name: "EC2→EBS 태그 동기화"
+        name_en: "EC2→EBS Tag Sync"
+        description: "EC2 인스턴스 태그를 연결된 EBS에 동기화"
+        description_en: "Sync EC2 instance tags to attached EBS volumes"
+        tool_ref: "tag_editor/ec2_to_ebs"
+        permission: "write"
+        supports_regions: true
+
+  3M:
+    display_name: "분기 작업"
+    display_name_en: "Quarterly Operations"
+    color: "blue"
+    icon: "📊"
+    tasks:
+      # 점검 (read)
+      - id: "3M-001"
+        name: "필수 태그 누락"
+        name_en: "Required Tag Missing"
+        description: "필수 태그 미적용 리소스 현황"
+        description_en: "Resources missing required tags"
+        tool_ref: "tag_editor/map_audit"
+        permission: "read"
+        supports_regions: true
+      - id: "3M-002"
+        name: "IAM 보안 점검"
+        name_en: "IAM Security Audit"
+        description: "IAM 사용자/역할 권한 분석"
+        description_en: "IAM user/role permission analysis"
+        tool_ref: "iam/iam_audit"
+        permission: "read"
+        supports_regions: false
+      # 적용 (write)
+      - id: "3M-003"
+        name: "MAP 태그 일괄 적용"
+        name_en: "MAP Tag Bulk Apply"
+        description: "MAP 2.0 마이그레이션 태그 일괄 적용"
+        description_en: "Bulk apply MAP 2.0 migration tags"
+        tool_ref: "tag_editor/map_apply"
+        permission: "write"
+        supports_regions: true
+      # 정리 (delete)
+      - id: "3M-004"
+        name: "오래된 스냅샷 정리"
+        name_en: "Old Snapshot Cleanup"
+        description: "90일 이상 경과된 미사용 스냅샷 정리"
+        description_en: "Cleanup unused snapshots older than 90 days"
+        tool_ref: "ec2/snapshot_cleanup"
+        permission: "delete"
+        supports_regions: true
+        requires_confirm: true  # 삭제 작업은 확인 필수
+
+  6M:
+    display_name: "반기 작업"
+    display_name_en: "Biannual Operations"
+    color: "green"
+    icon: "📋"
+    tasks:
+      # 점검 (read)
+      - id: "6M-001"
+        name: "Rightsizing 분석"
+        name_en: "Rightsizing Analysis"
+        description: "Cost Optimization Hub 권장사항"
+        description_en: "Cost Optimization Hub recommendations"
+        tool_ref: "cost/coh"
+        permission: "read"
+        supports_regions: false
+      # 정리 (delete)
+      - id: "6M-002"
+        name: "미사용 AMI 정리"
+        name_en: "Unused AMI Cleanup"
+        description: "미사용 AMI 및 연관 스냅샷 정리"
+        description_en: "Cleanup unused AMIs and associated snapshots"
+        tool_ref: "ec2/ami_cleanup"
+        permission: "delete"
+        supports_regions: true
+        requires_confirm: true
+
+  12M:
+    display_name: "연간 작업"
+    display_name_en: "Annual Operations"
+    color: "magenta"
+    icon: "📆"
+    tasks:
+      # 점검 (read)
+      - id: "12M-001"
+        name: "보안 종합 감사"
+        name_en: "Security Comprehensive Audit"
+        description: "IAM, Security Group, CloudTrail 종합 점검"
+        description_en: "Comprehensive IAM, SG, CloudTrail audit"
+        tool_ref: "iam/iam_audit"
+        permission: "read"
+        supports_regions: false

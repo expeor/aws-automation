@@ -44,6 +44,8 @@ SHORTCUTS = {
     "s": "browse",  # 서비스별 (EC2, ELB, VPC...)
     "c": "aws_category",  # AWS 카테고리 (Compute, Storage...)
     "t": "trusted_advisor",  # Trusted Advisor 영역 (보안, 비용, 성능...)
+    "r": "reports",  # 종합 보고서 (비용, 인벤토리, IP 검색, 로그)
+    "d": "scheduled",  # 정기 작업 (Daily/Monthly/Quarterly...)
     "f": "favorites",
     "g": "profile_groups",
     "p": "profiles",
@@ -186,10 +188,10 @@ class MainMenu:
         cmd_table.add_row(
             "[dim]t[/dim]",
             t("menu.check_types"),
-            "",
-            "",
-            "",
-            "",
+            "[dim]r[/dim]",
+            t("menu.reports"),
+            "[dim]d[/dim]",
+            t("menu.scheduled_operations"),
         )
         self.console.print(cmd_table)
 
@@ -320,6 +322,16 @@ class MainMenu:
         if action == "trusted_advisor":
             # Trusted Advisor 영역별 탐색
             self._show_trusted_advisor_view()
+            return True
+
+        if action == "reports":
+            # 종합 보고서 뷰
+            self._show_reports_view()
+            return True
+
+        if action == "scheduled":
+            # 정기 작업 뷰
+            self._show_scheduled_operations()
             return True
 
         if action == "favorite_select":
@@ -726,6 +738,8 @@ class MainMenu:
         self.console.print(f"  [cyan]s[/cyan]  {t('menu.aws_services'):14} {t('menu.help_services_desc')}")
         self.console.print(f"  [cyan]c[/cyan]  {t('menu.aws_category'):14} {t('menu.help_categories_desc')}")
         self.console.print(f"  [cyan]t[/cyan]  {t('menu.check_types'):14} {t('menu.help_check_types_desc')}")
+        self.console.print(f"  [cyan]r[/cyan]  {t('menu.reports'):14} {t('menu.help_reports_desc')}")
+        self.console.print(f"  [cyan]d[/cyan]  {t('menu.scheduled_operations'):14} {t('menu.help_scheduled_desc')}")
         self.console.print(f"  [cyan]f[/cyan]  {t('menu.favorites'):14} {t('menu.help_favorites_desc')}")
         self.console.print()
         self.console.print(f"[bold yellow]{t('menu.settings')}[/bold yellow]")
@@ -1153,6 +1167,148 @@ class MainMenu:
                 if 1 <= idx <= len(tools):
                     selected_tool = tools[idx - 1]
                     self._run_tool_directly(selected_tool["category"], selected_tool["tool_module"])
+                    return
+                else:
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
+
+    def _show_scheduled_operations(self) -> None:
+        """정기 작업 메뉴"""
+        from reports.scheduled.menu import show_scheduled_menu
+
+        action, task = show_scheduled_menu(self.console, self.lang)
+
+        if action == "run" and task:
+            # tool_ref에서 category/module 분리
+            parts = task.tool_ref.split("/")
+            if len(parts) >= 2:
+                category = parts[0]
+                module = "/".join(parts[1:])  # 서브모듈 지원
+                self._run_tool_directly(category, module)
+
+    def _show_reports_view(self) -> None:
+        """종합 보고서 뷰"""
+        from rich.table import Table
+
+        # reports 폴더의 카테고리만 필터링
+        report_category_names = {"cost_dashboard", "inventory", "ip_search", "log_analyzer"}
+        report_categories = [cat for cat in self._categories if cat.get("name") in report_category_names]
+
+        if not report_categories:
+            self.console.print()
+            self.console.print(f"[yellow]{t('menu.no_reports_available')}[/]")
+            wait_for_any_key()
+            return
+
+        while True:
+            # 화면 클리어
+            clear_screen()
+
+            self.console.print()
+            table = Table(
+                title=f"[bold]{t('menu.reports')}[/bold] ({t('menu.count_suffix', count=len(report_categories))})",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column(t("menu.header_category"), width=22)
+            table.add_column(t("menu.header_tools"), width=6, justify="right")
+            table.add_column(t("menu.header_description"), style="dim")
+
+            for i, cat in enumerate(report_categories, 1):
+                display_name = cat.get("display_name", cat.get("name", "")).upper()
+                tool_count = len(cat.get("tools", []))
+                desc = cat.get("description", "")[:55] if self.lang == "ko" else cat.get("description_en", "")[:55]
+                table.add_row(str(i), display_name, str(tool_count), desc)
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(report_categories):
+                    selected_cat = report_categories[idx - 1]
+                    self._show_report_tools(selected_cat)
+                else:
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(report_categories))}[/]")
+
+    def _show_report_tools(self, category: dict) -> None:
+        """리포트 카테고리의 도구 목록"""
+        from rich.table import Table
+
+        from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
+
+        tools = category.get("tools", [])
+        category_name = category.get("name", "")
+
+        if not tools:
+            self.console.print(f"[yellow]{t('menu.no_tools_in_service')}[/]")
+            wait_for_any_key()
+            return
+
+        while True:
+            # 화면 클리어
+            clear_screen()
+
+            self.console.print()
+            display_name = category.get("display_name", category_name).upper()
+            table = Table(
+                title=f"[bold]{display_name}[/bold] ({t('menu.count_suffix', count=len(tools))})",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=3, justify="right")
+            table.add_column(t("menu.header_tools"), width=30)
+            table.add_column(t("menu.header_permission"), width=6)
+            table.add_column(t("menu.header_area"), width=10)
+            table.add_column(t("menu.header_description"), style="dim")
+
+            for i, tool in enumerate(tools, 1):
+                perm = tool.get("permission", "read")
+                perm_color = PERMISSION_COLORS.get(perm, "green")
+                area = tool.get("area", "")
+                area_info = AREA_DISPLAY.get(area, {"label": area, "color": "dim"})
+
+                table.add_row(
+                    str(i),
+                    self._get_tool_name(tool),
+                    f"[{perm_color}]{perm}[/{perm_color}]",
+                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
+                    (self._get_tool_desc(tool) or "")[:50],
+                )
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            if choice == "0" or choice.lower() == "q":
+                return
+
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(tools):
+                    selected_tool = tools[idx - 1]
+                    tool_module = selected_tool.get("module", "")
+                    self._run_tool_directly(category_name, tool_module)
                     return
                 else:
                     self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")

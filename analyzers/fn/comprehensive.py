@@ -22,17 +22,16 @@ from rich.console import Console
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from shared.aws.pricing import (
-    get_lambda_monthly_cost,
-    get_lambda_provisioned_monthly_cost,
-)
-
 from shared.aws.lambda_ import (
     EOLStatus,
     LambdaFunctionInfo,
     collect_functions_with_metrics,
     get_recommended_upgrade,
     get_runtime_info,
+)
+from shared.aws.pricing import (
+    get_lambda_monthly_cost,
+    get_lambda_provisioned_monthly_cost,
 )
 
 if TYPE_CHECKING:

@@ -60,7 +60,7 @@ REPORTS_PATH = get_reports_path()
 # 스캔 대상 경로
 SCAN_PATHS = [
     ("analyzers", ANALYZERS_PATH),  # AWS 서비스별 분석 도구
-    ("reports", REPORTS_PATH),       # 종합 리포트
+    ("reports", REPORTS_PATH),  # 종합 리포트
 ]
 
 # =============================================================================

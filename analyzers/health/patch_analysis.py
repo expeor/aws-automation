@@ -90,7 +90,7 @@ def run(ctx: ExecutionContext) -> None:
     output_dir = OutputPath(identifier).sub("health", "compliance").with_date().build()
 
     # Excel 보고서 생성
-    reporter.generate_report(
+    excel_path = reporter.generate_report(
         output_dir=output_dir,
         file_prefix="patch_analysis",
         include_calendar=True,

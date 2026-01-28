@@ -439,6 +439,18 @@ MENU_MESSAGES = {
         "ko": "AWS 카테고리",
         "en": "AWS Categories",
     },
+    "reports": {
+        "ko": "종합 보고서",
+        "en": "Reports",
+    },
+    "reports_desc": {
+        "ko": "미사용 리소스, 인벤토리, IP 검색, 로그 분석",
+        "en": "Unused resources, Inventory, IP search, Log analysis",
+    },
+    "no_reports_available": {
+        "ko": "사용 가능한 보고서가 없습니다.",
+        "en": "No reports available.",
+    },
     # =========================================================================
     # Navigation & Prompts
     # =========================================================================
@@ -651,6 +663,10 @@ MENU_MESSAGES = {
         "ko": "영역별 (보안, 비용, 성능...)",
         "en": "By area (Security, Cost, Performance...)",
     },
+    "help_reports_desc": {
+        "ko": "종합 보고서 모음 (미사용, 인벤토리, IP, 로그)",
+        "en": "Comprehensive reports collection",
+    },
     "help_favorites_desc": {
         "ko": "자주 사용하는 도구 추가/제거",
         "en": "Add/remove frequently used tools",
@@ -714,5 +730,48 @@ MENU_MESSAGES = {
     "help_output_location": {
         "ko": "결과 파일",
         "en": "Result files",
+    },
+    # =========================================================================
+    # Scheduled Operations
+    # =========================================================================
+    "scheduled_operations": {
+        "ko": "정기 작업",
+        "en": "Scheduled Operations",
+    },
+    "comprehensive_reports": {
+        "ko": "종합 보고서",
+        "en": "Comprehensive Reports",
+    },
+    "header_cycle": {
+        "ko": "주기",
+        "en": "Cycle",
+    },
+    "task_check": {
+        "ko": "점검",
+        "en": "Check",
+    },
+    "task_apply": {
+        "ko": "적용",
+        "en": "Apply",
+    },
+    "task_cleanup": {
+        "ko": "정리",
+        "en": "Cleanup",
+    },
+    "permission_legend": {
+        "ko": "권한",
+        "en": "Permission",
+    },
+    "delete_task_warning": {
+        "ko": "⚠ delete 작업은 실행 전 확인을 요청합니다.",
+        "en": "⚠ Delete tasks require confirmation before execution.",
+    },
+    "delete_confirm_prompt": {
+        "ko": "⚠ '{name}'은(는) 삭제 작업입니다. 실행하시겠습니까? (y/N)",
+        "en": "⚠ '{name}' is a delete task. Execute? (y/N)",
+    },
+    "help_scheduled_desc": {
+        "ko": "정기 작업 (일간/월간/분기/반기/연간)",
+        "en": "Scheduled operations (Daily/Monthly/Quarterly...)",
     },
 }

@@ -112,6 +112,7 @@ exclude = [".git", "__pycache__", "build", "dist", ".eggs", "output", "temp"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = [
+    "E402",    # Module level import not at top (needed for plugin CATEGORY/TOOLS pattern)
     "E501",    # Line length handled by formatter
     "SIM102",  # Nested if statements sometimes clearer than combined
     "SIM108",  # Ternary operators reduce readability for long Korean f-strings
