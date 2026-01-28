@@ -1,1 +1,1 @@
-"""Test package for shared/io/html"""
+"""tests/shared/io/html - HTML 리포트 테스트"""

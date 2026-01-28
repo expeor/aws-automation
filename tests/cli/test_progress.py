@@ -564,3 +564,268 @@ class TestModuleExports:
 
         assert BaseTracker is not None
         assert SuccessFailColumn is not None
+
+
+# =============================================================================
+# ParallelTracker 추가 테스트
+# =============================================================================
+
+
+class TestParallelTrackerProperties:
+    """ParallelTracker 프로퍼티 테스트"""
+
+    def test_success_count_property(self):
+        """success_count 프로퍼티"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import ParallelTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=10)
+            tracker = ParallelTracker(progress, task_id, "test")
+
+            tracker.on_complete(success=True)
+            tracker.on_complete(success=True)
+
+            assert tracker.success_count == 2
+
+    def test_failed_count_property(self):
+        """failed_count 프로퍼티"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import ParallelTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=10)
+            tracker = ParallelTracker(progress, task_id, "test")
+
+            tracker.on_complete(success=False)
+            tracker.on_complete(success=False)
+            tracker.on_complete(success=False)
+
+            assert tracker.failed_count == 3
+
+    def test_total_count_property(self):
+        """total_count 프로퍼티"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import ParallelTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=None)
+            tracker = ParallelTracker(progress, task_id, "test")
+
+            tracker.set_total(50)
+
+            assert tracker.total_count == 50
+
+
+# =============================================================================
+# StepTracker.sub_parallel 테스트
+# =============================================================================
+
+
+class TestStepTrackerSubParallel:
+    """StepTracker.sub_parallel 추가 테스트"""
+
+    def test_sub_parallel_stats_tracking(self):
+        """nested parallel의 통계 추적"""
+        from cli.ui.progress import step_progress
+
+        with step_progress("테스트", total_steps=1) as steps:
+            steps.step("Step 1")
+
+            with steps.sub_parallel("수집") as tracker:
+                tracker.set_total(10)
+                for i in range(10):
+                    tracker.on_complete(success=i % 2 == 0)
+
+                success, failed, total = tracker.stats
+                assert success == 5
+                assert failed == 5
+                assert total == 10
+
+            steps.complete_step()
+
+
+# =============================================================================
+# DownloadTracker 추가 테스트
+# =============================================================================
+
+
+class TestDownloadTrackerProperties:
+    """DownloadTracker 프로퍼티 테스트"""
+
+    def test_total_property(self):
+        """total 프로퍼티"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import DownloadTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=100)
+            tracker = DownloadTracker(progress, task_id, "test", 100)
+
+            assert tracker.total == 100
+
+    def test_completed_property(self):
+        """completed 프로퍼티"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import DownloadTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=100)
+            tracker = DownloadTracker(progress, task_id, "test", 100)
+
+            tracker.advance(10)
+            tracker.advance(5)
+
+            assert tracker.completed == 15
+
+
+# =============================================================================
+# Context Manager 예외 처리 테스트
+# =============================================================================
+
+
+class TestContextManagerExceptions:
+    """Context manager 예외 처리 테스트"""
+
+    def test_parallel_progress_with_exception(self):
+        """예외 발생 시에도 정상 종료"""
+        from cli.ui.progress import parallel_progress
+
+        with parallel_progress("테스트") as tracker:
+            tracker.set_total(5)
+            tracker.on_complete(success=True)
+            # 예외는 context manager 외부에서 처리
+        # 정상 종료
+
+    def test_step_progress_with_exception(self):
+        """예외 발생 시에도 정상 종료"""
+        from cli.ui.progress import step_progress
+
+        with step_progress("테스트", total_steps=3) as steps:
+            steps.step("Step 1")
+            # 중간에 중단되어도 정상 종료
+        # 정상 종료
+
+    def test_download_progress_with_exception(self):
+        """예외 발생 시에도 정상 종료"""
+        from cli.ui.progress import download_progress
+
+        with download_progress("테스트", total=10) as tracker:
+            tracker.advance(3)
+            # 중간에 중단되어도 정상 종료
+        # 정상 종료
+
+
+# =============================================================================
+# BaseTracker.as_callback 추가 테스트
+# =============================================================================
+
+
+class TestAsCallbackAdvanced:
+    """as_callback 고급 테스트"""
+
+    def test_as_callback_with_args_and_kwargs(self):
+        """임의의 args/kwargs를 받는 콜백"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import DownloadTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=10)
+            tracker = DownloadTracker(progress, task_id, "test", 10)
+
+            callback = tracker.as_callback()
+
+            # 임의의 인자와 함께 호출
+            callback("arg1", "arg2", key1="value1")
+            assert tracker.completed == 1
+
+    def test_as_callback_status_without_done(self):
+        """done=False인 상태 콜백"""
+        from rich.progress import Progress
+
+        from cli.ui.progress import DownloadTracker
+
+        with Progress() as progress:
+            task_id = progress.add_task("test", total=10)
+            tracker = DownloadTracker(progress, task_id, "test", 10)
+
+            callback = tracker.as_callback(include_status=True)
+
+            # done=False로 호출하면 advance 안 함
+            callback("상태 메시지", done=False)
+            assert tracker.completed == 0
+
+            # done=True로 호출하면 advance
+            callback("완료", done=True)
+            assert tracker.completed == 1
+
+
+# =============================================================================
+# Custom Console 테스트
+# =============================================================================
+
+
+class TestCustomConsole:
+    """Custom console 사용 테스트"""
+
+    def test_parallel_progress_custom_console(self):
+        """커스텀 console 사용"""
+        from rich.console import Console
+
+        from cli.ui.progress import parallel_progress
+
+        custom_console = Console()
+
+        with parallel_progress("테스트", console=custom_console) as tracker:
+            tracker.set_total(5)
+            for _ in range(5):
+                tracker.on_complete(success=True)
+
+        success, failed, total = tracker.stats
+        assert success == 5
+
+    def test_step_progress_custom_console(self):
+        """커스텀 console 사용"""
+        from rich.console import Console
+
+        from cli.ui.progress import step_progress
+
+        custom_console = Console()
+
+        with step_progress("테스트", total_steps=2, console=custom_console) as steps:
+            steps.step("Step 1")
+            steps.complete_step()
+            steps.step("Step 2")
+            steps.complete_step()
+
+    def test_download_progress_custom_console(self):
+        """커스텀 console 사용"""
+        from rich.console import Console
+
+        from cli.ui.progress import download_progress
+
+        custom_console = Console()
+
+        with download_progress("테스트", total=5, console=custom_console) as tracker:
+            for _ in range(5):
+                tracker.advance()
+
+        assert tracker.completed == 5
+
+    def test_indeterminate_progress_custom_console(self):
+        """커스텀 console 사용"""
+        from rich.console import Console
+
+        from cli.ui.progress import indeterminate_progress
+
+        custom_console = Console()
+
+        with indeterminate_progress("테스트", console=custom_console) as status:
+            status.update("처리 중")
+            status.complete("완료")

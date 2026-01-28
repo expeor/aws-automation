@@ -517,3 +517,351 @@ class TestRun:
         flow_runner.run()
 
         assert mock_run_once.call_count == 1
+
+
+# =============================================================================
+# FlowRunner._find_tool_meta 테스트
+# =============================================================================
+
+
+class TestFindToolMeta:
+    """_find_tool_meta 메서드 테스트"""
+
+    @patch("core.tools.discovery.discover_categories")
+    def test_find_existing_tool(self, mock_discover, flow_runner):
+        """존재하는 도구 찾기"""
+        mock_discover.return_value = [
+            {
+                "name": "ec2",
+                "tools": [
+                    {
+                        "name": "미사용 EC2",
+                        "module": "unused_instances",
+                        "description": "설명",
+                        "permission": "read",
+                    }
+                ],
+            }
+        ]
+
+        meta = flow_runner._find_tool_meta("ec2", "unused_instances")
+        assert meta is not None
+        assert meta["name"] == "미사용 EC2"
+        assert meta["module"] == "unused_instances"
+
+    @patch("core.tools.discovery.discover_categories")
+    def test_find_nonexistent_tool(self, mock_discover, flow_runner):
+        """존재하지 않는 도구"""
+        mock_discover.return_value = [
+            {
+                "name": "ec2",
+                "tools": [],
+            }
+        ]
+
+        meta = flow_runner._find_tool_meta("ec2", "nonexistent")
+        assert meta is None
+
+    @patch("core.tools.discovery.discover_categories")
+    def test_find_tool_wrong_category(self, mock_discover, flow_runner):
+        """잘못된 카테고리"""
+        mock_discover.return_value = [
+            {
+                "name": "s3",
+                "tools": [
+                    {
+                        "name": "버킷 목록",
+                        "module": "list_buckets",
+                    }
+                ],
+            }
+        ]
+
+        meta = flow_runner._find_tool_meta("ec2", "list_buckets")
+        assert meta is None
+
+
+# =============================================================================
+# FlowRunner._save_history 테스트
+# =============================================================================
+
+
+class TestSaveHistory:
+    """_save_history 메서드 테스트"""
+
+    def test_save_history_no_tool(self, flow_runner):
+        """도구 없으면 이력 저장 안 함"""
+        ctx = ExecutionContext()
+        flow_runner._save_history(ctx)
+        # 에러 없이 완료
+
+    def test_save_history_no_category(self, flow_runner):
+        """카테고리 없으면 이력 저장 안 함"""
+        tool = ToolInfo(
+            name="테스트",
+            description="설명",
+            category="test",
+            permission="read",
+        )
+        ctx = ExecutionContext(tool=tool)
+        flow_runner._save_history(ctx)
+        # 에러 없이 완료
+
+    @patch("core.tools.discovery.discover_categories")
+    @patch("core.tools.history.RecentHistory")
+    def test_save_history_success(self, mock_history_class, mock_discover, flow_runner):
+        """이력 저장 성공"""
+        mock_discover.return_value = [
+            {
+                "name": "test",
+                "tools": [
+                    {
+                        "name": "테스트 도구",
+                        "module": "test_tool",
+                    }
+                ],
+            }
+        ]
+
+        mock_history = MagicMock()
+        mock_history_class.return_value = mock_history
+
+        tool = ToolInfo(
+            name="테스트 도구",
+            description="설명",
+            category="test",
+            permission="read",
+        )
+        ctx = ExecutionContext(category="test", tool=tool)
+
+        flow_runner._save_history(ctx)
+
+        mock_history.add.assert_called_once_with(
+            category="test",
+            tool_name="테스트 도구",
+            tool_module="test_tool",
+        )
+
+    @patch("core.tools.discovery.discover_categories")
+    @patch("core.tools.history.RecentHistory")
+    def test_save_history_exception_ignored(self, mock_history_class, mock_discover, flow_runner):
+        """이력 저장 실패는 무시"""
+        mock_discover.side_effect = Exception("Discovery failed")
+
+        tool = ToolInfo(
+            name="테스트",
+            description="설명",
+            category="test",
+            permission="read",
+        )
+        ctx = ExecutionContext(category="test", tool=tool)
+
+        # 예외 발생하지 않음
+        flow_runner._save_history(ctx)
+
+
+# =============================================================================
+# FlowRunner.run_tool_directly 테스트
+# =============================================================================
+
+
+class TestRunToolDirectly:
+    """run_tool_directly 메서드 테스트"""
+
+    @patch.object(FlowRunner, "_find_tool_meta")
+    def test_tool_not_found(self, mock_find, flow_runner):
+        """도구를 찾지 못하면 경고"""
+        mock_find.return_value = None
+
+        # 에러 발생하지 않음
+        flow_runner.run_tool_directly("test", "nonexistent")
+
+        mock_find.assert_called_once_with("test", "nonexistent", None)
+
+    @patch.object(FlowRunner, "_save_history")
+    @patch.object(FlowRunner, "_execute_tool")
+    @patch("cli.flow.runner.RegionStep")
+    @patch("cli.flow.runner.RoleStep")
+    @patch("cli.flow.runner.AccountStep")
+    @patch("cli.flow.runner.ProfileStep")
+    @patch.object(FlowRunner, "_find_tool_meta")
+    def test_run_tool_with_session(
+        self,
+        mock_find,
+        mock_profile_step,
+        mock_account_step,
+        mock_role_step,
+        mock_region_step,
+        mock_execute,
+        mock_save_history,
+        flow_runner,
+    ):
+        """세션 필요 도구 직접 실행"""
+        mock_find.return_value = {
+            "name": "테스트 도구",
+            "description": "설명",
+            "permission": "read",
+            "require_session": True,
+        }
+
+        mock_ctx = ExecutionContext(provider_kind=ProviderKind.SSO_SESSION)
+
+        for mock_step in [mock_profile_step, mock_account_step, mock_role_step, mock_region_step]:
+            instance = MagicMock()
+            instance.execute.return_value = mock_ctx
+            mock_step.return_value = instance
+
+        flow_runner.run_tool_directly("test", "test_tool")
+
+        # 모든 단계 호출 확인
+        mock_profile_step.return_value.execute.assert_called_once()
+        mock_account_step.return_value.execute.assert_called_once()
+        mock_role_step.return_value.execute.assert_called_once()
+        mock_region_step.return_value.execute.assert_called_once()
+        mock_execute.assert_called_once()
+        mock_save_history.assert_called_once()
+
+    @patch.object(FlowRunner, "_save_history")
+    @patch.object(FlowRunner, "_execute_tool")
+    @patch.object(FlowRunner, "_find_tool_meta")
+    def test_run_tool_without_session(self, mock_find, mock_execute, mock_save_history, flow_runner):
+        """세션 불필요 도구 직접 실행"""
+        mock_find.return_value = {
+            "name": "세션 불필요 도구",
+            "description": "설명",
+            "permission": "read",
+            "require_session": False,
+        }
+
+        flow_runner.run_tool_directly("test", "no_session_tool")
+
+        # execute만 호출 확인 (세션 단계 스킵)
+        mock_execute.assert_called_once()
+        mock_save_history.assert_called_once()
+
+
+# =============================================================================
+# FlowRunner._count_permissions 테스트
+# =============================================================================
+
+
+class TestCountPermissions:
+    """_count_permissions 메서드 테스트"""
+
+    def test_count_empty_permissions(self, flow_runner):
+        """빈 권한 목록"""
+        assert flow_runner._count_permissions({}) == 0
+
+    def test_count_read_permissions(self, flow_runner):
+        """읽기 권한 개수"""
+        permissions = {
+            "read": ["s3:ListBuckets", "s3:GetObject"],
+        }
+        assert flow_runner._count_permissions(permissions) == 2
+
+    def test_count_mixed_permissions(self, flow_runner):
+        """읽기/쓰기 권한 혼합"""
+        permissions = {
+            "read": ["s3:ListBuckets", "s3:GetObject"],
+            "write": ["s3:PutObject"],
+        }
+        assert flow_runner._count_permissions(permissions) == 3
+
+    def test_count_non_list_values(self, flow_runner):
+        """리스트가 아닌 값은 무시"""
+        permissions = {
+            "read": ["s3:ListBuckets"],
+            "other": "not a list",
+        }
+        assert flow_runner._count_permissions(permissions) == 1
+
+
+# =============================================================================
+# FlowRunner._handle_permission_error 테스트
+# =============================================================================
+
+
+class TestHandlePermissionError:
+    """_handle_permission_error 메서드 테스트"""
+
+    def test_non_access_denied_error(self, flow_runner):
+        """AccessDenied가 아닌 에러는 무시"""
+        error = ValueError("다른 에러")
+        flow_runner._handle_permission_error(error, None)
+        # 에러 없이 완료
+
+    def test_access_denied_error_without_permissions(self, flow_runner):
+        """AccessDenied 에러, 권한 정보 없음"""
+        error = MagicMock()
+        error.response = {"Error": {"Code": "AccessDenied"}}
+
+        flow_runner._handle_permission_error(error, None)
+        # 에러 없이 완료
+
+    def test_access_denied_error_with_permissions(self, flow_runner):
+        """AccessDenied 에러, 권한 정보 있음"""
+        error = MagicMock()
+        error.response = {"Error": {"Code": "AccessDenied"}}
+
+        permissions = {
+            "read": ["s3:ListBuckets"],
+            "write": ["s3:PutObject"],
+        }
+
+        flow_runner._handle_permission_error(error, permissions)
+        # 에러 없이 완료 (권한 안내 출력)
+
+    def test_various_access_denied_codes(self, flow_runner):
+        """다양한 AccessDenied 코드"""
+        codes = [
+            "AccessDenied",
+            "AccessDeniedException",
+            "UnauthorizedAccess",
+            "UnauthorizedOperation",
+            "AuthorizationError",
+        ]
+
+        for code in codes:
+            error = MagicMock()
+            error.response = {"Error": {"Code": code}}
+            flow_runner._handle_permission_error(error, None)
+            # 에러 없이 완료
+
+
+# =============================================================================
+# FlowRunner._print_permissions_in_box 테스트
+# =============================================================================
+
+
+class TestPrintPermissionsInBox:
+    """_print_permissions_in_box 메서드 테스트"""
+
+    def test_empty_permissions(self, flow_runner):
+        """빈 권한 목록"""
+        flow_runner._print_permissions_in_box({})
+        # 에러 없이 완료
+
+    def test_read_only_permissions(self, flow_runner):
+        """읽기 권한만"""
+        permissions = {
+            "read": ["s3:ListBuckets", "s3:GetObject"],
+        }
+        flow_runner._print_permissions_in_box(permissions)
+        # 에러 없이 완료
+
+    def test_write_only_permissions(self, flow_runner):
+        """쓰기 권한만"""
+        permissions = {
+            "write": ["s3:PutObject"],
+        }
+        flow_runner._print_permissions_in_box(permissions)
+        # 에러 없이 완료
+
+    def test_mixed_permissions(self, flow_runner):
+        """읽기/쓰기 권한 혼합"""
+        permissions = {
+            "read": ["s3:ListBuckets"],
+            "write": ["s3:PutObject"],
+        }
+        flow_runner._print_permissions_in_box(permissions)
+        # 에러 없이 완료

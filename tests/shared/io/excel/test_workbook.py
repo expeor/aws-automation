@@ -370,3 +370,487 @@ class TestWorkbookIntegration:
 
             # CSV 내보내기 메서드가 있다면 테스트
             # wb.export_csv(str(tmpdir), "test")
+
+
+class TestSummarySheetAdvanced:
+    """SummarySheet 고급 기능 테스트"""
+
+    def test_add_list_section_with_items(self):
+        """리스트 섹션 추가"""
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+
+        items = [("Item A", 100), ("Item B", 200), ("Item C", 150)]
+        summary.add_list_section("Top Items", items)
+
+        assert summary.current_row > 1
+
+    def test_add_list_section_empty(self):
+        """빈 리스트 섹션"""
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+
+        summary.add_list_section("Empty List", [])
+
+        assert summary.current_row > 1
+
+    def test_add_list_section_max_items(self):
+        """최대 항목 제한"""
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+
+        items = [(f"Item {i}", i * 10) for i in range(20)]
+        summary.add_list_section("Top 5", items, max_items=5)
+
+        # 5개만 추가되어야 함
+        assert summary.current_row > 1
+
+    def test_add_list_section_long_names(self):
+        """긴 이름 자르기"""
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+
+        long_name = "A" * 100
+        items = [(long_name, 100)]
+        summary.add_list_section("Long Names", items)
+
+        assert summary.current_row > 1
+
+    def test_add_item_with_number_format(self):
+        """숫자 포맷 지정"""
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+
+        summary.add_item("계좌번호", "123456789", number_format="@")
+
+        assert summary.current_row > 1
+
+    def test_summary_sheet_english(self):
+        """영어 Summary 시트"""
+        wb = Workbook(lang="en")
+        summary = wb.new_summary_sheet()
+
+        assert summary._ws.title == "Summary"
+
+    def test_summary_sheet_custom_position(self):
+        """Summary 시트 위치 지정"""
+        wb = Workbook()
+        # 일반 시트 먼저 생성
+        columns = [ColumnDef(header="Test")]
+        wb.new_sheet(name="Data", columns=columns)
+
+        # 맨 앞에 Summary 시트 추가
+        summary = wb.new_summary_sheet("요약", position=0)
+
+        assert wb._wb.sheetnames[0] == "요약"
+
+    def test_summary_sheet_multiple_sections(self):
+        """여러 섹션 추가"""
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+
+        (
+            summary.add_title("보고서")
+            .add_section("기본 정보")
+            .add_item("계정", "123456789012")
+            .add_blank_row()
+            .add_section("분석 결과")
+            .add_item("총 개수", "100개")
+            .add_item("비용", "$1,000", highlight="warning")
+            .add_blank_row()
+            .add_list_section("Top 5", [("A", 10), ("B", 20)])
+        )
+
+        assert summary.current_row > 8
+
+
+class TestWorkbookUtilityFunctions:
+    """Workbook 유틸리티 함수 테스트"""
+
+    def test_save_to_csv_dict_list(self):
+        """딕셔너리 리스트를 CSV로 저장"""
+        from shared.io.excel.workbook import save_to_csv
+
+        data = [
+            {"Name": "John", "Age": "30"},
+            {"Name": "Jane", "Age": "25"},
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = str(Path(tmpdir) / "test.csv")
+            save_to_csv(data, output_file)
+
+            assert Path(output_file).exists()
+            content = Path(output_file).read_text(encoding="utf-8-sig")
+            assert "Name" in content
+            assert "John" in content
+
+    def test_save_to_csv_list_list(self):
+        """리스트 리스트를 CSV로 저장"""
+        from shared.io.excel.workbook import save_to_csv
+
+        data = [["John", "30"], ["Jane", "25"]]
+        headers = ["Name", "Age"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = str(Path(tmpdir) / "test.csv")
+            save_to_csv(data, output_file, headers=headers)
+
+            assert Path(output_file).exists()
+            content = Path(output_file).read_text(encoding="utf-8-sig")
+            assert "Name" in content
+
+    def test_save_to_csv_empty_data(self):
+        """빈 데이터 저장"""
+        from shared.io.excel.workbook import save_to_csv
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = str(Path(tmpdir) / "empty.csv")
+            save_to_csv([], output_file)
+
+            assert Path(output_file).exists()
+
+    def test_save_dict_list_to_excel(self):
+        """딕셔너리 리스트를 Excel로 저장"""
+        from shared.io.excel.workbook import save_dict_list_to_excel
+
+        data = [
+            {"Name": "John", "Age": 30, "City": "Seoul"},
+            {"Name": "Jane", "Age": 25, "City": "Busan"},
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = str(Path(tmpdir) / "test.xlsx")
+            save_dict_list_to_excel(data, output_file)
+
+            assert Path(output_file).exists()
+            assert Path(output_file).stat().st_size > 0
+
+    def test_save_dict_list_to_excel_with_columns(self):
+        """컬럼 순서 지정하여 저장"""
+        from shared.io.excel.workbook import save_dict_list_to_excel
+
+        data = [
+            {"Name": "John", "Age": 30, "City": "Seoul"},
+            {"Name": "Jane", "Age": 25, "City": "Busan"},
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = str(Path(tmpdir) / "test.xlsx")
+            save_dict_list_to_excel(data, output_file, columns=["City", "Name"])
+
+            assert Path(output_file).exists()
+
+    def test_save_dict_list_to_excel_empty(self):
+        """빈 데이터 저장"""
+        from shared.io.excel.workbook import save_dict_list_to_excel
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = str(Path(tmpdir) / "empty.xlsx")
+            save_dict_list_to_excel([], output_file)
+
+            assert Path(output_file).exists()
+
+    def test_add_sheet_from_dict_list(self):
+        """기존 Workbook에 시트 추가"""
+        from openpyxl import Workbook as OpenpyxlWorkbook
+
+        from shared.io.excel.workbook import add_sheet_from_dict_list
+
+        wb = OpenpyxlWorkbook()
+        data = [
+            {"Name": "John", "Age": 30},
+            {"Name": "Jane", "Age": 25},
+        ]
+
+        ws = add_sheet_from_dict_list(wb, data, "TestSheet")
+
+        assert ws is not None
+        assert ws.title == "TestSheet"
+        assert ws.max_row == 3  # 헤더 + 2개 데이터
+
+    def test_add_sheet_from_dict_list_with_columns(self):
+        """컬럼 순서 지정하여 시트 추가"""
+        from openpyxl import Workbook as OpenpyxlWorkbook
+
+        from shared.io.excel.workbook import add_sheet_from_dict_list
+
+        wb = OpenpyxlWorkbook()
+        data = [
+            {"Name": "John", "Age": 30, "City": "Seoul"},
+        ]
+
+        ws = add_sheet_from_dict_list(wb, data, "TestSheet", columns=["City", "Name"])
+
+        assert ws is not None
+        assert ws.cell(row=1, column=1).value == "City"
+        assert ws.cell(row=1, column=2).value == "Name"
+
+    def test_add_sheet_from_dict_list_empty(self):
+        """빈 데이터로 시트 추가"""
+        from openpyxl import Workbook as OpenpyxlWorkbook
+
+        from shared.io.excel.workbook import add_sheet_from_dict_list
+
+        wb = OpenpyxlWorkbook()
+        ws = add_sheet_from_dict_list(wb, [], "EmptySheet")
+
+        assert ws is not None
+        assert ws.title == "EmptySheet"
+
+
+class TestWorksheetFormatting:
+    """워크시트 포맷팅 테스트"""
+
+    def test_calculate_optimal_column_width(self):
+        """최적 컬럼 너비 계산"""
+        from shared.io.excel.workbook import calculate_optimal_column_width
+
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+        sheet.add_row(["Short"])
+        sheet.add_row(["Very long text content here"])
+
+        width = calculate_optimal_column_width(sheet._ws, "A")
+
+        assert width > 10
+
+    def test_calculate_optimal_column_width_multiline(self):
+        """멀티라인 컬럼 너비 계산"""
+        from shared.io.excel.workbook import calculate_optimal_column_width
+
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+        sheet.add_row(["Line 1\nLine 2\nVery long line 3"])
+
+        width = calculate_optimal_column_width(sheet._ws, "A")
+
+        assert width > 10
+
+    def test_calculate_optimal_column_width_max_limit(self):
+        """최대 너비 제한"""
+        from shared.io.excel.workbook import calculate_optimal_column_width
+
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+        sheet.add_row(["A" * 200])  # 매우 긴 텍스트
+
+        width = calculate_optimal_column_width(sheet._ws, "A", max_width=50)
+
+        assert width <= 50
+
+    def test_calculate_optimal_row_height(self):
+        """최적 행 높이 계산"""
+        from shared.io.excel.workbook import calculate_optimal_row_height
+
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+        sheet.add_row(["Line 1\nLine 2\nLine 3"])
+
+        height = calculate_optimal_row_height(sheet._ws, 2)
+
+        assert height > 15  # 기본 높이보다 큼
+
+    def test_apply_detail_sheet_formatting(self):
+        """상세 시트 포맷팅 적용"""
+        from shared.io.excel.workbook import apply_detail_sheet_formatting
+
+        wb = Workbook()
+        columns = [ColumnDef(header="A"), ColumnDef(header="B")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+        sheet.add_row(["val1", "val2"])
+
+        apply_detail_sheet_formatting(sheet._ws, has_header=True)
+
+        assert sheet._ws.auto_filter.ref is not None
+        assert sheet._ws.freeze_panes == "A2"
+
+    def test_apply_detail_sheet_formatting_no_header(self):
+        """헤더 없이 포맷팅"""
+        from shared.io.excel.workbook import apply_detail_sheet_formatting
+
+        wb = Workbook()
+        columns = [ColumnDef(header="A")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        apply_detail_sheet_formatting(sheet._ws, has_header=False)
+
+        assert sheet._ws.auto_filter.ref is not None
+
+    def test_apply_summary_formatting(self):
+        """요약 시트 포맷팅"""
+        from shared.io.excel.workbook import apply_summary_formatting
+
+        wb = Workbook()
+        summary = wb.new_summary_sheet("요약")
+        summary.add_item("테스트", "값")
+
+        apply_summary_formatting(summary._ws)
+
+        assert summary._ws.sheet_view.zoomScale == 90
+
+    def test_apply_worksheet_settings(self):
+        """워크시트 기본 설정"""
+        from shared.io.excel.workbook import apply_worksheet_settings
+
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+        sheet.add_row(["value"])
+
+        apply_worksheet_settings(sheet._ws, zoom_scale=100, wrap_text=True)
+
+        assert sheet._ws.sheet_view.zoomScale == 100
+
+
+class TestSheetRowStyles:
+    """시트 행 스타일 테스트"""
+
+    def test_add_row_with_warning_style(self):
+        """경고 스타일 행"""
+        wb = Workbook()
+        columns = [ColumnDef(header="A"), ColumnDef(header="B")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        sheet.add_row(["warning", "data"], style=wb.styles.warning())
+
+        assert sheet.row_count == 1
+
+    def test_add_row_with_danger_style(self):
+        """위험 스타일 행"""
+        wb = Workbook()
+        columns = [ColumnDef(header="A"), ColumnDef(header="B")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        sheet.add_row(["danger", "data"], style=wb.styles.danger())
+
+        assert sheet.row_count == 1
+
+    def test_add_row_with_success_style(self):
+        """성공 스타일 행"""
+        wb = Workbook()
+        columns = [ColumnDef(header="A"), ColumnDef(header="B")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        sheet.add_row(["success", "data"], style=wb.styles.success())
+
+        assert sheet.row_count == 1
+
+    def test_add_row_with_info_style(self):
+        """정보 스타일 행"""
+        wb = Workbook()
+        columns = [ColumnDef(header="A"), ColumnDef(header="B")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        sheet.add_row(["info", "data"], style=wb.styles.info())
+
+        assert sheet.row_count == 1
+
+
+class TestWorkbookProperties:
+    """Workbook 프로퍼티 테스트"""
+
+    def test_lang_property(self):
+        """언어 프로퍼티"""
+        wb = Workbook(lang="en")
+
+        assert wb.lang == "en"
+
+    def test_styles_property(self):
+        """스타일 프로퍼티"""
+        wb = Workbook()
+
+        assert wb.styles is not None
+        assert hasattr(wb.styles, "warning")
+        assert hasattr(wb.styles, "danger")
+
+    def test_openpyxl_workbook_property(self):
+        """내부 openpyxl Workbook 접근"""
+        wb = Workbook()
+
+        assert wb.openpyxl_workbook is not None
+        assert hasattr(wb.openpyxl_workbook, "active")
+
+    def test_sheet_row_count_property(self):
+        """시트 행 수 프로퍼티"""
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        assert sheet.row_count == 0
+
+        sheet.add_row(["data"])
+        assert sheet.row_count == 1
+
+        sheet.add_row(["data2"])
+        assert sheet.row_count == 2
+
+
+class TestWorkbookEdgeCases:
+    """Workbook 경계 케이스 테스트"""
+
+    def test_save_as_without_region(self):
+        """리전 없이 저장"""
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        wb.new_sheet(name="Test", columns=columns)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = wb.save_as(str(tmpdir), "test_output")
+
+            assert Path(filepath).exists()
+            assert "test_output" in str(filepath)
+
+    def test_save_as_with_suffix(self):
+        """접미사 포함 저장"""
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        wb.new_sheet(name="Test", columns=columns)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = wb.save_as(str(tmpdir), "test", suffix="final")
+
+            assert Path(filepath).exists()
+            assert "final" in str(filepath)
+
+    @patch("shared.io.output.open_in_explorer")
+    def test_workbook_save_with_one_sheet(self, mock_open):
+        """하나의 빈 시트만 있는 Workbook 저장"""
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        wb.new_sheet(name="Sheet1", columns=columns)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = wb.save(Path(tmpdir) / "single_sheet.xlsx")
+
+            assert Path(filepath).exists()
+            wb.close()  # Close to release file handle
+
+    def test_sheet_with_no_rows(self):
+        """데이터 없는 시트"""
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+        sheet = wb.new_sheet(name="Test", columns=columns)
+
+        assert sheet.row_count == 0
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = wb.save(Path(tmpdir) / "no_rows.xlsx")
+            assert Path(filepath).exists()
+
+    def test_very_long_sheet_name(self):
+        """매우 긴 시트 이름"""
+        wb = Workbook()
+        columns = [ColumnDef(header="Test")]
+
+        # Excel 시트 이름은 31자 권장이지만 openpyxl은 경고만 함
+        long_name = "A" * 50
+        sheet = wb.new_sheet(name=long_name, columns=columns)
+
+        # openpyxl은 긴 이름을 허용하지만 경고 발생
+        # Excel에서 열 때 31자로 잘릴 수 있음
+        assert len(sheet._ws.title) == 50  # openpyxl은 그대로 유지

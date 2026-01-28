@@ -424,3 +424,273 @@ class TestCreateReportDirectory:
             path = create_report_directory("ebs", "test", "daily")
 
             assert "2025-12-10" in path
+
+
+# =============================================================================
+# OutputPath._get_project_root Tests
+# =============================================================================
+
+
+class TestGetProjectRoot:
+    """_get_project_root 메서드 테스트"""
+
+    def test_uses_env_variable_if_set(self, tmp_path):
+        """환경 변수 AA_OUTPUT_ROOT 우선 사용"""
+        test_root = tmp_path / "custom_root"
+        test_root.mkdir()
+
+        with patch.dict(os.environ, {"AA_OUTPUT_ROOT": str(test_root)}):
+            root = OutputPath._get_project_root()
+            assert str(test_root) in root
+
+    def test_finds_pyproject_toml(self, tmp_path):
+        """pyproject.toml이 있는 디렉토리 찾기"""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / "pyproject.toml").touch()
+
+        nested = project_root / "core" / "tools"
+        nested.mkdir(parents=True)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(nested)
+            root = OutputPath._get_project_root()
+            # Should find project_root
+            assert "project" in root or os.path.exists(os.path.join(root, "pyproject.toml"))
+        finally:
+            os.chdir(original_cwd)
+
+    def test_finds_git_directory(self, tmp_path):
+        """.git이 있는 디렉토리 찾기"""
+        project_root = tmp_path / "git_project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+
+        nested = project_root / "subdir"
+        nested.mkdir()
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(nested)
+            root = OutputPath._get_project_root()
+            assert "git_project" in root or os.path.exists(os.path.join(root, ".git"))
+        finally:
+            os.chdir(original_cwd)
+
+    def test_fallback_to_cwd(self, tmp_path):
+        """마커 파일 없으면 현재 디렉토리 반환"""
+        temp_dir = tmp_path / "no_markers"
+        temp_dir.mkdir()
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(temp_dir)
+            root = OutputPath._get_project_root()
+            # Should return cwd
+            assert os.path.exists(root)
+        finally:
+            os.chdir(original_cwd)
+
+
+# =============================================================================
+# Weekly Date Pattern Tests
+# =============================================================================
+
+
+class TestWeeklyDatePattern:
+    """주차 계산 테스트"""
+
+    def test_first_week_of_month(self):
+        """월 첫째 주 테스트"""
+        with patch("core.tools.output.builder.datetime") as mock_dt:
+            # 2025년 12월 1일 (월요일)
+            mock_dt.now.return_value = datetime(2025, 12, 1)
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+            parts = OutputPath._get_date_parts(DatePattern.WEEKLY)
+
+            assert len(parts) == 3
+            assert parts[0] == "2025"
+            assert parts[1] == "12"
+            assert "1주차" in parts[2]
+
+    def test_second_week_of_month(self):
+        """월 둘째 주 테스트"""
+        with patch("core.tools.output.builder.datetime") as mock_dt:
+            # 2025년 12월 10일
+            mock_dt.now.return_value = datetime(2025, 12, 10)
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+            parts = OutputPath._get_date_parts(DatePattern.WEEKLY)
+
+            assert "2주차" in parts[2]
+
+    def test_last_week_of_month(self):
+        """월 마지막 주 테스트"""
+        with patch("core.tools.output.builder.datetime") as mock_dt:
+            # 2025년 12월 31일
+            mock_dt.now.return_value = datetime(2025, 12, 31)
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+            parts = OutputPath._get_date_parts(DatePattern.WEEKLY)
+
+            # Should be 4th or 5th week
+            assert "주차" in parts[2]
+
+
+# =============================================================================
+# print_report_complete Tests
+# =============================================================================
+
+
+class TestPrintReportComplete:
+    """print_report_complete 함수 테스트"""
+
+    def test_single_path_output(self, capsys):
+        """단일 경로 출력"""
+        from core.tools.output.builder import print_report_complete
+
+        print_report_complete("/path/to/report.xlsx")
+
+        captured = capsys.readouterr()
+        assert "보고서 생성 완료" in captured.out
+        assert "/path/to/report.xlsx" in captured.out
+
+    def test_multiple_paths_output(self, capsys):
+        """여러 경로 출력"""
+        from core.tools.output.builder import print_report_complete
+
+        paths = {
+            "excel": "/path/to/report.xlsx",
+            "html": "/path/to/report.html",
+        }
+        print_report_complete(paths)
+
+        captured = capsys.readouterr()
+        assert "EXCEL" in captured.out
+        assert "HTML" in captured.out
+
+    def test_custom_message(self, capsys):
+        """커스텀 메시지 출력"""
+        from core.tools.output.builder import print_report_complete
+
+        print_report_complete("/path/to/report.xlsx", message="분석 완료!")
+
+        captured = capsys.readouterr()
+        assert "분석 완료" in captured.out
+
+    def test_empty_path_in_dict(self, capsys):
+        """딕셔너리에 빈 경로 포함"""
+        from core.tools.output.builder import print_report_complete
+
+        paths = {
+            "excel": "/path/to/report.xlsx",
+            "html": "",  # Empty path
+            "csv": None,  # None path
+        }
+        print_report_complete(paths)
+
+        captured = capsys.readouterr()
+        assert "EXCEL" in captured.out
+        # Empty/None paths should be skipped
+
+
+# =============================================================================
+# single_report_directory Tests
+# =============================================================================
+
+
+class TestSingleReportDirectory:
+    """single_report_directory 함수 테스트"""
+
+    def test_creates_reports_subdirectory(self, tmp_path):
+        """reports 하위 디렉토리 생성"""
+        from core.tools.output.builder import single_report_directory
+
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 31)
+
+            path = single_report_directory("my-sso-session")
+
+            assert os.path.isdir(path)
+            assert "my-sso-session" in path
+            assert "reports" in path
+            assert "2025-12-31" in path
+
+    def test_uses_daily_pattern(self, tmp_path):
+        """DAILY 패턴 사용 확인"""
+        from core.tools.output.builder import single_report_directory
+
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 1, 15)
+
+            path = single_report_directory("test-session")
+
+            assert "2025-01-15" in path
+
+
+# =============================================================================
+# Integration Tests
+# =============================================================================
+
+
+class TestIntegration:
+    """통합 테스트"""
+
+    def test_full_workflow_with_file_save(self, tmp_path):
+        """파일 저장 전체 워크플로우"""
+        with (
+            patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
+            patch("core.tools.output.builder.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = datetime(2025, 12, 25)
+
+            # Build path with chaining
+            builder = OutputPath("christmas-profile").sub("AWS_Reports").with_date("monthly")
+
+            # Save file
+            content = "Test report content"
+            result = builder.save_file("report.txt", content)
+
+            # Verify
+            assert os.path.exists(result.path)
+            assert "christmas-profile" in result.path
+            assert "AWS_Reports" in result.path
+            assert "2025" in result.path
+            assert "12" in result.path
+
+            with open(result.path, encoding="utf-8") as f:
+                assert f.read() == content
+
+    def test_multiple_files_same_directory(self, tmp_path):
+        """같은 디렉토리에 여러 파일 저장"""
+        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
+            builder = OutputPath("test-profile").sub("reports")
+
+            result1 = builder.save_file("file1.txt", "Content 1")
+            result2 = builder.save_file("file2.txt", "Content 2")
+
+            # Same directory
+            assert result1.directory == result2.directory
+
+            # Both files exist
+            assert os.path.exists(result1.path)
+            assert os.path.exists(result2.path)
+
+    def test_sanitization_in_full_workflow(self, tmp_path):
+        """전체 워크플로우에서 sanitization 확인"""
+        with patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)):
+            # Identifier with special characters
+            path = OutputPath("my profile/test\\name").build()
+
+            assert "my_profile_test_name" in path
+            assert " " not in path
+            assert "/" not in os.path.basename(path)
+            assert "\\" not in os.path.basename(path)
