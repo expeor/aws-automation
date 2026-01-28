@@ -25,9 +25,7 @@ if TYPE_CHECKING:
 console = Console()
 
 
-def _collect_issues(
-    session, account_id: str, account_name: str, region: str
-) -> list[HealthEvent] | None:
+def _collect_issues(session, account_id: str, account_name: str, region: str) -> list[HealthEvent] | None:
     """단일 계정의 서비스 장애 수집 (병렬 실행용)
 
     Args:

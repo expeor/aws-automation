@@ -33,9 +33,7 @@ if TYPE_CHECKING:
 console = Console()
 
 
-def _collect_patches(
-    session, account_id: str, account_name: str, region: str
-) -> CollectionResult | None:
+def _collect_patches(session, account_id: str, account_name: str, region: str) -> CollectionResult | None:
     """단일 계정의 패치 이벤트 수집 (병렬 실행용)
 
     Args:
