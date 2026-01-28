@@ -113,6 +113,9 @@ no_implicit_optional = true
 
 ## 플러그인 작성 패턴
 
+> **⚠️ 멀티 계정 지원 필수**: 모든 도구는 `parallel_collect` 패턴을 사용해야 합니다.
+> `get_context_session()` 직접 호출은 SSO Session 멀티 계정 선택 시 오류 발생.
+
 ### 기본 구조
 
 플러그인은 `plugins/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:

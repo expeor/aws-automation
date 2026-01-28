@@ -7,6 +7,16 @@ description: 새로운 AWS 서비스 플러그인 생성 (폴더 + __init__.py +
 **새로운 AWS 서비스**를 처음 추가할 때 사용합니다.
 기존 서비스에 도구만 추가하려면 `/add-plugin-tool`을 사용하세요.
 
+> **⚠️ 중요: 멀티 계정 지원 필수**
+>
+> 모든 도구는 반드시 `parallel_collect` 패턴을 사용해야 합니다.
+> SSO Session에서 여러 계정을 선택할 수 있으므로, 단일 세션만 처리하면 오류가 발생합니다.
+>
+> - ✅ `parallel_collect(ctx, callback, service="ec2")` - 사용
+> - ❌ `get_context_session(ctx, "us-east-1")` - 사용 금지
+>
+> 자세한 패턴은 `.claude/skills/parallel-execution-patterns/SKILL.md` 참조
+
 ## 입력
 
 $ARGUMENTS
