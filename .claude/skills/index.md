@@ -126,13 +126,13 @@ from core.parallel import parallel_collect, get_client, quiet_mode
 from core.parallel.errors import ErrorCollector, ErrorSeverity, try_or_default
 
 # CloudWatch 메트릭
-from plugins.cloudwatch.common import batch_get_metrics, MetricQuery
+from shared.aws.metrics import batch_get_metrics, MetricQuery
 
 # 인벤토리 수집
-from plugins.resource_explorer.common import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 
 # 리포트 출력
-from core.tools.io.compat import generate_reports
+from shared.io.compat import generate_reports
 ```
 
 ---

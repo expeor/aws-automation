@@ -174,7 +174,7 @@ def calculate_unused_cost(resources: list[dict]) -> dict:
 
 ```python
 # plugins/cost/comprehensive.py 패턴
-from plugins.resource_explorer.common.collector import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 
 def comprehensive_cost_analysis(ctx):
     """종합 비용 분석"""

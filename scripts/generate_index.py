@@ -6,7 +6,7 @@ Project Index Generator
 Claude Code의 토큰 사용량을 줄이고 프로젝트 탐색을 빠르게 합니다.
 
 Usage:
-    python scripts/generate_index.py [--section plugins|core|git|all]
+    python scripts/generate_index.py [--section analyzers|core|git|all]
 """
 
 from __future__ import annotations
@@ -21,57 +21,76 @@ from pathlib import Path
 # Project root detection
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-PLUGINS_DIR = PROJECT_ROOT / "plugins"
+ANALYZERS_DIR = PROJECT_ROOT / "analyzers"
+REPORTS_DIR = PROJECT_ROOT / "reports"
+SHARED_DIR = PROJECT_ROOT / "shared"
 CORE_DIR = PROJECT_ROOT / "core"
 OUTPUT_FILE = PROJECT_ROOT / ".claude" / "project-index.md"
 
 
-def scan_plugins() -> list[dict]:
-    """Scan all plugins and extract CATEGORY/TOOLS metadata."""
-    plugins = []
+def scan_analyzers_and_reports() -> tuple[list[dict], list[dict]]:
+    """Scan analyzers and reports directories for CATEGORY/TOOLS metadata."""
+    analyzers = []
+    reports = []
 
-    for init_file in sorted(PLUGINS_DIR.glob("*/__init__.py")):
-        service_name = init_file.parent.name
-        try:
-            content = init_file.read_text(encoding="utf-8")
-            # Parse AST to extract CATEGORY and TOOLS
-            tree = ast.parse(content)
+    # Scan analyzers/
+    for init_file in sorted(ANALYZERS_DIR.glob("*/__init__.py")):
+        result = _parse_init_file(init_file)
+        if result:
+            analyzers.append(result)
 
-            category = None
-            tools = []
+    # Scan reports/
+    for init_file in sorted(REPORTS_DIR.glob("*/__init__.py")):
+        result = _parse_init_file(init_file)
+        if result:
+            reports.append(result)
 
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Assign):
-                    for target in node.targets:
-                        if isinstance(target, ast.Name):
-                            if target.id == "CATEGORY" and isinstance(node.value, ast.Dict):
-                                category = ast.literal_eval(ast.unparse(node.value))
-                            elif target.id == "TOOLS" and isinstance(node.value, ast.List):
-                                tools = ast.literal_eval(ast.unparse(node.value))
+    return analyzers, reports
 
-            if category:
-                # Collect areas from tools
-                areas = list({t.get("area", "other") for t in tools if isinstance(t, dict)})
-                plugins.append({
-                    "name": service_name,
-                    "display_name": category.get("display_name", service_name.upper()),
-                    "description": category.get("description", ""),
-                    "description_en": category.get("description_en", ""),
-                    "tool_count": len(tools),
-                    "areas": sorted(areas),
-                    "tools": tools,
-                })
-        except Exception as e:
-            print(f"Warning: Failed to parse {init_file}: {e}", file=sys.stderr)
 
-    return plugins
+def _parse_init_file(init_file: Path) -> dict | None:
+    """Parse a single __init__.py file for CATEGORY/TOOLS metadata."""
+    service_name = init_file.parent.name
+    try:
+        content = init_file.read_text(encoding="utf-8")
+        # Parse AST to extract CATEGORY and TOOLS
+        tree = ast.parse(content)
+
+        category = None
+        tools = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        if target.id == "CATEGORY" and isinstance(node.value, ast.Dict):
+                            category = ast.literal_eval(ast.unparse(node.value))
+                        elif target.id == "TOOLS" and isinstance(node.value, ast.List):
+                            tools = ast.literal_eval(ast.unparse(node.value))
+
+        if category:
+            # Collect areas from tools
+            areas = list({t.get("area", "other") for t in tools if isinstance(t, dict)})
+            return {
+                "name": service_name,
+                "display_name": category.get("display_name", service_name.upper()),
+                "description": category.get("description", ""),
+                "description_en": category.get("description_en", ""),
+                "tool_count": len(tools),
+                "areas": sorted(areas),
+                "tools": tools,
+            }
+    except Exception as e:
+        print(f"Warning: Failed to parse {init_file}: {e}", file=sys.stderr)
+
+    return None
 
 
 def get_directory_stats() -> dict:
     """Get file counts for main directories."""
     stats = {}
 
-    for dir_name in ["cli", "core", "plugins", "tests"]:
+    for dir_name in ["cli", "core", "shared", "analyzers", "reports", "tests"]:
         dir_path = PROJECT_ROOT / dir_name
         if dir_path.exists():
             py_files = list(dir_path.rglob("*.py"))
@@ -145,17 +164,24 @@ def get_core_modules() -> list[dict]:
     return modules
 
 
-def render_index_md(plugins: list[dict], core_modules: list[dict], git_status: dict, dir_stats: dict) -> str:
+def render_index_md(
+    analyzers: list[dict],
+    reports: list[dict],
+    core_modules: list[dict],
+    git_status: dict,
+    dir_stats: dict,
+) -> str:
     """Render the project index markdown."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Calculate totals
-    total_tools = sum(p["tool_count"] for p in plugins)
+    all_items = analyzers + reports
+    total_tools = sum(p["tool_count"] for p in all_items)
     total_files = sum(dir_stats.values())
 
     # Count areas
     area_counter: Counter[str] = Counter()
-    for p in plugins:
+    for p in all_items:
         for area in p["areas"]:
             area_counter[area] += 1
 
@@ -169,7 +195,8 @@ def render_index_md(plugins: list[dict], core_modules: list[dict], git_status: d
         "## Quick Stats",
         "",
         f"- **Total Files**: {total_files} Python files",
-        f"- **Plugins**: {len(plugins)} services, {total_tools} tools",
+        f"- **Analyzers**: {len(analyzers)} services, {sum(p['tool_count'] for p in analyzers)} tools",
+        f"- **Reports**: {len(reports)} categories, {sum(p['tool_count'] for p in reports)} tools",
         f"- **Core Modules**: {len(core_modules)}",
         f"- **Branch**: `{git_status['branch']}`",
         "",
@@ -178,7 +205,7 @@ def render_index_md(plugins: list[dict], core_modules: list[dict], git_status: d
     ]
 
     for area, count in area_counter.most_common():
-        lines.append(f"- `{area}`: {count} plugins")
+        lines.append(f"- `{area}`: {count} items")
 
     lines.extend([
         "",
@@ -188,7 +215,9 @@ def render_index_md(plugins: list[dict], core_modules: list[dict], git_status: d
         "|-----------|-------|-------------|",
         f"| `cli/` | {dir_stats.get('cli', 0)} | CLI entry point, interactive menu, i18n |",
         f"| `core/` | {dir_stats.get('core', 0)} | Auth, parallel execution, tools |",
-        f"| `plugins/` | {dir_stats.get('plugins', 0)} | AWS service analysis tools |",
+        f"| `shared/` | {dir_stats.get('shared', 0)} | Shared utilities (AWS, I/O) |",
+        f"| `analyzers/` | {dir_stats.get('analyzers', 0)} | AWS service analysis tools |",
+        f"| `reports/` | {dir_stats.get('reports', 0)} | Comprehensive reports |",
         f"| `tests/` | {dir_stats.get('tests', 0)} | pytest tests |",
         "",
         "## Core Modules",
@@ -202,14 +231,28 @@ def render_index_md(plugins: list[dict], core_modules: list[dict], git_status: d
 
     lines.extend([
         "",
-        "## Plugin Registry",
+        "## Analyzers Registry",
         "",
         "| Service | Display | Tools | Areas |",
         "|---------|---------|-------|-------|",
     ])
 
-    for p in plugins:
+    for p in analyzers:
         areas_str = ", ".join(p["areas"][:3])  # Limit to 3 areas
+        if len(p["areas"]) > 3:
+            areas_str += "..."
+        lines.append(f"| `{p['name']}` | {p['display_name']} | {p['tool_count']} | {areas_str} |")
+
+    lines.extend([
+        "",
+        "## Reports Registry",
+        "",
+        "| Name | Display | Tools | Areas |",
+        "|------|---------|-------|-------|",
+    ])
+
+    for p in reports:
+        areas_str = ", ".join(p["areas"][:3])
         if len(p["areas"]) > 3:
             areas_str += "..."
         lines.append(f"| `{p['name']}` | {p['display_name']} | {p['tool_count']} | {areas_str} |")
@@ -266,17 +309,47 @@ def render_index_md(plugins: list[dict], core_modules: list[dict], git_status: d
                 lines.append(f"- ... and {len(git_status['modified']) - 10} more")
             lines.append("")
 
-    # Plugin details (collapsed)
+    # Analyzer details (collapsed)
     lines.extend([
-        "## Plugin Details",
+        "## Analyzer Details",
         "",
         "<details>",
         "<summary>Click to expand full tool list</summary>",
         "",
     ])
 
-    for p in plugins:
-        lines.append(f"### {p['display_name']} (`{p['name']}`)")
+    for p in analyzers:
+        lines.append(f"### {p['display_name']} (`analyzers/{p['name']}`)")
+        lines.append("")
+        lines.append(f"> {p['description']}")
+        lines.append("")
+
+        if p["tools"]:
+            lines.append("| Tool | Module | Area |")
+            lines.append("|------|--------|------|")
+            for tool in p["tools"]:
+                name = tool.get("name_en", tool.get("name", "Unknown"))
+                module = tool.get("module", "-")
+                area = tool.get("area", "-")
+                lines.append(f"| {name} | `{module}` | {area} |")
+            lines.append("")
+
+    lines.extend([
+        "</details>",
+        "",
+    ])
+
+    # Report details (collapsed)
+    lines.extend([
+        "## Report Details",
+        "",
+        "<details>",
+        "<summary>Click to expand full tool list</summary>",
+        "",
+    ])
+
+    for p in reports:
+        lines.append(f"### {p['display_name']} (`reports/{p['name']}`)")
         lines.append("")
         lines.append(f"> {p['description']}")
         lines.append("")
@@ -306,7 +379,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate project index")
     parser.add_argument(
         "--section",
-        choices=["plugins", "core", "git", "all"],
+        choices=["analyzers", "core", "git", "all"],
         default="all",
         help="Section to regenerate (default: all)",
     )
@@ -315,8 +388,9 @@ def main():
     print(f"Scanning project at {PROJECT_ROOT}...")
 
     # Always scan everything for now (incremental update can be added later)
-    plugins = scan_plugins()
-    print(f"  Found {len(plugins)} plugins with {sum(p['tool_count'] for p in plugins)} tools")
+    analyzers, reports = scan_analyzers_and_reports()
+    print(f"  Found {len(analyzers)} analyzers with {sum(p['tool_count'] for p in analyzers)} tools")
+    print(f"  Found {len(reports)} reports with {sum(p['tool_count'] for p in reports)} tools")
 
     core_modules = get_core_modules()
     print(f"  Found {len(core_modules)} core modules")
@@ -328,7 +402,7 @@ def main():
     print(f"  Total: {sum(dir_stats.values())} Python files")
 
     # Render and save
-    content = render_index_md(plugins, core_modules, git_status, dir_stats)
+    content = render_index_md(analyzers, reports, core_modules, git_status, dir_stats)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(content, encoding="utf-8")

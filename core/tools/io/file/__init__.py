@@ -1,15 +1,20 @@
-# pkg/io/file - 파일 I/O
-"""
-파일 유틸리티
+"""DEPRECATED: Use shared.io.file instead.
 
-Note:
-    탐색기 열기는 pkg.output.open_in_explorer 사용.
+이 모듈은 하위 호환성을 위해 유지됩니다.
+새 코드에서는 shared.io.file를 사용하세요.
 """
 
-from .io import ensure_dir, read_file, read_json, write_file, write_json
+import warnings
+
+from shared.io.file import ensure_dir, read_file, read_json, write_file, write_json
+
+warnings.warn(
+    "core.tools.io.file is deprecated. Use shared.io.file instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__: list[str] = [
-    # io
     "read_file",
     "write_file",
     "ensure_dir",

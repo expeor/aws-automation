@@ -15,14 +15,17 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
     import boto3
 
+# Retry mode 타입 (botocore TypedDict와 호환)
+RetryMode = Literal["legacy", "standard", "adaptive"]
+
 # 기본 retry 설정
 DEFAULT_MAX_ATTEMPTS = 5
-DEFAULT_RETRY_MODE = "adaptive"  # adaptive: 동적 조정, standard: 고정
+DEFAULT_RETRY_MODE: RetryMode = "adaptive"  # adaptive: 동적 조정, standard: 고정
 DEFAULT_CONNECT_TIMEOUT = 10  # 초
 DEFAULT_READ_TIMEOUT = 30  # 초
 
@@ -32,7 +35,7 @@ def get_client(
     service_name: str,
     region_name: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-    retry_mode: str = DEFAULT_RETRY_MODE,
+    retry_mode: RetryMode = DEFAULT_RETRY_MODE,
     connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
     read_timeout: int = DEFAULT_READ_TIMEOUT,
     **kwargs: Any,
@@ -61,7 +64,7 @@ def get_client(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # pyright: ignore[reportArgumentType]
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
     )
@@ -86,7 +89,7 @@ def get_resource(
     service_name: str,
     region_name: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-    retry_mode: str = DEFAULT_RETRY_MODE,
+    retry_mode: RetryMode = DEFAULT_RETRY_MODE,
     **kwargs: Any,
 ) -> Any:
     """Retry가 적용된 boto3 resource 생성
@@ -105,7 +108,7 @@ def get_resource(
     from botocore.config import Config
 
     config = Config(
-        retries={"max_attempts": max_attempts, "mode": retry_mode},
+        retries={"max_attempts": max_attempts, "mode": retry_mode},  # pyright: ignore[reportArgumentType]
     )
 
     if "config" in kwargs:

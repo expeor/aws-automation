@@ -6,7 +6,7 @@ core/config.py - 중앙 집중식 설정 관리
 
 주요 컴포넌트:
     - Settings: 불변 설정 클래스 (싱글톤 패턴)
-    - 경로 헬퍼: get_project_root(), get_plugins_path()
+    - 경로 헬퍼: get_project_root(), get_analyzers_path(), get_reports_path()
     - 환경변수 헬퍼: get_default_profile(), get_default_region()
     - 버전 관리: get_version()
     - 메타데이터 검증: validate_tool_metadata()
@@ -26,10 +26,10 @@ Usage:
     region = get_default_region()           # AWS_REGION 또는 기본값
 
     # 프로젝트 경로
-    from core.config import get_project_root, get_plugins_path
+    from core.config import get_project_root, get_analyzers_path
 
     root = get_project_root()               # Path(".../aws-automation-toolkit")
-    plugins = get_plugins_path()            # Path(".../aws-automation-toolkit/plugins")
+    analyzers = get_analyzers_path()        # Path(".../aws-automation-toolkit/analyzers")
 
     # 메타데이터 검증
     from core.config import validate_tool_metadata
@@ -64,9 +64,20 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def get_analyzers_path() -> Path:
+    """분석기 폴더 경로 반환"""
+    return get_project_root() / "analyzers"
+
+
+# Backwards compatibility alias
 def get_plugins_path() -> Path:
-    """플러그인 폴더 경로 반환"""
-    return get_project_root() / "plugins"
+    """DEPRECATED: Use get_analyzers_path() instead"""
+    return get_analyzers_path()
+
+
+def get_reports_path() -> Path:
+    """리포트 폴더 경로 반환"""
+    return get_project_root() / "reports"
 
 
 def get_version_file() -> Path:

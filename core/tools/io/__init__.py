@@ -1,28 +1,36 @@
-# core/tools/io - 파일 입출력 모듈
-"""
-파일 입출력 유틸리티
+"""DEPRECATED: Use shared.io instead.
 
-구조:
-    core/tools/io/csv/    - CSV 파일 읽기 (인코딩 감지)
-    core/tools/io/excel/  - Excel 파일 쓰기 (결과 출력)
-    core/tools/io/html/   - HTML 리포트 생성 (시각화)
-    core/tools/io/file/   - 기본 파일 I/O
-    core/tools/io/config.py - 출력 설정 (OutputFormat, OutputConfig)
-    core/tools/io/compat.py - 호환성 헬퍼 (generate_reports)
+이 모듈은 하위 호환성을 위해 유지됩니다.
+새 코드에서는 shared.io를 사용하세요.
 
-사용 예시:
+Migration:
+    # Before
     from core.tools.io.csv import read_csv_robust
     from core.tools.io.excel import Workbook, ColumnDef
     from core.tools.io.html import AWSReport, create_aws_report
-    from core.tools.io.file import ensure_dir
     from core.tools.io.config import OutputConfig, OutputFormat
     from core.tools.io.compat import generate_reports
-    from core.tools.output import open_in_explorer, open_file
+
+    # After
+    from shared.io.csv import read_csv_robust
+    from shared.io.excel import Workbook, ColumnDef
+    from shared.io.html import AWSReport, create_aws_report
+    from shared.io.config import OutputConfig, OutputFormat
+    from shared.io.compat import generate_reports
 """
 
-from core.tools.io import csv, excel, file, html
-from core.tools.io.compat import generate_dual_report, generate_reports
-from core.tools.io.config import OutputConfig, OutputFormat
+import warnings
+
+# Re-export submodules from shared.io
+from shared.io import csv, excel, file, html
+from shared.io.compat import generate_dual_report, generate_reports
+from shared.io.config import OutputConfig, OutputFormat
+
+warnings.warn(
+    "core.tools.io is deprecated. Use shared.io instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__: list[str] = [
     "csv",

@@ -115,7 +115,7 @@ class TestCollect{Resource}:
     def test_collect_normal(self, mock_context, mock_boto3_session):
         """정상 수집 케이스"""
         # Arrange
-        from plugins.{service}.{module} import collect_{resource}
+        from analyzers.{service}.{module} import collect_{resource}
 
         mock_client = MagicMock()
         mock_boto3_session.client.return_value = mock_client
@@ -136,7 +136,7 @@ class TestCollect{Resource}:
 
     def test_collect_empty(self, mock_context, mock_boto3_session):
         """빈 결과 케이스"""
-        from plugins.{service}.{module} import collect_{resource}
+        from analyzers.{service}.{module} import collect_{resource}
 
         mock_client = MagicMock()
         mock_boto3_session.client.return_value = mock_client
@@ -154,7 +154,7 @@ class TestCollect{Resource}:
     def test_collect_access_denied(self, mock_context, mock_boto3_session):
         """권한 없음 에러 케이스"""
         from botocore.exceptions import ClientError
-        from plugins.{service}.{module} import collect_{resource}
+        from analyzers.{service}.{module} import collect_{resource}
 
         mock_client = MagicMock()
         mock_boto3_session.client.return_value = mock_client
@@ -178,7 +178,7 @@ class TestAnalyze{Resource}:
 
     def test_analyze_normal(self):
         """정상 분석 케이스"""
-        from plugins.{service}.{module} import analyze_{resource}
+        from analyzers.{service}.{module} import analyze_{resource}
 
         # Arrange
         test_data = [
@@ -198,7 +198,7 @@ class TestAnalyze{Resource}:
 
     def test_analyze_empty_input(self):
         """빈 입력 케이스"""
-        from plugins.{service}.{module} import analyze_{resource}
+        from analyzers.{service}.{module} import analyze_{resource}
 
         result = analyze_{resource}(
             [],
@@ -218,7 +218,7 @@ class TestRun:
     @patch("plugins.{service}.{module}.generate_reports")
     def test_run_success(self, mock_reports, mock_parallel, mock_context):
         """정상 실행"""
-        from plugins.{service}.{module} import run
+        from analyzers.{service}.{module} import run
 
         # Arrange
         mock_result = MagicMock()
@@ -240,7 +240,7 @@ class TestRun:
     @patch("plugins.{service}.{module}.parallel_collect")
     def test_run_no_results(self, mock_parallel, mock_context):
         """결과 없음"""
-        from plugins.{service}.{module} import run
+        from analyzers.{service}.{module} import run
 
         mock_result = MagicMock()
         mock_result.get_data.return_value = []
@@ -253,7 +253,7 @@ class TestRun:
     @patch("plugins.{service}.{module}.parallel_collect")
     def test_run_with_errors(self, mock_parallel, mock_context):
         """부분 실패"""
-        from plugins.{service}.{module} import run
+        from analyzers.{service}.{module} import run
 
         mock_result = MagicMock()
         mock_result.get_data.return_value = [MagicMock()]
@@ -478,7 +478,7 @@ class TestPerformanceBenchmarks:
     @pytest.mark.benchmark(group="metrics")
     def test_batch_metrics_performance(self, benchmark):
         """배치 메트릭 조회 성능 벤치마크"""
-        from plugins.cloudwatch.common.batch_metrics import (
+        from shared.aws.metrics import (
             build_lambda_metric_queries,
         )
 

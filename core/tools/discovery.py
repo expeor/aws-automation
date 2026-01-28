@@ -1,13 +1,19 @@
 """
-core/tools/discovery.py - 플러그인 자동 발견 시스템
+core/tools/discovery.py - 분석기/리포트 자동 발견 시스템
 
 카테고리/도구를 자동으로 발견하여 menu.py 수동 관리 제거.
 새 도구 추가: 폴더 생성 + __init__.py 작성만 하면 자동 등록.
 
 폴더 구조:
-    plugins/
-    ├── analysis/        # 통합 분석 플랫폼 (cost, security, inventory, network, compliance, log, report)
-    ├── {service}/       # AWS 서비스별 도구 (rds, ec2, s3, iam, kms, ...)
+    analyzers/           # AWS 서비스별 분석 도구
+    ├── ec2/             # EC2 분석 (unused, ebs_audit 등)
+    ├── rds/             # RDS 분석
+    └── ...
+
+    reports/             # 종합 리포트
+    ├── cost_dashboard/  # 비용 대시보드
+    ├── inventory/       # 리소스 인벤토리
+    └── ...
 
 Usage:
     from core.tools.discovery import discover_categories, load_tool
@@ -28,8 +34,9 @@ from pathlib import Path
 from typing import Any
 
 from core.config import (
-    get_plugins_path,
+    get_analyzers_path,
     get_project_root,
+    get_reports_path,
     settings,
     validate_tool_metadata,
 )
@@ -44,12 +51,16 @@ logger = logging.getLogger(__name__)
 # 프로젝트 루트 경로 (core.config 사용)
 PROJECT_ROOT = get_project_root()
 
-# 플러그인 폴더 경로 (core.config 사용)
-PLUGINS_PATH = get_plugins_path()
+# 분석기 폴더 경로 (core.config 사용)
+ANALYZERS_PATH = get_analyzers_path()
+
+# 리포트 폴더 경로 (core.config 사용)
+REPORTS_PATH = get_reports_path()
 
 # 스캔 대상 경로
 SCAN_PATHS = [
-    ("plugins", PLUGINS_PATH),  # 모든 플러그인 (analysis + {service})
+    ("analyzers", ANALYZERS_PATH),  # AWS 서비스별 분석 도구
+    ("reports", REPORTS_PATH),       # 종합 리포트
 ]
 
 # =============================================================================

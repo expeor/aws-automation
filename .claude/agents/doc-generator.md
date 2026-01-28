@@ -68,7 +68,7 @@ plugins/{service}/{tool}.py - {도구명}
     - cloudwatch:GetMetricStatistics (선택)
 
 Example:
-    >>> from plugins.{service}.{tool} import run
+    >>> from analyzers.{service}.{tool} import run
     >>> run(ctx)  # 분석 실행 및 보고서 생성
 """
 ```
