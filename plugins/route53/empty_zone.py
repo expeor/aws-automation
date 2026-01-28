@@ -17,7 +17,7 @@ from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.cost.pricing import get_hosted_zone_price
+from shared.aws.pricing import get_hosted_zone_price
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

@@ -26,7 +26,7 @@ from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

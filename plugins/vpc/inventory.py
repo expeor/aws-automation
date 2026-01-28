@@ -19,7 +19,7 @@ from rich.table import Table
 
 from core.tools.io.excel import ColumnDef, Workbook
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.resource_explorer.common import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

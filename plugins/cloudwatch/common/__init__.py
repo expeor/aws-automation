@@ -1,11 +1,11 @@
 """
-plugins/cloudwatch/common - Shared CloudWatch Utilities
+plugins/cloudwatch/common - Backwards Compatibility Shim
 
-CloudWatch API 최적화 도구 제공 (GetMetricData 배치 조회 등)
-여러 플러그인에서 공유하는 CloudWatch 유틸리티 모음.
+DEPRECATED: 이 모듈은 shared.aws.metrics로 이동되었습니다.
+새 코드에서는 shared.aws.metrics를 직접 import하세요.
 
-Usage:
-    from plugins.cloudwatch.common import (
+Usage (NEW):
+    from shared.aws.metrics import (
         MetricQuery,
         batch_get_metrics,
         build_ec2_metric_queries,
@@ -13,7 +13,10 @@ Usage:
     )
 """
 
-from .batch_metrics import (
+import warnings
+
+# Re-export from new location for backwards compatibility
+from shared.aws.metrics import (
     MetricQuery,
     batch_get_metrics,
     batch_get_metrics_with_stats,
@@ -38,3 +41,10 @@ __all__ = [
     "build_sagemaker_endpoint_metric_queries",
     "sanitize_metric_id",
 ]
+
+# Issue deprecation warning when this module is imported
+warnings.warn(
+    "plugins.cloudwatch.common is deprecated. Use shared.aws.metrics instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)

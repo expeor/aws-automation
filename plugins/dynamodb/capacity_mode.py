@@ -18,7 +18,7 @@ from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.cost.pricing.dynamodb import (
+from shared.aws.pricing.dynamodb import (
     estimate_ondemand_cost,
     get_dynamodb_monthly_cost,
 )

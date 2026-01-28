@@ -28,7 +28,7 @@ from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from plugins.cost.pricing import get_sagemaker_monthly_cost
 
 if TYPE_CHECKING:

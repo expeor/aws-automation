@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from core.auth.session import get_context_session
 from core.tools.output import OutputPath
 
-from .common import (  # noqa: F401
+from shared.aws.health import (  # noqa: F401
     REQUIRED_PERMISSIONS,
     HealthCollector,
     HealthDashboard,
@@ -43,7 +43,7 @@ def run(ctx: ExecutionContext) -> None:
     output_dir = OutputPath(identifier).sub("health", "compliance").with_date().build()
 
     # Excel 보고서 생성
-    excel_path = reporter.generate_report(
+    reporter.generate_report(
         output_dir=output_dir,
         file_prefix="patch_analysis",
         include_calendar=True,

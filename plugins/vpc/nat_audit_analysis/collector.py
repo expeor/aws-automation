@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from botocore.exceptions import ClientError
 
 from core.parallel import get_client
-from plugins.cloudwatch.common import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,7 @@ class NATCollector:
 
     def _calculate_costs(self, nat: NATGateway) -> None:
         """비용 계산"""
-        from plugins.cost.pricing import get_nat_data_price, get_nat_monthly_fixed_cost
+        from shared.aws.pricing import get_nat_data_price, get_nat_monthly_fixed_cost
 
         # 월간 고정 비용
         nat.monthly_fixed_cost = get_nat_monthly_fixed_cost(nat.region)

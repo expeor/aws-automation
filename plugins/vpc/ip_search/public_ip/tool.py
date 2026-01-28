@@ -18,7 +18,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from core.tools.output.builder import OutputPath
-from plugins.vpc.ip_search.common.ip_ranges import (
+from shared.aws.ip_ranges import (
     PublicIPResult,
     get_available_filters,
     get_public_cache_status,

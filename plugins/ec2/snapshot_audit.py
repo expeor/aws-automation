@@ -26,7 +26,7 @@ from rich.console import Console
 
 from core.parallel import get_client, is_quiet, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.cost.pricing import get_snapshot_monthly_cost
+from shared.aws.pricing import get_snapshot_monthly_cost
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from plugins.cloudwatch.common.batch_metrics import (
+from shared.aws.metrics.batch_metrics import (
     MetricQuery,
     _chunks,
     batch_get_metrics,

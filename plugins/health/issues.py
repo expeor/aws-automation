@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from core.auth.session import get_context_session
 
-from .common import REQUIRED_PERMISSIONS, HealthCollector  # noqa: F401
+from shared.aws.health import REQUIRED_PERMISSIONS, HealthCollector  # noqa: F401
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

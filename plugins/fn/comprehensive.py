@@ -22,17 +22,15 @@ from rich.console import Console
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
-from plugins.cost.pricing import (
+from shared.aws.pricing import (
     get_lambda_monthly_cost,
     get_lambda_provisioned_monthly_cost,
 )
 
-from .common.collector import (
+from shared.aws.lambda_ import (
+    EOLStatus,
     LambdaFunctionInfo,
     collect_functions_with_metrics,
-)
-from .common.runtime_eol import (
-    EOLStatus,
     get_recommended_upgrade,
     get_runtime_info,
 )

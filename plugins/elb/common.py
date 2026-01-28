@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from plugins.cost.pricing import get_elb_monthly_cost
+from shared.aws.pricing import get_elb_monthly_cost
 
 
 class LBType(Enum):

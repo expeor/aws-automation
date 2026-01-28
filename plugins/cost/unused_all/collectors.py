@@ -93,7 +93,7 @@ from plugins.eventbridge.unused import (
 from plugins.eventbridge.unused import (
     collect_rules as collect_eventbridge_rules,
 )
-from plugins.fn.common.collector import collect_functions_with_metrics
+from shared.aws.lambda_.collector import collect_functions_with_metrics
 from plugins.fn.unused import analyze_functions as analyze_lambda_functions
 from plugins.fsx.unused import (
     analyze_filesystems as analyze_fsx_filesystems,
