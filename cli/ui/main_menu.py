@@ -335,8 +335,8 @@ class MainMenu:
             return True
 
         if action == "favorite_select":
-            # 즐겨찾기 도구 직접 실행
-            self._run_tool_directly(data.category, data.tool_module)
+            # 즐겨찾기 도구 직접 실행 (tool_name 폴백 지원)
+            self._run_tool_directly(data.category, data.tool_module, data.tool_name)
             return True
 
         if action == "search":
@@ -362,12 +362,12 @@ class MainMenu:
 
         return True
 
-    def _run_tool_directly(self, category: str, tool_module: str) -> None:
+    def _run_tool_directly(self, category: str, tool_module: str, tool_name: str | None = None) -> None:
         """도구 직접 실행 (프로파일/리전 선택 후)"""
         from cli.flow import create_flow_runner
 
         runner = create_flow_runner()
-        runner.run_tool_directly(category, tool_module)
+        runner.run_tool_directly(category, tool_module, tool_name)
 
         # 도구 실행 완료 후 메뉴 복귀 전 대기
         self.console.print()
