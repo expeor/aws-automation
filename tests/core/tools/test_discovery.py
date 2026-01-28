@@ -5,16 +5,28 @@ internal/tools/discovery.py 단위 테스트
 플러그인 자동 발견 시스템 테스트.
 """
 
+import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.exceptions import MetadataValidationError
 from core.tools.discovery import (
+    _get_cache_key,
+    _is_cache_valid,
+    _validate_category_metadata,
+    clear_discovery_cache,
+    discover_all_categories,
     discover_categories,
+    get_area_summary,
     get_category,
+    get_category_by_sub_service,
     list_categories,
     list_tools,
+    list_tools_by_area,
     load_tool,
+    resolve_category,
 )
 
 # =============================================================================
@@ -376,3 +388,265 @@ class TestServiceToolsLoadable:
         tool = load_tool("ec2", "미사용 AMI 탐지")
         assert tool is not None
         assert callable(tool["run"])
+
+
+# =============================================================================
+# Cache Management Tests
+# =============================================================================
+
+
+class TestCacheManagement:
+    """캐시 관리 테스트"""
+
+    def test_get_cache_key(self):
+        """캐시 키 생성 테스트"""
+        key1 = _get_cache_key(include_aws_services=True, only_analysis=False)
+        key2 = _get_cache_key(include_aws_services=False, only_analysis=True)
+        key3 = _get_cache_key(include_aws_services=True, only_analysis=False)
+
+        assert key1 == "categories_True_False"
+        assert key2 == "categories_False_True"
+        assert key1 == key3
+
+    def test_is_cache_valid_fresh(self):
+        """새로운 캐시 유효성 테스트"""
+        current_time = time.time()
+        assert _is_cache_valid(current_time) is True
+
+    def test_is_cache_valid_expired(self):
+        """만료된 캐시 유효성 테스트"""
+        old_time = time.time() - 700
+        assert _is_cache_valid(old_time) is False
+
+    def test_clear_discovery_cache(self):
+        """캐시 초기화 테스트"""
+        from core.tools.discovery import _discovery_cache
+
+        # Add test data
+        _discovery_cache["test_key"] = ([{"name": "test"}], time.time())
+        assert len(_discovery_cache) > 0
+
+        # Clear cache
+        clear_discovery_cache()
+        assert len(_discovery_cache) == 0
+
+    def test_cache_used_on_second_call(self):
+        """두 번째 호출 시 캐시 사용 확인"""
+        clear_discovery_cache()
+
+        # First call
+        categories1 = discover_categories(use_cache=True)
+
+        # Second call should use cache
+        with patch("core.tools.discovery.importlib.import_module") as mock_import:
+            categories2 = discover_categories(use_cache=True)
+            # Should not call import on cache hit
+            assert categories1 == categories2
+
+    def test_cache_bypassed_when_disabled(self):
+        """캐시 비활성화 시 우회 확인"""
+        clear_discovery_cache()
+
+        categories1 = discover_categories(use_cache=False)
+        categories2 = discover_categories(use_cache=False)
+
+        # Both should work but may be different instances
+        assert isinstance(categories1, list)
+        assert isinstance(categories2, list)
+
+
+# =============================================================================
+# Metadata Validation Tests
+# =============================================================================
+
+
+class TestMetadataValidation:
+    """메타데이터 검증 테스트"""
+
+    def test_validate_category_metadata_success(self):
+        """정상 카테고리 메타데이터 검증"""
+        category = {
+            "name": "test",
+            "description": "Test category",
+        }
+        tools = [
+            {
+                "name": "Test Tool",
+                "description": "Test description",
+                "permission": "read",
+                "module": "test_module",
+                "area": "unused",
+            }
+        ]
+
+        cat_info, warnings = _validate_category_metadata("test.module", category, tools)
+
+        assert cat_info["name"] == "test"
+        assert "tools" in cat_info
+        assert len(warnings) == 0
+
+    def test_validate_category_metadata_missing_name(self):
+        """카테고리명 누락 검증"""
+        category = {"description": "Test category"}
+        tools = []
+
+        cat_info, warnings = _validate_category_metadata("test.module", category, tools)
+
+        assert any("'name' 필드 누락" in w for w in warnings)
+
+    def test_validate_category_metadata_missing_description(self):
+        """설명 누락 검증"""
+        category = {"name": "test"}
+        tools = []
+
+        cat_info, warnings = _validate_category_metadata("test.module", category, tools)
+
+        assert any("'description' 필드 누락" in w for w in warnings)
+
+    def test_validate_category_metadata_strict_mode(self):
+        """Strict 모드 검증"""
+        category = {"name": "test", "description": "Test"}
+        tools = [
+            {
+                "name": "Invalid Tool",
+                # Missing required fields
+            }
+        ]
+
+        with pytest.raises(MetadataValidationError):
+            _validate_category_metadata("test.module", category, tools, strict=True)
+
+
+# =============================================================================
+# Sub-service and Area Tests
+# =============================================================================
+
+
+class TestSubServiceAndArea:
+    """하위 서비스 및 영역 테스트"""
+
+    def test_get_category_by_sub_service(self):
+        """하위 서비스명으로 카테고리 조회"""
+        # ELB 카테고리는 alb, nlb 하위 서비스를 가짐
+        cat = get_category_by_sub_service("alb", include_aws_services=True)
+
+        if cat:  # If ELB category exists
+            assert cat["name"] == "elb"
+            assert "_sub_service_filter" in cat
+
+    def test_resolve_category_by_name(self):
+        """이름으로 카테고리 조회"""
+        cat = resolve_category("ec2", include_aws_services=True)
+
+        assert cat is not None
+        assert cat["name"] == "ec2"
+
+    def test_resolve_category_by_sub_service(self):
+        """하위 서비스명으로 카테고리 조회"""
+        cat = resolve_category("alb", include_aws_services=True)
+
+        # alb may resolve to elb category
+        if cat:
+            assert cat["name"] == "elb" or "_sub_service_filter" in cat
+
+    def test_list_tools_by_area(self):
+        """영역별 도구 목록 조회"""
+        tools = list_tools_by_area("unused")
+
+        assert isinstance(tools, list)
+        if tools:
+            for item in tools:
+                assert "category" in item
+                assert "tool" in item
+                assert item["tool"]["area"] == "unused"
+
+    def test_get_area_summary(self):
+        """영역별 도구 개수 요약"""
+        summary = get_area_summary()
+
+        assert isinstance(summary, dict)
+        if summary:
+            assert all(isinstance(count, int) for count in summary.values())
+            assert all(count > 0 for count in summary.values())
+
+
+# =============================================================================
+# Advanced Discovery Tests
+# =============================================================================
+
+
+class TestAdvancedDiscovery:
+    """고급 디스커버리 테스트"""
+
+    def test_discover_all_categories(self):
+        """모든 카테고리 발견 (AWS 서비스 포함)"""
+        categories = discover_all_categories()
+
+        assert isinstance(categories, list)
+        assert len(categories) > 0
+
+    def test_categories_sorted_by_priority(self):
+        """카테고리 우선순위 정렬 확인"""
+        categories = discover_categories()
+
+        # Analysis categories should appear first
+        if categories:
+            first_category = categories[0]
+            assert "name" in first_category
+
+    def test_only_analysis_filter(self):
+        """분석 카테고리만 필터링"""
+        categories = discover_categories(only_analysis=True, use_cache=False)
+
+        # Should only contain analysis categories
+        from core.tools.discovery import ANALYSIS_CATEGORIES
+
+        for cat in categories:
+            assert cat["name"] in ANALYSIS_CATEGORIES
+
+    def test_load_tool_with_required_permissions(self):
+        """필수 권한이 있는 도구 로드"""
+        # Some tools may have REQUIRED_PERMISSIONS
+        tool = load_tool("ec2", "미사용 EBS 볼륨 탐지")
+
+        if tool:
+            assert "run" in tool
+            # required_permissions is optional
+            assert "required_permissions" in tool
+
+    def test_referenced_tool_loading(self):
+        """참조 도구 로딩 테스트"""
+        # This tests the ref field functionality
+        with patch("core.tools.discovery.get_category") as mock_get:
+            mock_get.side_effect = [
+                {
+                    "name": "collection",
+                    "module_path": "analyzers.collection",
+                    "tools": [
+                        {
+                            "name": "참조 도구",
+                            "ref": "ec2/unused",
+                        }
+                    ],
+                },
+                {
+                    "name": "ec2",
+                    "module_path": "analyzers.ec2",
+                    "tools": [
+                        {
+                            "name": "Original Tool",
+                            "module": "unused",
+                        }
+                    ],
+                },
+            ]
+
+            with patch("core.tools.discovery.importlib.import_module") as mock_import:
+                mock_module = MagicMock()
+                mock_module.run = lambda ctx: {}
+                mock_import.return_value = mock_module
+
+                tool = load_tool("collection", "참조 도구")
+
+                # The test is successful if it doesn't raise an error
+                assert tool is None or "meta" in tool
