@@ -367,19 +367,128 @@ def run(ctx) -> None:
     open_in_explorer(output_path)
 ```
 
-## 레거시 패턴 (사용 지양)
+## 멀티 계정 필수 요구사항 (중요!)
+
+**모든 플러그인은 반드시 `parallel_collect` 패턴을 사용해야 합니다.**
+
+SSO Session에서 여러 계정을 선택할 수 있으므로, 단일 세션만 처리하면 오류가 발생합니다:
+```
+오류: SSO Session에서 여러 계정이 선택된 경우 account_id를 명시해야 합니다
+```
+
+### 잘못된 패턴 (사용 금지)
 
 ```python
-# 순차 루프
+# ❌ 단일 세션만 처리 - 멀티 계정 미지원
+from core.auth.session import get_context_session
+
+def run(ctx):
+    session = get_context_session(ctx, "us-east-1")  # 오류 발생!
+    result = analyze(session)
+```
+
+### 올바른 패턴 (필수)
+
+```python
+# ✅ parallel_collect 사용 - 멀티 계정 지원
+from core.parallel import parallel_collect
+
+def _collect(session, account_id: str, account_name: str, region: str):
+    return analyze(session, account_id, account_name, region)
+
+def run(ctx):
+    result = parallel_collect(ctx, _collect, service="my-service")
+```
+
+## 글로벌 서비스 패턴
+
+IAM, Health, SSO 등 글로벌 서비스도 `parallel_collect` 패턴을 사용해야 합니다.
+리전 파라미터는 받지만, 글로벌 서비스는 항상 `us-east-1` 등 고정 리전을 사용합니다.
+
+### Health API 예시 (us-east-1 전용)
+
+```python
+from core.parallel import parallel_collect
+
+def _collect_health(session, account_id: str, account_name: str, region: str):
+    """병렬 실행 콜백
+
+    region 파라미터는 받지만, Health API는 항상 us-east-1 사용
+    """
+    # Health API는 session 생성 시 이미 적절한 리전 설정됨
+    collector = HealthCollector(session, account_id, account_name)
+    return collector.collect_all()
+
+def run(ctx):
+    # CLI에서 리전이 "Global (us-east-1)"로 설정됨
+    result = parallel_collect(ctx, _collect_health, service="health")
+
+    # 여러 계정 결과 병합
+    results = [r for r in result.get_data() if r is not None]
+    merged = CollectionResult.merge(results)
+```
+
+### IAM 예시 (글로벌 서비스)
+
+```python
+def _collect_iam(session, account_id: str, account_name: str, region: str):
+    """IAM은 글로벌이지만 region 파라미터는 무시"""
+    collector = IAMCollector()
+    return collector.collect(session, account_id, account_name)
+
+def run(ctx):
+    # IAM은 어느 리전에서든 호출 가능
+    result = parallel_collect(ctx, _collect_iam, service="iam")
+```
+
+## 대체 패턴 (특수 상황용)
+
+### InventoryCollector (VPC/리소스 인벤토리)
+
+대규모 리소스 수집 시 스트리밍 방식 사용:
+
+```python
+from plugins.resource_explorer.common import InventoryCollector
+
+def run(ctx):
+    collector = InventoryCollector(ctx)  # 내부적으로 parallel_collect 사용
+    vpcs = collector.collect_vpcs()
+    subnets = collector.collect_subnets()
+```
+
+### SessionIterator (글로벌 서비스, 한 번만 실행)
+
+SSO처럼 조직 전체에서 한 번만 실행해야 하는 경우:
+
+```python
+from core.auth import SessionIterator
+
+def run(ctx):
+    with SessionIterator(ctx) as sessions:
+        for session, identifier, region in sessions:
+            # 첫 번째 성공 시 종료
+            result = collect_org_data(session)
+            if result:
+                break
+```
+
+## 레거시 패턴 (사용 금지)
+
+```python
+# ❌ 순차 루프 - 멀티 계정 미지원
 for account in accounts:
     for region in regions:
         session = ctx.provider.get_session(account.id, region=region)
         result = analyze(session, account, region)
 
-# 직접 ThreadPoolExecutor
+# ❌ 직접 ThreadPoolExecutor - 세션 관리 복잡
 from concurrent.futures import ThreadPoolExecutor
 with ThreadPoolExecutor() as executor:
     futures = [executor.submit(func, args) for args in items]
+
+# ❌ get_context_session 직접 사용 - 멀티 계정 미지원
+from core.auth.session import get_context_session
+session = get_context_session(ctx, "us-east-1")  # 오류 발생!
 ```
 
 ## 참조

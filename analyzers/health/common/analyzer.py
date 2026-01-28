@@ -158,6 +158,9 @@ class HealthEvent:
     event_scope_code: str  # ACCOUNT_SPECIFIC, PUBLIC, etc.
     description: str
     affected_entities: list[AffectedEntity] = field(default_factory=list)
+    # 멀티 계정 지원을 위한 필드
+    account_id: str = ""
+    account_name: str = ""
 
     @property
     def is_scheduled_change(self) -> bool:
@@ -259,9 +262,11 @@ class HealthAnalyzer:
     Attributes:
         session: boto3 Session 객체
         client: health 클라이언트
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
 
     Example:
-        analyzer = HealthAnalyzer(session)
+        analyzer = HealthAnalyzer(session, "123456789012", "my-account")
 
         # 모든 이벤트 조회
         all_events = analyzer.get_events()
@@ -277,14 +282,18 @@ class HealthAnalyzer:
         )
     """
 
-    def __init__(self, session):
+    def __init__(self, session, account_id: str = "", account_name: str = ""):
         """초기화
 
         Args:
             session: boto3.Session 객체
+            account_id: AWS 계정 ID (멀티 계정 지원용)
+            account_name: 계정 이름 (멀티 계정 지원용)
         """
         self.session = session
         self.client = session.client("health", region_name=HEALTH_REGION)
+        self.account_id = account_id
+        self.account_name = account_name
 
     def get_events(
         self,
@@ -329,6 +338,9 @@ class HealthAnalyzer:
         # 이벤트 목록 조회
         for item in self._paginate_events(event_filter, page_size):
             event = HealthEvent.from_api_response(item)
+            # 멀티 계정 지원: 계정 정보 설정
+            event.account_id = self.account_id
+            event.account_name = self.account_name
             events.append(event)
             event_arns.append(event.arn)
 

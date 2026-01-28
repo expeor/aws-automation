@@ -129,6 +129,9 @@ no_implicit_optional = true
 
 ## 플러그인 작성 패턴
 
+> **⚠️ 멀티 계정 지원 필수**: 모든 도구는 `parallel_collect` 패턴을 사용해야 합니다.
+> `get_context_session()` 직접 호출은 SSO Session 멀티 계정 선택 시 오류 발생.
+
 ### 기본 구조
 
 플러그인은 `analyzers/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:
@@ -278,9 +281,14 @@ if not result.is_valid:
 from core.tools.io.excel import Workbook, ColumnDef
 
 wb = Workbook()
-ws = wb.add_sheet("Results")
-ws.add_headers([ColumnDef("리소스", width=30), ColumnDef("상태", width=15)])
-ws.add_rows(data)
+columns = [
+    ColumnDef("리소스", width=30),
+    ColumnDef("상태", width=15, style="center"),
+    ColumnDef("수량", width=10, style="number"),
+]
+sheet = wb.new_sheet("Results", columns)
+for row in data:
+    sheet.add_row([row["resource"], row["status"], row["count"]])
 wb.save("output.xlsx")
 
 # HTML 보고서 (ECharts 시각화)

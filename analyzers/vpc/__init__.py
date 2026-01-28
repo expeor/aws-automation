@@ -24,6 +24,15 @@ TOOLS = [
         "module": "sg_audit",
         "area": "security",
     },
+    {
+        "name": "Security Group 정책 내역",
+        "name_en": "Security Group Policy Inventory",
+        "description": "모든 Security Group의 인바운드/아웃바운드 규칙 전체 목록 추출",
+        "description_en": "Export all Security Group inbound/outbound rules",
+        "permission": "read",
+        "module": "sg_inventory",
+        "area": "inventory",
+    },
     # Unused resource detection
     {
         "name": "미사용 네트워크 리소스 탐지",

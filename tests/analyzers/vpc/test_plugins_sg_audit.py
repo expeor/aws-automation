@@ -58,23 +58,22 @@ class TestCreateOutputDirectory:
     """_create_output_directory 함수 테스트"""
 
     @patch("analyzers.vpc.sg_audit.OutputPath")
-    def test_with_sso_session(self, mock_output_path):
-        """SSO 세션이 있는 경우"""
+    def test_with_profile_name_sso(self, mock_output_path):
+        """profile_name이 있는 경우 (SSO)"""
         from analyzers.vpc.sg_audit import _create_output_directory
 
         mock_ctx = MagicMock()
-        mock_ctx.is_sso_session.return_value = True
-        mock_ctx.accounts = [MagicMock(id="123456789012")]
+        mock_ctx.profile_name = "sso-session-name"
 
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/123456789012/vpc/security/2024-01-01"
+        mock_path_instance.build.return_value = "/output/sso-session-name/vpc/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)
 
-        mock_output_path.assert_called_once_with("123456789012")
+        mock_output_path.assert_called_once_with("sso-session-name")
         mock_path_instance.sub.assert_called_once_with("vpc", "security")
 
     @patch("analyzers.vpc.sg_audit.OutputPath")
