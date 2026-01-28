@@ -11,6 +11,10 @@ from .discovery import (
     list_tools_by_area,
     load_tool,
 )
+from .datadog_client import (
+    DatadogClientManager,
+    get_datadog_clients,
+)
 from .tag_validator import (
     TagPolicy,
     TagPolicyValidator,
@@ -32,6 +36,9 @@ __all__: list[str] = [
     "load_tool",
     "list_tools_by_area",
     "get_area_summary",
+    # Datadog Client
+    "DatadogClientManager",
+    "get_datadog_clients",
     # Tag Validation
     "TagPolicyValidator",
     "TagPolicy",
