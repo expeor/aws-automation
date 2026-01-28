@@ -676,7 +676,7 @@ class TestRunToolDirectly:
         # 에러 발생하지 않음
         flow_runner.run_tool_directly("test", "nonexistent")
 
-        mock_find.assert_called_once_with("test", "nonexistent")
+        mock_find.assert_called_once_with("test", "nonexistent", None)
 
     @patch.object(FlowRunner, "_save_history")
     @patch.object(FlowRunner, "_execute_tool")
