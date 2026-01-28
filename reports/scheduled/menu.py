@@ -8,24 +8,40 @@ from rich.table import Table
 from cli.i18n import t
 from cli.ui.console import clear_screen
 
-from .registry import get_schedule_groups
+from .registry import (
+    get_schedule_groups,
+    list_available_companies,
+    load_config,
+    resolve_company,
+)
 from .types import PERMISSION_COLORS, ScheduledTask, ScheduleGroup
 
 
-def show_scheduled_menu(console: Console, lang: str = "ko") -> tuple[str, ScheduledTask | None]:
+def show_scheduled_menu(
+    console: Console, lang: str = "ko", company: str | None = None
+) -> tuple[str, ScheduledTask | None]:
     """정기 작업 메뉴 표시
 
     Args:
         console: Rich Console 인스턴스
         lang: 언어 설정 ("ko" 또는 "en")
+        company: 회사명 (None이면 환경변수 → default)
 
     Returns:
         (action, selected_task) - action: "run", "back", "exit"
     """
-    groups = get_schedule_groups(lang=lang)
+    current_company = resolve_company(company)
 
     while True:
+        groups = get_schedule_groups(company=current_company, lang=lang)
+        config = load_config(company=current_company)
+        company_display = config.get("company_name" if lang == "ko" else "company_name_en", current_company)
+
         clear_screen()
+        console.print()
+
+        # 회사명 표시
+        console.print(f"[dim]📁 {t('menu.current_config')}: [cyan]{company_display}[/cyan][/dim]")
         console.print()
 
         # 주기별 그룹 테이블 (권한별 개수 표시)
@@ -60,12 +76,18 @@ def show_scheduled_menu(console: Console, lang: str = "ko") -> tuple[str, Schedu
             f"[yellow]●{t('menu.task_apply')}(write)[/yellow] "
             f"[red]●{t('menu.task_cleanup')}(delete)[/red][/dim]"
         )
-        console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
+        console.print(f"[dim]c: {t('menu.change_config')}  0: {t('menu.go_back')}[/dim]")
 
         choice = console.input("> ").strip()
 
         if choice == "0" or choice.lower() == "q":
             return ("back", None)
+
+        if choice.lower() == "c":
+            new_config = _show_config_selector(console, current_company, lang)
+            if new_config:
+                current_company = new_config
+            continue
 
         if choice.isdigit():
             idx = int(choice)
@@ -75,6 +97,51 @@ def show_scheduled_menu(console: Console, lang: str = "ko") -> tuple[str, Schedu
                     return result
 
     return ("back", None)
+
+
+def _show_config_selector(console: Console, current: str, lang: str) -> str | None:
+    """설정 프로필 선택 메뉴
+
+    Args:
+        console: Rich Console 인스턴스
+        current: 현재 선택된 설정
+        lang: 언어 설정
+
+    Returns:
+        선택된 설정명 또는 None (취소)
+    """
+    configs = list_available_companies()
+
+    if len(configs) <= 1:
+        console.print(f"\n[yellow]{t('menu.no_other_configs')}[/yellow]")
+        console.input(f"[dim]{t('menu.press_any_key')}[/dim]")
+        return None
+
+    clear_screen()
+    console.print()
+    console.print(f"[bold]{t('menu.select_config')}[/bold]")
+    console.print()
+
+    for i, cfg in enumerate(configs, 1):
+        config = load_config(company=cfg)
+        display_name = config.get("config_name" if lang == "ko" else "config_name_en", config.get("company_name" if lang == "ko" else "company_name_en", cfg))
+        marker = " [cyan]◀[/cyan]" if cfg == current else ""
+        console.print(f"  [dim]{i}[/dim] {display_name} [dim]({cfg})[/dim]{marker}")
+
+    console.print()
+    console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
+
+    choice = console.input("> ").strip()
+
+    if choice == "0" or choice.lower() == "q":
+        return None
+
+    if choice.isdigit():
+        idx = int(choice)
+        if 1 <= idx <= len(configs):
+            return configs[idx - 1]
+
+    return None
 
 
 def _show_group_tasks(console: Console, group: ScheduleGroup, lang: str) -> tuple[str, ScheduledTask | None]:

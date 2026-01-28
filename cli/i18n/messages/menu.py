@@ -774,4 +774,24 @@ MENU_MESSAGES = {
         "ko": "정기 작업 (일간/월간/분기/반기/연간)",
         "en": "Scheduled operations (Daily/Monthly/Quarterly...)",
     },
+    "current_config": {
+        "ko": "현재 설정",
+        "en": "Current config",
+    },
+    "change_config": {
+        "ko": "설정 변경",
+        "en": "Change config",
+    },
+    "select_config": {
+        "ko": "설정 프로필 선택",
+        "en": "Select Config Profile",
+    },
+    "no_other_configs": {
+        "ko": "다른 설정이 없습니다. config/ 폴더에 YAML 파일을 추가하세요.",
+        "en": "No other configs. Add YAML files to config/ folder.",
+    },
+    "press_any_key": {
+        "ko": "계속하려면 Enter...",
+        "en": "Press Enter to continue...",
+    },
 }
