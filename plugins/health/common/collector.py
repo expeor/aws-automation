@@ -132,6 +132,120 @@ class CollectionResult:
         """서비스별 패치 목록"""
         return [p for p in self.patches if p.service == service]
 
+    @classmethod
+    def merge(cls, results: list["CollectionResult"]) -> "CollectionResult":
+        """여러 CollectionResult를 병합
+
+        Args:
+            results: 병합할 CollectionResult 리스트
+
+        Returns:
+            병합된 CollectionResult
+        """
+        if not results:
+            return cls(
+                events=[],
+                patches=[],
+                summary_by_urgency={},
+                summary_by_service={},
+                summary_by_month={},
+            )
+
+        if len(results) == 1:
+            return results[0]
+
+        # 모든 이벤트와 패치 병합
+        all_events: list[HealthEvent] = []
+        all_patches: list[PatchItem] = []
+
+        for result in results:
+            all_events.extend(result.events)
+            all_patches.extend(result.patches)
+
+        # 긴급도순 재정렬
+        urgency_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        all_patches.sort(
+            key=lambda p: (
+                urgency_order.get(p.urgency, 99),
+                p.scheduled_date or datetime.max.replace(tzinfo=timezone.utc),
+            )
+        )
+
+        # 요약 재계산
+        summary_by_urgency = _summarize_by_urgency(all_patches)
+        summary_by_service = _summarize_by_service(all_patches)
+        summary_by_month = _group_by_month(all_patches)
+
+        return cls(
+            events=all_events,
+            patches=all_patches,
+            summary_by_urgency=summary_by_urgency,
+            summary_by_service=summary_by_service,
+            summary_by_month=summary_by_month,
+        )
+
+
+def _summarize_by_urgency(patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
+    """긴급도별 요약 (helper)"""
+    summary: dict[str, dict[str, Any]] = {}
+
+    for patch in patches:
+        urgency = patch.urgency
+        if urgency not in summary:
+            summary[urgency] = {
+                "count": 0,
+                "services": set(),
+                "affected_resources": 0,
+            }
+
+        summary[urgency]["count"] += 1
+        summary[urgency]["services"].add(patch.service)
+        summary[urgency]["affected_resources"] += len(patch.affected_resources)
+
+    # set을 list로 변환
+    for urgency in summary:
+        summary[urgency]["services"] = list(summary[urgency]["services"])
+
+    return summary
+
+
+def _summarize_by_service(patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
+    """서비스별 요약 (helper)"""
+    summary: dict[str, dict[str, Any]] = {}
+
+    for patch in patches:
+        service = patch.service
+        if service not in summary:
+            summary[service] = {
+                "count": 0,
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+                "affected_resources": 0,
+            }
+
+        summary[service]["count"] += 1
+        summary[service][patch.urgency] = summary[service].get(patch.urgency, 0) + 1
+        summary[service]["affected_resources"] += len(patch.affected_resources)
+
+    return summary
+
+
+def _group_by_month(patches: list[PatchItem]) -> dict[str, list[PatchItem]]:
+    """월별 그룹화 (helper)"""
+    grouped: dict[str, list[PatchItem]] = {}
+
+    for patch in patches:
+        month_key = patch.scheduled_date.strftime("%Y-%m") if patch.scheduled_date else "미정"
+
+        if month_key not in grouped:
+            grouped[month_key] = []
+
+        grouped[month_key].append(patch)
+
+    return grouped
+
 
 class HealthCollector:
     """AWS Health 이벤트 수집기
@@ -139,14 +253,18 @@ class HealthCollector:
     Health 이벤트를 수집하고 패치 분석에 필요한 형태로 가공합니다.
     """
 
-    def __init__(self, session):
+    def __init__(self, session, account_id: str = "", account_name: str = ""):
         """초기화
 
         Args:
             session: boto3.Session 객체
+            account_id: AWS 계정 ID (멀티 계정 지원용)
+            account_name: 계정 이름 (멀티 계정 지원용)
         """
         self.session = session
-        self.analyzer = HealthAnalyzer(session)
+        self.account_id = account_id
+        self.account_name = account_name
+        self.analyzer = HealthAnalyzer(session, account_id, account_name)
 
     def collect_patches(
         self,
