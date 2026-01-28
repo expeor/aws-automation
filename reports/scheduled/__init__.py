@@ -17,8 +17,19 @@ CATEGORY = {
     "aliases": ["periodic", "routine", "governance", "schedule"],
 }
 
-# Discovery용 빈 TOOLS (메뉴에서 직접 처리)
-TOOLS: list = []
+# 메뉴 전환용 도구 (CategoryStep에서 is_menu 처리)
+TOOLS = [
+    {
+        "name": "정기 작업 관리",
+        "name_en": "Scheduled Operations Management",
+        "description": "일간/월간/분기/반기/연간 정기 작업 실행",
+        "description_en": "Execute daily/monthly/quarterly/biannual/annual scheduled operations",
+        "permission": "read",
+        "module": "_scheduled_menu",
+        "is_menu": True,
+        "area": "inventory",  # 관리 도구이므로 inventory 분류
+    },
+]
 
 # 외부 API
 from .menu import show_scheduled_menu
