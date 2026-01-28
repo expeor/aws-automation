@@ -108,13 +108,7 @@ def run(ctx: ExecutionContext) -> None:
 
 def _create_output_directory(ctx) -> str:
     """출력 디렉토리 생성"""
-    # identifier 결정
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
-
+    # profile_name: SSO Session 이름 또는 프로파일 이름
+    identifier = ctx.profile_name or "default"
     output_path = OutputPath(identifier).sub("vpc", "security").with_date().build()
     return output_path
