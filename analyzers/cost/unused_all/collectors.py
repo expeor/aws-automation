@@ -93,7 +93,6 @@ from analyzers.eventbridge.unused import (
 from analyzers.eventbridge.unused import (
     collect_rules as collect_eventbridge_rules,
 )
-from shared.aws.lambda_.collector import collect_functions_with_metrics
 from analyzers.fn.unused import analyze_functions as analyze_lambda_functions
 from analyzers.fsx.unused import (
     analyze_filesystems as analyze_fsx_filesystems,
@@ -176,6 +175,7 @@ from analyzers.vpc.endpoint_audit import (
 from analyzers.vpc.eni_audit import analyze_enis, collect_enis
 from analyzers.vpc.nat_audit_analysis import NATAnalyzer, NATCollector
 from analyzers.vpc.sg_audit_analysis import SGAnalyzer, SGCollector, SGStatus
+from shared.aws.lambda_.collector import collect_functions_with_metrics
 
 # =============================================================================
 # 개별 리소스 수집/분석 함수 (병렬 실행용)

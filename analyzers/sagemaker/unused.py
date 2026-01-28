@@ -26,10 +26,10 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
+from analyzers.cost.pricing import get_sagemaker_monthly_cost
 from core.parallel import get_client, parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
-from analyzers.cost.pricing import get_sagemaker_monthly_cost
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

@@ -6,8 +6,9 @@ YAML 설정 파일 로드 및 주기별 그룹화
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from .types import ScheduledTask, ScheduleGroup, TaskCycle
 
@@ -15,7 +16,7 @@ CONFIG_DIR = Path(__file__).parent / "config"
 
 
 @lru_cache(maxsize=1)
-def load_config(company: str | None = None) -> dict:
+def load_config(company: str | None = None) -> dict[str, Any]:
     """설정 파일 로드
 
     Args:
@@ -29,7 +30,8 @@ def load_config(company: str | None = None) -> dict:
         config_file = CONFIG_DIR / "default.yaml"
 
     with config_file.open(encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        result: dict[str, Any] = yaml.safe_load(f)
+        return result
 
 
 def get_schedule_groups(company: str | None = None, lang: str = "ko") -> list[ScheduleGroup]:

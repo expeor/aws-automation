@@ -38,7 +38,7 @@ try:
     _HAS_PYTRICIA = True
     logger.debug("pytricia available, using Radix Tree for IP lookup")
 except ImportError:
-    pytricia = None  # type: ignore[misc]
+    pytricia = None
     logger.debug("pytricia not available, falling back to binary search")
 
 

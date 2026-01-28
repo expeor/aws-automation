@@ -63,51 +63,57 @@ def _flatten_rules(sgs: list[SecurityGroup]) -> list[dict]:
 
         # 인바운드 규칙
         for rule in sg.inbound_rules:
-            rows.append({
-                **base_info,
-                "direction": "Inbound",
-                "protocol": rule.protocol,
-                "port_range": rule.port_range,
-                "source_dest": rule.source_dest,
-                "source_dest_type": rule.source_dest_type,
-                "is_ipv6": "Yes" if rule.is_ipv6 else "No",
-                "is_self_reference": "Yes" if rule.is_self_reference else "No",
-                "is_cross_account": "Yes" if rule.is_cross_account else "No",
-                "referenced_account_id": rule.referenced_account_id or "",
-                "rule_description": rule.description,
-            })
+            rows.append(
+                {
+                    **base_info,
+                    "direction": "Inbound",
+                    "protocol": rule.protocol,
+                    "port_range": rule.port_range,
+                    "source_dest": rule.source_dest,
+                    "source_dest_type": rule.source_dest_type,
+                    "is_ipv6": "Yes" if rule.is_ipv6 else "No",
+                    "is_self_reference": "Yes" if rule.is_self_reference else "No",
+                    "is_cross_account": "Yes" if rule.is_cross_account else "No",
+                    "referenced_account_id": rule.referenced_account_id or "",
+                    "rule_description": rule.description,
+                }
+            )
 
         # 아웃바운드 규칙
         for rule in sg.outbound_rules:
-            rows.append({
-                **base_info,
-                "direction": "Outbound",
-                "protocol": rule.protocol,
-                "port_range": rule.port_range,
-                "source_dest": rule.source_dest,
-                "source_dest_type": rule.source_dest_type,
-                "is_ipv6": "Yes" if rule.is_ipv6 else "No",
-                "is_self_reference": "Yes" if rule.is_self_reference else "No",
-                "is_cross_account": "Yes" if rule.is_cross_account else "No",
-                "referenced_account_id": rule.referenced_account_id or "",
-                "rule_description": rule.description,
-            })
+            rows.append(
+                {
+                    **base_info,
+                    "direction": "Outbound",
+                    "protocol": rule.protocol,
+                    "port_range": rule.port_range,
+                    "source_dest": rule.source_dest,
+                    "source_dest_type": rule.source_dest_type,
+                    "is_ipv6": "Yes" if rule.is_ipv6 else "No",
+                    "is_self_reference": "Yes" if rule.is_self_reference else "No",
+                    "is_cross_account": "Yes" if rule.is_cross_account else "No",
+                    "referenced_account_id": rule.referenced_account_id or "",
+                    "rule_description": rule.description,
+                }
+            )
 
         # 규칙이 없는 SG도 기록 (빈 규칙)
         if not sg.inbound_rules and not sg.outbound_rules:
-            rows.append({
-                **base_info,
-                "direction": "None",
-                "protocol": "",
-                "port_range": "",
-                "source_dest": "",
-                "source_dest_type": "",
-                "is_ipv6": "",
-                "is_self_reference": "",
-                "is_cross_account": "",
-                "referenced_account_id": "",
-                "rule_description": "(규칙 없음)",
-            })
+            rows.append(
+                {
+                    **base_info,
+                    "direction": "None",
+                    "protocol": "",
+                    "port_range": "",
+                    "source_dest": "",
+                    "source_dest_type": "",
+                    "is_ipv6": "",
+                    "is_self_reference": "",
+                    "is_cross_account": "",
+                    "referenced_account_id": "",
+                    "rule_description": "(규칙 없음)",
+                }
+            )
 
     return rows
 
@@ -118,19 +124,21 @@ def _flatten_resources(sgs: list[SecurityGroup]) -> list[dict]:
 
     for sg in sgs:
         for res in sg.attached_resources:
-            rows.append({
-                "account_id": sg.account_id,
-                "account_name": sg.account_name,
-                "region": sg.region,
-                "vpc_id": sg.vpc_id,
-                "sg_id": sg.sg_id,
-                "sg_name": sg.sg_name,
-                "resource_type": res.resource_type,
-                "resource_id": res.resource_id,
-                "resource_name": res.resource_name,
-                "private_ip": res.private_ip,
-                "eni_id": res.eni_id,
-            })
+            rows.append(
+                {
+                    "account_id": sg.account_id,
+                    "account_name": sg.account_name,
+                    "region": sg.region,
+                    "vpc_id": sg.vpc_id,
+                    "sg_id": sg.sg_id,
+                    "sg_name": sg.sg_name,
+                    "resource_type": res.resource_type,
+                    "resource_id": res.resource_id,
+                    "resource_name": res.resource_name,
+                    "private_ip": res.private_ip,
+                    "eni_id": res.eni_id,
+                }
+            )
 
     return rows
 
@@ -165,28 +173,30 @@ def _create_excel_report(rows: list[dict], resource_rows: list[dict], output_pat
 
     sheet = wb.new_sheet("SG Rules", columns)
     for row in rows:
-        sheet.add_row([
-            row["account_id"],
-            row["account_name"],
-            row["region"],
-            row["vpc_id"],
-            row["sg_id"],
-            row["sg_name"],
-            row["sg_description"],
-            row["is_default_sg"],
-            row["is_default_vpc"],
-            row["eni_count"],
-            row["direction"],
-            row["protocol"],
-            row["port_range"],
-            row["source_dest"],
-            row["source_dest_type"],
-            row["is_ipv6"],
-            row["is_self_reference"],
-            row["is_cross_account"],
-            row["referenced_account_id"],
-            row["rule_description"],
-        ])
+        sheet.add_row(
+            [
+                row["account_id"],
+                row["account_name"],
+                row["region"],
+                row["vpc_id"],
+                row["sg_id"],
+                row["sg_name"],
+                row["sg_description"],
+                row["is_default_sg"],
+                row["is_default_vpc"],
+                row["eni_count"],
+                row["direction"],
+                row["protocol"],
+                row["port_range"],
+                row["source_dest"],
+                row["source_dest_type"],
+                row["is_ipv6"],
+                row["is_self_reference"],
+                row["is_cross_account"],
+                row["referenced_account_id"],
+                row["rule_description"],
+            ]
+        )
 
     # 연결된 리소스 시트
     _add_resources_sheet(wb, resource_rows)
@@ -217,19 +227,21 @@ def _add_resources_sheet(wb: Workbook, resource_rows: list[dict]) -> None:
 
     sheet = wb.new_sheet("Attached Resources", columns)
     for row in resource_rows:
-        sheet.add_row([
-            row["account_id"],
-            row["account_name"],
-            row["region"],
-            row["vpc_id"],
-            row["sg_id"],
-            row["sg_name"],
-            row["resource_type"],
-            row["resource_id"],
-            row["resource_name"],
-            row["private_ip"],
-            row["eni_id"],
-        ])
+        sheet.add_row(
+            [
+                row["account_id"],
+                row["account_name"],
+                row["region"],
+                row["vpc_id"],
+                row["sg_id"],
+                row["sg_name"],
+                row["resource_type"],
+                row["resource_id"],
+                row["resource_name"],
+                row["private_ip"],
+                row["eni_id"],
+            ]
+        )
 
 
 def _add_summary_sheet(wb: Workbook, rows: list[dict], resource_rows: list[dict]) -> None:
@@ -289,21 +301,23 @@ def _add_summary_sheet(wb: Workbook, rows: list[dict], resource_rows: list[dict]
     sheet = wb.new_sheet("SG Summary", summary_columns)
     for stat in sg_stats.values():
         resource_types = ", ".join(sorted(stat["resource_types"])) if stat["resource_types"] else "-"
-        sheet.add_row([
-            stat["account_id"],
-            stat["account_name"],
-            stat["region"],
-            stat["vpc_id"],
-            stat["sg_id"],
-            stat["sg_name"],
-            stat["is_default_sg"],
-            stat["eni_count"],
-            stat["inbound_count"],
-            stat["outbound_count"],
-            stat["total_rules"],
-            stat["resource_count"],
-            resource_types,
-        ])
+        sheet.add_row(
+            [
+                stat["account_id"],
+                stat["account_name"],
+                stat["region"],
+                stat["vpc_id"],
+                stat["sg_id"],
+                stat["sg_name"],
+                stat["is_default_sg"],
+                stat["eni_count"],
+                stat["inbound_count"],
+                stat["outbound_count"],
+                stat["total_rules"],
+                stat["resource_count"],
+                resource_types,
+            ]
+        )
 
 
 def _create_output_directory(ctx: ExecutionContext) -> str:
