@@ -7,8 +7,9 @@
 - ip_ranges: AWS, GCP, Azure, Oracle IP 범위 데이터
 - lambda_: Lambda 함수 분석 유틸리티
 - health: AWS Health 이벤트 분석
+- tags: 태그 정책 검증
 """
 
-from . import health, inventory, ip_ranges, lambda_, metrics, pricing
+from . import health, inventory, ip_ranges, lambda_, metrics, pricing, tags
 
-__all__ = ["metrics", "pricing", "inventory", "ip_ranges", "lambda_", "health"]
+__all__ = ["metrics", "pricing", "inventory", "ip_ranges", "lambda_", "health", "tags"]

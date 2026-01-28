@@ -1,46 +1,28 @@
-"""HTML 리포트 출력 모듈
+"""DEPRECATED: Use shared.io.html instead.
 
-ECharts 기반 시각화 + 테이블을 단일 HTML 파일로 생성
-
-사용법:
-    # 저수준 API (커스텀 리포트)
-    from core.tools.io.html import HTMLReport
-
-    report = HTMLReport("리포트 제목")
-    report.add_pie_chart("분포", [("A", 10), ("B", 20)])
-    report.add_table("데이터", ["col1", "col2"], [["a", "b"]])
-    report.save("output.html")
-
-    # 고수준 API (AWS 분석 도구용 - 권장)
-    from core.tools.io.html import AWSReport, ResourceItem
-
-    report = AWSReport("EC2 미사용 분석", "EC2", "unused", ctx)
-    report.set_summary(total=100, found=10, savings=500)
-    report.add_resource(ResourceItem(...))
-    report.save("output.html")
-
-    # 더 간단하게
-    from core.tools.io.html import create_aws_report
-
-    report = create_aws_report(
-        title="EC2 미사용",
-        service="EC2",
-        tool_name="unused",
-        ctx=ctx,
-        resources=results,  # list[dict]
-    )
-    report.save("output.html")
+이 모듈은 하위 호환성을 위해 유지됩니다.
+새 코드에서는 shared.io.html를 사용하세요.
 """
 
-from .aws_report import AWSReport, ResourceItem, create_aws_report
-from .report import (
+import warnings
+
+from shared.io.html import (
     DEFAULT_TOP_N,
+    AWSReport,
     ChartSize,
     HTMLReport,
+    ResourceItem,
     aggregate_by_group,
     build_treemap_hierarchy,
+    create_aws_report,
     group_top_n,
     open_in_browser,
+)
+
+warnings.warn(
+    "core.tools.io.html is deprecated. Use shared.io.html instead.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 __all__ = [

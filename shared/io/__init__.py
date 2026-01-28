@@ -6,9 +6,25 @@
 - csv: CSV 파일 처리 (인코딩 자동 감지)
 - file: 기본 파일 I/O 유틸리티
 - output: 출력 경로 관리 및 빌더
+- config: 출력 설정 (OutputConfig, OutputFormat)
+- compat: 호환성 헬퍼 (generate_reports, generate_dual_report)
 """
 
-# 하위 모듈들은 Phase 3에서 이동 후 import됨
-# from . import excel, html, csv, file, output
+from . import csv, excel, file, html, output
+from .compat import generate_dual_report, generate_reports
+from .config import OutputConfig, OutputFormat
 
-__all__: list[str] = []
+__all__: list[str] = [
+    # 하위 모듈
+    "excel",
+    "html",
+    "csv",
+    "file",
+    "output",
+    # 설정
+    "OutputConfig",
+    "OutputFormat",
+    # 고수준 API
+    "generate_reports",
+    "generate_dual_report",
+]

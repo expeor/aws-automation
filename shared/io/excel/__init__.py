@@ -1,12 +1,26 @@
-"""DEPRECATED: Use shared.io.excel instead.
+# pkg/io/excel - Excel 출력 양식 (공통 스타일, 헬퍼)
+"""
+Excel 스타일 및 Workbook 유틸리티.
 
-이 모듈은 하위 호환성을 위해 유지됩니다.
-새 코드에서는 shared.io.excel를 사용하세요.
+사용 예시:
+    from shared.io.excel import Workbook, ColumnDef, Styles
+
+    wb = Workbook()
+    columns = [
+        ColumnDef(header="ID", width=20, style="data"),
+        ColumnDef(header="크기", width=10, style="number"),
+        ColumnDef(header="상태", width=12, style="center"),
+    ]
+
+    sheet = wb.new_sheet(name="결과", columns=columns)
+    sheet.add_row(["vol-123", 100, "available"])
+    sheet.add_row(["vol-456", 50, "in-use"], style=Styles.warning())
+    sheet.add_summary_row(["합계", 150, "-"])
+
+    wb.save_as(output_dir, "report", "ap-northeast-2")
 """
 
-import warnings
-
-from shared.io.excel import (
+from .styles import (
     ALIGN_CENTER,
     ALIGN_CENTER_WRAP,
     ALIGN_LEFT,
@@ -45,19 +59,8 @@ from shared.io.excel import (
     NUMBER_FORMAT_PERCENT,
     NUMBER_FORMAT_STATUS,
     NUMBER_FORMAT_TEXT,
-    ColumnDef,
     RowStyle,
-    Sheet,
     Styles,
-    SummaryItem,
-    SummarySheet,
-    Workbook,
-    add_sheet_from_dict_list,
-    apply_detail_sheet_formatting,
-    apply_summary_formatting,
-    apply_worksheet_settings,
-    calculate_optimal_column_width,
-    calculate_optimal_row_height,
     create_status_style,
     create_summary_cell_style,
     create_summary_dashboard_style,
@@ -80,14 +83,21 @@ from shared.io.excel import (
     get_summary_font,
     get_thin_border,
     get_warning_fill,
+)
+from .workbook import (
+    ColumnDef,
+    Sheet,
+    SummaryItem,
+    SummarySheet,
+    Workbook,
+    add_sheet_from_dict_list,
+    apply_detail_sheet_formatting,
+    apply_summary_formatting,
+    apply_worksheet_settings,
+    calculate_optimal_column_width,
+    calculate_optimal_row_height,
     save_dict_list_to_excel,
     save_to_csv,
-)
-
-warnings.warn(
-    "core.tools.io.excel is deprecated. Use shared.io.excel instead.",
-    DeprecationWarning,
-    stacklevel=2,
 )
 
 __all__: list[str] = [
