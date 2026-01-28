@@ -3,9 +3,9 @@ reports/scheduled/registry.py - 정기 작업 레지스트리
 
 YAML 설정 파일 로드 및 주기별 그룹화
 
-회사 선택 우선순위:
+설정 선택 우선순위:
 1. 함수 파라미터 (company)
-2. 환경변수 (AA_SCHEDULED_COMPANY)
+2. 환경변수 (AA_SCHEDULED_CONFIG)
 3. 기본값 (default.yaml)
 """
 
@@ -76,15 +76,20 @@ def load_config(company: str | None = None) -> dict[str, Any]:
     return _load_config_internal(resolved)
 
 
-def get_schedule_groups(company: str | None = None, lang: str = "ko") -> list[ScheduleGroup]:
+def get_schedule_groups(
+    company: str | None = None,
+    lang: str = "ko",
+    include_empty: bool = False,
+) -> list[ScheduleGroup]:
     """주기별 그룹 목록 반환
 
     Args:
-        company: 회사명 (None이면 default)
+        company: 설정 프로필명 (None이면 default)
         lang: 언어 ("ko" 또는 "en")
+        include_empty: 빈 그룹 포함 여부 (기본: False)
 
     Returns:
-        ScheduleGroup 목록
+        ScheduleGroup 목록 (빈 그룹은 기본적으로 제외)
     """
     config = load_config(company)
     groups = []
@@ -93,7 +98,11 @@ def get_schedule_groups(company: str | None = None, lang: str = "ko") -> list[Sc
         try:
             cycle = TaskCycle(cycle_code)
         except ValueError:
+            # 유효하지 않은 주기 코드 무시
             continue
+
+        # tasks 섹션이 없거나 빈 리스트인 경우 처리
+        task_list = data.get("tasks") or []
 
         tasks = [
             ScheduledTask(
@@ -110,15 +119,19 @@ def get_schedule_groups(company: str | None = None, lang: str = "ko") -> list[Sc
                 requires_confirm=t.get("requires_confirm", False),
                 enabled=t.get("enabled", True),
             )
-            for t in data.get("tasks", [])
+            for t in task_list
             if t.get("enabled", True)
         ]
+
+        # 빈 그룹 필터링 (include_empty=False인 경우)
+        if not include_empty and not tasks:
+            continue
 
         groups.append(
             ScheduleGroup(
                 cycle=cycle,
-                display_name=data["display_name"] if lang == "ko" else data.get("display_name_en", data["display_name"]),
-                display_name_en=data.get("display_name_en", data["display_name"]),
+                display_name=data.get("display_name", cycle_code) if lang == "ko" else data.get("display_name_en", data.get("display_name", cycle_code)),
+                display_name_en=data.get("display_name_en", data.get("display_name", cycle_code)),
                 color=data.get("color", "dim"),
                 icon=data.get("icon", "📄"),
                 tasks=tasks,
