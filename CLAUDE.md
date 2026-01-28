@@ -265,9 +265,14 @@ if not result.is_valid:
 from core.tools.io.excel import Workbook, ColumnDef
 
 wb = Workbook()
-ws = wb.add_sheet("Results")
-ws.add_headers([ColumnDef("리소스", width=30), ColumnDef("상태", width=15)])
-ws.add_rows(data)
+columns = [
+    ColumnDef("리소스", width=30),
+    ColumnDef("상태", width=15, style="center"),
+    ColumnDef("수량", width=10, style="number"),
+]
+sheet = wb.new_sheet("Results", columns)
+for row in data:
+    sheet.add_row([row["resource"], row["status"], row["count"]])
 wb.save("output.xlsx")
 
 # HTML 보고서 (ECharts 시각화)

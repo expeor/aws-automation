@@ -40,6 +40,17 @@ class SGRule:
 
 
 @dataclass
+class AttachedResource:
+    """SG에 연결된 리소스 정보"""
+
+    resource_type: str  # EC2, RDS, Lambda, ELB, ElastiCache, ECS, etc.
+    resource_id: str  # 리소스 ID
+    resource_name: str  # 리소스 이름 (태그 Name 또는 ID)
+    eni_id: str  # ENI ID
+    private_ip: str  # 프라이빗 IP
+
+
+@dataclass
 class SecurityGroup:
     """Security Group 정보"""
 
@@ -62,6 +73,9 @@ class SecurityGroup:
     # ENI 연결 정보
     eni_count: int = 0
     eni_descriptions: list[str] = field(default_factory=list)
+
+    # 연결된 리소스 목록
+    attached_resources: list[AttachedResource] = field(default_factory=list)
 
     # 참조 정보
     referenced_by_sgs: set[str] = field(default_factory=set)
@@ -255,7 +269,12 @@ class SGCollector:
 
             for page in paginator.paginate():
                 for eni in page.get("NetworkInterfaces", []):
+                    eni_id = eni.get("NetworkInterfaceId", "")
                     eni_desc = eni.get("Description", "")
+                    private_ip = eni.get("PrivateIpAddress", "")
+
+                    # 리소스 유형 및 ID 파악
+                    resource_type, resource_id, resource_name = self._parse_eni_resource(eni)
 
                     # 이 ENI에 연결된 SG들
                     for group in eni.get("Groups", []):
@@ -265,8 +284,97 @@ class SGCollector:
                             if eni_desc:
                                 self.security_groups[sg_id].eni_descriptions.append(eni_desc)
 
+                            # 연결된 리소스 정보 추가
+                            if resource_type:
+                                attached = AttachedResource(
+                                    resource_type=resource_type,
+                                    resource_id=resource_id,
+                                    resource_name=resource_name,
+                                    eni_id=eni_id,
+                                    private_ip=private_ip,
+                                )
+                                self.security_groups[sg_id].attached_resources.append(attached)
+
         except ClientError as e:
             logger.warning(f"ENI 수집 실패: {e}")
+
+    def _parse_eni_resource(self, eni: dict[str, Any]) -> tuple[str, str, str]:
+        """ENI에서 연결된 리소스 유형/ID 파악
+
+        Returns:
+            (resource_type, resource_id, resource_name)
+        """
+        eni_desc = eni.get("Description", "")
+        attachment = eni.get("Attachment", {})
+        instance_id = attachment.get("InstanceId", "")
+
+        # EC2 인스턴스
+        if instance_id:
+            # 태그에서 Name 추출
+            tags = {t["Key"]: t["Value"] for t in eni.get("TagSet", [])}
+            instance_name = tags.get("Name", instance_id)
+            return "EC2", instance_id, instance_name
+
+        # Description 기반 리소스 파악
+        desc_lower = eni_desc.lower()
+
+        # RDS
+        if "rds" in desc_lower or eni_desc.startswith("RDS"):
+            # "RDSNetworkInterface" 또는 DB 식별자 추출
+            resource_id = eni_desc
+            if ":" in eni_desc:
+                parts = eni_desc.split(":")
+                resource_id = parts[-1] if parts else eni_desc
+            return "RDS", resource_id, eni_desc
+
+        # Lambda
+        if "lambda" in desc_lower or eni_desc.startswith("AWS Lambda VPC ENI"):
+            # 함수 이름 추출 시도
+            if ":" in eni_desc:
+                parts = eni_desc.split(":")
+                func_name = parts[-1] if parts else eni_desc
+                return "Lambda", func_name, func_name
+            return "Lambda", eni_desc, eni_desc
+
+        # ELB (ALB/NLB/CLB)
+        if eni_desc.startswith("ELB ") or "elb" in desc_lower:
+            # "ELB app/my-alb/..." 또는 "ELB net/my-nlb/..."
+            parts = eni_desc.split("/")
+            if len(parts) >= 2:
+                elb_type = "ALB" if "app/" in eni_desc else "NLB" if "net/" in eni_desc else "CLB"
+                elb_name = parts[1] if len(parts) > 1 else eni_desc
+                return elb_type, elb_name, eni_desc
+            return "ELB", eni_desc, eni_desc
+
+        # ElastiCache
+        if "elasticache" in desc_lower:
+            return "ElastiCache", eni_desc, eni_desc
+
+        # ECS
+        if "ecs" in desc_lower or eni_desc.startswith("ecs-managed"):
+            return "ECS", eni_desc, eni_desc
+
+        # VPC Endpoint
+        if "vpce" in desc_lower or eni_desc.startswith("VPC Endpoint"):
+            return "VPCEndpoint", eni_desc, eni_desc
+
+        # NAT Gateway
+        if "nat" in desc_lower and "gateway" in desc_lower:
+            return "NATGateway", eni_desc, eni_desc
+
+        # OpenSearch / Elasticsearch
+        if "opensearch" in desc_lower or "elasticsearch" in desc_lower:
+            return "OpenSearch", eni_desc, eni_desc
+
+        # Redshift
+        if "redshift" in desc_lower:
+            return "Redshift", eni_desc, eni_desc
+
+        # 기타 (Description이 있으면)
+        if eni_desc:
+            return "Other", eni_desc, eni_desc
+
+        return "", "", ""
 
     def _analyze_sg_references(self) -> None:
         """SG 간 참조 관계 분석"""
