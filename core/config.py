@@ -69,6 +69,11 @@ def get_plugins_path() -> Path:
     return get_project_root() / "plugins"
 
 
+def get_reports_path() -> Path:
+    """리포트 폴더 경로 반환"""
+    return get_project_root() / "reports"
+
+
 def get_version_file() -> Path:
     """version.txt 파일 경로 반환"""
     return get_project_root() / "version.txt"

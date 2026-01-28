@@ -1,11 +1,11 @@
 """
-plugins/resource_explorer/common/services/ec2.py - EC2 리소스 수집
+shared/aws/inventory/services/ec2.py - EC2 리소스 수집
 """
 
 from __future__ import annotations
 
 from core.parallel import get_client
-from plugins.vpc.ip_search.parser import parse_eni_description
+from reports.ip_search.parser import parse_eni_description
 
 from ..types import EC2Instance, SecurityGroup
 from .helpers import count_rules, has_public_access_rule, parse_tags

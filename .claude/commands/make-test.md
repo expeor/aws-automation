@@ -478,7 +478,7 @@ class TestPerformanceBenchmarks:
     @pytest.mark.benchmark(group="metrics")
     def test_batch_metrics_performance(self, benchmark):
         """배치 메트릭 조회 성능 벤치마크"""
-        from plugins.cloudwatch.common.batch_metrics import (
+        from shared.aws.metrics import (
             build_lambda_metric_queries,
         )
 

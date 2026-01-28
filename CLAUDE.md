@@ -21,16 +21,20 @@ AWS 운영 자동화 CLI 도구. 미사용 리소스 탐지, 보안 점검, 비�
 ```
 aws-automation/
 ├── cli/            # Click 기반 CLI, 대화형 메뉴, i18n
-├── core/           # 인증, 병렬처리, 도구 관리, 파일 I/O
-├── plugins/        # AWS 서비스별 분석 도구 (30개 카테고리, 70+ 도구)
+├── core/           # 인증, 병렬처리, 도구 관리
+├── shared/         # 공유 유틸리티 (AWS, I/O)
+├── plugins/        # AWS 서비스별 분석 도구 (30개 카테고리)
+├── reports/        # 종합 리포트 (cost_dashboard, inventory, ip_search, log_analyzer)
 └── tests/          # pytest 테스트
 ```
 
 ### 주요 디렉토리
 
 - **cli/**: 메인 앱 진입점 (`app.py`), 플로우 관리, 프롬프트, 국제화(i18n)
-- **core/**: 인증 프로바이더, 병렬 처리, 도구 레지스트리, 파일 I/O
+- **core/**: 인증 프로바이더, 병렬 처리, 도구 레지스트리
+- **shared/**: 공유 유틸리티 (AWS: metrics, pricing, inventory, ip_ranges / I/O: excel, html, csv)
 - **plugins/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam, cost 등)
+- **reports/**: 종합 리포트 (비용 대시보드, 인벤토리, IP 검색, 로그 분석)
 
 ### Core 모듈 구조
 
@@ -40,39 +44,51 @@ core/
 ├── parallel/       # 병렬 실행 (Map-Reduce, Rate Limiting, Quotas)
 │   ├── executor.py       # ParallelSessionExecutor, parallel_collect
 │   ├── rate_limiter.py   # Token Bucket Rate Limiting
-│   └── quotas.py         # Service Quotas 확인 (NEW)
+│   └── quotas.py         # Service Quotas 확인
 ├── tools/          # 도구 관리, 캐시, 히스토리
-│   ├── io/         # 파일 입출력
-│   │   ├── csv/    # CSV 읽기 (인코딩 감지)
-│   │   ├── excel/  # Excel 쓰기 (openpyxl)
-│   │   ├── html/   # HTML 리포트 (ECharts)
-│   │   └── file/   # 기본 파일 I/O
-│   ├── output/     # 출력 빌더
-│   ├── history/    # 사용 기록, 즐겨찾기
-│   └── tag_validator.py  # 태그 정책 검증 (NEW)
-├── cloudwatch/     # CloudWatch re-export (→ plugins/cloudwatch/common)
+│   ├── discovery.py      # 플러그인/리포트 발견
+│   ├── history/          # 사용 기록, 즐겨찾기
+│   └── cache/            # 캐시 관리
 ├── region/         # 리전 데이터 및 가용성 확인
 │   ├── data.py           # ALL_REGIONS, REGION_NAMES
-│   └── availability.py   # 리전 가용성 확인 (NEW)
+│   └── availability.py   # 리전 가용성 확인
 └── filter.py       # 리전 필터링
 ```
 
-### 플러그인 공유 모듈
+### Shared 모듈 구조
 
-데이터 수집/처리 로직은 사용하는 플러그인에 위치:
+공유 유틸리티는 `shared/`에 위치:
 
 ```
-plugins/
-├── cloudwatch/common/          # CloudWatch 메트릭 배치 수집
-│   └── batch_metrics.py        # GetMetricData 배치 API (500개/호출)
-├── resource_explorer/common/   # 리소스 인벤토리 수집/캐싱
-│   ├── collector.py            # InventoryCollector
-│   ├── cache.py                # TTL 기반 캐싱
-│   ├── types.py                # 리소스 타입 정의
-│   └── services/               # 서비스별 수집기 (ec2, vpc, elb)
-├── vpc/ip_search/common/       # IP 대역 검색
-│   └── ip_ranges/              # AWS, GCP, Azure, Oracle IP 범위
-└── cost/pricing/               # AWS 가격 정보
+shared/
+├── aws/                        # AWS 관련 공유 유틸리티
+│   ├── metrics/                # CloudWatch 메트릭 배치 수집
+│   │   └── batch_metrics.py    # GetMetricData 배치 API (500개/호출)
+│   ├── inventory/              # 리소스 인벤토리 수집/캐싱
+│   │   ├── collector.py        # InventoryCollector
+│   │   ├── types.py            # 리소스 타입 정의
+│   │   └── services/           # 서비스별 수집기
+│   ├── ip_ranges/              # IP 대역 검색 (AWS, GCP, Azure, Oracle)
+│   ├── pricing/                # AWS 가격 정보
+│   └── health/                 # Health 이벤트 분석
+│
+└── io/                         # I/O 유틸리티
+    ├── excel/                  # Excel 출력 (openpyxl)
+    ├── html/                   # HTML 리포트 (ECharts)
+    ├── csv/                    # CSV 처리
+    └── output/                 # 출력 경로 관리
+```
+
+### Reports 모듈 구조
+
+종합 리포트는 `reports/`에 위치:
+
+```
+reports/
+├── cost_dashboard/             # 미사용 리소스 종합 대시보드
+├── inventory/                  # AWS 리소스 인벤토리
+├── ip_search/                  # IP 검색 (Public/Private)
+└── log_analyzer/               # ALB/NLB 로그 분석
 ```
 
 ## 코딩 스타일

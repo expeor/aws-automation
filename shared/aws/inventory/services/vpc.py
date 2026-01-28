@@ -1,11 +1,11 @@
 """
-plugins/resource_explorer/common/services/vpc.py - VPC/Network 리소스 수집
+shared/aws/inventory/services/vpc.py - VPC/Network 리소스 수집
 """
 
 from __future__ import annotations
 
 from core.parallel import get_client
-from plugins.vpc.ip_search.parser import parse_eni_description
+from reports.ip_search.parser import parse_eni_description
 
 from ..types import ENI, VPC, ElasticIP, InternetGateway, NATGateway, RouteTable, Subnet, VPCEndpoint
 from .helpers import parse_tags

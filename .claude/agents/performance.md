@@ -227,7 +227,7 @@ GetMetricData API는 최대 500개 메트릭을 1회 호출로 조회 가능합�
 
 ```python
 from datetime import datetime, timedelta
-from plugins.cloudwatch.common.batch_metrics import (
+from shared.aws.metrics import (
     batch_get_metrics,
     build_lambda_metric_queries,
     MetricQuery,
@@ -292,7 +292,7 @@ queries = [
 ### 기본 사용법
 
 ```python
-from plugins.resource_explorer.common.collector import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 
 def analyze_resources(ctx):
     collector = InventoryCollector(ctx)

@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
     from core.filter import AccountFilter
     from core.tools.io.config import OutputConfig
-    from plugins.resource_explorer.common import InventoryCollector
+    from shared.aws.inventory import InventoryCollector
 
 # core.exceptions에서 BackToMenuError 재사용
 from core.exceptions import BackToMenuError
@@ -407,7 +407,7 @@ class ExecutionContext:
             security_groups = inventory.collect_security_groups()
         """
         # Lazy import to avoid circular dependencies
-        from plugins.resource_explorer.common import InventoryCollector
+        from shared.aws.inventory import InventoryCollector
 
         # Create a new collector that uses the global cache
         return InventoryCollector(self)

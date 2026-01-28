@@ -14,15 +14,7 @@ CATEGORY = {
 }
 
 TOOLS = [
-    {
-        "name": "미사용 리소스 종합 탐지",
-        "name_en": "Comprehensive Unused Resources Detection",
-        "description": "NAT, ENI, EBS, EIP, ELB, Snapshot, DynamoDB 등 미사용 리소스 종합 보고서",
-        "description_en": "Comprehensive unused resources report (NAT, ENI, EBS, EIP, ELB, Snapshot, DynamoDB)",
-        "permission": "read",
-        "module": "unused_all",
-        "area": "cost",
-    },
+    # NOTE: "미사용 리소스 종합 탐지" moved to reports/cost_dashboard
     {
         "name": "Cost Optimization Hub 현황",
         "name_en": "Cost Optimization Hub Inventory",

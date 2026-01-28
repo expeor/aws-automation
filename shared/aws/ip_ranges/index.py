@@ -1,5 +1,5 @@
 """
-plugins/vpc/ip_search/common/ip_ranges/index.py - Optimized IP Range Index
+shared/aws/ip_ranges/index.py - Optimized IP Range Index
 
 고성능 IP 대역 검색을 위한 인덱스 구조:
 - pytricia 사용 시: Radix Tree 기반 O(W) 조회 (W=32/128 비트)
@@ -11,7 +11,7 @@ Performance:
 - Linear Search: ~10ms per lookup (original)
 
 Usage:
-    from plugins.vpc.ip_search.common.ip_ranges.index import IPRangeIndex
+    from shared.aws.ip_ranges.index import IPRangeIndex
 
     # Build index
     index = IPRangeIndex()

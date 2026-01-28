@@ -30,6 +30,7 @@ from typing import Any
 from core.config import (
     get_plugins_path,
     get_project_root,
+    get_reports_path,
     settings,
     validate_tool_metadata,
 )
@@ -47,9 +48,13 @@ PROJECT_ROOT = get_project_root()
 # 플러그인 폴더 경로 (core.config 사용)
 PLUGINS_PATH = get_plugins_path()
 
+# 리포트 폴더 경로 (core.config 사용)
+REPORTS_PATH = get_reports_path()
+
 # 스캔 대상 경로
 SCAN_PATHS = [
     ("plugins", PLUGINS_PATH),  # 모든 플러그인 (analysis + {service})
+    ("reports", REPORTS_PATH),  # 종합 리포트 (cost_dashboard, inventory, ip_search, log_analyzer)
 ]
 
 # =============================================================================

@@ -1,13 +1,13 @@
 # Inventory Collector 패턴
 
-`plugins/resource_explorer/common/collector.py` 모듈의 사용 패턴입니다.
+`shared/aws/inventory/collector.py` 모듈의 사용 패턴입니다.
 
 병렬 처리를 통해 multi-account/region에서 AWS 리소스를 수집합니다.
 
 ## 권장 패턴
 
 ```python
-from plugins.resource_explorer.common import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 ```
 
 ---
@@ -45,7 +45,7 @@ class InventoryCollector:
 ### 기본 사용법
 
 ```python
-from plugins.resource_explorer.common import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 
 def run(ctx) -> None:
     collector = InventoryCollector(ctx)
@@ -187,7 +187,7 @@ def run(ctx) -> None:
 
 ## 리소스 타입 (dataclass)
 
-모든 리소스 타입은 `plugins/resource_explorer/common/types.py`에 정의되어 있습니다.
+모든 리소스 타입은 `shared/aws/inventory/types.py`에 정의되어 있습니다.
 
 ### 공통 필드
 
@@ -290,8 +290,8 @@ def run(ctx) -> None:
 ## 전체 예시 (네트워크 인벤토리)
 
 ```python
-from plugins.resource_explorer.common import InventoryCollector
-from core.tools.io.compat import generate_reports
+from shared.aws.inventory import InventoryCollector
+from shared.io.compat import generate_reports
 from core.tools.output import OutputPath
 
 def run(ctx) -> None:
@@ -360,7 +360,7 @@ def run(ctx) -> None:
 
 ## 참조
 
-- `plugins/resource_explorer/common/collector.py` - InventoryCollector 클래스
-- `plugins/resource_explorer/common/types.py` - 리소스 타입 정의
-- `plugins/resource_explorer/common/services/` - 서비스별 수집기
+- `shared/aws/inventory/collector.py` - InventoryCollector 클래스
+- `shared/aws/inventory/types.py` - 리소스 타입 정의
+- `shared/aws/inventory/services/` - 서비스별 수집기
 - `.claude/skills/parallel-execution-patterns.md` - 병렬 처리 패턴

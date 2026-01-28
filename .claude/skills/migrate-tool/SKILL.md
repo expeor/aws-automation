@@ -546,7 +546,7 @@ for func in functions:
 
 #### After (현재 패턴)
 ```python
-from plugins.cloudwatch.common.batch_metrics import (
+from shared.aws.metrics import (
     batch_get_metrics,
     build_lambda_metric_queries,
 )
@@ -601,7 +601,7 @@ def tool2_collect(session, region):
 
 #### After (현재 패턴)
 ```python
-from plugins.resource_explorer.common.collector import InventoryCollector
+from shared.aws.inventory import InventoryCollector
 
 def tool1_collect(ctx, session, region):
     collector = InventoryCollector(ctx)

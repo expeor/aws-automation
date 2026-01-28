@@ -13,27 +13,7 @@ CATEGORY = {
 }
 
 TOOLS = [
-    # Search tools
-    {
-        "name": "클라우드 IP 대역 조회",
-        "name_en": "Cloud IP Range Lookup",
-        "description": "IP가 어느 클라우드(AWS, GCP, Azure, Oracle) 소속인지 확인",
-        "description_en": "Check which cloud provider owns an IP (AWS, GCP, Azure, Oracle)",
-        "permission": "read",
-        "module": "ip_search.public_ip",
-        "area": "search",
-        "require_session": False,
-    },
-    {
-        "name": "내부 IP 리소스 조회",
-        "name_en": "Internal IP Resource Lookup",
-        "description": "내부 IP가 어떤 AWS 리소스(EC2, Lambda, ECS 등)에 할당되어 있는지 확인",
-        "description_en": "Find which AWS resource (EC2, Lambda, ECS, etc.) an internal IP belongs to",
-        "permission": "read",
-        "module": "ip_search.private_ip",
-        "area": "search",
-        "require_session": False,
-    },
+    # NOTE: IP search tools moved to reports/ip_search
     # Security tools
     {
         "name": "Security Group 보안 점검",
