@@ -1,0 +1,163 @@
+# Sample Configuration
+# 커스텀 정기 작업 설정 예시
+#
+# 사용 방법:
+#   1. 이 파일을 복사하여 {설정명}.yaml로 저장
+#   2. 환경변수 설정: export AA_SCHEDULED_CONFIG=설정명
+#   3. 또는 메뉴에서 'c' 키로 설정 변경
+
+config_name: "샘플 설정"
+config_name_en: "Sample Config"
+
+cycles:
+  # =========================================================================
+  # 일간 작업 (Daily)
+  # =========================================================================
+  D:
+    display_name: "일간 점검"
+    display_name_en: "Daily Check"
+    color: "red"
+    icon: "🔔"
+    tasks:
+      - id: "D-001"
+        name: "서비스 Health 점검"
+        name_en: "Service Health Check"
+        description: "AWS Health Dashboard 이벤트 및 PHD 공지사항 확인"
+        description_en: "Check AWS Health Dashboard events and PHD announcements"
+        tool_ref: "health/analysis"
+        permission: "read"
+        supports_regions: false
+
+  # =========================================================================
+  # 월간 작업 (Monthly)
+  # =========================================================================
+  1M:
+    display_name: "월간 거버넌스"
+    display_name_en: "Monthly Governance"
+    color: "yellow"
+    icon: "📋"
+    tasks:
+      # 점검 (read)
+      - id: "1M-001"
+        name: "비용 최적화 점검"
+        name_en: "Cost Optimization Review"
+        description: "미사용 리소스 및 예약 인스턴스 분석"
+        description_en: "Analyze unused resources and reserved instances"
+        tool_ref: "cost_dashboard/orchestrator"
+        permission: "read"
+        supports_regions: true
+
+      - id: "1M-002"
+        name: "보안 그룹 현황"
+        name_en: "Security Group Status"
+        description: "Security Group 정책 내역 추출"
+        description_en: "Extract Security Group policy details"
+        tool_ref: "vpc/sg_inventory"
+        permission: "read"
+        supports_regions: true
+
+      # 적용 (write)
+      - id: "1M-003"
+        name: "EC2→EBS 태그 동기화"
+        name_en: "EC2→EBS Tag Sync"
+        description: "EC2 인스턴스 태그를 연결된 EBS에 동기화"
+        description_en: "Sync EC2 instance tags to attached EBS volumes"
+        tool_ref: "tag_editor/ec2_to_ebs"
+        permission: "write"
+        supports_regions: true
+
+  # =========================================================================
+  # 분기 작업 (Quarterly)
+  # =========================================================================
+  3M:
+    display_name: "분기 컴플라이언스"
+    display_name_en: "Quarterly Compliance"
+    color: "blue"
+    icon: "🔒"
+    tasks:
+      # 점검 (read)
+      - id: "3M-001"
+        name: "IAM 권한 리뷰"
+        name_en: "IAM Permission Review"
+        description: "미사용 IAM 사용자/역할 점검"
+        description_en: "Review unused IAM users/roles"
+        tool_ref: "iam/iam_audit"
+        permission: "read"
+        supports_regions: false
+
+      - id: "3M-002"
+        name: "필수 패치 일정"
+        name_en: "Required Patch Schedule"
+        description: "예정된 AWS 패치 및 유지보수 일정 확인"
+        description_en: "Check scheduled AWS patches and maintenance"
+        tool_ref: "health/patch_analysis"
+        permission: "read"
+        supports_regions: false
+
+      - id: "3M-003"
+        name: "필수 태그 누락"
+        name_en: "Required Tag Missing"
+        description: "필수 태그 미적용 리소스 현황"
+        description_en: "Resources missing required tags"
+        tool_ref: "tag_editor/map_audit"
+        permission: "read"
+        supports_regions: true
+
+      # 정리 (delete)
+      - id: "3M-004"
+        name: "오래된 스냅샷 정리"
+        name_en: "Old Snapshot Cleanup"
+        description: "90일 이상 경과된 미사용 스냅샷 정리"
+        description_en: "Cleanup unused snapshots older than 90 days"
+        tool_ref: "ec2/snapshot_cleanup"
+        permission: "delete"
+        supports_regions: true
+        requires_confirm: true
+
+  # =========================================================================
+  # 반기 작업 (Biannual)
+  # =========================================================================
+  6M:
+    display_name: "반기 최적화"
+    display_name_en: "Biannual Optimization"
+    color: "green"
+    icon: "📊"
+    tasks:
+      # 점검 (read)
+      - id: "6M-001"
+        name: "Rightsizing 분석"
+        name_en: "Rightsizing Analysis"
+        description: "Cost Optimization Hub 권장사항 검토"
+        description_en: "Review Cost Optimization Hub recommendations"
+        tool_ref: "cost/coh"
+        permission: "read"
+        supports_regions: false
+
+      # 정리 (delete)
+      - id: "6M-002"
+        name: "미사용 AMI 정리"
+        name_en: "Unused AMI Cleanup"
+        description: "미사용 AMI 및 연관 스냅샷 정리"
+        description_en: "Cleanup unused AMIs and associated snapshots"
+        tool_ref: "ec2/ami_cleanup"
+        permission: "delete"
+        supports_regions: true
+        requires_confirm: true
+
+  # =========================================================================
+  # 연간 작업 (Annual)
+  # =========================================================================
+  12M:
+    display_name: "연간 종합 감사"
+    display_name_en: "Annual Comprehensive Audit"
+    color: "magenta"
+    icon: "📆"
+    tasks:
+      - id: "12M-001"
+        name: "보안 종합 감사"
+        name_en: "Security Comprehensive Audit"
+        description: "IAM, Security Group, CloudTrail 종합 점검"
+        description_en: "Comprehensive IAM, SG, CloudTrail audit"
+        tool_ref: "iam/iam_audit"
+        permission: "read"
+        supports_regions: false

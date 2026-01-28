@@ -1,5 +1,5 @@
-company_name: "기본"
-company_name_en: "Default"
+config_name: "기본 설정"
+config_name_en: "Default"
 
 cycles:
   D:

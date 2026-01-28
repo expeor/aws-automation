@@ -2,8 +2,14 @@
 reports/scheduled/registry.py - 정기 작업 레지스트리
 
 YAML 설정 파일 로드 및 주기별 그룹화
+
+회사 선택 우선순위:
+1. 함수 파라미터 (company)
+2. 환경변수 (AA_SCHEDULED_COMPANY)
+3. 기본값 (default.yaml)
 """
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -14,24 +20,60 @@ from .types import ScheduledTask, ScheduleGroup, TaskCycle
 
 CONFIG_DIR = Path(__file__).parent / "config"
 
+# 환경변수 키
+ENV_CONFIG = "AA_SCHEDULED_CONFIG"
 
-@lru_cache(maxsize=1)
-def load_config(company: str | None = None) -> dict[str, Any]:
-    """설정 파일 로드
+
+def get_config_from_env() -> str | None:
+    """환경변수에서 설정 프로필명 조회"""
+    return os.environ.get(ENV_CONFIG)
+
+
+def resolve_company(company: str | None = None) -> str:
+    """설정 프로필명 결정 (우선순위 적용)
 
     Args:
-        company: 회사명 (None이면 default)
+        company: 명시적 설정 프로필명 (최우선)
 
     Returns:
-        설정 딕셔너리
+        결정된 설정명 (기본값: "default")
     """
-    config_file = CONFIG_DIR / f"{company or 'default'}.yaml"
+    if company:
+        return company
+    return get_config_from_env() or "default"
+
+
+def list_available_companies() -> list[str]:
+    """사용 가능한 설정 프로필 목록 반환"""
+    if not CONFIG_DIR.exists():
+        return ["default"]
+    return sorted([f.stem for f in CONFIG_DIR.glob("*.yaml")])
+
+
+def _load_config_internal(company: str) -> dict[str, Any]:
+    """내부 설정 로드 함수 (캐시 없음)"""
+    config_file = CONFIG_DIR / f"{company}.yaml"
     if not config_file.exists():
         config_file = CONFIG_DIR / "default.yaml"
 
     with config_file.open(encoding="utf-8") as f:
         result: dict[str, Any] = yaml.safe_load(f)
         return result
+
+
+# 캐시: company별로 최대 8개 설정 캐시
+@lru_cache(maxsize=8)
+def load_config(company: str | None = None) -> dict[str, Any]:
+    """설정 파일 로드
+
+    Args:
+        company: 회사명 (None이면 환경변수 → default 순서)
+
+    Returns:
+        설정 딕셔너리
+    """
+    resolved = resolve_company(company)
+    return _load_config_internal(resolved)
 
 
 def get_schedule_groups(company: str | None = None, lang: str = "ko") -> list[ScheduleGroup]:
