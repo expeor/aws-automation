@@ -22,12 +22,11 @@ from rich.console import Console
 
 from core.parallel import parallel_collect
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.lambda_ import LambdaFunctionInfo, collect_functions_with_metrics
 from shared.aws.pricing import (
     get_lambda_monthly_cost,
     get_lambda_provisioned_monthly_cost,
 )
-
-from shared.aws.lambda_ import LambdaFunctionInfo, collect_functions_with_metrics
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
