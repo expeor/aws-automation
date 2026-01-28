@@ -95,6 +95,6 @@ def run(ctx: ExecutionContext) -> None:
         file_prefix="phd_events",
     )
 
-    console.print(f"\n[green]보고서 생성 완료![/green]")
+    console.print("\n[green]보고서 생성 완료![/green]")
     console.print(f"  {report_path}")
     open_in_explorer(output_dir)

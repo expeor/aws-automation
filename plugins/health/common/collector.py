@@ -133,7 +133,7 @@ class CollectionResult:
         return [p for p in self.patches if p.service == service]
 
     @classmethod
-    def merge(cls, results: list["CollectionResult"]) -> "CollectionResult":
+    def merge(cls, results: list[CollectionResult]) -> CollectionResult:
         """여러 CollectionResult를 병합
 
         Args:

@@ -104,7 +104,7 @@ def run(ctx: ExecutionContext) -> None:
     dashboard = HealthDashboard(merged_result)
     dashboard.generate(html_path, auto_open=True)
 
-    console.print(f"\n[green]보고서 생성 완료![/green]")
+    console.print("\n[green]보고서 생성 완료![/green]")
     console.print(f"  Excel: {excel_path}")
     console.print(f"  HTML: {html_path}")
     open_in_explorer(output_dir)
