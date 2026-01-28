@@ -13,11 +13,11 @@ from core.config import (
     VALID_AREAS,
     VALID_PERMISSIONS,
     LogConfig,
+    get_analyzers_path,
     get_default_profile,
     get_default_region,
     get_env_bool,
     get_env_int,
-    get_plugins_path,
     get_project_root,
     get_version,
     settings,
@@ -75,14 +75,14 @@ class TestProjectPaths:
         assert isinstance(root, Path)
         assert root.exists()
         assert (root / "core").exists()
-        assert (root / "plugins").exists()
+        assert (root / "analyzers").exists()
 
-    def test_get_plugins_path(self):
-        """플러그인 경로"""
-        plugins = get_plugins_path()
-        assert isinstance(plugins, Path)
-        assert plugins.exists()
-        assert plugins.name == "plugins"
+    def test_get_analyzers_path(self):
+        """분석기 경로"""
+        analyzers = get_analyzers_path()
+        assert isinstance(analyzers, Path)
+        assert analyzers.exists()
+        assert analyzers.name == "analyzers"
 
 
 class TestEnvironmentHelpers:

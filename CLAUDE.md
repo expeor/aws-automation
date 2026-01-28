@@ -23,7 +23,7 @@ aws-automation/
 ├── cli/            # Click 기반 CLI, 대화형 메뉴, i18n
 ├── core/           # 인증, 병렬처리, 도구 관리
 ├── shared/         # 공유 유틸리티 (AWS, I/O)
-├── plugins/        # AWS 서비스별 분석 도구 (30개 카테고리)
+├── analyzers/        # AWS 서비스별 분석 도구 (30개 카테고리)
 ├── reports/        # 종합 리포트 (cost_dashboard, inventory, ip_search, log_analyzer)
 └── tests/          # pytest 테스트
 ```
@@ -33,7 +33,7 @@ aws-automation/
 - **cli/**: 메인 앱 진입점 (`app.py`), 플로우 관리, 프롬프트, 국제화(i18n)
 - **core/**: 인증 프로바이더, 병렬 처리, 도구 레지스트리
 - **shared/**: 공유 유틸리티 (AWS: metrics, pricing, inventory, ip_ranges / I/O: excel, html, csv)
-- **plugins/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam, cost 등)
+- **analyzers/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam, cost 등)
 - **reports/**: 종합 리포트 (비용 대시보드, 인벤토리, IP 검색, 로그 분석)
 
 ### Core 모듈 구조
@@ -131,10 +131,10 @@ no_implicit_optional = true
 
 ### 기본 구조
 
-플러그인은 `plugins/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:
+플러그인은 `analyzers/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:
 
 ```python
-# plugins/{service}/__init__.py
+# analyzers/{service}/__init__.py
 CATEGORY = {
     "name": "{service}",
     "display_name": "{Service}",
@@ -172,7 +172,7 @@ TOOLS = [
 ### 도구 모듈 패턴
 
 ```python
-# plugins/{service}/{module}.py
+# analyzers/{service}/{module}.py
 from core.parallel import parallel_collect, get_client
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str):
@@ -329,7 +329,7 @@ pytest tests/ -v
 
 # 특정 모듈
 pytest tests/core/ -v
-pytest tests/plugins/ec2/ -v
+pytest tests/analyzers/ec2/ -v
 
 # 커버리지
 pytest tests/ --cov=core --cov=cli --cov=plugins
@@ -343,7 +343,7 @@ tests/
 │   ├── auth/       # 인증 테스트
 │   ├── parallel/   # 병렬 처리 테스트
 │   └── tools/      # 도구 테스트
-└── plugins/        # 플러그인 테스트
+└── analyzers/        # 플러그인 테스트
     └── cloudwatch/ # CloudWatch batch_metrics 테스트
 ```
 
