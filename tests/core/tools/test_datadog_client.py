@@ -5,6 +5,9 @@ tests/core/tools/test_datadog_client.py - Datadog 클라이언트 테스트
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 
+# Skip all tests if datadog_api_client is not installed
+pytest.importorskip("datadog_api_client")
+
 
 class TestDatadogClientManager:
     """DatadogClientManager 클래스 테스트"""
