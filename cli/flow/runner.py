@@ -67,19 +67,21 @@ class FlowRunner:
         self,
         category: str,
         tool_module: str,
+        tool_name: str | None = None,
     ) -> None:
         """도구 직접 실행 (최근 사용/즐겨찾기에서 선택 시)
 
         Args:
             category: 카테고리 이름
             tool_module: 도구 모듈 이름
+            tool_name: 도구 이름 (tool_module이 비어있을 때 폴백용)
         """
         # 화면 클리어
         clear_screen()
 
         try:
             # 도구 정보 조회
-            tool_meta = self._find_tool_meta(category, tool_module)
+            tool_meta = self._find_tool_meta(category, tool_module, tool_name)
             if not tool_meta:
                 console.print(f"[red]! {t('runner.tool_not_found', path=f'{category}/{tool_module}')}[/red]")
                 return
@@ -134,8 +136,15 @@ class FlowRunner:
         self,
         category: str,
         tool_module: str,
+        tool_name: str | None = None,
     ) -> dict | None:
-        """도구 메타데이터 조회"""
+        """도구 메타데이터 조회
+
+        Args:
+            category: 카테고리 이름
+            tool_module: 도구 모듈 이름
+            tool_name: 도구 이름 (tool_module이 비어있을 때 폴백용)
+        """
         from core.tools.discovery import discover_categories
 
         categories = discover_categories(include_aws_services=True)
@@ -145,7 +154,11 @@ class FlowRunner:
                 for tool_meta in cat.get("tools", []):
                     if not isinstance(tool_meta, dict):
                         continue
-                    if tool_meta.get("module") == tool_module:
+                    # module 또는 ref 필드와 매칭 (ref만 정의된 도구 지원)
+                    if tool_module and (tool_meta.get("module") == tool_module or tool_meta.get("ref") == tool_module):
+                        return tool_meta
+                    # tool_module이 비어있으면 tool_name으로 폴백
+                    if not tool_module and tool_name and tool_meta.get("name") == tool_name:
                         return tool_meta
 
         return None
@@ -168,7 +181,8 @@ class FlowRunner:
                 if cat["name"] == ctx.category:
                     for tool in cat.get("tools", []):
                         if isinstance(tool, dict) and tool.get("name") == ctx.tool.name:
-                            tool_module = tool.get("module", "")
+                            # ref만 정의된 도구 지원
+                            tool_module = tool.get("module") or tool.get("ref", "")
                             break
                     break
 
