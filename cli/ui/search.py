@@ -131,7 +131,21 @@ class ToolSearchEngine:
         self._alias_to_category.clear()
         self._category_names.clear()
 
-        for cat in categories:
+        # 우선순위 정렬: report > 기타 (중복 제거 시 report가 우선)
+        def category_priority(cat: dict) -> tuple:
+            name = cat.get("name", "")
+            source = cat.get("_source", "")
+            # reports 폴더 또는 report 카테고리 우선
+            if source == "reports" or name == "report":
+                return (0, name)
+            return (1, name)
+
+        sorted_categories = sorted(categories, key=category_priority)
+
+        # 중복 도구명 제거를 위한 set
+        seen_tool_names: set[str] = set()
+
+        for cat in sorted_categories:
             cat_name = cat.get("name", "")
             cat_display = cat.get("display_name", cat_name)  # UI 표시용
             cat_desc = cat.get("description", cat_name)
@@ -154,7 +168,14 @@ class ToolSearchEngine:
             for tool in cat.get("tools", []):
                 tool_name = tool.get("name", "")
                 tool_name_en = tool.get("name_en", "")
-                tool_module = tool.get("module", "")
+
+                # 중복 도구명 제거 (우선순위: report > analyzer)
+                if tool_name in seen_tool_names:
+                    continue
+                seen_tool_names.add(tool_name)
+
+                # ref 필드가 있으면 module 대신 사용 (reports/__init__.py 등에서 ref만 정의한 경우)
+                tool_module = tool.get("module") or tool.get("ref", "")
                 tool_desc = tool.get("description", "")
                 tool_desc_en = tool.get("description_en", "")
                 permission = tool.get("permission", "read")
