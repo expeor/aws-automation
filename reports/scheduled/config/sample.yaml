@@ -29,6 +29,32 @@ cycles:
         supports_regions: false
 
   # =========================================================================
+  # 주간 작업 (Weekly)
+  # =========================================================================
+  W:
+    display_name: "주간 점검"
+    display_name_en: "Weekly Check"
+    color: "cyan"
+    icon: "📆"
+    tasks:
+      - id: "W-001"
+        name: "예정 패치 일정"
+        name_en: "Scheduled Patch Review"
+        description: "향후 90일 내 예정된 AWS 패치/유지보수 일정"
+        description_en: "AWS patches and maintenance scheduled within 90 days"
+        tool_ref: "health/patch_analysis"
+        permission: "read"
+        supports_regions: false
+      - id: "W-002"
+        name: "Security Group 현황"
+        name_en: "Security Group Status"
+        description: "Security Group 정책 내역 및 연결 리소스 현황"
+        description_en: "Security Group policy details and attached resources"
+        tool_ref: "vpc/sg_inventory"
+        permission: "read"
+        supports_regions: true
+
+  # =========================================================================
   # 월간 작업 (Monthly)
   # =========================================================================
   1M:
