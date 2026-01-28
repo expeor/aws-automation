@@ -464,7 +464,10 @@ def _get_last_invocation_time(
 
         for dp in datapoints:
             if dp.get("Sum", 0) > 0:
-                return dp.get("Timestamp")
+                timestamp = dp.get("Timestamp")
+                if isinstance(timestamp, datetime):
+                    return timestamp
+                return None
 
     except ClientError:
         pass
