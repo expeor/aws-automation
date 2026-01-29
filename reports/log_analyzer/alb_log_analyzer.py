@@ -293,6 +293,54 @@ class ALBLogAnalyzer:
             """CREATE OR REPLACE MACRO extract_elb_name(log_line) AS (
                    coalesce(regexp_extract(extract_elb_full(log_line), '^[^/]+/([^/]+)/', 1), '')
                )""",
+            # ========== 추가 분석 필드 (Phase 2) ==========
+            # HTTP 버전 추출 (request 필드에서: "GET /path HTTP/1.1")
+            """CREATE OR REPLACE MACRO extract_http_version(log_line) AS (
+                   CASE
+                       WHEN regexp_extract(log_line, '"[^"]*\\s+HTTP/2[^"]*"', 0) IS NOT NULL THEN 'HTTP/2'
+                       WHEN regexp_extract(log_line, '"[^"]*\\s+HTTP/1\\.1[^"]*"', 0) IS NOT NULL THEN 'HTTP/1.1'
+                       WHEN regexp_extract(log_line, '"[^"]*\\s+HTTP/1\\.0[^"]*"', 0) IS NOT NULL THEN 'HTTP/1.0'
+                       WHEN log_line LIKE '%grpc%' OR log_line LIKE '%gRPC%' THEN 'gRPC'
+                       WHEN log_line LIKE 'h2 %' OR log_line LIKE 'grpcs %' THEN 'HTTP/2'
+                       WHEN log_line LIKE 'wss %' OR log_line LIKE 'ws %' THEN 'WebSocket'
+                       ELSE 'Unknown'
+                   END
+               )""",
+            # SSL/TLS 프로토콜 (필드 15: ssl_protocol - TLSv1.2, TLSv1.3 등)
+            """CREATE OR REPLACE MACRO extract_ssl_protocol(log_line) AS (
+                   coalesce(
+                       regexp_extract(log_line, '\\s(TLSv1\\.[0-3])\\s', 1),
+                       CASE WHEN log_line LIKE 'http %' THEN 'None' ELSE '-' END
+                   )
+               )""",
+            # SSL/TLS 암호 스위트 (필드 14: ssl_cipher)
+            """CREATE OR REPLACE MACRO extract_ssl_cipher(log_line) AS (
+                   coalesce(
+                       regexp_extract(log_line, '\\s([A-Z][A-Z0-9]+-[A-Z0-9-]+)\\s+TLSv', 1),
+                       CASE WHEN log_line LIKE 'http %' THEN 'None' ELSE '-' END
+                   )
+               )""",
+            # Actions Executed (필드 22: "waf,forward", "authenticate,forward" 등)
+            """CREATE OR REPLACE MACRO extract_actions(log_line) AS (
+                   coalesce(
+                       regexp_extract(log_line, '"(waf[^"]*|forward|redirect|fixed-response|authenticate[^"]*)"', 1),
+                       '-'
+                   )
+               )""",
+            # Classification (필드 28: Acceptable, Ambiguous, Severe)
+            """CREATE OR REPLACE MACRO extract_classification(log_line) AS (
+                   coalesce(
+                       regexp_extract(log_line, '"(Acceptable|Ambiguous|Severe)"', 1),
+                       'Unknown'
+                   )
+               )""",
+            # Classification Reason (필드 29)
+            """CREATE OR REPLACE MACRO extract_classification_reason(log_line) AS (
+                   coalesce(
+                       regexp_extract(log_line, '"(Acceptable|Ambiguous|Severe)"\\s+"([^"]*)"', 2),
+                       '-'
+                   )
+               )""",
         ]
 
         # 함수들을 개별적으로 실행
@@ -476,7 +524,14 @@ class ALBLogAnalyzer:
                 extract_redirect_url(line) as redirect_url,
                 extract_error_reason(line) as error_reason,
                 extract_received_bytes(line) as received_bytes,
-                extract_sent_bytes(line) as sent_bytes
+                extract_sent_bytes(line) as sent_bytes,
+                -- 추가 분석 필드 (Phase 2)
+                extract_http_version(line) as http_version,
+                extract_ssl_protocol(line) as ssl_protocol,
+                extract_ssl_cipher(line) as ssl_cipher,
+                extract_actions(line) as actions_executed,
+                extract_classification(line) as classification,
+                extract_classification_reason(line) as classification_reason
             FROM read_csv_auto([{file_list_sql}],
                               delim='\\t',
                               header=false,
@@ -944,6 +999,390 @@ class ALBLogAnalyzer:
             """
             sent_bytes_results = self.conn.execute(sent_bytes_query).fetchall()
             sent_bytes = {url: bytes_count for url, bytes_count in sent_bytes_results}
+
+            # ==================================================================================
+            # 성능 분석 (TPS, 시간별 Latency, SLA, Target별 성능)
+            # ==================================================================================
+
+            # 시간 버킷 크기 결정 (데이터 범위에 따라 적응)
+            time_range_seconds = (self.end_datetime - self.start_datetime).total_seconds()
+            time_range_hours = time_range_seconds / 3600
+
+            if time_range_hours <= 1:
+                bucket_minutes = 1
+            elif time_range_hours <= 3:
+                bucket_minutes = 5
+            elif time_range_hours <= 24:
+                bucket_minutes = 15
+            elif time_range_hours <= 24 * 7:
+                bucket_minutes = 60
+            else:
+                bucket_minutes = 240
+
+            bucket_interval = f"{bucket_minutes} minutes"
+
+            # 시간 버킷별 TPS 및 요약 통계
+            tps_time_series: list[dict[str, Any]] = []
+            try:
+                tps_query = f"""
+                SELECT
+                    time_bucket(INTERVAL '{bucket_interval}', timestamp) as bucket,
+                    COUNT(*) as request_count,
+                    ROUND(COUNT(*) / ({bucket_minutes} * 60.0), 2) as tps,
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY response_time) as p50,
+                    PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY response_time) as p90,
+                    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY response_time) as p99,
+                    SUM(CASE WHEN elb_status_code LIKE '4%' OR elb_status_code LIKE '5%' THEN 1 ELSE 0 END) as error_count
+                FROM alb_logs
+                WHERE timestamp IS NOT NULL
+                  AND timestamp >= '{start_local}'
+                  AND timestamp <= '{end_local}'
+                GROUP BY bucket
+                ORDER BY bucket
+                """
+                tps_results = self.conn.execute(tps_query).fetchall()
+                for bucket_ts, req_count, tps, p50, p90, p99, errors in tps_results:
+                    error_rate = (errors / req_count * 100) if req_count > 0 else 0
+                    tps_time_series.append(
+                        {
+                            "timestamp": bucket_ts,
+                            "request_count": int(req_count),
+                            "tps": float(tps or 0),
+                            "p50_ms": round(float(p50 or 0) * 1000, 2),
+                            "p90_ms": round(float(p90 or 0) * 1000, 2),
+                            "p99_ms": round(float(p99 or 0) * 1000, 2),
+                            "error_count": int(errors or 0),
+                            "error_rate": round(error_rate, 2),
+                        }
+                    )
+            except Exception as e:
+                logger.debug(f"TPS 시계열 계산 실패: {e}")
+                tps_time_series = []
+
+            # SLA 준수율 계산 (응답 시간 임계값별)
+            sla_compliance: dict[str, dict[str, Any]] = {}
+            try:
+                sla_query = """
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN response_time < 0.1 THEN 1 ELSE 0 END) as under_100ms,
+                    SUM(CASE WHEN response_time < 0.5 THEN 1 ELSE 0 END) as under_500ms,
+                    SUM(CASE WHEN response_time < 1.0 THEN 1 ELSE 0 END) as under_1s
+                FROM alb_logs
+                WHERE response_time IS NOT NULL AND response_time >= 0
+                """
+                sla_result = self.conn.execute(sla_query).fetchone()
+                if sla_result and sla_result[0] > 0:
+                    total = sla_result[0]
+                    sla_compliance = {
+                        "under_100ms": {
+                            "compliant": int(sla_result[1] or 0),
+                            "non_compliant": total - int(sla_result[1] or 0),
+                            "rate": round(int(sla_result[1] or 0) / total * 100, 2),
+                            "threshold": "< 100ms",
+                            "slo_target": 99.0,
+                        },
+                        "under_500ms": {
+                            "compliant": int(sla_result[2] or 0),
+                            "non_compliant": total - int(sla_result[2] or 0),
+                            "rate": round(int(sla_result[2] or 0) / total * 100, 2),
+                            "threshold": "< 500ms",
+                            "slo_target": 99.0,
+                        },
+                        "under_1s": {
+                            "compliant": int(sla_result[3] or 0),
+                            "non_compliant": total - int(sla_result[3] or 0),
+                            "rate": round(int(sla_result[3] or 0) / total * 100, 2),
+                            "threshold": "< 1s",
+                            "slo_target": 99.9,
+                        },
+                    }
+            except Exception as e:
+                logger.debug(f"SLA 준수율 계산 실패: {e}")
+                sla_compliance = {}
+
+            # Target별 Latency 백분위수
+            target_latency_stats: dict[str, dict[str, Any]] = {}
+            try:
+                target_latency_query = """
+                SELECT
+                    target,
+                    target_group_name,
+                    COUNT(*) as total_requests,
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY response_time) as p50,
+                    PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY response_time) as p90,
+                    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY response_time) as p99,
+                    AVG(response_time) as avg_rt,
+                    SUM(CASE WHEN elb_status_code LIKE '4%' OR elb_status_code LIKE '5%' THEN 1 ELSE 0 END) as error_count
+                FROM alb_logs
+                WHERE target IS NOT NULL AND target != '' AND target != '-'
+                  AND response_time IS NOT NULL AND response_time >= 0
+                GROUP BY target, target_group_name
+                ORDER BY total_requests DESC
+                LIMIT 50
+                """
+                target_latency_results = self.conn.execute(target_latency_query).fetchall()
+                for target, tg_name, total, p50, p90, p99, avg_rt, errors in target_latency_results:
+                    display_key = f"{tg_name}({target})" if tg_name else target
+                    error_rate = (errors / total * 100) if total > 0 else 0
+                    target_latency_stats[display_key] = {
+                        "total_requests": int(total),
+                        "p50_ms": round(float(p50 or 0) * 1000, 2),
+                        "p90_ms": round(float(p90 or 0) * 1000, 2),
+                        "p99_ms": round(float(p99 or 0) * 1000, 2),
+                        "avg_ms": round(float(avg_rt or 0) * 1000, 2),
+                        "error_count": int(errors or 0),
+                        "error_rate": round(error_rate, 2),
+                    }
+            except Exception as e:
+                logger.debug(f"Target Latency 통계 계산 실패: {e}")
+                target_latency_stats = {}
+
+            # 응답 시간 구간별 분포 (히스토그램 데이터)
+            response_time_distribution: dict[str, int] = {}
+            try:
+                distribution_query = """
+                SELECT
+                    SUM(CASE WHEN response_time < 0.1 THEN 1 ELSE 0 END) as under_100ms,
+                    SUM(CASE WHEN response_time >= 0.1 AND response_time < 0.5 THEN 1 ELSE 0 END) as ms_100_500,
+                    SUM(CASE WHEN response_time >= 0.5 AND response_time < 1.0 THEN 1 ELSE 0 END) as ms_500_1000,
+                    SUM(CASE WHEN response_time >= 1.0 AND response_time < 3.0 THEN 1 ELSE 0 END) as s_1_3,
+                    SUM(CASE WHEN response_time >= 3.0 THEN 1 ELSE 0 END) as over_3s
+                FROM alb_logs
+                WHERE response_time IS NOT NULL AND response_time >= 0
+                """
+                dist_result = self.conn.execute(distribution_query).fetchone()
+                if dist_result:
+                    response_time_distribution = {
+                        "<100ms": int(dist_result[0] or 0),
+                        "100-500ms": int(dist_result[1] or 0),
+                        "500ms-1s": int(dist_result[2] or 0),
+                        "1-3s": int(dist_result[3] or 0),
+                        ">3s": int(dist_result[4] or 0),
+                    }
+            except Exception as e:
+                logger.debug(f"응답 시간 분포 계산 실패: {e}")
+                response_time_distribution = {}
+
+            # ==================================================================================
+            # 추가 분석 (Phase 2): 처리 시간 분해, 연결 실패, HTTP 버전, SSL/TLS, Actions, Classification
+            # ==================================================================================
+
+            # 처리 시간 분해 분석 (Request/Target/Response 각각의 P50/P90/P99)
+            processing_time_breakdown: dict[str, dict[str, float]] = {}
+            try:
+                breakdown_query = """
+                SELECT
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY request_processing_time) as req_p50,
+                    PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY request_processing_time) as req_p90,
+                    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY request_processing_time) as req_p99,
+                    AVG(request_processing_time) as req_avg,
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY target_processing_time) as target_p50,
+                    PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY target_processing_time) as target_p90,
+                    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY target_processing_time) as target_p99,
+                    AVG(target_processing_time) as target_avg,
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY response_processing_time) as resp_p50,
+                    PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY response_processing_time) as resp_p90,
+                    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY response_processing_time) as resp_p99,
+                    AVG(response_processing_time) as resp_avg
+                FROM alb_logs
+                WHERE request_processing_time IS NOT NULL
+                  AND target_processing_time IS NOT NULL
+                  AND response_processing_time IS NOT NULL
+                """
+                breakdown_result = self.conn.execute(breakdown_query).fetchone()
+                if breakdown_result:
+                    processing_time_breakdown = {
+                        "request": {
+                            "p50_ms": round(float(breakdown_result[0] or 0) * 1000, 3),
+                            "p90_ms": round(float(breakdown_result[1] or 0) * 1000, 3),
+                            "p99_ms": round(float(breakdown_result[2] or 0) * 1000, 3),
+                            "avg_ms": round(float(breakdown_result[3] or 0) * 1000, 3),
+                        },
+                        "target": {
+                            "p50_ms": round(float(breakdown_result[4] or 0) * 1000, 3),
+                            "p90_ms": round(float(breakdown_result[5] or 0) * 1000, 3),
+                            "p99_ms": round(float(breakdown_result[6] or 0) * 1000, 3),
+                            "avg_ms": round(float(breakdown_result[7] or 0) * 1000, 3),
+                        },
+                        "response": {
+                            "p50_ms": round(float(breakdown_result[8] or 0) * 1000, 3),
+                            "p90_ms": round(float(breakdown_result[9] or 0) * 1000, 3),
+                            "p99_ms": round(float(breakdown_result[10] or 0) * 1000, 3),
+                            "avg_ms": round(float(breakdown_result[11] or 0) * 1000, 3),
+                        },
+                    }
+            except Exception as e:
+                logger.debug(f"처리 시간 분해 분석 실패: {e}")
+                processing_time_breakdown = {}
+
+            # 연결 실패 분석 (-1 값 탐지)
+            connection_failures: dict[str, Any] = {}
+            try:
+                failure_query = """
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN request_processing_time IS NULL THEN 1 ELSE 0 END) as request_failures,
+                    SUM(CASE WHEN target_processing_time IS NULL THEN 1 ELSE 0 END) as target_failures,
+                    SUM(CASE WHEN response_processing_time IS NULL THEN 1 ELSE 0 END) as response_failures
+                FROM alb_logs
+                """
+                failure_result = self.conn.execute(failure_query).fetchone()
+                if failure_result and failure_result[0] > 0:
+                    total = failure_result[0]
+                    connection_failures = {
+                        "total_requests": int(total),
+                        "request_failures": int(failure_result[1] or 0),
+                        "target_failures": int(failure_result[2] or 0),
+                        "response_failures": int(failure_result[3] or 0),
+                        "request_failure_rate": round((failure_result[1] or 0) / total * 100, 2),
+                        "target_failure_rate": round((failure_result[2] or 0) / total * 100, 2),
+                        "response_failure_rate": round((failure_result[3] or 0) / total * 100, 2),
+                    }
+
+                # Target별 연결 실패 상세
+                target_failure_query = """
+                SELECT target, target_group_name, COUNT(*) as failure_count
+                FROM alb_logs
+                WHERE target_processing_time IS NULL
+                  AND target IS NOT NULL AND target != '' AND target != '-'
+                GROUP BY target, target_group_name
+                ORDER BY failure_count DESC
+                LIMIT 20
+                """
+                target_failure_results = self.conn.execute(target_failure_query).fetchall()
+                connection_failures["target_failures_detail"] = [
+                    {"target": t, "target_group": tg or "", "count": c} for t, tg, c in target_failure_results
+                ]
+            except Exception as e:
+                logger.debug(f"연결 실패 분석 실패: {e}")
+                connection_failures = {}
+
+            # HTTP 버전 분포
+            http_version_distribution: dict[str, int] = {}
+            try:
+                http_version_query = """
+                SELECT http_version, COUNT(*) as count
+                FROM alb_logs
+                WHERE http_version IS NOT NULL AND http_version != 'Unknown'
+                GROUP BY http_version
+                ORDER BY count DESC
+                """
+                http_version_results = self.conn.execute(http_version_query).fetchall()
+                http_version_distribution = {version: int(count) for version, count in http_version_results}
+            except Exception as e:
+                logger.debug(f"HTTP 버전 분포 계산 실패: {e}")
+                http_version_distribution = {}
+
+            # SSL/TLS 통계
+            ssl_stats: dict[str, Any] = {}
+            try:
+                # TLS 프로토콜 분포
+                ssl_protocol_query = """
+                SELECT ssl_protocol, COUNT(*) as count
+                FROM alb_logs
+                WHERE ssl_protocol IS NOT NULL AND ssl_protocol != '-' AND ssl_protocol != 'None'
+                GROUP BY ssl_protocol
+                ORDER BY count DESC
+                """
+                ssl_protocol_results = self.conn.execute(ssl_protocol_query).fetchall()
+                ssl_stats["protocol_distribution"] = {proto: int(count) for proto, count in ssl_protocol_results}
+
+                # 암호 스위트 Top 10
+                ssl_cipher_query = """
+                SELECT ssl_cipher, COUNT(*) as count
+                FROM alb_logs
+                WHERE ssl_cipher IS NOT NULL AND ssl_cipher != '-' AND ssl_cipher != 'None'
+                GROUP BY ssl_cipher
+                ORDER BY count DESC
+                LIMIT 10
+                """
+                ssl_cipher_results = self.conn.execute(ssl_cipher_query).fetchall()
+                ssl_stats["cipher_distribution"] = {cipher: int(count) for cipher, count in ssl_cipher_results}
+
+                # 취약 TLS 버전 사용자 (TLSv1.0, TLSv1.1)
+                weak_tls_query = """
+                SELECT client_ip, ssl_protocol, COUNT(*) as count
+                FROM alb_logs
+                WHERE ssl_protocol IN ('TLSv1.0', 'TLSv1.1')
+                GROUP BY client_ip, ssl_protocol
+                ORDER BY count DESC
+                LIMIT 50
+                """
+                weak_tls_results = self.conn.execute(weak_tls_query).fetchall()
+                ssl_stats["weak_tls_clients"] = [
+                    {"client_ip": ip, "protocol": proto, "count": int(count)} for ip, proto, count in weak_tls_results
+                ]
+            except Exception as e:
+                logger.debug(f"SSL/TLS 통계 계산 실패: {e}")
+                ssl_stats = {}
+
+            # Actions 통계
+            actions_stats: dict[str, int] = {}
+            try:
+                actions_query = """
+                SELECT
+                    CASE
+                        WHEN actions_executed LIKE '%waf-failed%' THEN 'WAF Blocked'
+                        WHEN actions_executed LIKE '%waf%' THEN 'WAF Passed'
+                        WHEN actions_executed LIKE '%authenticate%' THEN 'Authenticated'
+                        WHEN actions_executed LIKE '%redirect%' THEN 'Redirect'
+                        WHEN actions_executed LIKE '%fixed-response%' THEN 'Fixed Response'
+                        WHEN actions_executed LIKE '%forward%' THEN 'Forward'
+                        WHEN actions_executed = '-' OR actions_executed IS NULL THEN 'None'
+                        ELSE 'Other'
+                    END as action_type,
+                    COUNT(*) as count
+                FROM alb_logs
+                GROUP BY action_type
+                ORDER BY count DESC
+                """
+                actions_results = self.conn.execute(actions_query).fetchall()
+                actions_stats = {action: int(count) for action, count in actions_results}
+            except Exception as e:
+                logger.debug(f"Actions 통계 계산 실패: {e}")
+                actions_stats = {}
+
+            # Classification 통계 (Desync 탐지)
+            classification_stats: dict[str, Any] = {}
+            try:
+                classification_query = """
+                SELECT classification, COUNT(*) as count
+                FROM alb_logs
+                WHERE classification IS NOT NULL AND classification != 'Unknown'
+                GROUP BY classification
+                ORDER BY count DESC
+                """
+                classification_results = self.conn.execute(classification_query).fetchall()
+                classification_stats["distribution"] = {cls: int(count) for cls, count in classification_results}
+
+                # Ambiguous/Severe 요청 상세 (보안 이벤트) - Excel 최대 행 제한 적용
+                # Excel 2007+ (.xlsx) max rows: 1,048,576 (header 1행 제외 = 1,048,575)
+                security_events_query = f"""
+                SELECT timestamp, client_ip, classification, classification_reason, url, elb_status_code
+                FROM alb_logs
+                WHERE classification IN ('Ambiguous', 'Severe')
+                  AND timestamp >= '{start_local}'
+                  AND timestamp <= '{end_local}'
+                ORDER BY timestamp DESC
+                LIMIT 1048575
+                """
+                security_events_results = self.conn.execute(security_events_query).fetchall()
+                classification_stats["security_events"] = [
+                    {
+                        "timestamp": ts,
+                        "client_ip": ip,
+                        "classification": cls,
+                        "reason": reason,
+                        "url": url,
+                        "status_code": status,
+                    }
+                    for ts, ip, cls, reason, url, status in security_events_results
+                ]
+            except Exception as e:
+                logger.debug(f"Classification 통계 계산 실패: {e}")
+                classification_stats = {}
+
             if progress is not None and task_id is not None:
                 progress.update(task_id, description="[cyan]느린 응답/바이트 분석 완료...")
                 progress.advance(task_id)
@@ -1167,6 +1606,19 @@ class ALBLogAnalyzer:
                 "error_reason_counts": error_reason_counts,
                 "target_request_stats": target_request_stats,
                 "url_error_stats": url_error_stats,
+                # 성능 분석 데이터 (TPS, SLA, Target Latency)
+                "tps_time_series": tps_time_series,
+                "sla_compliance": sla_compliance,
+                "target_latency_stats": target_latency_stats,
+                "response_time_distribution": response_time_distribution,
+                "bucket_minutes": bucket_minutes,
+                # 추가 분석 데이터 (Phase 2)
+                "processing_time_breakdown": processing_time_breakdown,
+                "connection_failures": connection_failures,
+                "http_version_distribution": http_version_distribution,
+                "ssl_stats": ssl_stats,
+                "actions_stats": actions_stats,
+                "classification_stats": classification_stats,
                 # 빈 데이터 (호환성)
                 "elb_error_timestamps": [],
                 "backend_error_timestamps": [],
@@ -1290,6 +1742,19 @@ class ALBLogAnalyzer:
             "error_reason_counts": {},
             "target_request_stats": {},
             "url_error_stats": {},
+            # 성능 분석 데이터 (TPS, SLA, Target Latency)
+            "tps_time_series": [],
+            "sla_compliance": {},
+            "target_latency_stats": {},
+            "response_time_distribution": {},
+            "bucket_minutes": 15,
+            # 추가 분석 데이터 (Phase 2)
+            "processing_time_breakdown": {},
+            "connection_failures": {},
+            "http_version_distribution": {},
+            "ssl_stats": {},
+            "actions_stats": {},
+            "classification_stats": {},
             # 국가 정보
             "ip_country_mapping": {},
             "country_statistics": {},

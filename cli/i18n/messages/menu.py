@@ -42,8 +42,8 @@ MENU_MESSAGES = {
         "en": "Profiles",
     },
     "search_keyword_hint": {
-        "ko": "검색: 키워드 입력",
-        "en": "Search: Enter keyword",
+        "ko": "검색: 서비스명 또는 키워드 (예: ec2, 미사용, snapshot)",
+        "en": "Search: Service or keyword (e.g., ec2, unused, snapshot)",
     },
     "all_tools": {
         "ko": "전체 도구",
@@ -253,6 +253,18 @@ MENU_MESSAGES = {
         "ko": "추가",
         "en": "Add",
     },
+    "add_tool": {
+        "ko": "도구 추가",
+        "en": "Add Tool",
+    },
+    "add_tool_favorite": {
+        "ko": "도구 즐겨찾기 추가",
+        "en": "Add Tool Favorite",
+    },
+    "number_or_search_hint": {
+        "ko": "번호 입력: 추가 | 키워드 입력: 검색",
+        "en": "Enter number to add | Enter keyword to search",
+    },
     "delete": {
         "ko": "삭제",
         "en": "Delete",
@@ -268,6 +280,14 @@ MENU_MESSAGES = {
     "add_favorite": {
         "ko": "즐겨찾기 추가",
         "en": "Add Favorite",
+    },
+    "add_category": {
+        "ko": "카테고리 추가",
+        "en": "Add Category",
+    },
+    "add_category_favorite": {
+        "ko": "카테고리 즐겨찾기 추가",
+        "en": "Add Category Favorite",
     },
     "tool_name_or_keyword": {
         "ko": "도구명 또는 키워드 입력 (취소: Enter)",
@@ -432,12 +452,20 @@ MENU_MESSAGES = {
         "en": "Edit",
     },
     "check_types": {
-        "ko": "점검 유형",
-        "en": "Check Types",
+        "ko": "목적별",
+        "en": "By Purpose",
     },
     "aws_category": {
-        "ko": "AWS 카테고리",
-        "en": "AWS Categories",
+        "ko": "분야별",
+        "en": "By Category",
+    },
+    "by_purpose": {
+        "ko": "목적별",
+        "en": "By Purpose",
+    },
+    "by_category": {
+        "ko": "분야별",
+        "en": "By Category",
     },
     "reports": {
         "ko": "종합 보고서",
@@ -628,6 +656,10 @@ MENU_MESSAGES = {
         "ko": "이 카테고리에 서비스가 없습니다.",
         "en": "No services in this category.",
     },
+    "category_coming_soon": {
+        "ko": "'{category}' 카테고리는 준비 중입니다.",
+        "en": "'{category}' category is coming soon.",
+    },
     "no_tools_in_service": {
         "ko": "이 서비스에 도구가 없습니다.",
         "en": "No tools in this service.",
@@ -793,5 +825,92 @@ MENU_MESSAGES = {
     "press_any_key": {
         "ko": "계속하려면 Enter...",
         "en": "Press Enter to continue...",
+    },
+    # =========================================================================
+    # Scheduled Menu View Modes
+    # =========================================================================
+    "expanded": {
+        "ko": "펼침",
+        "en": "Expanded",
+    },
+    "collapsed": {
+        "ko": "접힘",
+        "en": "Collapsed",
+    },
+    "toggle_expand": {
+        "ko": "펼치기/접기",
+        "en": "Expand/Collapse",
+    },
+    # =========================================================================
+    # Scheduled Operations - Run History
+    # =========================================================================
+    "run_history": {
+        "ko": "실행 이력",
+        "en": "Run History",
+    },
+    "recent_runs": {
+        "ko": "최근 실행 이력",
+        "en": "Recent Runs",
+    },
+    "no_history": {
+        "ko": "실행 이력이 없습니다",
+        "en": "No run history",
+    },
+    "status_success": {
+        "ko": "완료",
+        "en": "Done",
+    },
+    "status_failed": {
+        "ko": "실패",
+        "en": "Failed",
+    },
+    "header_datetime": {
+        "ko": "일시",
+        "en": "Date/Time",
+    },
+    "header_status": {
+        "ko": "상태",
+        "en": "Status",
+    },
+    "header_duration": {
+        "ko": "소요",
+        "en": "Duration",
+    },
+    # =========================================================================
+    # Scheduled Operations - Next Run
+    # =========================================================================
+    "next_run": {
+        "ko": "다음",
+        "en": "Next",
+    },
+    # =========================================================================
+    # Scheduled Operations - Search/Filter
+    # =========================================================================
+    "search_tasks": {
+        "ko": "작업 검색",
+        "en": "Search Tasks",
+    },
+    "filter_permission": {
+        "ko": "권한 필터",
+        "en": "Permission Filter",
+    },
+    "filter_all": {
+        "ko": "전체",
+        "en": "All",
+    },
+    # =========================================================================
+    # Scheduled Operations - Batch Run
+    # =========================================================================
+    "selected_tasks": {
+        "ko": "선택된 작업",
+        "en": "Selected Tasks",
+    },
+    "confirm_batch_run": {
+        "ko": "실행하시겠습니까?",
+        "en": "Execute?",
+    },
+    "running_task": {
+        "ko": "실행 중",
+        "en": "Running",
     },
 }

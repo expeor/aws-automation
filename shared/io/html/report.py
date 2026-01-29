@@ -265,6 +265,7 @@ class ChartConfig:
     option: dict[str, Any]
     height: int = 350
     size: ChartSize = field(default=ChartSize.SMALL)
+    section_title: str | None = None  # 섹션 타이틀 (이 차트 앞에 표시)
 
 
 class HTMLReport:
@@ -307,10 +308,39 @@ class HTMLReport:
         self.summaries: list[dict[str, Any]] = []
         self.created_at = datetime.now()
         self._chart_counter = 0
+        self._pending_section_title: str | None = None  # 다음 차트에 적용할 섹션 타이틀
 
     def _next_chart_id(self) -> str:
         self._chart_counter += 1
         return f"chart_{self._chart_counter}"
+
+    def _add_chart(self, option: dict[str, Any], height: int, size: ChartSize) -> HTMLReport:
+        """내부 헬퍼: 차트 추가 및 pending section_title 적용"""
+        section_title = self._pending_section_title
+        self._pending_section_title = None  # 사용 후 초기화
+        self.charts.append(ChartConfig(
+            self._next_chart_id(), option, height=height, size=size, section_title=section_title
+        ))
+        return self
+
+    def add_section_title(self, title: str) -> HTMLReport:
+        """섹션 타이틀 추가 (다음 차트 앞에 표시)
+
+        차트 그룹을 구분하는 제목을 추가합니다.
+        이 메서드를 호출한 후 추가되는 첫 번째 차트 앞에 섹션 타이틀이 표시됩니다.
+
+        Args:
+            title: 섹션 제목 (예: "개요", "트래픽 분석", "에러 분석")
+
+        Returns:
+            self (체이닝 지원)
+
+        Example:
+            >>> report.add_section_title("개요")
+            >>> report.add_pie_chart("상태 코드 분포", data)  # 이 차트 앞에 "개요" 섹션 표시
+        """
+        self._pending_section_title = title
+        return self
 
     def add_summary(self, items: list[tuple[str, str | int | float, str | None]]) -> HTMLReport:
         """요약 카드 추가
@@ -380,8 +410,7 @@ class HTMLReport:
         }
         # 데이터 양에 따른 크기 결정
         height, size = _determine_chart_size(len(data), chart_type="pie")
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_bar_chart(
         self,
@@ -460,8 +489,7 @@ class HTMLReport:
             "yAxis": axis_config if horizontal else value_axis,
             "series": series_list,
         }
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_line_chart(
         self,
@@ -535,8 +563,7 @@ class HTMLReport:
         if len(categories) > 50:
             size = ChartSize.LARGE if size.value in ("small", "medium") else size
 
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_gauge_chart(
         self,
@@ -544,17 +571,29 @@ class HTMLReport:
         value: int | float,
         max_value: int | float = 100,
         thresholds: list[tuple[float, str]] | None = None,
+        unit: str = "%",
     ) -> HTMLReport:
-        """게이지 차트
+        """게이지 차트 (비율/진행률 표시용)
 
         Args:
             title: 차트 제목
             value: 현재 값
-            max_value: 최대 값
-            thresholds: (비율, 색상) 리스트. 예: [(0.3, '#91cc75'), (0.7, '#fac858'), (1, '#ee6666')]
+            max_value: 최대 값 (기본 100)
+            thresholds: (비율, 색상) 리스트. 비율은 0~1 사이.
+                기본값: 0~70% 초록, 70~90% 노랑, 90~100% 빨강
+                정상 응답률용: [(0.7, '#ee6666'), (0.9, '#fac858'), (1, '#91cc75')]
+            unit: 표시 단위 (기본 "%")
+
+        Example:
+            >>> report.add_gauge_chart("정상 응답 비율", 95.5, unit="%")
+            >>> report.add_gauge_chart(
+            ...     "SLA 준수율", 99.9,
+            ...     thresholds=[(0.99, '#ee6666'), (0.999, '#fac858'), (1, '#91cc75')]
+            ... )
         """
         if thresholds is None:
-            thresholds = [(0.3, "#91cc75"), (0.7, "#fac858"), (1, "#ee6666")]
+            # 기본: 높을수록 좋음 (정상 응답률 등)
+            thresholds = [(0.7, "#ee6666"), (0.9, "#fac858"), (1, "#91cc75")]
 
         option = {
             "title": {"text": title, "left": "center"},
@@ -571,21 +610,23 @@ class HTMLReport:
                         }
                     },
                     "pointer": {"itemStyle": {"color": "auto"}},
-                    "axisTick": {"distance": -30, "length": 8},
-                    "splitLine": {"distance": -30, "length": 20},
-                    "axisLabel": {"distance": 25, "fontSize": 12},
+                    "axisTick": {"distance": -30, "length": 8, "lineStyle": {"color": "auto"}},
+                    "splitLine": {"distance": -30, "length": 20, "lineStyle": {"color": "auto"}},
+                    "axisLabel": {"distance": 25, "fontSize": 12, "color": "#999"},
                     "detail": {
                         "valueAnimation": True,
-                        "formatter": "{value}",
-                        "fontSize": 24,
+                        "formatter": f"{{value}}{unit}",
+                        "fontSize": 28,
+                        "fontWeight": "bold",
+                        "color": "inherit",
+                        "offsetCenter": [0, "70%"],
                     },
-                    "data": [{"value": value, "name": title}],
+                    "data": [{"value": round(value, 1)}],
                 }
             ],
         }
         # 게이지 차트는 항상 SMALL
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=300, size=ChartSize.SMALL))
-        return self
+        return self._add_chart(option, height=300, size=ChartSize.SMALL)
 
     def add_radar_chart(
         self,
@@ -621,8 +662,7 @@ class HTMLReport:
         }
         # 레이더 차트: 지표 수에 따라 크기 결정
         height, size = _determine_chart_size(len(indicators), len(series), chart_type="radar")
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_treemap_chart(
         self,
@@ -712,8 +752,7 @@ class HTMLReport:
         else:
             size = ChartSize.LARGE
             height = 450
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_heatmap_chart(
         self,
@@ -776,8 +815,7 @@ class HTMLReport:
         height = max(height, len(y_data) * 40 + 100)
         if len(x_data) > 10 or len(y_data) > 8:
             size = ChartSize.LARGE if size.value in ("small", "medium") else size
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_scatter_chart(
         self,
@@ -817,8 +855,7 @@ class HTMLReport:
         # 산점도: 데이터 포인트 수에 따라 크기 결정
         total_points = sum(len(points) for _, points in series)
         height, size = _determine_chart_size(total_points, len(series), chart_type="scatter")
-        self.charts.append(ChartConfig(self._next_chart_id(), option, height=height, size=size))
-        return self
+        return self._add_chart(option, height, size)
 
     def add_time_series_chart(
         self,
@@ -1096,6 +1133,20 @@ class HTMLReport:
         .chart-box.xlarge {{ grid-column: 1 / -1; }}
         .chart-container {{ width: 100%; }}
 
+        .section-title {{
+            grid-column: 1 / -1;
+            margin-top: 16px;
+            margin-bottom: -8px;
+        }}
+        .section-title h2 {{
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            border-left: 4px solid #5470c6;
+            padding-left: 12px;
+            margin: 0;
+        }}
+
         .table-section {{
             background: white;
             padding: 24px;
@@ -1300,6 +1351,11 @@ class HTMLReport:
 
         boxes = []
         for chart in self.charts:
+            # 섹션 타이틀이 있으면 먼저 추가
+            if chart.section_title:
+                boxes.append(
+                    f'<div class="section-title"><h2>{chart.section_title}</h2></div>'
+                )
             size_class = chart.size.value  # "small", "medium", "large", "xlarge"
             boxes.append(
                 f'<div class="chart-box {size_class}"><div id="{chart.chart_id}" class="chart-container"></div></div>'

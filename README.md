@@ -11,15 +11,15 @@
 
 AWS 운영 자동화를 위한 CLI 도구입니다.
 
-미사용 리소스 탐지, 보안 점검, IAM 감사, 로그 분석 등 **70개 이상**의 AWS 운영 도구를 제공합니다 (**36개 서비스**). 멀티 계정·멀티 리전을 지원하며, 결과는 Excel로 저장됩니다.
+미사용 리소스 탐지, 보안 점검, IAM 감사, 로그 분석 등 **70개 이상**의 AWS 운영 도구를 제공합니다 (**35개 서비스**). 멀티 계정·멀티 리전을 지원하며, 결과는 Excel로 저장됩니다.
 
 ## 주요 기능
 
 - **멀티 계정 & 리전**: 여러 AWS 계정과 리전을 동시에 분석
 - **다중 인증 지원**: SSO Session, SSO Profile, Access Key 자동 감지
-- **Excel 보고서**: 분석 결과를 Excel 파일로 자동 저장
+- **Excel/HTML 보고서**: 분석 결과를 Excel 및 HTML로 자동 저장
+- **정기 작업**: 일간/월간/분기/반기/연간 거버넌스 작업 스케줄 관리
 - **키워드 검색**: 대화형 메뉴에서 도구를 빠르게 검색
-- **플러그인 구조**: 새로운 도구를 쉽게 추가 가능
 
 ## 설치
 
@@ -34,6 +34,17 @@ pip install aws-automation
 ```bash
 git clone https://github.com/expeor/aws-automation.git
 cd aws-automation
+
+# 가상환경 생성 및 활성화
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+
+# 패키지 설치
 pip install -e .
 ```
 
@@ -195,32 +206,50 @@ aa list-tools --json | jq '.[] | select(.category=="ec2")'
 
 | 서비스          | 주요 도구                             |
 | --------------- | ------------------------------------- |
-| EC2             | EBS/EIP/Snapshot/AMI 미사용 분석      |
-| VPC             | 보안 그룹 감사, NAT Gateway, IP 검색  |
-| Lambda          | 미사용/버전/Provisioned 분석          |
-| S3              | 빈 버킷 탐지                          |
-| IAM             | 사용자/역할 감사, 정책 분석           |
-| RDS             | 스냅샷 감사                           |
-| ELB             | ALB/NLB 감사, 로그 분석, 마이그레이션 |
-| DynamoDB        | 용량 모드 분석, 미사용 테이블 탐지    |
-| CloudWatch      | 로그 그룹 감사, 알람 분석             |
-| CloudTrail      | Trail 감사                            |
-| CloudFormation  | 리소스 검색                           |
-| Route53         | 빈 호스팅 영역 탐지                   |
-| ECR             | 미사용 저장소 탐지                    |
-| KMS             | 키 사용 감사                          |
-| Secrets Manager | 미사용 시크릿 탐지                    |
-| SSO             | SSO 구성 감사                         |
 | ACM             | 미사용/만료 임박 인증서 탐지          |
-| EFS             | 미사용 파일시스템 탐지                |
-| SNS/SQS         | 미사용 토픽/큐 탐지                   |
-| ElastiCache     | 미사용 클러스터 탐지                  |
 | API Gateway     | 미사용 API 탐지                       |
-| EventBridge     | 미사용 규칙 탐지                      |
+| Backup          | 백업 현황, 종합 분석                  |
+| CloudFormation  | 리소스 검색                           |
+| CloudTrail      | Trail 감사                            |
+| CloudWatch      | 로그 그룹 감사, 알람 분석             |
 | CodeCommit      | 미사용 리포지토리 탐지                |
-| Health          | AWS Health 이벤트 분석                |
 | Cost            | Cost Optimization Hub, 통합 분석      |
+| DynamoDB        | 용량 모드 분석, 미사용 테이블 탐지    |
+| EC2             | EBS/EIP/Snapshot/AMI 미사용 분석      |
+| ECR             | 미사용 저장소 탐지                    |
+| EFS             | 미사용 파일시스템 탐지                |
+| ELB             | ALB/NLB 감사, 로그 분석, 마이그레이션 |
+| ElastiCache     | 미사용 클러스터 탐지                  |
+| EventBridge     | 미사용 규칙 탐지                      |
+| FSx             | 미사용 파일시스템 탐지                |
+| Glue            | 미사용 ETL Job 탐지                   |
+| Health          | AWS Health 이벤트 분석                |
+| IAM             | 사용자/역할 감사, 정책 분석           |
+| KMS             | 키 사용 감사                          |
+| Kinesis         | 미사용 스트림 탐지                    |
+| Lambda          | 미사용/버전/Provisioned 분석          |
+| OpenSearch      | 미사용 도메인 탐지                    |
+| RDS             | 스냅샷 감사                           |
+| Redshift        | 미사용 클러스터 탐지                  |
+| Route53         | 빈 호스팅 영역 탐지                   |
+| S3              | 빈 버킷 탐지                          |
+| SageMaker       | 미사용 엔드포인트 탐지                |
+| SNS/SQS         | 미사용 토픽/큐 탐지                   |
+| SSO             | SSO 구성 감사                         |
+| Secrets Manager | 미사용 시크릿 탐지                    |
 | Tag Editor      | MAP 2.0 태그 감사/적용                |
+| Transfer Family | 미사용 서버 탐지                      |
+| VPC             | 보안 그룹 감사, NAT Gateway, IP 검색  |
+
+## 종합 리포트
+
+| 리포트 | 설명 |
+| ------ | ---- |
+| Cost Dashboard | NAT, EBS, EIP, ELB 등 미사용 리소스 종합 대시보드 |
+| Resource Inventory | EC2, VPC, ELB 등 주요 리소스 인벤토리 |
+| IP Search | Public/Private IP 검색 (AWS, GCP, Azure, Oracle) |
+| Log Analyzer | ALB 로그 분석 (TPS, SLA, 응답시간, 보안 이벤트) |
+| Scheduled Operations | 정기 작업 관리 (일간/월간/분기/반기/연간) |
 
 ## 요구 사항
 

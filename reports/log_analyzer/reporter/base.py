@@ -55,6 +55,62 @@ class BaseSheetWriter:
     def create_sheet(self, name: str) -> Worksheet:
         return self.workbook.create_sheet(name)
 
+    def validate_excel_limits(self, row_count: int, col_count: int, sheet_name: str = "") -> tuple[int, int]:
+        """Validate and truncate data to Excel limits.
+
+        Excel 2007+ (.xlsx) limits:
+        - Rows: 1,048,576 (2^20)
+        - Columns: 16,384 (2^14, up to XFD)
+
+        Args:
+            row_count: Number of data rows (excluding header)
+            col_count: Number of columns
+            sheet_name: Sheet name for logging
+
+        Returns:
+            Tuple of (truncated_row_count, truncated_col_count)
+        """
+        max_rows = self.config.MAX_ROWS_PER_SHEET  # 1,048,575 (header excluded)
+        max_cols = self.config.EXCEL_MAX_COLS  # 16,384
+
+        truncated_rows = row_count
+        truncated_cols = col_count
+
+        if row_count > max_rows:
+            logger.warning(
+                f"[{sheet_name}] Row count ({row_count:,}) exceeds Excel limit ({max_rows:,}). "
+                f"Truncating to {max_rows:,} rows."
+            )
+            truncated_rows = max_rows
+
+        if col_count > max_cols:
+            logger.warning(
+                f"[{sheet_name}] Column count ({col_count}) exceeds Excel limit ({max_cols}). "
+                f"Truncating to {max_cols} columns."
+            )
+            truncated_cols = max_cols
+
+        return truncated_rows, truncated_cols
+
+    def truncate_data(self, data_list: list, sheet_name: str = "") -> list:
+        """Truncate data list to Excel row limit.
+
+        Args:
+            data_list: List of data rows
+            sheet_name: Sheet name for logging
+
+        Returns:
+            Truncated list
+        """
+        max_rows = self.config.MAX_ROWS_PER_SHEET
+        if len(data_list) > max_rows:
+            logger.warning(
+                f"[{sheet_name}] Data rows ({len(data_list):,}) exceed Excel limit. "
+                f"Truncating to {max_rows:,} rows."
+            )
+            return data_list[:max_rows]
+        return data_list
+
     def write_header_row(self, ws: Worksheet, headers: list[str] | tuple[str, ...], row: int = 1) -> None:
         style = self.styles.get_header_style()
         for col, header in enumerate(headers, 1):

@@ -17,8 +17,16 @@ CATEGORY = {
 }
 
 TOOLS: list[dict] = [
-    # ALB 로그 분석 도구는 analyzers/elb/alb_log.py에서 정의됨
-    # reports/__init__.py에서 ref로 참조하므로 중복 제거
+    {
+        "name": "ALB 로그 분석",
+        "name_en": "ALB Log Analysis",
+        "description": "S3에 저장된 ALB 액세스 로그 분석",
+        "description_en": "Analyze ALB access logs stored in S3",
+        "permission": "read",
+        "ref": "elb/alb_log",
+        "area": "log",
+        "single_region_only": True,
+    },
 ]
 
 from .alb_excel_reporter import ALBExcelReporter

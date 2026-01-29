@@ -71,7 +71,8 @@ TOOLS = [
         "description": "일간/월간/분기/반기/연간 정기 작업 관리",
         "description_en": "Daily/Monthly/Quarterly/Biannual/Annual scheduled operations",
         "permission": "read",
-        "module": "_scheduled_menu",
+        "ref": "scheduled/menu",
+        "require_session": False,
         "is_menu": True,  # CategoryStep에서 특별 처리
         "area": "inventory",  # 관리 도구이므로 inventory 분류
     },

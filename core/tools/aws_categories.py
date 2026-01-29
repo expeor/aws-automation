@@ -317,11 +317,13 @@ def get_aws_category_for_service(service_name: str) -> str:
     return SERVICE_TO_CATEGORY.get(service_name, "other")
 
 
-def get_aws_category_view() -> list[dict]:
+def get_aws_category_view(include_empty: bool = True) -> list[dict]:
     """AWS 카테고리별로 플러그인을 그룹핑하여 반환
 
     discovery에서 발견된 플러그인을 AWS 공식 카테고리로 그룹핑합니다.
-    플러그인이 있는 카테고리만 반환합니다.
+
+    Args:
+        include_empty: True면 도구가 없는 카테고리도 포함 (기본값: True)
 
     Returns:
         [
@@ -349,7 +351,8 @@ def get_aws_category_view() -> list[dict]:
             if service_name in plugin_map:
                 matched_plugins.append(plugin_map[service_name])
 
-        if matched_plugins:
+        # include_empty=True면 빈 카테고리도 포함, 아니면 도구가 있는 것만
+        if include_empty or matched_plugins:
             result.append(
                 {
                     "key": cat_key,

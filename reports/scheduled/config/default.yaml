@@ -98,8 +98,24 @@ cycles:
         tool_ref: "iam/iam_audit"
         permission: "read"
         supports_regions: false
-      # 적용 (write)
       - id: "3M-003"
+        name: "IAM 사용자 현황 보고서"
+        name_en: "IAM User Snapshot Report"
+        description: "IAM 사용자 종합 현황 (Access Key, Git Credential, 비활성 사용자, 오래된 키)"
+        description_en: "IAM user snapshot including access keys, git credentials, inactive users, old keys"
+        tool_ref: "iam/user_snapshot"
+        permission: "read"
+        supports_regions: false
+      - id: "3M-004"
+        name: "EBS 암호화 현황"
+        name_en: "EBS Encryption Status"
+        description: "미암호화 EBS 볼륨 및 연결된 인스턴스 탐지"
+        description_en: "Detect unencrypted EBS volumes and attached instances"
+        tool_ref: "ec2/ebs_encryption"
+        permission: "read"
+        supports_regions: true
+      # 적용 (write)
+      - id: "3M-005"
         name: "MAP 태그 일괄 적용"
         name_en: "MAP Tag Bulk Apply"
         description: "MAP 2.0 마이그레이션 태그 일괄 적용"
@@ -108,7 +124,7 @@ cycles:
         permission: "write"
         supports_regions: true
       # 정리 (delete)
-      - id: "3M-004"
+      - id: "3M-006"
         name: "오래된 스냅샷 정리"
         name_en: "Old Snapshot Cleanup"
         description: "90일 이상 경과된 미사용 스냅샷 정리"
@@ -133,8 +149,16 @@ cycles:
         tool_ref: "cost/coh"
         permission: "read"
         supports_regions: false
-      # 정리 (delete)
       - id: "6M-002"
+        name: "미사용 IAM Role 탐지"
+        name_en: "Unused IAM Roles Detection"
+        description: "365일 이상 미사용 Role 탐지 및 연결 리소스 분석"
+        description_en: "Detect unused IAM roles (365+ days) with connected resource analysis"
+        tool_ref: "iam/unused_roles"
+        permission: "read"
+        supports_regions: false
+      # 정리 (delete)
+      - id: "6M-003"
         name: "미사용 AMI 정리"
         name_en: "Unused AMI Cleanup"
         description: "미사용 AMI 및 연관 스냅샷 정리"

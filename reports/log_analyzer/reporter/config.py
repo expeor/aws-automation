@@ -9,11 +9,19 @@ from dataclasses import dataclass
 class SheetConfig:
     """Sheet-level configuration constants."""
 
+    # Excel 2007+ (.xlsx) limits: 1,048,576 rows, 16,384 columns
+    # Excel 97-2003 (.xls) limits: 65,536 rows, 256 columns
+    EXCEL_MAX_ROWS: int = 1_048_576
+    EXCEL_MAX_COLS: int = 16_384
+
     ZOOM_SCALE: int = 85
     HEADER_ROW_HEIGHT: int = 40
     DATA_ROW_HEIGHT: int = 20
     DEFAULT_COLUMN_WIDTH: int = 15
-    MAX_ROWS_PER_SHEET: int = 1_000_000
+
+    # Max data rows per sheet (Excel max - 1 for header row)
+    MAX_ROWS_PER_SHEET: int = EXCEL_MAX_ROWS - 1  # 1,048,575
+
     BATCH_SIZE: int = 10_000
     TOP_URL_LIMIT: int = 100
     TOP_COUNTRY_LIMIT: int = 50
@@ -21,6 +29,9 @@ class SheetConfig:
     TOP_BYTES_LIMIT: int = 100
     TOP_CLIENT_LIMIT: int = 100
     SUMMARY_TOP_ITEMS: int = 5
+
+    # Security events limit (no artificial limit, but respect Excel max)
+    SECURITY_EVENTS_LIMIT: int = MAX_ROWS_PER_SHEET
 
 
 # Column style types
@@ -52,6 +63,11 @@ COLUMN_STYLE_MAP: dict[str, str] = {
     "Request": STYLE_DATA,
     "Redirect URL": STYLE_DATA,
     "User Agent": STYLE_DATA,
+    "Request Processing": STYLE_DECIMAL3,
+    "Target Processing": STYLE_DECIMAL3,
+    "Response Processing": STYLE_DECIMAL3,
+    "Classification": STYLE_CENTER,
+    "Reason": STYLE_CENTER,
 }
 
 COLUMN_WIDTH_MAP: dict[str, int] = {
@@ -79,6 +95,11 @@ COLUMN_WIDTH_MAP: dict[str, int] = {
     "IP": 20,
     "Error Reason": 40,
     "Response time": 15,
+    "Request Processing": 18,
+    "Target Processing": 18,
+    "Response Processing": 18,
+    "Classification": 16,
+    "Reason": 45,
     "수신 데이터 (Bytes)": 20,
     "송신 데이터 (Bytes)": 20,
     "총 데이터 (Bytes)": 20,
@@ -108,7 +129,7 @@ class SheetNames:
     RESPONSE_TIME: str = "응답 시간 Top 100"
     BYTES_ANALYSIS: str = "데이터 전송량 Top 100"
     ABUSE_IP_LIST: str = "악성 IP 목록"
-    ABUSE_REQUESTS: str = "악성 IP 요청 모음"
+    ABUSE_REQUESTS: str = "보안 이벤트"
     ELB_2XX: str = "ELB 2xx Top 100"
     ELB_3XX: str = "ELB 3xx Top 100"
     ELB_4XX_COUNT: str = "ELB 4xx Count"
@@ -134,6 +155,8 @@ class Headers:
         "Timestamp",
         "Client",
         "Country",
+        "Classification",
+        "Reason",
         "Target",
         "Target group name",
         "Method",
@@ -145,6 +168,9 @@ class Headers:
 
     RESPONSE_TIME: tuple[str, ...] = (
         "Response time",
+        "Request Processing",
+        "Target Processing",
+        "Response Processing",
         "Timestamp",
         "Client",
         "Country",

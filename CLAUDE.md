@@ -389,29 +389,31 @@ aa
 aa ec2
 aa vpc
 
-# Headless 모드 (CI/CD용)
-aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
+# 비대화형 모드 (도구 직접 실행)
+aa ec2/ebs_audit -p my-profile -r ap-northeast-2
 
 # 다중 리전
-aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
+aa ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
 
 # 전체 리전
-aa run ec2/ebs_audit -p my-profile -r all
+aa ec2/ebs_audit -p my-profile -r all
 
 # 출력 형식 지정
-aa run ec2/ebs_audit -p my-profile -f json -o result.json
+aa ec2/ebs_audit -p my-profile -f json -o result.json
 
 # IP 검색
 aa ip 10.0.1.50
 
 # 도구 목록
-aa list-tools
+aa tools              # 기본
+aa tools -c ec2       # 카테고리 필터
+aa list-tools         # 별칭 (호환성)
 
 # 프로파일 그룹 관리
 aa group
 ```
 
-### Headless 모드 옵션
+### 비대화형 모드 옵션
 
 | 옵션 | 설명 |
 |------|------|

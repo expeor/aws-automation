@@ -44,7 +44,7 @@ COMPACT_LOGO = """
 FULL_LOGO = """
 [bold #FF9900]  AA   AA [/]
 [bold #FF9900] A  A A  A[/]   [bold white]AWS Automation CLI[/]
-[bold #CC7700] AAAA AAAA[/]   [dim]v{version}[/]
+[bold #CC7700] AAAA AAAA[/]   [dim]Operations Toolkit[/]
 [bold #CC7700] A  A A  A[/]
 [bold #995500] A  A A  A[/]
 """
@@ -77,14 +77,13 @@ def print_banner(console: Console, compact: bool = False) -> None:
         console: Rich Console 인스턴스
         compact: True면 간소화된 배너
     """
-    version = get_version()
-    context = get_current_context()
-    hint = t("common.help_quit_hint")
-
     if compact:
+        version = get_version()
+        context = get_current_context()
+        hint = t("common.help_quit_hint")
         logo = COMPACT_LOGO.format(version=version, context=context, hint=hint)
     else:
-        logo = FULL_LOGO.format(version=version)
+        logo = FULL_LOGO
 
     console.print()
     for line in logo.strip().split("\n"):

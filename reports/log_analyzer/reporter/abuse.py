@@ -114,27 +114,49 @@ class AbuseIPSheetWriter(BaseSheetWriter):
 
 
 class AbuseRequestsSheetWriter(BaseSheetWriter):
-    """Creates abuse IP requests analysis sheet."""
+    """Creates abuse IP requests and security events analysis sheet.
+
+    Merges:
+    - Abuse IP requests (marked as 'Abuse')
+    - Security events: Ambiguous/Severe HTTP classification (Desync detection)
+
+    Color coding:
+    - Abuse IP → Red (danger)
+    - Ambiguous → Orange (warning)
+    - Abuse + Ambiguous → Red (Abuse takes priority)
+    """
 
     def write(self) -> None:
-        """Create abuse IP requests sheet."""
+        """Create abuse IP requests and security events sheet."""
         try:
             matching_ips = self.get_matching_abuse_ips()
-            if not matching_ips:
-                return
 
-            # Collect all logs from abuse IPs
-            abuse_requests = self._collect_abuse_requests(matching_ips)
-            if not abuse_requests:
+            # Collect abuse requests
+            abuse_requests = self._collect_abuse_requests(matching_ips) if matching_ips else []
+
+            # Collect security events (Ambiguous/Severe)
+            security_events = self._collect_security_events()
+
+            # Merge: add classification to abuse requests, merge with security events
+            all_requests = self._merge_requests(abuse_requests, security_events, matching_ips)
+
+            if not all_requests:
                 return
 
             ws = self.create_sheet(SHEET_NAMES.ABUSE_REQUESTS)
             headers = list(HEADERS.ABUSE_REQUESTS)
             self.write_header_row(ws, headers)
 
-            # Sort by timestamp and write
-            sorted_requests = sorted(abuse_requests, key=self._safe_timestamp_key)
-            self._write_abuse_request_rows(ws, sorted_requests, headers)
+            # Sort by timestamp and validate Excel limits
+            sorted_requests = sorted(all_requests, key=self._safe_timestamp_key)
+            sorted_requests = self.truncate_data(sorted_requests, SHEET_NAMES.ABUSE_REQUESTS)
+
+            # Validate column count
+            _, col_count = self.validate_excel_limits(len(sorted_requests), len(headers), SHEET_NAMES.ABUSE_REQUESTS)
+            if col_count < len(headers):
+                headers = headers[:col_count]
+
+            self._write_abuse_request_rows(ws, sorted_requests, headers, matching_ips)
 
             # Finalize
             if sorted_requests:
@@ -148,7 +170,7 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE
 
         except Exception as e:
-            logger.error(f"악성 IP 요청 분석 시트 생성 중 오류: {e}")
+            logger.error(f"악성 IP/보안 이벤트 시트 생성 중 오류: {e}")
 
     def _collect_abuse_requests(self, abuse_ips: set[str]) -> list[dict[str, Any]]:
         """Collect all requests from abuse IPs."""
@@ -163,6 +185,92 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
         # Filter for abuse IPs
         return [log for log in all_logs if log.get("client_ip", "N/A") in abuse_ips]
 
+    def _collect_security_events(self) -> list[dict[str, Any]]:
+        """Collect security events (Ambiguous/Severe classification)."""
+        classification_stats = self.data.get("classification_stats", {})
+        if not classification_stats:
+            return []
+        return classification_stats.get("security_events", [])
+
+    def _merge_requests(
+        self,
+        abuse_requests: list[dict[str, Any]],
+        security_events: list[dict[str, Any]],
+        abuse_ips: set[str],
+    ) -> list[dict[str, Any]]:
+        """Merge abuse requests and security events, avoiding duplicates.
+
+        Classification values:
+        - "Abuse": AbuseIPDB registered IP
+        - "Ambiguous": ALB Ambiguous classification
+        - "Severe": ALB Severe classification
+        - "Abuse+Ambiguous": Both AbuseIPDB and Ambiguous
+        - "Abuse+Severe": Both AbuseIPDB and Severe
+
+        Reason: Only contains ALB classification_reason (empty for pure Abuse)
+        """
+        merged: list[dict[str, Any]] = []
+        seen_keys: set[tuple] = set()
+
+        def make_key(log: dict[str, Any]) -> tuple:
+            """Create unique key for deduplication."""
+            ts = log.get("timestamp")
+            ts_str = ts.strftime("%Y-%m-%d %H:%M:%S") if hasattr(ts, "strftime") else str(ts)
+            return (ts_str, log.get("client_ip", ""), log.get("request", "")[:50])
+
+        # Add abuse requests with 'Abuse' classification
+        for log in abuse_requests:
+            key = make_key(log)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                log_copy = log.copy()
+                log_copy["_classification"] = "Abuse"
+                log_copy["_reason"] = ""  # No ALB reason for pure abuse
+                log_copy["_is_abuse"] = True
+                merged.append(log_copy)
+
+        # Add security events (Ambiguous/Severe)
+        for event in security_events:
+            key = make_key(event)
+            client_ip = event.get("client_ip", "")
+            is_abuse = client_ip in abuse_ips
+            event_class = event.get("classification", "")
+            event_reason = event.get("reason", "")
+
+            if key in seen_keys:
+                # Already exists from abuse - update to combined classification
+                for log in merged:
+                    if make_key(log) == key:
+                        if event_class in ("Ambiguous", "Severe"):
+                            log["_classification"] = f"Abuse+{event_class}"
+                            log["_reason"] = event_reason
+                        break
+            else:
+                seen_keys.add(key)
+                # Determine classification
+                if is_abuse:
+                    classification = f"Abuse+{event_class}" if event_class else "Abuse"
+                else:
+                    classification = event_class
+
+                log_copy = {
+                    "timestamp": event.get("timestamp"),
+                    "client_ip": client_ip,
+                    "target": event.get("target", ""),
+                    "target_group_name": event.get("target_group", ""),
+                    "http_method": event.get("method", ""),
+                    "request": event.get("url", ""),
+                    "user_agent": event.get("user_agent", ""),
+                    "elb_status_code": event.get("status_code", ""),
+                    "target_status_code": event.get("target_status_code", ""),
+                    "_classification": classification,
+                    "_reason": event_reason,
+                    "_is_abuse": is_abuse,
+                }
+                merged.append(log_copy)
+
+        return merged
+
     def _safe_timestamp_key(self, entry: dict[str, Any]) -> datetime:
         """Get timestamp for sorting."""
         ts = entry.get("timestamp")
@@ -175,14 +283,43 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
                 pass
         return datetime.min
 
+    def _extract_reason(self, reason: str) -> str:
+        """Extract clean ALB classification reason.
+
+        Only returns the actual ALB classification_reason, not "AbuseIPDB".
+
+        Examples:
+            - "AbuseIPDB" -> ""
+            - "AbuseIPDB + Ambiguous: HeaderNameContainsUnprintableCharacter"
+              -> "HeaderNameContainsUnprintableCharacter"
+            - "HeaderNameContainsUnprintableCharacter"
+              -> "HeaderNameContainsUnprintableCharacter"
+        """
+        if not reason:
+            return ""
+
+        # If it contains a colon, extract the part after it
+        if ": " in reason:
+            return reason.split(": ", 1)[1]
+
+        # If it's just "AbuseIPDB", return empty
+        if reason == "AbuseIPDB":
+            return ""
+
+        # Otherwise return as-is (it's an ALB classification_reason)
+        return reason
+
     def _write_abuse_request_rows(
         self,
         ws: Worksheet,
         requests: list[dict[str, Any]],
         headers: list[str],
+        abuse_ips: set[str],
     ) -> None:
-        """Write abuse request rows."""
+        """Write abuse request and security event rows with color coding."""
         border = self.styles.thin_border
+        abuse_fill = self.styles.fill_abuse  # Red for Abuse IP
+        warning_fill = self.styles.warning_fill  # Orange for Ambiguous
 
         for row_idx, log in enumerate(requests, start=2):
             client_ip = log.get("client_ip", "N/A")
@@ -193,16 +330,26 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
             target_group = log.get("target_group_name", "") or ""
 
             timestamp_str = self.format_timestamp(log.get("timestamp"))
+            classification = log.get("_classification", "")
+            reason = log.get("_reason", "")
+            reason_display = self._extract_reason(reason)
             method = log.get("http_method", "").replace("-", "")
             request = log.get("request", "N/A")
             user_agent = log.get("user_agent", "N/A")
             elb_status = self.convert_status_code(log.get("elb_status_code", "N/A"))
             backend_status = self.convert_status_code(log.get("target_status_code", "N/A"))
 
+            # Determine row fill color (Abuse > Ambiguous)
+            is_abuse = log.get("_is_abuse", False) or client_ip in abuse_ips
+            is_ambiguous = classification == "Ambiguous"
+            row_fill = abuse_fill if is_abuse else (warning_fill if is_ambiguous else None)
+
             values = [
                 timestamp_str,
                 client_ip,
                 country,
+                classification,
+                reason_display,
                 target_field,
                 target_group,
                 method,
@@ -216,12 +363,16 @@ class AbuseRequestsSheetWriter(BaseSheetWriter):
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = border
 
-                # Alignment
-                if col_idx in (1, 2, 3, 4, 5, 6):  # Timestamp through Method
-                    cell.alignment = self.styles.align_center
-                elif col_idx in (7, 8):  # Request, User Agent
+                # Alignment (12 columns)
+                if col_idx in (9, 10):  # Request, User Agent - left align
                     cell.alignment = self.styles.align_left
-                elif col_idx in (9, 10):  # Status codes
+                elif col_idx in (11, 12):  # Status codes - right align
                     cell.alignment = self.styles.align_right
                     if isinstance(value, int):
                         cell.number_format = "0"
+                else:  # All others (1-8) - center align
+                    cell.alignment = self.styles.align_center
+
+                # Apply row color
+                if row_fill:
+                    cell.fill = row_fill

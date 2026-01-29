@@ -11,7 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 class SummarySheetWriter(BaseSheetWriter):
-    """Creates the summary/overview sheet for the report."""
+    """Creates the summary/overview sheet for the report.
+
+    Essential information only:
+    1. ALB Info (identification)
+    2. Analysis Period
+    3. Key Metrics (requests, IPs, error rate, latency)
+    4. Status Code Summary
+    5. Security Alerts (if any)
+    """
 
     def write(self) -> None:
         """Create the summary sheet."""
@@ -20,113 +28,127 @@ class SummarySheetWriter(BaseSheetWriter):
             helper = SummarySheetHelper(ws)
 
             # 1. Title
-            helper.add_title("ALB 로그 분석 보고서")
+            helper.add_title("ALB 로그 분석 요약")
 
-            # 2. Analysis Info
+            # 2. ALB Info
             s3_uri = self.data.get("s3_uri", "")
-            bucket_name, account_id, region, _ = self._parse_s3_uri(s3_uri)
+            _, account_id, region, _ = self._parse_s3_uri(s3_uri)
             alb_name = self.data.get("alb_name", "N/A")
 
-            helper.add_section("분석 정보")
-            helper.add_item("계정 번호", account_id, number_format="@")
+            helper.add_section("ALB 정보")
             helper.add_item("ALB 이름", alb_name)
-            helper.add_item("S3 버킷", bucket_name)
+            helper.add_item("계정", account_id, number_format="@")
             helper.add_item("리전", region)
 
             # 3. Analysis Period
             helper.add_blank_row()
             helper.add_section("분석 기간")
-            helper.add_item("요청 시작 시간", self.data.get("start_time", "N/A"))
-            helper.add_item("요청 종료 시간", self.data.get("end_time", "N/A"))
+
+            # Use actual log time if available, otherwise requested time
+            actual_start = self.data.get("actual_start_time")
+            actual_end = self.data.get("actual_end_time")
+
+            if actual_start and actual_start != "N/A":
+                helper.add_item("시작", actual_start)
+                helper.add_item("종료", actual_end)
+            else:
+                helper.add_item("시작", self.data.get("start_time", "N/A"))
+                helper.add_item("종료", self.data.get("end_time", "N/A"))
+
             helper.add_item("타임존", self.data.get("timezone", "N/A"))
 
-            if self.data.get("actual_start_time") and self.data.get("actual_start_time") != "N/A":
-                helper.add_item("실제 로그 시작", self.data.get("actual_start_time", "N/A"))
-                helper.add_item("실제 로그 종료", self.data.get("actual_end_time", "N/A"))
-
-            # 4. Data Statistics
+            # 4. Key Metrics
             helper.add_blank_row()
-            helper.add_section("데이터 통계")
-            helper.add_item("총 로그 라인 수", f"{self.data.get('log_lines_count', 0):,}개")
-            helper.add_item("분석된 로그 파일 수", f"{self.data.get('log_files_count', 0):,}개")
-            helper.add_item("고유 클라이언트 IP 수", f"{self.data.get('unique_client_ips', 0):,}개")
-            helper.add_item(
-                "총 수신 바이트",
-                self.format_bytes(self.data.get("total_received_bytes", 0)),
+            helper.add_section("핵심 지표")
+
+            total_requests = (
+                self.data.get("elb_2xx_count", 0)
+                + self.data.get("elb_3xx_count", 0)
+                + self.data.get("elb_4xx_count", 0)
+                + self.data.get("elb_5xx_count", 0)
             )
-            helper.add_item(
-                "총 송신 바이트",
-                self.format_bytes(self.data.get("total_sent_bytes", 0)),
-            )
-            helper.add_item("평균 응답 시간", self._calculate_average_response_time())
-            helper.add_item("전체 에러율", self._calculate_error_rate())
+            helper.add_item("총 요청 수", f"{total_requests:,}")
+            helper.add_item("고유 클라이언트 IP", f"{self.data.get('unique_client_ips', 0):,}")
 
-            # 5. HTTP Status Code Statistics
-            helper.add_blank_row()
-            self._add_status_code_statistics(helper)
+            # Error rate with highlighting
+            error_rate = self._calculate_error_rate()
+            error_rate_value = float(error_rate.replace("%", "")) if error_rate != "N/A" else 0
+            highlight = "danger" if error_rate_value >= 5 else ("warning" if error_rate_value >= 1 else None)
+            helper.add_item("에러율 (4xx+5xx)", error_rate, highlight=highlight)
 
-            # 6. Security Information
-            helper.add_blank_row()
-            helper.add_section("보안 정보")
-
-            abuse_count = len(self.get_matching_abuse_ips())
-            highlight = "danger" if abuse_count > 0 else None
-            helper.add_item("탐지된 Abuse IP", f"{abuse_count:,}개", highlight=highlight)
-
-            # Abuse IP request count
-            abuse_total_requests = self._calculate_abuse_requests()
-            highlight = "danger" if abuse_total_requests > 0 else None
-            helper.add_item(
-                "전체 Abuse IP 요청 수",
-                f"{abuse_total_requests:,}개",
-                highlight=highlight,
-            )
-
-            # 7. Request Pattern Analysis
-            helper.add_blank_row()
-            helper.add_section("요청 패턴 분석")
-            top_urls = self._get_top_request_urls(SheetConfig.SUMMARY_TOP_ITEMS)
-            helper.add_list_section("상위 요청 URL", top_urls, suffix="회")
-
-            helper.add_blank_row()
-            top_agents = self._get_top_user_agents(SheetConfig.SUMMARY_TOP_ITEMS)
-            helper.add_list_section("상위 User Agent", top_agents, suffix="회")
-
-            # 8. Geographic Analysis
-            helper.add_blank_row()
-            helper.add_section("지리적 분석")
-            top_countries = self._get_top_countries(SheetConfig.SUMMARY_TOP_ITEMS)
-            helper.add_list_section("상위 국가", top_countries, suffix="개 IP")
-
-            # 9. Performance Analysis
-            helper.add_blank_row()
-            helper.add_section("성능 분석")
-
-            # 백분위수 데이터 활용
+            # Response time percentiles
             percentiles = self.data.get("response_time_percentiles", {})
             if percentiles:
-                helper.add_item("P50 응답 시간", f"{percentiles.get('p50', 0) * 1000:.1f}ms")
-                helper.add_item("P90 응답 시간", f"{percentiles.get('p90', 0) * 1000:.1f}ms")
-                helper.add_item("P95 응답 시간", f"{percentiles.get('p95', 0) * 1000:.1f}ms")
+                p50 = percentiles.get("p50", 0) * 1000
                 p99 = percentiles.get("p99", 0) * 1000
-                highlight = "warning" if p99 > 1000 else None  # 1초 이상이면 경고
-                helper.add_item("P99 응답 시간", f"{p99:.1f}ms", highlight=highlight)
-                helper.add_item("평균 응답 시간", f"{percentiles.get('avg', 0) * 1000:.1f}ms")
-                helper.add_item("최대 응답 시간", f"{percentiles.get('max', 0) * 1000:.1f}ms")
-            else:
-                response_stats = self._calculate_response_time_stats()
-                helper.add_item("최대 응답 시간", response_stats["max"])
-                helper.add_item("최소 응답 시간", response_stats["min"])
-                helper.add_item("중간 응답 시간", response_stats["median"])
+                helper.add_item("P50 응답시간", f"{p50:.0f}ms")
+                highlight = "danger" if p99 > 3000 else ("warning" if p99 > 1000 else None)
+                helper.add_item("P99 응답시간", f"{p99:.0f}ms", highlight=highlight)
 
-            # 10. Error Reasons (Top 5)
-            error_reasons = self.data.get("error_reason_counts", {})
-            if error_reasons:
+            # 5. Status Code Summary
+            helper.add_blank_row()
+            helper.add_section("상태 코드")
+
+            elb_2xx = self.data.get("elb_2xx_count", 0)
+            elb_4xx = self.data.get("elb_4xx_count", 0)
+            elb_5xx = self.data.get("elb_5xx_count", 0)
+            backend_5xx = self.data.get("backend_5xx_count", 0)
+
+            # Calculate percentages
+            if total_requests > 0:
+                helper.add_item("2xx 성공", f"{elb_2xx:,} ({elb_2xx / total_requests * 100:.1f}%)")
+                if elb_4xx > 0:
+                    helper.add_item(
+                        "4xx 클라이언트 에러",
+                        f"{elb_4xx:,} ({elb_4xx / total_requests * 100:.1f}%)",
+                        highlight="warning",
+                    )
+                if elb_5xx > 0:
+                    helper.add_item(
+                        "5xx 서버 에러",
+                        f"{elb_5xx:,} ({elb_5xx / total_requests * 100:.1f}%)",
+                        highlight="danger",
+                    )
+                if backend_5xx > 0:
+                    helper.add_item(
+                        "Backend 5xx",
+                        f"{backend_5xx:,} ({backend_5xx / total_requests * 100:.1f}%)",
+                        highlight="danger",
+                    )
+            else:
+                helper.add_item("2xx 성공", f"{elb_2xx:,}")
+
+            # 6. Security Alerts (only if issues exist)
+            abuse_count = len(self.get_matching_abuse_ips())
+            classification_stats = self.data.get("classification_stats", {})
+            ambiguous_count = classification_stats.get("distribution", {}).get("Ambiguous", 0)
+            severe_count = classification_stats.get("distribution", {}).get("Severe", 0)
+
+            if abuse_count > 0 or ambiguous_count > 0 or severe_count > 0:
                 helper.add_blank_row()
-                helper.add_section("에러 원인 분석")
-                sorted_reasons = sorted(error_reasons.items(), key=lambda x: x[1], reverse=True)[:5]
-                for reason, count in sorted_reasons:
-                    helper.add_item(reason, f"{count:,}건", highlight="warning")
+                helper.add_section("⚠️ 보안 경고")
+
+                if abuse_count > 0:
+                    abuse_requests = self._calculate_abuse_requests()
+                    helper.add_item(
+                        "Abuse IP 탐지",
+                        f"{abuse_count:,}개 IP ({abuse_requests:,}건 요청)",
+                        highlight="danger",
+                    )
+
+                if severe_count > 0:
+                    helper.add_item(
+                        "Severe 요청 (Desync 의심)",
+                        f"{severe_count:,}건",
+                        highlight="danger",
+                    )
+
+                if ambiguous_count > 0:
+                    helper.add_item(
+                        "Ambiguous 요청",
+                        f"{ambiguous_count:,}건",
+                        highlight="warning",
+                    )
 
             # Set zoom
             ws.sheet_view.zoomScale = SheetConfig.ZOOM_SCALE
@@ -164,32 +186,6 @@ class SummarySheetWriter(BaseSheetWriter):
 
         return bucket_name, account_id, region, service_prefix
 
-    def _calculate_average_response_time(self) -> str:
-        """Calculate average response time from data."""
-        try:
-            long_response_times = self.data.get("long_response_times", [])
-            if not long_response_times or not isinstance(long_response_times, list):
-                return "0.000초"
-
-            total_time = 0.0
-            valid_count = 0
-
-            for entry in long_response_times:
-                if isinstance(entry, dict) and "response_time" in entry:
-                    response_time = entry.get("response_time", 0)
-                    if isinstance(response_time, (int, float)) and response_time > 0:
-                        total_time += float(response_time)
-                        valid_count += 1
-
-            if valid_count == 0:
-                return "0.000초"
-
-            return f"{total_time / valid_count:.3f}초"
-
-        except Exception as e:
-            logger.error(f"평균 응답 시간 계산 중 오류: {e}")
-            return "N/A"
-
     def _calculate_error_rate(self) -> str:
         """Calculate error rate percentage."""
         try:
@@ -222,105 +218,3 @@ class SummarySheetWriter(BaseSheetWriter):
         except Exception as e:
             logger.debug("Failed to calculate abuse IP requests: %s", e)
             return 0
-
-    def _add_status_code_statistics(self, helper: SummarySheetHelper) -> None:
-        """Add HTTP status code statistics section."""
-        helper.add_section("HTTP 상태 코드 통계")
-
-        total_requests = (
-            self.data.get("elb_2xx_count", 0)
-            + self.data.get("elb_3xx_count", 0)
-            + self.data.get("elb_4xx_count", 0)
-            + self.data.get("elb_5xx_count", 0)
-        )
-
-        status_codes = [
-            ("ELB 2xx", "elb_2xx_count", None),
-            ("ELB 3xx", "elb_3xx_count", None),
-            ("ELB 4xx", "elb_4xx_count", "warning"),
-            ("ELB 5xx", "elb_5xx_count", "danger"),
-            ("Backend 4xx", "backend_4xx_count", "warning"),
-            ("Backend 5xx", "backend_5xx_count", "danger"),
-        ]
-
-        for label, key, highlight_type in status_codes:
-            count = self.data.get(key, 0)
-            if total_requests > 0 and key.startswith("elb_"):
-                percentage = (count / total_requests) * 100
-                display_value = f"{count:,}개 ({percentage:.1f}%)"
-            else:
-                display_value = f"{count:,}개"
-
-            highlight = highlight_type if count > 0 else None
-            helper.add_item(label, display_value, highlight=highlight)
-
-    def _get_top_request_urls(self, limit: int) -> list[tuple[str, int]]:
-        """Get top requested URLs."""
-        try:
-            url_counts = self.data.get("request_url_counts", {})
-            if not url_counts:
-                return []
-
-            sorted_urls = sorted(url_counts.items(), key=lambda x: x[1], reverse=True)
-            return sorted_urls[:limit]
-        except Exception as e:
-            logger.error(f"상위 요청 URL 계산 중 오류: {e}")
-            return []
-
-    def _get_top_user_agents(self, limit: int) -> list[tuple[str, int]]:
-        """Get top user agents."""
-        try:
-            ua_counts = self.data.get("user_agent_counts", {})
-            if not ua_counts:
-                return []
-
-            sorted_agents = sorted(ua_counts.items(), key=lambda x: x[1], reverse=True)
-            return sorted_agents[:limit]
-        except Exception as e:
-            logger.error(f"상위 User Agent 계산 중 오류: {e}")
-            return []
-
-    def _get_top_countries(self, limit: int) -> list[tuple[str, int]]:
-        """Get top countries."""
-        try:
-            country_stats = self.data.get("country_statistics", {})
-            if not country_stats:
-                return []
-
-            sorted_countries = sorted(country_stats.items(), key=lambda x: x[1], reverse=True)
-            return sorted_countries[:limit]
-        except Exception as e:
-            logger.error(f"상위 국가 계산 중 오류: {e}")
-            return []
-
-    def _calculate_response_time_stats(self) -> dict[str, str]:
-        """Calculate response time statistics."""
-        try:
-            long_response_times = self.data.get("long_response_times", [])
-            if not long_response_times or not isinstance(long_response_times, list):
-                return {"max": "N/A", "min": "N/A", "median": "N/A"}
-
-            response_times = []
-            for entry in long_response_times:
-                if isinstance(entry, dict) and "response_time" in entry:
-                    rt = entry.get("response_time", 0)
-                    if isinstance(rt, (int, float)) and rt > 0:
-                        response_times.append(float(rt))
-
-            if not response_times:
-                return {"max": "N/A", "min": "N/A", "median": "N/A"}
-
-            response_times.sort()
-            n = len(response_times)
-
-            median = (response_times[n // 2 - 1] + response_times[n // 2]) / 2 if n % 2 == 0 else response_times[n // 2]
-
-            return {
-                "max": f"{response_times[-1]:.3f}초",
-                "min": f"{response_times[0]:.3f}초",
-                "median": f"{median:.3f}초",
-            }
-
-        except Exception as e:
-            logger.error(f"응답 시간 통계 계산 중 오류: {e}")
-            return {"max": "N/A", "min": "N/A", "median": "N/A"}

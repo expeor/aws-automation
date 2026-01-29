@@ -419,8 +419,8 @@ class CategoryStep:
             title_justify="left",
         )
         table.add_column("#", style="dim", width=4, justify="right")
-        table.add_column(t("menu.header_category"), width=16)  # 12 → 16
-        table.add_column(t("menu.header_name"), width=26)  # 20 → 26
+        table.add_column(t("menu.header_category"), width=18)
+        table.add_column(t("menu.header_name"), width=28)
         table.add_column(t("menu.header_description"), style="dim")
 
         for i, r in enumerate(results, 1):
@@ -455,8 +455,16 @@ class CategoryStep:
                 console.print(f"[dim]{t('menu.enter_number')}[/dim]")
 
     def _select_tool(self, category: dict) -> dict | None:
-        """도구 선택 UI (필터 지원)"""
+        """도구 선택 UI (필터 지원)
+
+        is_menu: True인 도구가 유일하면 자동 선택 (선택 UI 스킵)
+        """
         tools = category.get("tools", [])
+
+        # is_menu 도구 자동 선택: 도구가 1개이고 is_menu=True이면 바로 반환
+        if len(tools) == 1 and tools[0].get("is_menu"):
+            return tools[0]
+
         return self._display_tool_table_with_filter(category, tools)
 
     def _display_tool_table_with_filter(self, category: dict, tools: list[dict]) -> dict | None:

@@ -458,15 +458,12 @@ def _run_search_loop(
     session_name: str,
 ) -> None:
     """Main search loop."""
+    from cli.flow.context import ExecutionContext
+    from cli.flow.steps import ProfileStep, RegionStep
     from core.auth.session import get_session
 
     searcher = MultiCacheSearch(caches)
     detail_mode = False
-
-    # Get session for detail mode (lazy - only create when needed)
-    profile_name = getattr(ctx, "profile_name", None) or "default"
-    regions = getattr(ctx, "regions", None) or ["ap-northeast-2"]
-    region = regions[0] if isinstance(regions, list) else regions
     session = None  # Will be created when detail mode is first enabled
 
     # Show selected caches summary
@@ -492,6 +489,11 @@ def _run_search_loop(
             continue
 
         if query.lower() == "d":
+            # Detail mode is only available with a single cache
+            if len(caches) > 1:
+                console.print(f"[yellow]{t('detail_mode_single_cache_only')}[/yellow]")
+                continue
+
             detail_mode = not detail_mode
             status = t("detail_mode_on") if detail_mode else t("detail_mode_off")
             console.print(f"[magenta]{status}[/magenta]")
@@ -499,12 +501,33 @@ def _run_search_loop(
                 console.print(f"[dim]  {t('detail_mode_desc')}[/dim]")
                 # Create session when detail mode is first enabled
                 if session is None:
+                    cache = caches[0]
+                    profile_name = cache.profile_name
+                    # ENICache uses _region_index, get first available region
+                    available_regions = list(cache._region_index.keys()) if cache._region_index else []
+                    region = available_regions[0] if available_regions else "ap-northeast-2"
                     try:
                         session = get_session(profile_name, region)
-                    except Exception as e:
-                        logger.warning(f"Failed to create session: {e}")
-                        console.print(f"[yellow]{t('error')}: {e}[/yellow]")
-                        detail_mode = False
+                    except Exception:
+                        # Failed to create session with cache profile, try auth flow
+                        logger.warning(f"Failed to create session with profile {profile_name}, starting auth flow")
+                        try:
+                            detail_ctx = ExecutionContext()
+                            detail_ctx = ProfileStep().execute(detail_ctx)
+                            if not detail_ctx.profile_name:
+                                console.print(f"[yellow]{t('detail_mode_auth_failed')}[/yellow]")
+                                detail_mode = False
+                                continue
+                            detail_ctx = RegionStep().execute(detail_ctx)
+                            if not detail_ctx.regions:
+                                console.print(f"[yellow]{t('detail_mode_auth_failed')}[/yellow]")
+                                detail_mode = False
+                                continue
+                            session = get_session(detail_ctx.profile_name, detail_ctx.regions[0])
+                        except Exception as e:
+                            logger.warning(f"Auth flow failed: {e}")
+                            console.print(f"[yellow]{t('detail_mode_auth_failed')}[/yellow]")
+                            detail_mode = False
             continue
 
         # Search
