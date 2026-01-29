@@ -89,11 +89,25 @@ def _save_to_cache(name: str, data: dict) -> None:
         logger.debug("Cache operation failed: %s", e)
 
 
-def clear_public_cache() -> int:
-    """Clear all public IP caches (returns deleted file count)"""
+ALL_PROVIDERS = ["aws", "gcp", "azure", "oracle", "cloudflare", "fastly"]
+
+
+def clear_public_cache(providers: list[str] | None = None) -> int:
+    """Clear public IP caches (returns deleted file count)
+
+    Args:
+        providers: List of provider names to clear (None for all)
+
+    Returns:
+        Number of deleted cache files
+    """
     cache_dir = _get_cache_dir()
     count = 0
-    for name in ["aws", "gcp", "azure", "oracle", "cloudflare", "fastly"]:
+    target_providers = [p.lower() for p in providers] if providers else ALL_PROVIDERS
+
+    for name in target_providers:
+        if name not in ALL_PROVIDERS:
+            continue
         cache_file = os.path.join(cache_dir, f"{name}.json")
         if os.path.exists(cache_file):
             try:
@@ -104,21 +118,28 @@ def clear_public_cache() -> int:
     return count
 
 
-def refresh_public_cache(callback=None) -> dict[str, Any]:
+def refresh_public_cache(
+    providers: list[str] | None = None,
+    callback=None,
+) -> dict[str, Any]:
     """
     Refresh public IP cache (delete and re-download)
 
     Args:
+        providers: List of provider names to refresh (None for all)
         callback: Progress callback function (provider, status)
 
     Returns:
         {"success": [...], "failed": [...], "counts": {...}}
     """
-    providers = ["aws", "gcp", "azure", "oracle", "cloudflare", "fastly"]
+    target_providers = [p.lower() for p in providers] if providers else ALL_PROVIDERS
+    # Filter to valid providers only
+    target_providers = [p for p in target_providers if p in ALL_PROVIDERS]
+
     result: dict[str, Any] = {"success": [], "failed": [], "counts": {}}
 
-    # Clear cache first
-    clear_public_cache()
+    # Clear cache first (only for target providers)
+    clear_public_cache(target_providers)
 
     # Download each provider's data
     loaders = {
@@ -130,7 +151,7 @@ def refresh_public_cache(callback=None) -> dict[str, Any]:
         "fastly": get_fastly_ip_ranges,
     }
 
-    for provider in providers:
+    for provider in target_providers:
         if callback:
             callback(provider, "downloading")
 
@@ -654,6 +675,8 @@ def load_ip_ranges_parallel_with_errors(
 def search_public_ip(
     ip_list: list[str],
     providers: list[str] | None = None,
+    region_filter: str | None = None,
+    service_filter: str | None = None,
 ) -> list[PublicIPResult]:
     """
     Search public IP ranges
@@ -661,6 +684,8 @@ def search_public_ip(
     Args:
         ip_list: List of IP addresses to search
         providers: List of providers to search (None for all)
+        region_filter: Filter results by region (partial match, case-insensitive)
+        service_filter: Filter results by service (partial match, case-insensitive)
 
     Returns:
         List of search results
@@ -682,6 +707,10 @@ def search_public_ip(
 
     all_results = []
 
+    # Normalize filters for case-insensitive matching
+    region_filter_lower = region_filter.lower() if region_filter else None
+    service_filter_lower = service_filter.lower() if service_filter else None
+
     for ip in ip_list:
         ip = ip.strip()
         if not ip:
@@ -693,13 +722,221 @@ def search_public_ip(
             if provider in data_sources:
                 results = search_func(ip, data_sources[provider])
                 if results:
-                    all_results.extend(results)
-                    found = True
+                    # Apply filters
+                    for result in results:
+                        # Region filter
+                        if region_filter_lower:
+                            if not result.region or region_filter_lower not in result.region.lower():
+                                continue
+                        # Service filter
+                        if service_filter_lower:
+                            if not result.service or service_filter_lower not in result.service.lower():
+                                continue
+                        all_results.append(result)
+                        found = True
 
         if not found:
             all_results.append(
                 PublicIPResult(
                     ip_address=ip,
+                    provider="Unknown",
+                    service="",
+                    ip_prefix="",
+                    region="",
+                )
+            )
+
+    return all_results
+
+
+def search_public_cidr(
+    cidr_list: list[str],
+    providers: list[str] | None = None,
+    region_filter: str | None = None,
+    service_filter: str | None = None,
+) -> list[PublicIPResult]:
+    """
+    Search public IP ranges by CIDR overlap
+
+    Args:
+        cidr_list: List of CIDR ranges to search (e.g., ["13.0.0.0/8", "52.0.0.0/16"])
+        providers: List of providers to search (None for all)
+        region_filter: Filter results by region (partial match, case-insensitive)
+        service_filter: Filter results by service (partial match, case-insensitive)
+
+    Returns:
+        List of overlapping IP ranges from cloud providers
+    """
+    all_providers = {"aws", "gcp", "azure", "oracle", "cloudflare", "fastly"}
+    target_providers = {p.lower() for p in providers} & all_providers if providers else all_providers
+
+    data_sources = load_ip_ranges_parallel(target_providers)
+
+    all_results: list[PublicIPResult] = []
+
+    # Normalize filters for case-insensitive matching
+    region_filter_lower = region_filter.lower() if region_filter else None
+    service_filter_lower = service_filter.lower() if service_filter else None
+
+    for cidr_str in cidr_list:
+        cidr_str = cidr_str.strip()
+        if not cidr_str:
+            continue
+
+        try:
+            input_network = ipaddress.ip_network(cidr_str, strict=False)
+        except ValueError:
+            continue
+
+        found = False
+
+        # Search in each provider's data
+        for provider_name, data in data_sources.items():
+            if not data:
+                continue
+
+            # Get prefixes based on provider format
+            if provider_name == "aws":
+                prefixes = data.get("prefixes", []) if input_network.version == 4 else data.get("ipv6_prefixes", [])
+                prefix_key = "ip_prefix" if input_network.version == 4 else "ipv6_prefix"
+                for prefix in prefixes:
+                    try:
+                        provider_network = ipaddress.ip_network(prefix[prefix_key])
+                        if input_network.overlaps(provider_network):
+                            # Apply filters
+                            p_region = prefix.get("region", "")
+                            p_service = prefix.get("service", "")
+                            if region_filter_lower and (not p_region or region_filter_lower not in p_region.lower()):
+                                continue
+                            if service_filter_lower and (
+                                not p_service or service_filter_lower not in p_service.lower()
+                            ):
+                                continue
+                            all_results.append(
+                                PublicIPResult(
+                                    ip_address=cidr_str,
+                                    provider="AWS",
+                                    service=p_service,
+                                    ip_prefix=prefix[prefix_key],
+                                    region=p_region,
+                                    extra={"network_border_group": prefix.get("network_border_group", "")},
+                                )
+                            )
+                            found = True
+                    except (ValueError, KeyError):
+                        continue
+
+            elif provider_name == "gcp":
+                for prefix in data.get("prefixes", []):
+                    prefix_key = "ipv4Prefix" if input_network.version == 4 else "ipv6Prefix"
+                    if prefix_key not in prefix:
+                        continue
+                    try:
+                        provider_network = ipaddress.ip_network(prefix[prefix_key])
+                        if input_network.overlaps(provider_network):
+                            p_scope = prefix.get("scope", "")
+                            p_service = prefix.get("service", "Google Cloud")
+                            if region_filter_lower and (not p_scope or region_filter_lower not in p_scope.lower()):
+                                continue
+                            if service_filter_lower and (
+                                not p_service or service_filter_lower not in p_service.lower()
+                            ):
+                                continue
+                            all_results.append(
+                                PublicIPResult(
+                                    ip_address=cidr_str,
+                                    provider="GCP",
+                                    service=p_service,
+                                    ip_prefix=prefix[prefix_key],
+                                    region=p_scope,
+                                )
+                            )
+                            found = True
+                    except ValueError:
+                        continue
+
+            elif provider_name == "azure":
+                for service in data.get("values", []):
+                    svc_name = service.get("name", "Azure")
+                    svc_region = service.get("properties", {}).get("region", "Global")
+                    if region_filter_lower and (not svc_region or region_filter_lower not in svc_region.lower()):
+                        continue
+                    if service_filter_lower and (not svc_name or service_filter_lower not in svc_name.lower()):
+                        continue
+                    for prefix_str in service.get("properties", {}).get("addressPrefixes", []):
+                        try:
+                            provider_network = ipaddress.ip_network(prefix_str)
+                            if input_network.overlaps(provider_network):
+                                all_results.append(
+                                    PublicIPResult(
+                                        ip_address=cidr_str,
+                                        provider="Azure",
+                                        service=svc_name,
+                                        ip_prefix=prefix_str,
+                                        region=svc_region,
+                                    )
+                                )
+                                found = True
+                        except ValueError:
+                            continue
+
+            elif provider_name == "oracle":
+                for region in data.get("regions", []):
+                    reg_name = region.get("region", "Unknown")
+                    if region_filter_lower and (not reg_name or region_filter_lower not in reg_name.lower()):
+                        continue
+                    for cidr_obj in region.get("cidrs", []):
+                        cidr = cidr_obj.get("cidr", "")
+                        tags = cidr_obj.get("tags", [])
+                        svc_name = ", ".join(tags) if tags else "Oracle Cloud"
+                        if service_filter_lower and (not svc_name or service_filter_lower not in svc_name.lower()):
+                            continue
+                        try:
+                            provider_network = ipaddress.ip_network(cidr)
+                            if input_network.overlaps(provider_network):
+                                all_results.append(
+                                    PublicIPResult(
+                                        ip_address=cidr_str,
+                                        provider="Oracle",
+                                        service=svc_name,
+                                        ip_prefix=cidr,
+                                        region=reg_name,
+                                    )
+                                )
+                                found = True
+                        except ValueError:
+                            continue
+
+            elif provider_name in ("cloudflare", "fastly"):
+                provider_display = provider_name.capitalize()
+                prefixes = data.get("prefixes", []) if input_network.version == 4 else data.get("ipv6_prefixes", [])
+                prefix_key = "ip_prefix" if input_network.version == 4 else "ipv6_prefix"
+                for prefix in prefixes:
+                    try:
+                        provider_network = ipaddress.ip_network(prefix[prefix_key])
+                        if input_network.overlaps(provider_network):
+                            p_service = prefix.get("service", f"{provider_display} CDN")
+                            if service_filter_lower and (
+                                not p_service or service_filter_lower not in p_service.lower()
+                            ):
+                                continue
+                            all_results.append(
+                                PublicIPResult(
+                                    ip_address=cidr_str,
+                                    provider=provider_display,
+                                    service=p_service,
+                                    ip_prefix=prefix[prefix_key],
+                                    region="Global",
+                                )
+                            )
+                            found = True
+                    except (ValueError, KeyError):
+                        continue
+
+        if not found:
+            all_results.append(
+                PublicIPResult(
+                    ip_address=cidr_str,
                     provider="Unknown",
                     service="",
                     ip_prefix="",

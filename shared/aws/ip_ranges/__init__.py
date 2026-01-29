@@ -26,6 +26,8 @@ Usage:
 """
 
 from .providers import (
+    # Constants
+    ALL_PROVIDERS,
     # Data types
     PublicIPResult,
     # Cache management
@@ -53,11 +55,14 @@ from .providers import (
     search_in_fastly,
     search_in_gcp,
     search_in_oracle,
+    search_public_cidr,
     search_public_ip,
     search_public_ip_optimized,
 )
 
 __all__ = [
+    # Constants
+    "ALL_PROVIDERS",
     # Data types
     "PublicIPResult",
     # Cache management
@@ -74,6 +79,7 @@ __all__ = [
     "load_ip_ranges_parallel",
     # Search functions
     "search_public_ip",
+    "search_public_cidr",
     "search_public_ip_optimized",
     "search_in_aws",
     "search_in_gcp",
