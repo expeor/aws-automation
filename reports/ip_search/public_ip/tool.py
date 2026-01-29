@@ -19,11 +19,14 @@ from rich.table import Table
 
 from core.tools.output.builder import OutputPath
 from shared.aws.ip_ranges import (
+    ALL_PROVIDERS,
     PublicIPResult,
+    clear_public_cache,
     get_available_filters,
     get_public_cache_status,
     refresh_public_cache,
     search_by_filter,
+    search_public_cidr,
     search_public_ip,
 )
 
@@ -127,18 +130,20 @@ def _copy_to_clipboard(results: list[PublicIPResult]) -> bool:
 # =============================================================================
 
 
-def _validate_ip_input(ip_str: str) -> tuple[list[str], list[str]]:
-    """Validate IP input and return valid IPs and errors.
+def _validate_ip_input(ip_str: str) -> tuple[list[str], list[str], list[str]]:
+    """Validate IP input and return valid IPs, CIDRs, and errors.
 
     Supports multiple delimiters: comma, space, newline.
+    Supports both single IP addresses and CIDR notation.
 
     Args:
         ip_str: Raw input string
 
     Returns:
-        Tuple of (valid_ips, error_messages)
+        Tuple of (valid_ips, valid_cidrs, error_messages)
     """
     valid_ips: list[str] = []
+    valid_cidrs: list[str] = []
     errors: list[str] = []
 
     # Normalize delimiters: replace space and newline with comma
@@ -149,13 +154,21 @@ def _validate_ip_input(ip_str: str) -> tuple[list[str], list[str]]:
         if not ip:
             continue
 
-        try:
-            ipaddress.ip_address(ip)
-            valid_ips.append(ip)
-        except ValueError:
-            errors.append(t("validation_invalid_ip", ip=ip))
+        # Check if it's CIDR notation
+        if "/" in ip:
+            try:
+                ipaddress.ip_network(ip, strict=False)
+                valid_cidrs.append(ip)
+            except ValueError:
+                errors.append(t("validation_invalid_ip", ip=ip))
+        else:
+            try:
+                ipaddress.ip_address(ip)
+                valid_ips.append(ip)
+            except ValueError:
+                errors.append(t("validation_invalid_ip", ip=ip))
 
-    return valid_ips, errors
+    return valid_ips, valid_cidrs, errors
 
 
 def _is_private_ip(ip_str: str) -> bool:
@@ -177,7 +190,31 @@ def _show_help() -> None:
     help_lines = [
         f"[bold]{t('help_input_format')}[/bold]",
         f"  {t('help_single_ip')}",
+        f"  {t('help_cidr')}",
         f"  {t('help_multi_ip')}",
+        "",
+        f"[bold]{t('help_filter_options')}[/bold]",
+        f"  {t('help_filter_provider')}",
+        f"  {t('help_filter_region')}",
+        f"  {t('help_filter_service')}",
+        "",
+        f"[bold]{t('help_interactive_filter')}[/bold]",
+        f"  {t('help_filter_set')}",
+        f"  {t('help_filter_clear')}",
+        "",
+        f"[bold cyan]{t('help_examples')}[/bold cyan]",
+        f"  {t('help_example_basic')}",
+        f"  {t('help_example_multi')}",
+        f"  {t('help_example_cidr')}",
+        f"  {t('help_example_provider')}",
+        f"  {t('help_example_multi_provider')}",
+        f"  {t('help_example_region')}",
+        f"  {t('help_example_service')}",
+        f"  {t('help_example_combined')}",
+        "",
+        f"[bold cyan]{t('help_interactive_example')}[/bold cyan]",
+        f"  {t('help_interactive_step1')}",
+        f"  {t('help_interactive_step2')}",
         "",
         f"[bold]{t('help_shortcuts')}[/bold]",
         f"  {t('help_shortcut_help')}",
@@ -225,29 +262,30 @@ def _display_results_table(results: list[PublicIPResult]) -> None:
     console.print(table)
 
 
-def _show_export_menu(results: list[PublicIPResult], session_name: str) -> bool:
-    """Show export options menu. Returns True to continue, False to exit."""
-    console.print(f"\n[bold cyan]{t('export_title')}[/bold cyan]")
-    console.print(f"  (1) {t('export_csv')}")
-    console.print(f"  (2) {t('export_excel')}")
-    console.print(f"  (3) {t('export_clipboard')}")
-    console.print(f"  (0) {t('export_continue')}")
+def _show_export_menu(results: list[PublicIPResult], session_name: str) -> None:
+    """Show export options as inline hint (non-blocking)."""
+    console.print("\n[dim]e=export (1:csv, 2:excel, 3:clipboard) | Enter=계속[/dim]")
 
-    choice = Prompt.ask(t("prompt_select"), choices=["0", "1", "2", "3"], default="0")
+    choice = console.input("> ").strip().lower()
 
-    if choice == "1":
+    # Handle 'e' to show full export menu
+    if choice == "e":
+        console.print(f"  (1) {t('export_csv')}")
+        console.print(f"  (2) {t('export_excel')}")
+        console.print(f"  (3) {t('export_clipboard')}")
+        choice = console.input(f"  {t('prompt_select')}: ").strip().lower()
+
+    if choice == "1" or choice == "csv":
         filepath = _export_csv(results, session_name)
         if filepath:
             console.print(f"[green]{t('export_saved', path=filepath)}[/green]")
-    elif choice == "2":
+    elif choice == "2" or choice == "excel":
         filepath = _export_excel(results, session_name)
         if filepath:
             console.print(f"[green]{t('export_saved', path=filepath)}[/green]")
-    elif choice == "3":
+    elif choice == "3" or choice in ("clip", "clipboard", "copy"):
         if _copy_to_clipboard(results):
             console.print(f"[green]{t('export_copied')}[/green]")
-
-    return True  # Continue searching
 
 
 def _show_cache_status() -> None:
@@ -266,16 +304,58 @@ def _show_cache_status() -> None:
             console.print(f"  {provider}: [dim]{t('cache_none')}[/dim]")
 
 
+def _parse_provider_selection(selection: str) -> list[str]:
+    """Parse provider selection string (e.g., '1,3,5' or '1 3 5').
+
+    Args:
+        selection: User input string
+
+    Returns:
+        List of provider names
+    """
+    # Normalize: replace comma and space with comma
+    normalized = selection.replace(" ", ",")
+    indices = [s.strip() for s in normalized.split(",") if s.strip()]
+
+    providers = []
+    for idx in indices:
+        if idx.isdigit():
+            i = int(idx)
+            if 1 <= i <= len(ALL_PROVIDERS):
+                providers.append(ALL_PROVIDERS[i - 1])
+    return providers
+
+
 def _show_cache_menu() -> None:
     """Show cache management menu."""
-    _show_cache_status()
+    status = get_public_cache_status()
 
-    console.print(f"\n  (1) {t('cache_refresh')}")
+    console.print(f"\n[bold cyan]{t('cache_status_title')}[/bold cyan]")
+
+    # Display each provider with number
+    for i, provider in enumerate(ALL_PROVIDERS, 1):
+        info = status["providers"].get(provider.upper(), {})
+        if info.get("cached"):
+            is_valid = info.get("valid", False)
+            status_icon = "[green]●[/green]" if is_valid else "[yellow]●[/yellow]"
+            count = info.get("count", 0)
+            cache_time = info.get("time", "")
+            console.print(f"  [{i}] {status_icon} {provider.upper()}: {count} ({cache_time})")
+        else:
+            console.print(f"  [{i}] [dim]○[/dim] {provider.upper()}: [dim]{t('cache_none')}[/dim]")
+
+    console.print()
+    console.print(f"  (a) {t('cache_refresh_all')}")
+    console.print(f"  (1-6) {t('cache_refresh_select')}")
+    console.print(f"  (c) {t('cache_delete')}")
     console.print(f"  (0) {t('menu_back')}")
 
-    choice = Prompt.ask(t("prompt_select"), choices=["0", "1"], default="0")
+    choice = console.input(f"\n{t('prompt_select')}: ").strip().lower()
 
-    if choice == "1":
+    if choice == "0":
+        return
+    elif choice == "a":
+        # Refresh all providers
         with console.status(f"[bold yellow]{t('cache_refreshing')}[/bold yellow]"):
             result = refresh_public_cache()
 
@@ -285,6 +365,43 @@ def _show_cache_menu() -> None:
             console.print(f"  [dim]{counts}[/dim]")
         if result["failed"]:
             console.print(f"[yellow]{t('cache_refresh_failed')}: {', '.join(result['failed'])}[/yellow]")
+
+    elif choice == "c":
+        # Cache delete submenu
+        console.print(f"\n  (a) {t('cache_delete_all')}")
+        console.print(f"  (1-6) {t('cache_delete_select')}")
+        console.print(f"  (0) {t('menu_back')}")
+
+        del_choice = console.input(f"\n{t('prompt_select')}: ").strip().lower()
+
+        if del_choice == "0":
+            return
+        elif del_choice == "a":
+            count = clear_public_cache()
+            console.print(f"[green]{t('cache_deleted', providers='ALL')} ({count})[/green]")
+        else:
+            providers = _parse_provider_selection(del_choice)
+            if providers:
+                count = clear_public_cache(providers)
+                provider_names = ", ".join(p.upper() for p in providers)
+                console.print(f"[green]{t('cache_deleted', providers=provider_names)} ({count})[/green]")
+
+    else:
+        # Selective refresh (e.g., "1" or "1,3,5")
+        providers = _parse_provider_selection(choice)
+        if providers:
+            provider_names = ", ".join(p.upper() for p in providers)
+            with console.status(
+                f"[bold yellow]{t('cache_refreshing_providers', providers=provider_names)}[/bold yellow]"
+            ):
+                result = refresh_public_cache(providers)
+
+            if result["success"]:
+                counts = ", ".join(f"{p}: {result['counts'].get(p, 0)}" for p in result["success"])
+                console.print(f"[green]{t('cache_refresh_done')}[/green]")
+                console.print(f"  [dim]{counts}[/dim]")
+            if result["failed"]:
+                console.print(f"[yellow]{t('cache_refresh_failed')}: {', '.join(result['failed'])}[/yellow]")
 
 
 # =============================================================================
@@ -328,6 +445,130 @@ def _ensure_cache_ready() -> bool:
 
 
 # =============================================================================
+# Filter Parsing
+# =============================================================================
+
+
+def _parse_inline_filters(ip_input: str) -> tuple[str, dict[str, str | list[str] | None]]:
+    """Parse inline filters from IP input.
+
+    Supports:
+        -p <provider>   CSP filter (can be comma-separated)
+        -r <region>     Region filter
+        -s <service>    Service filter
+
+    Args:
+        ip_input: Raw input string (e.g., "52.94.76.1 -p aws -r ap-northeast-2")
+
+    Returns:
+        Tuple of (ip_part, filters_dict)
+        filters_dict: {"providers": [...], "region": str, "service": str}
+    """
+    import shlex
+
+    filters: dict[str, str | list[str] | None] = {
+        "providers": None,
+        "region": None,
+        "service": None,
+    }
+
+    # Try to parse using shlex for proper quoting support
+    try:
+        parts = shlex.split(ip_input)
+    except ValueError:
+        # Fall back to simple split if shlex fails
+        parts = ip_input.split()
+
+    if not parts:
+        return "", filters
+
+    ip_parts = []
+    i = 0
+    while i < len(parts):
+        part = parts[i]
+
+        if part == "-p" and i + 1 < len(parts):
+            # Provider filter
+            provider_str = parts[i + 1]
+            providers = [p.strip().lower() for p in provider_str.split(",")]
+            filters["providers"] = [p for p in providers if p in ALL_PROVIDERS]
+            i += 2
+        elif part == "-r" and i + 1 < len(parts):
+            # Region filter
+            filters["region"] = parts[i + 1]
+            i += 2
+        elif part == "-s" and i + 1 < len(parts):
+            # Service filter
+            filters["service"] = parts[i + 1]
+            i += 2
+        elif part.startswith("-"):
+            # Unknown flag, skip
+            i += 1
+        else:
+            # IP address part
+            ip_parts.append(part)
+            i += 1
+
+    return " ".join(ip_parts), filters
+
+
+def _get_filter_display(filters: dict[str, str | list[str] | None]) -> str:
+    """Get display string for current filters."""
+    parts: list[str] = []
+
+    providers = filters.get("providers")
+    if providers and isinstance(providers, list):
+        parts.append(", ".join(p.upper() for p in providers))
+    else:
+        parts.append("ALL")
+
+    region = filters.get("region")
+    if region and isinstance(region, str):
+        parts.append(region)
+
+    service = filters.get("service")
+    if service and isinstance(service, str):
+        parts.append(service)
+
+    return " / ".join(parts)
+
+
+def _interactive_filter_setup() -> dict[str, str | list[str] | None]:
+    """Interactive filter setup dialog.
+
+    Returns:
+        filters_dict: {"providers": [...], "region": str, "service": str}
+    """
+    filters: dict[str, str | list[str] | None] = {
+        "providers": None,
+        "region": None,
+        "service": None,
+    }
+
+    console.print(f"\n[bold cyan]{t('help_interactive_filter')}[/bold cyan]")
+
+    # CSP filter
+    csp_input = Prompt.ask(f"  {t('filter_prompt_csp')}", default="").strip()
+    if csp_input:
+        providers = [p.strip().lower() for p in csp_input.split(",")]
+        valid_providers = [p for p in providers if p in ALL_PROVIDERS]
+        if valid_providers:
+            filters["providers"] = valid_providers
+
+    # Region filter
+    region_input = Prompt.ask(f"  {t('filter_prompt_region')}", default="").strip()
+    if region_input:
+        filters["region"] = region_input
+
+    # Service filter
+    service_input = Prompt.ask(f"  {t('filter_prompt_service')}", default="").strip()
+    if service_input:
+        filters["service"] = service_input
+
+    return filters
+
+
+# =============================================================================
 # Search Functions
 # =============================================================================
 
@@ -338,64 +579,129 @@ def _search_by_ip(session_name: str) -> None:
     if not _ensure_cache_ready():
         return
 
-    console.print(f"\n[dim]{t('prompt_enter_ip')} | ?={t('help_shortcut_help').split(' - ')[1]}[/dim]")
-    ip_input = Prompt.ask(f"[bold cyan]{t('header_ip')}[/bold cyan]").strip()
+    # Persistent filter state
+    current_filters: dict[str, str | list[str] | None] = {
+        "providers": None,
+        "region": None,
+        "service": None,
+    }
 
-    if not ip_input:
-        return
+    while True:
+        # Show current filter if active
+        has_filters = any(current_filters.values())
+        if has_filters:
+            filter_display = _get_filter_display(current_filters)
+            console.print(f"\n[bold magenta]{t('filter_current', filters=filter_display)}[/bold magenta]")
 
-    # Handle help command
-    if ip_input == "?":
-        _show_help()
-        return
+        console.print(f"\n[dim]{t('prompt_enter_ip')} | ?=help | f=filter | fc=clear | 0=back[/dim]")
+        ip_input = Prompt.ask(f"[bold cyan]{t('header_ip')}[/bold cyan]").strip()
 
-    # Validate input
-    valid_ips, errors = _validate_ip_input(ip_input)
+        if not ip_input:
+            return
 
-    # Show validation errors
-    if errors:
-        console.print(f"\n[yellow]{t('validation_errors_found', count=len(errors))}[/yellow]")
-        for error in errors[:5]:  # Show max 5 errors
-            console.print(f"  [dim]{error}[/dim]")
-        if len(errors) > 5:
-            console.print(f"  [dim]... +{len(errors) - 5}[/dim]")
+        # Handle commands
+        if ip_input == "?":
+            _show_help()
+            continue
+        elif ip_input.lower() == "f":
+            # Interactive filter setup
+            current_filters = _interactive_filter_setup()
+            if any(current_filters.values()):
+                console.print(f"[green]{t('filter_set_success')}[/green]")
+            continue
+        elif ip_input.lower() == "fc":
+            # Clear filters
+            current_filters = {"providers": None, "region": None, "service": None}
+            console.print(f"[green]{t('filter_cleared')}[/green]")
+            continue
+        elif ip_input == "0":
+            return
 
-    # No valid IPs
-    if not valid_ips:
-        console.print(f"\n[red]{t('validation_no_valid_ips')}[/red]")
-        return
+        # Parse inline filters from input
+        ip_part, inline_filters = _parse_inline_filters(ip_input)
 
-    # If there were some errors but also valid IPs, inform user
-    if errors and valid_ips:
-        console.print(f"[cyan]{t('validation_valid_ips', count=len(valid_ips))}[/cyan]")
+        # Merge filters: inline filters override current filters
+        effective_filters = current_filters.copy()
+        if inline_filters.get("providers"):
+            effective_filters["providers"] = inline_filters["providers"]
+        if inline_filters.get("region"):
+            effective_filters["region"] = inline_filters["region"]
+        if inline_filters.get("service"):
+            effective_filters["service"] = inline_filters["service"]
 
-    with console.status(f"[bold yellow]{t('searching')}[/bold yellow]"):
-        results = search_public_ip(valid_ips)
+        # Validate input (supports both IPs and CIDRs)
+        valid_ips, valid_cidrs, errors = _validate_ip_input(ip_part)
 
-    if not results:
-        # Show detailed error message
-        console.print(f"\n[yellow]{t('result_no_match_detail')}[/yellow]")
-        # Show hints based on input
-        sample_ip = valid_ips[0] if valid_ips else ""
-        if sample_ip and _is_private_ip(sample_ip):
-            console.print(f"  [dim]{t('result_no_match_hint_private')}[/dim]")
-        else:
-            console.print(f"  [dim]{t('result_no_match_hint_public', ip=sample_ip)}[/dim]")
-        console.print(f"  [dim]{t('result_no_match_hint_check')}[/dim]")
-        return
+        # Show validation errors
+        if errors:
+            console.print(f"\n[yellow]{t('validation_errors_found', count=len(errors))}[/yellow]")
+            for error in errors[:5]:  # Show max 5 errors
+                console.print(f"  [dim]{error}[/dim]")
+            if len(errors) > 5:
+                console.print(f"  [dim]... +{len(errors) - 5}[/dim]")
 
-    # Filter out Unknown if there are known matches for the same IP
-    known_results = [r for r in results if r.provider != "Unknown"]
-    known_ips = {r.ip_address for r in known_results}
-    truly_unknown = [r for r in results if r.provider == "Unknown" and r.ip_address not in known_ips]
+        # No valid IPs or CIDRs
+        if not valid_ips and not valid_cidrs:
+            console.print(f"\n[red]{t('validation_no_valid_ips')}[/red]")
+            continue
 
-    display_results = known_results + truly_unknown
+        # If there were some errors but also valid inputs, inform user
+        total_valid = len(valid_ips) + len(valid_cidrs)
+        if errors and total_valid > 0:
+            console.print(f"[cyan]{t('validation_valid_ips', count=total_valid)}[/cyan]")
 
-    console.print(f"\n[bold cyan]{t('result_title')} ({t('result_count', count=len(display_results))})[/bold cyan]")
-    _display_results_table(display_results)
+        # Prepare search parameters
+        providers_list = effective_filters.get("providers")
+        region_filter = effective_filters.get("region")
+        service_filter = effective_filters.get("service")
 
-    if display_results:
-        _show_export_menu(display_results, session_name)
+        results: list[PublicIPResult] = []
+
+        with console.status(f"[bold yellow]{t('searching')}[/bold yellow]"):
+            # Search for individual IPs
+            if valid_ips:
+                ip_results = search_public_ip(
+                    valid_ips,
+                    providers=providers_list if isinstance(providers_list, list) else None,
+                    region_filter=region_filter if isinstance(region_filter, str) else None,
+                    service_filter=service_filter if isinstance(service_filter, str) else None,
+                )
+                results.extend(ip_results)
+
+            # Search for CIDR ranges
+            if valid_cidrs:
+                cidr_results = search_public_cidr(
+                    valid_cidrs,
+                    providers=providers_list if isinstance(providers_list, list) else None,
+                    region_filter=region_filter if isinstance(region_filter, str) else None,
+                    service_filter=service_filter if isinstance(service_filter, str) else None,
+                )
+                results.extend(cidr_results)
+
+        if not results:
+            # Show detailed error message
+            console.print(f"\n[yellow]{t('result_no_match_detail')}[/yellow]")
+            # Show hints based on input
+            sample = valid_ips[0] if valid_ips else (valid_cidrs[0] if valid_cidrs else "")
+            if sample and "/" not in sample and _is_private_ip(sample):
+                console.print(f"  [dim]{t('result_no_match_hint_private')}[/dim]")
+            else:
+                console.print(f"  [dim]{t('result_no_match_hint_public', ip=sample)}[/dim]")
+            console.print(f"  [dim]{t('result_no_match_hint_check')}[/dim]")
+            continue
+
+        # Filter out Unknown if there are known matches for the same IP
+        known_results = [r for r in results if r.provider != "Unknown"]
+        known_ips = {r.ip_address for r in known_results}
+        truly_unknown = [r for r in results if r.provider == "Unknown" and r.ip_address not in known_ips]
+
+        display_results = known_results + truly_unknown
+
+        console.print(f"\n[bold cyan]{t('result_title')} ({t('result_count', count=len(display_results))})[/bold cyan]")
+        _display_results_table(display_results)
+
+        if display_results:
+            _show_export_menu(display_results, session_name)
 
 
 def _search_by_filter(session_name: str) -> None:
@@ -440,23 +746,33 @@ def _search_by_filter(session_name: str) -> None:
         console.print(f"\n  [dim]{t('filter_more', count=len(filters['services']) - 12)}[/dim]")
     console.print()
 
-    # Get filter input
+    # Get filter input - separate region and service
     console.print(f"\n[dim]{t('prompt_enter_filter')}[/dim]")
-    filter_value = Prompt.ask("[bold yellow]Filter[/bold yellow]").strip()
+    region_filter = Prompt.ask(f"  {t('filter_prompt_region')}", default="").strip()
+    service_filter = Prompt.ask(f"  {t('filter_prompt_service')}", default="").strip()
 
-    if not filter_value:
+    if not region_filter and not service_filter:
+        console.print(f"\n[yellow]{t('validation_no_valid_ips').replace('IP', '필터')}[/yellow]")
         return
 
-    # Search
+    # Search with both filters
     with console.status(f"[bold yellow]{t('searching')}[/bold yellow]"):
-        # Try as region first, then as service
-        results = search_by_filter(provider=provider, region=filter_value)
-        if not results:
-            results = search_by_filter(provider=provider, service=filter_value)
+        results = search_by_filter(
+            provider=provider,
+            region=region_filter if region_filter else None,
+            service=service_filter if service_filter else None,
+        )
+
+    filter_desc = []
+    if region_filter:
+        filter_desc.append(f"region={region_filter}")
+    if service_filter:
+        filter_desc.append(f"service={service_filter}")
+    filter_str = ", ".join(filter_desc)
 
     if not results:
         console.print(f"\n[yellow]{t('result_no_match_detail')}[/yellow]")
-        console.print(f"  [dim]• {provider.upper()}: '{filter_value}' 필터와 일치하는 IP 범위 없음[/dim]")
+        console.print(f"  [dim]• {provider.upper()}: {filter_str} 필터와 일치하는 IP 범위 없음[/dim]")
         return
 
     console.print(f"\n[bold cyan]{t('result_title')} ({t('result_count', count=len(results))})[/bold cyan]")
@@ -493,7 +809,7 @@ def run(ctx: ExecutionContext) -> None:
         print_box_line(f"  1) {t('menu_search_ip')}")
         print_box_line(f"  2) {t('menu_filter_search')}")
         print_box_line(f"  3) {t('menu_cache_manage')}")
-        print_box_line(f"  ?) {t('help_shortcut_help').split(' - ')[1]}")
+        print_box_line(f"  ?) {t('menu_help_short')}")
         print_box_line(f"  0) {t('menu_back')}")
         print_box_end()
 

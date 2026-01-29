@@ -255,9 +255,13 @@ MESSAGES = {
         "ko": "• 단일 IP: 52.94.76.1",
         "en": "• Single IP: 52.94.76.1",
     },
+    "help_cidr": {
+        "ko": "• CIDR 범위: 13.0.0.0/8, 52.94.0.0/16 (중첩 검색)",
+        "en": "• CIDR range: 13.0.0.0/8, 52.94.0.0/16 (overlap search)",
+    },
     "help_multi_ip": {
-        "ko": "• 다중 IP: 52.94.76.1, 8.8.8.8 (쉼표, 공백, 줄바꿈 구분)",
-        "en": "• Multiple IPs: 52.94.76.1, 8.8.8.8 (comma, space, or newline)",
+        "ko": "• 다중 입력: 52.94.76.1, 8.8.8.8, 13.0.0.0/8 (쉼표/공백 구분)",
+        "en": "• Multiple: 52.94.76.1, 8.8.8.8, 13.0.0.0/8 (comma/space)",
     },
     "help_shortcuts": {
         "ko": "단축키:",
@@ -278,6 +282,142 @@ MESSAGES = {
     "help_providers": {
         "ko": "지원 프로바이더: AWS, GCP, Azure, Oracle, Cloudflare, Fastly",
         "en": "Supported providers: AWS, GCP, Azure, Oracle, Cloudflare, Fastly",
+    },
+    # Filter options
+    "help_filter_options": {
+        "ko": "필터 옵션 (인라인):",
+        "en": "Filter Options (inline):",
+    },
+    "help_filter_provider": {
+        "ko": "• -p <csp>      CSP 필터 (aws, gcp, azure, oracle, cloudflare, fastly)",
+        "en": "• -p <csp>      CSP filter (aws, gcp, azure, oracle, cloudflare, fastly)",
+    },
+    "help_filter_region": {
+        "ko": "• -r <region>   리전 필터 (ap-northeast-2, us-east-1, ...)",
+        "en": "• -r <region>   Region filter (ap-northeast-2, us-east-1, ...)",
+    },
+    "help_filter_service": {
+        "ko": "• -s <service>  서비스 필터 (EC2, S3, CLOUDFRONT, ...)",
+        "en": "• -s <service>  Service filter (EC2, S3, CLOUDFRONT, ...)",
+    },
+    "help_interactive_filter": {
+        "ko": "대화형 필터:",
+        "en": "Interactive filter:",
+    },
+    "help_filter_set": {
+        "ko": "• f             필터 설정 (CSP/리전/서비스를 순차적으로 입력)",
+        "en": "• f             Set filter (CSP/region/service sequentially)",
+    },
+    "help_filter_clear": {
+        "ko": "• fc            필터 초기화",
+        "en": "• fc            Clear filter",
+    },
+    "help_examples": {
+        "ko": "사용 예시:",
+        "en": "Usage Examples:",
+    },
+    "help_example_basic": {
+        "ko": "  52.94.76.1                        → 모든 CSP에서 검색",
+        "en": "  52.94.76.1                        → Search all CSPs",
+    },
+    "help_example_multi": {
+        "ko": "  52.94.76.1, 8.8.8.8               → 다중 IP 검색 (쉼표/공백 구분)",
+        "en": "  52.94.76.1, 8.8.8.8               → Multiple IPs (comma/space)",
+    },
+    "help_example_provider": {
+        "ko": "  52.94.76.1 -p aws                 → AWS에서만 검색",
+        "en": "  52.94.76.1 -p aws                 → Search AWS only",
+    },
+    "help_example_multi_provider": {
+        "ko": "  52.94.76.1 -p aws,gcp             → AWS, GCP에서 검색",
+        "en": "  52.94.76.1 -p aws,gcp             → Search AWS and GCP",
+    },
+    "help_example_region": {
+        "ko": "  52.94.76.1 -p aws -r ap-northeast → AWS 서울 리전에서 검색",
+        "en": "  52.94.76.1 -p aws -r ap-northeast → Search AWS Seoul region",
+    },
+    "help_example_service": {
+        "ko": "  52.94.76.1 -p aws -s EC2          → AWS EC2 대역에서 검색",
+        "en": "  52.94.76.1 -p aws -s EC2          → Search AWS EC2 ranges",
+    },
+    "help_example_combined": {
+        "ko": "  8.8.8.8, 1.1.1.1 -p gcp,cloudflare → 복합 필터 검색",
+        "en": "  8.8.8.8, 1.1.1.1 -p gcp,cloudflare → Combined filter search",
+    },
+    "help_example_cidr": {
+        "ko": "  13.0.0.0/8 -p aws                 → CIDR 범위 중첩 검색",
+        "en": "  13.0.0.0/8 -p aws                 → CIDR overlap search",
+    },
+    "help_interactive_example": {
+        "ko": "대화형 필터 예시:",
+        "en": "Interactive Filter Example:",
+    },
+    "help_interactive_step1": {
+        "ko": "  f → aws → ap-northeast-2 → EC2   → 필터 설정 후 검색",
+        "en": "  f → aws → ap-northeast-2 → EC2   → Set filter then search",
+    },
+    "help_interactive_step2": {
+        "ko": "  fc                                → 필터 초기화",
+        "en": "  fc                                → Clear all filters",
+    },
+    # Cache management
+    "cache_refresh_all": {
+        "ko": "전체 새로고침",
+        "en": "Refresh all",
+    },
+    "cache_refresh_select": {
+        "ko": "개별 새로고침 (예: 1 또는 1,3,5)",
+        "en": "Refresh selected (e.g., 1 or 1,3,5)",
+    },
+    "cache_delete": {
+        "ko": "캐시 삭제",
+        "en": "Delete cache",
+    },
+    "cache_delete_all": {
+        "ko": "전체 삭제",
+        "en": "Delete all",
+    },
+    "cache_delete_select": {
+        "ko": "개별 삭제 (예: 1 또는 1,3,5)",
+        "en": "Delete selected (e.g., 1 or 1,3,5)",
+    },
+    "cache_deleted": {
+        "ko": "캐시 삭제 완료: {providers}",
+        "en": "Cache deleted: {providers}",
+    },
+    "cache_refreshing_providers": {
+        "ko": "{providers} 캐시 새로고침 중...",
+        "en": "Refreshing {providers} cache...",
+    },
+    # Filter state
+    "filter_current": {
+        "ko": "[필터 적용됨] {filters}",
+        "en": "[Filter applied] {filters}",
+    },
+    "filter_cleared": {
+        "ko": "필터가 초기화되었습니다",
+        "en": "Filter cleared",
+    },
+    "filter_prompt_csp": {
+        "ko": "CSP (aws,gcp,azure,oracle,cloudflare,fastly 또는 Enter=전체)",
+        "en": "CSP (aws,gcp,azure,oracle,cloudflare,fastly or Enter=all)",
+    },
+    "filter_prompt_region": {
+        "ko": "리전 (예: ap-northeast-2, Enter=전체)",
+        "en": "Region (e.g., ap-northeast-2, Enter=all)",
+    },
+    "filter_prompt_service": {
+        "ko": "서비스 (예: EC2, S3, Enter=전체)",
+        "en": "Service (e.g., EC2, S3, Enter=all)",
+    },
+    "filter_set_success": {
+        "ko": "필터가 설정되었습니다",
+        "en": "Filter has been set",
+    },
+    # Menu display (short versions)
+    "menu_help_short": {
+        "ko": "도움말",
+        "en": "Help",
     },
 }
 

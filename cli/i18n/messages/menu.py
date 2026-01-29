@@ -456,7 +456,7 @@ MENU_MESSAGES = {
         "en": "By Purpose",
     },
     "aws_category": {
-        "ko": "분야별",
+        "ko": "카테고리별",
         "en": "By Category",
     },
     "by_purpose": {
@@ -464,7 +464,7 @@ MENU_MESSAGES = {
         "en": "By Purpose",
     },
     "by_category": {
-        "ko": "분야별",
+        "ko": "카테고리별",
         "en": "By Category",
     },
     "reports": {
