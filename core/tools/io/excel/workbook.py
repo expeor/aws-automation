@@ -151,7 +151,7 @@ class SummarySheet:
 
         # 기본 컬럼 너비 설정
         ws.column_dimensions["A"].width = 25
-        ws.column_dimensions["B"].width = 40
+        ws.column_dimensions["B"].width = 25
 
         # 줌 비율 85% 설정
         ws.sheet_view.zoomScale = 85

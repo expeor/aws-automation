@@ -29,6 +29,7 @@ TOOLS = [
         "permission": "read",
         "module": "public_ip.tool",
         "area": "search",
+        "require_session": False,
     },
     {
         "name": "Private IP 검색",
@@ -38,6 +39,7 @@ TOOLS = [
         "permission": "read",
         "module": "private_ip.tool",
         "area": "search",
+        "require_session": False,
     },
 ]
 

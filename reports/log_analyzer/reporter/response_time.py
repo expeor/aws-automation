@@ -86,8 +86,20 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
             country = self.get_country_code(client_ip)
             timestamp_str = self.format_timestamp(log.get("timestamp"))
 
+            # Processing time breakdown (convert seconds to ms, handle -1 as None)
+            req_proc = log.get("request_processing_time")
+            target_proc = log.get("target_processing_time")
+            resp_proc = log.get("response_processing_time")
+
+            req_proc_ms = round(req_proc * 1000, 3) if req_proc is not None and req_proc >= 0 else None
+            target_proc_ms = round(target_proc * 1000, 3) if target_proc is not None and target_proc >= 0 else None
+            resp_proc_ms = round(resp_proc * 1000, 3) if resp_proc is not None and resp_proc >= 0 else None
+
             values = [
                 log.get("response_time", 0),
+                req_proc_ms,
+                target_proc_ms,
+                resp_proc_ms,
                 timestamp_str,
                 client_ip,
                 country,
@@ -104,14 +116,16 @@ class ResponseTimeSheetWriter(BaseSheetWriter):
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = border
 
-                # Alignment
-                if col_idx == 1:  # Response time
+                # Alignment (14 columns now)
+                if col_idx in (1, 2, 3, 4):  # Response time + Processing times
                     cell.alignment = self.styles.align_right
-                elif col_idx in (2, 3, 4, 5, 6, 7):  # Timestamp through Method
+                    if col_idx > 1 and value is not None:
+                        cell.number_format = "0.000"
+                elif col_idx in (5, 6, 7, 8, 9, 10):  # Timestamp through Method
                     cell.alignment = self.styles.align_center
-                elif col_idx in (8, 9):  # Request, User Agent
+                elif col_idx in (11, 12):  # Request, User Agent
                     cell.alignment = self.styles.align_left
-                elif col_idx in (10, 11):  # Status codes
+                elif col_idx in (13, 14):  # Status codes
                     cell.alignment = self.styles.align_right
                     if isinstance(value, int):
                         cell.number_format = "0"

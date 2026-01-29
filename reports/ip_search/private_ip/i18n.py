@@ -391,6 +391,15 @@ MESSAGES = {
         "ko": "?=도움말",
         "en": "?=Help",
     },
+    # Detail mode restrictions
+    "detail_mode_single_cache_only": {
+        "ko": "Detail Mode는 단일 캐시 선택 시에만 사용 가능합니다. '캐시 선택'에서 1개만 선택하세요.",
+        "en": "Detail Mode is only available with a single cache. Select only 1 cache in 'Select Cache'.",
+    },
+    "detail_mode_auth_failed": {
+        "ko": "인증 실패. Detail Mode를 비활성화합니다.",
+        "en": "Authentication failed. Disabling Detail Mode.",
+    },
 }
 
 

@@ -143,8 +143,8 @@ class TestReportsTools:
         assert tool["permission"] == "read"
         # Note: area changed from "operational" to "inventory" in reports/__init__.py
         assert tool["area"] == "inventory"
-        assert "module" in tool
-        assert tool["module"] == "_scheduled_menu"
+        assert "ref" in tool
+        assert tool["ref"] == "scheduled/menu"
         assert tool.get("is_menu") is True
 
 

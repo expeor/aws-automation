@@ -76,17 +76,137 @@ def get_version() -> str:
 VERSION = get_version()
 
 # 유틸리티 명령어 목록 (서비스 명령어와 분리 표시용)
-UTILITY_COMMANDS = {"run", "list-tools", "group"}
+UTILITY_COMMANDS = {"tools", "group"}
 
 
 class GroupedCommandsGroup(click.Group):
-    """명령어를 서비스/유틸리티로 분리해서 표시하는 커스텀 Click 그룹"""
+    """명령어를 서비스/유틸리티로 분리해서 표시하는 커스텀 Click 그룹
+
+    추가 기능:
+    - aa ec2/unused_eip 형식의 path 기반 도구 직접 실행 지원
+    """
+
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
+        """명령어 조회 - path 형식이면 run 명령어로 라우팅"""
+        # 등록된 명령어가 있으면 그대로 반환
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            return cmd
+
+        # path 형식(/)이면 run 명령어로 라우팅
+        if "/" in cmd_name:
+            return self._create_path_run_command(cmd_name)
+
+        return None
+
+    def _create_path_run_command(self, tool_path: str) -> Command:
+        """path 기반 도구 실행을 위한 동적 명령어 생성"""
+
+        @click.command(name=tool_path)
+        @click.option("-p", "--profile", "profile", help="SSO Profile 또는 Access Key 프로파일 (단일)")
+        @click.option("-g", "--profile-group", "profile_group", help="프로파일 그룹 이름 (다중 프로파일)")
+        @click.option("-s", "--sso-session", "sso_session", help="SSO Session 이름 (멀티 계정)")
+        @click.option("--account", "accounts", multiple=True, help="계정 ID (SSO Session용, 다중 가능)")
+        @click.option("--role", "role", help="Role 이름 (SSO Session용)")
+        @click.option("--fallback-role", "fallback_role", help="Fallback Role (SSO Session용)")
+        @click.option("-r", "--region", multiple=True, default=["ap-northeast-2"], help="리전 (다중 가능)")
+        @click.option(
+            "-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both"
+        )
+        @click.option("-o", "--output", default=None, help="출력 파일 경로")
+        @click.option("-q", "--quiet", is_flag=True, help="최소 출력 모드")
+        @click.pass_context
+        def path_run_cmd(
+            ctx: Context,
+            profile: str | None,
+            profile_group: str | None,
+            sso_session: str | None,
+            accounts: tuple[str, ...],
+            role: str | None,
+            fallback_role: str | None,
+            region: tuple[str, ...],
+            format: str,
+            output: str | None,
+            quiet: bool,
+        ) -> None:
+            """도구 직접 실행"""
+            from cli.headless import run_headless
+
+            # 인증 옵션 검증
+            auth_options = [bool(profile), bool(profile_group), bool(sso_session)]
+            if sum(auth_options) == 0:
+                click.echo(t("cli.run_auth_required"), err=True)
+                raise SystemExit(1)
+            if sum(auth_options) > 1:
+                click.echo(t("cli.run_auth_conflict"), err=True)
+                raise SystemExit(1)
+
+            # SSO Session 옵션 검증
+            if sso_session:
+                if not role:
+                    click.echo(t("cli.run_sso_role_required"), err=True)
+                    raise SystemExit(1)
+                if not accounts:
+                    click.echo(t("cli.run_sso_account_required"), err=True)
+                    raise SystemExit(1)
+
+            # SSO Session 실행
+            if sso_session:
+                exit_code = run_headless(
+                    tool_path=tool_path,
+                    sso_session=sso_session,
+                    accounts=list(accounts),
+                    role=role,
+                    fallback_role=fallback_role,
+                    regions=list(region),
+                    format=format,
+                    output=output,
+                    quiet=quiet,
+                )
+                raise SystemExit(exit_code)
+
+            # Profile Group 실행 (다중 프로파일 순차 실행)
+            if profile_group:
+                from core.tools.history import ProfileGroupsManager
+
+                manager = ProfileGroupsManager()
+                group = manager.get_by_name(profile_group)
+                if not group:
+                    click.echo(t("cli.run_group_not_found", name=profile_group), err=True)
+                    raise SystemExit(1)
+
+                total_exit_code = 0
+                for p in group.profiles:
+                    exit_code = run_headless(
+                        tool_path=tool_path,
+                        profile=p,
+                        regions=list(region),
+                        format=format,
+                        output=output,
+                        quiet=quiet,
+                    )
+                    if exit_code != 0:
+                        total_exit_code = exit_code
+                raise SystemExit(total_exit_code)
+
+            # 단일 프로파일 실행
+            exit_code = run_headless(
+                tool_path=tool_path,
+                profile=profile,
+                regions=list(region),
+                format=format,
+                output=output,
+                quiet=quiet,
+            )
+            raise SystemExit(exit_code)
+
+        return path_run_cmd
 
     def format_commands(self, ctx: Context, formatter: HelpFormatter) -> None:
         """명령어를 그룹화해서 표시"""
         commands: list[tuple[str, Command]] = []
         for subcommand in self.list_commands(ctx):
-            cmd = self.get_command(ctx, subcommand)
+            cmd = super().get_command(ctx, subcommand)  # 동적 명령어 제외
             if cmd is None or cmd.hidden:
                 continue
             commands.append((subcommand, cmd))
@@ -131,8 +251,8 @@ def _build_help_text(lang: str = "ko") -> str:
             "",
             "\b",
             t("cli.help_headless_mode"),
-            f"  aa run <tool_path> [options]    {t('cli.help_run_tool')}",
-            f"  aa list-tools                   {t('cli.help_list_tools')}",
+            f"  aa <tool_path> [options]        {t('cli.help_run_tool')} (e.g., aa ec2/ebs_audit -p ...)",
+            f"  aa tools                        {t('cli.help_list_tools')}",
             "",
             f"  {t('cli.help_examples')}",
             "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
@@ -161,13 +281,13 @@ def _build_help_text(lang: str = "ko") -> str:
             "  aa <서비스>     특정 서비스 도구 실행",
             "",
             "\b",
-            "[Headless 모드 (CI/CD용)]",
-            "  aa run <도구경로> [옵션]    도구 실행",
-            "  aa list-tools               도구 목록 조회",
+            "[비대화형 모드]",
+            "  aa <도구경로> [옵션]        도구 직접 실행",
+            "  aa tools                    도구 목록 조회",
             "",
             "  예시:",
-            "    aa run ec2/ebs_audit -p my-profile -r ap-northeast-2",
-            "    aa run ec2/ebs_audit -g 'Dev Team' -r all -f json",
+            "    aa ec2/ebs_audit -p my-profile -r ap-northeast-2",
+            "    aa ec2/ebs_audit -g 'Dev Team' -r all -f json",
             "",
             "\b",
             "[프로파일 그룹]",
@@ -214,213 +334,7 @@ def cli(ctx: Context, lang: str) -> None:
 cli.help = _build_help_text()
 
 
-# =============================================================================
-# Headless CLI 명령어
-# =============================================================================
-
-
-@cli.command("run")
-@click.argument("tool_path")
-@click.option(
-    "-p",
-    "--profile",
-    "profiles",
-    multiple=True,
-    help="SSO Profile 또는 Access Key 프로파일 (다중 가능, 쉼표 구분 지원)",
-)
-@click.option(
-    "-g",
-    "--profile-group",
-    "profile_group",
-    required=False,
-    help="저장된 프로파일 그룹 이름 (aa group list로 확인)",
-)
-@click.option(
-    "-s",
-    "--sso-session",
-    "sso_session",
-    required=False,
-    help="SSO Session 이름 (멀티 계정 지원)",
-)
-@click.option(
-    "--account",
-    "accounts",
-    multiple=True,
-    help="계정 ID (다중 가능, 'all'=전체) - SSO Session 전용",
-)
-@click.option(
-    "--role",
-    "role",
-    required=False,
-    help="사용할 Role 이름 - SSO Session 전용",
-)
-@click.option(
-    "--fallback-role",
-    "fallback_role",
-    required=False,
-    help="Fallback Role 이름 (Primary Role 없는 계정용) - SSO Session 전용",
-)
-@click.option(
-    "-r",
-    "--region",
-    multiple=True,
-    default=["ap-northeast-2"],
-    help="리전 (다중 가능, 'all'=전체, 패턴 가능: 'ap-*')",
-)
-@click.option(
-    "-f",
-    "--format",
-    type=click.Choice(["excel", "html", "both", "console", "json", "csv"]),
-    default="both",
-    help="출력 형식 (기본: both = Excel + HTML)",
-)
-@click.option(
-    "-o",
-    "--output",
-    default=None,
-    help="출력 파일 경로 (기본: 자동 생성)",
-)
-@click.option(
-    "-q",
-    "--quiet",
-    is_flag=True,
-    help="최소 출력 모드",
-)
-def run_command(
-    tool_path: str,
-    profiles: tuple[str, ...],
-    profile_group: str | None,
-    sso_session: str | None,
-    accounts: tuple[str, ...],
-    role: str | None,
-    fallback_role: str | None,
-    region: tuple[str, ...],
-    format: str,
-    output: str | None,
-    quiet: bool,
-) -> None:
-    """비대화형 도구 실행 (CI/CD용)
-
-    SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.
-
-    \b
-    TOOL_PATH: category/module 형식 (aa list-tools로 확인)
-        예: ec2/ebs_audit, iam/unused_users, s3/public_buckets
-
-    \b
-    Examples:
-        # SSO Profile / Access Key 실행
-        aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
-
-        # 다중 프로파일 실행 (순차)
-        aa run ec2/ebs_audit -p dev-profile -p staging-profile -p prod-profile
-
-        # 다중 프로파일 (쉼표 구분)
-        aa run ec2/ebs_audit -p dev,staging,prod -r all
-
-        # 프로파일 그룹으로 실행
-        aa run ec2/ebs_audit -g "개발 환경" -r ap-northeast-2
-
-        # SSO Session으로 멀티 계정 실행
-        aa run ec2/ebs_audit -s my-sso --account 111122223333 --account 444455556666 --role AdminRole
-
-        # SSO Session 전체 계정 실행
-        aa run ec2/ebs_audit -s my-sso --account all --role AdminRole -r all
-
-        # SSO Session + Fallback Role
-        aa run ec2/ebs_audit -s my-sso --account all --role AdminRole --fallback-role ReadOnlyRole
-
-        # 다중 리전
-        aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
-
-        # JSON 출력
-        aa run ec2/ebs_audit -p my-profile -f json -o result.json
-    """
-    from cli.headless import run_headless
-
-    # 인증 옵션 검증: profiles, profile_group, sso_session 중 하나만 사용
-    auth_options = [bool(profiles), bool(profile_group), bool(sso_session)]
-    if sum(auth_options) == 0:
-        click.echo(t("cli.run_auth_required"), err=True)
-        raise SystemExit(1)
-
-    if sum(auth_options) > 1:
-        click.echo(t("cli.run_auth_conflict"), err=True)
-        raise SystemExit(1)
-
-    # SSO Session 옵션 검증
-    if sso_session:
-        if not role:
-            click.echo(t("cli.run_sso_role_required"), err=True)
-            raise SystemExit(1)
-        if not accounts:
-            click.echo(t("cli.run_sso_account_required"), err=True)
-            raise SystemExit(1)
-
-    # SSO Session 실행
-    if sso_session:
-        exit_code = run_headless(
-            tool_path=tool_path,
-            sso_session=sso_session,
-            accounts=list(accounts),
-            role=role,
-            fallback_role=fallback_role,
-            regions=list(region),
-            format=format,
-            output=output,
-            quiet=quiet,
-        )
-        raise SystemExit(exit_code)
-
-    # 프로파일 목록 구성
-    profiles_to_run: list[str] = []
-
-    if profile_group:
-        # 프로파일 그룹에서 가져오기
-        from core.tools.history import ProfileGroupsManager
-
-        manager = ProfileGroupsManager()
-        group = manager.get_by_name(profile_group)
-        if not group:
-            click.echo(t("cli.run_group_not_found", name=profile_group), err=True)
-            click.echo(t("cli.run_group_list_hint"), err=True)
-            raise SystemExit(1)
-        profiles_to_run = group.profiles
-    else:
-        # -p 옵션에서 프로파일 파싱 (쉼표 구분 지원)
-        for p in profiles:
-            if "," in p:
-                # 쉼표로 구분된 프로파일 분리
-                profiles_to_run.extend([x.strip() for x in p.split(",") if x.strip()])
-            else:
-                profiles_to_run.append(p)
-
-    if not profiles_to_run:
-        click.echo(t("cli.run_auth_required"), err=True)
-        raise SystemExit(1)
-
-    # 다중 프로파일 안내
-    if len(profiles_to_run) > 1 and not quiet:
-        click.echo(t("cli.run_multi_profile", count=len(profiles_to_run)))
-
-    # 여러 프로파일 순차 실행
-    total_exit_code = 0
-    for p in profiles_to_run:
-        exit_code = run_headless(
-            tool_path=tool_path,
-            profile=p,
-            regions=list(region),
-            format=format,
-            output=output,
-            quiet=quiet,
-        )
-        if exit_code != 0:
-            total_exit_code = exit_code
-
-    raise SystemExit(total_exit_code)
-
-
-@cli.command("list-tools")
+@cli.command("tools")
 @click.option(
     "-c",
     "--category",
@@ -433,14 +347,14 @@ def run_command(
     is_flag=True,
     help="JSON 형식으로 출력",
 )
-def list_tools_command(category: str | None, as_json: bool) -> None:
+def tools_command(category: str | None, as_json: bool) -> None:
     """사용 가능한 도구 목록
 
     \b
     Examples:
-        aa list-tools              # 전체 도구 목록
-        aa list-tools -c ec2       # EC2 카테고리만
-        aa list-tools --json       # JSON 출력
+        aa tools              # 전체 도구 목록
+        aa tools -c ec2       # EC2 카테고리만
+        aa tools --json       # JSON 출력
     """
     import json as json_module
     from typing import Any
@@ -494,6 +408,16 @@ def list_tools_command(category: str | None, as_json: bool) -> None:
         console.print(table)
         console.print()
         console.print(f"[dim]{t('cli.usage_hint')}[/dim]")
+
+
+# list-tools 별칭 (호환성 유지)
+@cli.command("list-tools", hidden=True)
+@click.option("-c", "--category", default=None, help="특정 카테고리만 표시")
+@click.option("--json", "as_json", is_flag=True, help="JSON 형식으로 출력")
+@click.pass_context
+def list_tools_alias(ctx: Context, category: str | None, as_json: bool) -> None:
+    """사용 가능한 도구 목록 (별칭: aa tools 사용 권장)"""
+    ctx.invoke(tools_command, category=category, as_json=as_json)
 
 
 # =============================================================================

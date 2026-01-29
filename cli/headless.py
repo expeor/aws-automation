@@ -1,7 +1,7 @@
 """
 cli/headless.py - Headless CLI Runner
 
-CI/CD 파이프라인 및 자동화를 위한 비대화형 실행 모드입니다.
+스크립트 및 자동화를 위한 비대화형 실행 모드입니다.
 SSO Session, SSO Profile, Access Key 프로파일을 지원합니다.
 
 Usage:
@@ -86,7 +86,7 @@ class HeadlessRunner:
     """Headless CLI Runner
 
     대화형 프롬프트 없이 도구를 실행합니다.
-    CI/CD 파이프라인 및 스크립트 자동화에 적합합니다.
+    스크립트 자동화에 적합합니다.
     """
 
     def __init__(self, config: HeadlessConfig):

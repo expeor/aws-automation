@@ -32,6 +32,15 @@ TOOLS = [
         "area": "unused",
     },
     {
+        "name": "암호화되지 않은 EBS 볼륨 탐지",
+        "name_en": "Unencrypted EBS Volume Detection",
+        "description": "암호화되지 않은 EBS 볼륨 및 연결된 인스턴스 탐지",
+        "description_en": "Detect unencrypted EBS volumes and attached instances",
+        "permission": "read",
+        "module": "ebs_encryption",
+        "area": "security",
+    },
+    {
         "name": "미사용 EIP 탐지",
         "name_en": "Unused EIP Detection",
         "description": "미연결 Elastic IP 탐지",

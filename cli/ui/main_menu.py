@@ -8,6 +8,7 @@ cli/ui/main_menu.py - 메인 메뉴 UI (V2)
 """
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
@@ -41,9 +42,8 @@ SHORTCUTS = {
     "h": "help",
     "?": "help",
     "a": "all_tools",
-    "s": "browse",  # 서비스별 (EC2, ELB, VPC...)
-    "c": "aws_category",  # AWS 카테고리 (Compute, Storage...)
-    "t": "trusted_advisor",  # Trusted Advisor 영역 (보안, 비용, 성능...)
+    "c": "aws_category",  # 분야별 (Compute, Storage...)
+    "t": "trusted_advisor",  # 목적별 (보안, 비용, 성능...)
     "r": "reports",  # 종합 보고서 (비용, 인벤토리, IP 검색, 로그)
     "d": "scheduled",  # 정기 작업 (Daily/Monthly/Quarterly...)
     "f": "favorites",
@@ -85,6 +85,98 @@ class MainMenu:
         if self.lang == "en":
             return str(tool.get("description_en") or tool.get("description", ""))
         return str(tool.get("description", ""))
+
+    def _render_tool_row_with_service(self, tool: dict, index: int) -> list[str]:
+        """SERVICE 컬럼 포함 행 렌더링 (목적별 뷰용)"""
+        perm = tool.get("permission", "read")
+        perm_color = PERMISSION_COLORS.get(perm, "green")
+        return [
+            str(index),
+            tool.get("category_display", tool["category"]).upper(),
+            self._get_tool_name(tool),
+            f"[{perm_color}]{perm}[/{perm_color}]",
+            (self._get_tool_desc(tool) or "")[:50],
+        ]
+
+    def _render_tool_row_with_area(self, tool: dict, index: int) -> list[str]:
+        """AREA 컬럼 포함 행 렌더링 (서비스별/리포트 뷰용)"""
+        from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
+
+        perm = tool.get("permission", "read")
+        perm_color = PERMISSION_COLORS.get(perm, "green")
+        area = tool.get("area", "")
+        area_info = AREA_DISPLAY.get(area, {"label": area, "color": "dim"})
+        return [
+            str(index),
+            self._get_tool_name(tool),
+            f"[{perm_color}]{perm}[/{perm_color}]",
+            f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
+            (self._get_tool_desc(tool) or "")[:50],
+        ]
+
+    def _show_tool_list(
+        self,
+        tools: list[dict],
+        title: str,
+        columns: list[tuple[str, int | None, str | None, str]],
+        row_renderer: Callable[[dict, int], list[str]],
+        get_category: Callable[[dict], str],
+        get_module: Callable[[dict], str],
+    ) -> None:
+        """도구 목록 테이블 공통 표시
+
+        Args:
+            tools: 도구 목록
+            title: 테이블 제목
+            columns: 컬럼 정의 [(header_key, width, style, justify), ...]
+            row_renderer: 행 렌더링 함수 (tool, index) -> [col1, col2, ...]
+            get_category: 카테고리 추출 함수
+            get_module: 모듈 추출 함수
+        """
+        from rich.table import Table
+
+        while True:
+            clear_screen()
+            self.console.print()
+
+            table = Table(
+                title=title,
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+
+            for header_key, width, style, justify in columns:
+                kwargs: dict[str, Any] = {"justify": justify}
+                if width is not None:
+                    kwargs["width"] = width
+                if style is not None:
+                    kwargs["style"] = style
+                table.add_column(t(header_key), **kwargs)
+
+            for i, tool in enumerate(tools, 1):
+                table.add_row(*row_renderer(tool, i))
+
+            self.console.print(table)
+            self.console.print()
+            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+            if choice == "0" or choice.lower() == "q":
+                return
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(tools):
+                    selected = tools[idx - 1]
+                    self._run_tool_directly(get_category(selected), get_module(selected))
+                    return
+                else:
+                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
 
     def _ensure_initialized(self) -> None:
         """지연 초기화 (첫 호출 시)"""
@@ -152,7 +244,13 @@ class MainMenu:
         self.console.print(f"[bold]{t('menu.favorites')}{count_info}[/bold]")
 
         for i, item in enumerate(fav_items, 1):
-            self.console.print(f"  {i}. {item.tool_name} [dim]{item.category}[/dim]")
+            item_type = getattr(item, "item_type", "tool")
+            if item_type == "category":
+                # 카테고리: 폴더 아이콘 표시
+                self.console.print(f"  {i}. [cyan]📁[/cyan] {item.tool_name}")
+            else:
+                # 도구: 도구 아이콘 표시
+                self.console.print(f"  {i}. [green]🔧[/green] {item.tool_name} [dim]{item.category}[/dim]")
 
         return fav_items
 
@@ -180,18 +278,18 @@ class MainMenu:
         cmd_table.add_row(
             "[dim]a[/dim]",
             t("menu.all_tools"),
-            "[dim]s[/dim]",
-            t("menu.aws_services"),
+            "[dim]t[/dim]",
+            t("menu.by_purpose"),
             "[dim]c[/dim]",
-            t("menu.aws_category"),
+            t("menu.by_category"),
         )
         cmd_table.add_row(
-            "[dim]t[/dim]",
-            t("menu.check_types"),
             "[dim]r[/dim]",
             t("menu.reports"),
             "[dim]d[/dim]",
             t("menu.scheduled_operations"),
+            "",
+            "",
         )
         self.console.print(cmd_table)
 
@@ -217,18 +315,11 @@ class MainMenu:
             "[dim]g[/dim]",
             t("menu.profile_groups"),
         )
-        cmd_table2.add_row(
-            "[dim]q[/dim]",
-            t("common.exit"),
-            "",
-            "",
-            "",
-            "",
-        )
         self.console.print(cmd_table2)
 
         self.console.print()
         self.console.print(f"[dim]{t('menu.search_keyword_hint')}[/dim]")
+        self.console.print(f"[dim]q: {t('common.exit')}[/dim]")
 
     def _print_footer(self) -> None:
         """하단 안내 출력"""
@@ -306,14 +397,6 @@ class MainMenu:
             self._list_all_tools()
             return True
 
-        if action == "browse":
-            # 서비스별 탐색 (FlowRunner로 위임)
-            from cli.flow import create_flow_runner
-
-            runner = create_flow_runner()
-            runner.run()
-            return True
-
         if action == "aws_category":
             # AWS 카테고리별 탐색
             self._show_aws_category_view()
@@ -335,8 +418,14 @@ class MainMenu:
             return True
 
         if action == "favorite_select":
-            # 즐겨찾기 도구 직접 실행 (tool_name 폴백 지원)
-            self._run_tool_directly(data.category, data.tool_module, data.tool_name)
+            # 즐겨찾기 선택: 도구 또는 카테고리
+            item_type = getattr(data, "item_type", "tool")
+            if item_type == "category":
+                # 카테고리 선택: 해당 서비스의 도구 목록으로 이동
+                self._show_favorite_category_tools(data.category)
+            else:
+                # 도구 직접 실행 (tool_name 폴백 지원)
+                self._run_tool_directly(data.category, data.tool_module, data.tool_name)
             return True
 
         if action == "search":
@@ -372,6 +461,23 @@ class MainMenu:
         # 도구 실행 완료 후 메뉴 복귀 전 대기
         self.console.print()
         wait_for_any_key(f"[dim]{t('common.press_any_key_to_return')}[/dim]")
+
+    def _show_favorite_category_tools(self, category_name: str) -> None:
+        """즐겨찾기 카테고리의 도구 목록 표시"""
+        # 해당 카테고리 찾기
+        category = None
+        for cat in self._categories:
+            if cat.get("name") == category_name:
+                category = cat
+                break
+
+        if not category:
+            self.console.print(f"[yellow]{t('menu.category_not_found', name=category_name)}[/]")
+            wait_for_any_key()
+            return
+
+        # _show_tools_in_service와 동일한 뷰 사용
+        self._show_tools_in_service(category)
 
     def _handle_search(self, query: str) -> None:
         """검색 처리"""
@@ -414,8 +520,8 @@ class MainMenu:
             title_justify="left",
         )
         table.add_column("#", style="dim", width=4, justify="right")
-        table.add_column(t("menu.header_category"), width=16)
-        table.add_column(t("menu.header_name"), width=26)
+        table.add_column(t("menu.header_category"), width=18)
+        table.add_column(t("menu.header_name"), width=28)
         table.add_column(t("menu.header_description"), style="dim")
 
         for i, r in enumerate(results, 1):
@@ -735,9 +841,8 @@ class MainMenu:
         # 메뉴 탐색
         self.console.print(f"[bold yellow]{t('menu.tool_navigation')}[/bold yellow]")
         self.console.print(f"  [cyan]a[/cyan]  {t('menu.all_tools'):14} {t('menu.help_all_tools_desc')}")
-        self.console.print(f"  [cyan]s[/cyan]  {t('menu.aws_services'):14} {t('menu.help_services_desc')}")
-        self.console.print(f"  [cyan]c[/cyan]  {t('menu.aws_category'):14} {t('menu.help_categories_desc')}")
-        self.console.print(f"  [cyan]t[/cyan]  {t('menu.check_types'):14} {t('menu.help_check_types_desc')}")
+        self.console.print(f"  [cyan]t[/cyan]  {t('menu.by_purpose'):14} {t('menu.help_check_types_desc')}")
+        self.console.print(f"  [cyan]c[/cyan]  {t('menu.by_category'):14} {t('menu.help_categories_desc')}")
         self.console.print(f"  [cyan]r[/cyan]  {t('menu.reports'):14} {t('menu.help_reports_desc')}")
         self.console.print(f"  [cyan]d[/cyan]  {t('menu.scheduled_operations'):14} {t('menu.help_scheduled_desc')}")
         self.console.print(f"  [cyan]f[/cyan]  {t('menu.favorites'):14} {t('menu.help_favorites_desc')}")
@@ -794,15 +899,19 @@ class MainMenu:
 
             if fav_items:
                 for i, item in enumerate(fav_items, 1):
-                    self.console.print(f"  {i:>2}. {item.tool_name} [dim]{item.category}[/dim]")
+                    item_type = getattr(item, "item_type", "tool")
+                    if item_type == "category":
+                        self.console.print(f"  {i:>2}. [cyan]📁[/cyan] {item.tool_name}")
+                    else:
+                        self.console.print(f"  {i:>2}. [green]🔧[/green] {item.tool_name} [dim]{item.category}[/dim]")
                 self.console.print()
             else:
                 self.console.print(f"[dim]{t('menu.no_favorites_registered')}[/dim]")
                 self.console.print()
 
-            # 메뉴 옵션
+            # 메뉴 옵션: a(도구 추가), c(카테고리 추가), d(삭제), u(위로), n(아래로)
             self.console.print(
-                f"[dim]a[/dim] {t('menu.add')}"
+                f"[dim]a[/dim] {t('menu.add_tool')}  [dim]c[/dim] {t('menu.add_category')}"
                 + (
                     f"  [dim]d[/dim] {t('menu.delete')}  [dim]u[/dim] {t('menu.move_up')}  [dim]n[/dim] {t('menu.move_down')}"
                     if fav_items
@@ -819,6 +928,8 @@ class MainMenu:
 
             if choice == "a":
                 self._add_favorite_interactive()
+            elif choice == "c":
+                self._add_favorite_category_interactive()
             elif choice == "d" and fav_items:
                 self._remove_favorite_interactive(fav_items)
             elif choice == "u" and fav_items:
@@ -827,34 +938,198 @@ class MainMenu:
                 self._reorder_favorite_interactive(fav_items, "down")
 
     def _add_favorite_interactive(self) -> None:
-        """즐겨찾기 추가"""
-        self.console.print()
-        self.console.print(f"[bold]{t('menu.add_favorite')}[/bold]")
-        self.console.print(f"[dim]{t('menu.tool_name_or_keyword')}[/dim]")
+        """도구 즐겨찾기 추가"""
+        from rich.table import Table
 
-        query = self.console.input(f"{t('common.search')}: ").strip()
+        # 전체 도구 목록 준비
+        all_tools = []
+        for cat in self._categories:
+            cat_name = cat.get("name", "")
+            cat_display = cat.get("display_name", cat_name)
+            for tool in cat.get("tools", []):
+                all_tools.append(
+                    {
+                        "category": cat_name,
+                        "category_display": cat_display,
+                        "tool_module": tool.get("module", ""),
+                        "tool_name": self._get_tool_name(tool),
+                        "tool_desc": self._get_tool_desc(tool),
+                        **tool,
+                    }
+                )
 
-        if not query:
-            return
+        PAGE_SIZE = 20
+        total_count = len(all_tools)
+        total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
+        current_page = 1
 
-        if not self._search_engine:
-            self.console.print(f"[dim]{t('menu.search_init_failed')}[/dim]")
-            return
-
-        results = self._search_engine.search(query, limit=10)
-
-        if not results:
-            self.console.print(f"[dim]{t('menu.no_results', query=query)}[/dim]")
-            return
-
-        # 검색 결과 표시
         assert self._favorites is not None
-        self.console.print()
-        for i, r in enumerate(results, 1):
-            is_fav = self._favorites.is_favorite(r.category, r.tool_module)
-            fav_marker = " *" if is_fav else ""
-            self.console.print(f"  {i:>2}. [{r.category}] {r.tool_name}{fav_marker}")
 
+        while True:
+            clear_screen()
+            self.console.print()
+            self.console.print(f"[bold]{t('menu.add_tool_favorite')}[/bold]")
+            self.console.print()
+
+            # 현재 페이지 도구들
+            start_idx = (current_page - 1) * PAGE_SIZE
+            end_idx = min(start_idx + PAGE_SIZE, total_count)
+            page_tools = all_tools[start_idx:end_idx]
+
+            table = Table(
+                title=f"{t('menu.page_info', current=current_page, total=total_pages)}",
+                show_header=True,
+                header_style="dim",
+                box=None,
+                padding=(0, 1),
+                title_justify="left",
+            )
+            table.add_column("#", style="dim", width=4, justify="right")
+            table.add_column(t("menu.header_service"), width=18)
+            table.add_column(t("menu.header_tools"), width=28)
+            table.add_column(t("menu.header_description"), style="dim")
+
+            for idx, tool in enumerate(page_tools, start_idx + 1):
+                is_fav = self._favorites.is_favorite(tool["category"], tool["tool_module"])
+                marker = " *" if is_fav else ""
+                table.add_row(
+                    str(idx),
+                    tool["category_display"].upper(),
+                    f"{tool['tool_name']}{marker}",
+                    tool["tool_desc"][:40],
+                )
+
+            self.console.print(table)
+            self.console.print()
+
+            # 네비게이션 및 검색 안내
+            nav_parts = []
+            if current_page > 1:
+                nav_parts.append(f"[dim]p[/dim] {t('menu.previous')}")
+            if current_page < total_pages:
+                nav_parts.append(f"[dim]n[/dim] {t('menu.next')}")
+            nav_parts.append(f"[dim]0[/dim] {t('menu.go_back')}")
+            self.console.print("  ".join(nav_parts))
+            self.console.print(f"[dim]{t('menu.number_or_search_hint')}[/dim]")
+
+            choice = self.console.input("> ").strip()
+
+            if not choice:
+                continue
+
+            choice_lower = choice.lower()
+
+            if choice == "0" or choice_lower == "q":
+                return
+
+            # 페이지 이동
+            if choice_lower == "n" and current_page < total_pages:
+                current_page += 1
+                continue
+            if choice_lower == "p" and current_page > 1:
+                current_page -= 1
+                continue
+
+            # 숫자: 도구 선택
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= total_count:
+                    selected = all_tools[idx - 1]
+                    if self._favorites.is_favorite(selected["category"], selected["tool_module"]):
+                        self.console.print(f"[dim]{t('menu.already_registered', name=selected['tool_name'])}[/dim]")
+                    else:
+                        success = self._favorites.add(
+                            selected["category"], selected["tool_name"], selected["tool_module"]
+                        )
+                        if success:
+                            self.console.print(f"[dim]{t('menu.added', name=selected['tool_name'])}[/dim]")
+                        else:
+                            self.console.print(f"[dim]{t('menu.add_failed_max')}[/dim]")
+                    wait_for_any_key()
+                    return
+                continue
+
+            # 키워드 검색
+            if not self._search_engine:
+                continue
+
+            results = self._search_engine.search(choice, limit=15)
+            if not results:
+                self.console.print(f"[dim]{t('menu.no_results', query=choice)}[/dim]")
+                wait_for_any_key()
+                continue
+
+            # 검색 결과 표시
+            clear_screen()
+            self.console.print()
+            self.console.print(f"[bold]{t('common.search')}: {choice}[/bold]")
+            self.console.print()
+
+            for i, r in enumerate(results, 1):
+                is_fav = self._favorites.is_favorite(r.category, r.tool_module)
+                marker = " *" if is_fav else ""
+                self.console.print(f"  {i:>2}. [{r.category}] {r.tool_name}{marker}")
+
+            self.console.print()
+            self.console.print(f"[dim]{t('menu.return_zero')}[/dim]")
+
+            sub_choice = self.console.input(f"{t('menu.number_prompt')}: ").strip()
+
+            if sub_choice == "0" or not sub_choice:
+                continue
+
+            if sub_choice.isdigit():
+                sub_idx = int(sub_choice)
+                if 1 <= sub_idx <= len(results):
+                    search_result = results[sub_idx - 1]
+                    if self._favorites.is_favorite(search_result.category, search_result.tool_module):
+                        self.console.print(f"[dim]{t('menu.already_registered', name=search_result.tool_name)}[/dim]")
+                    else:
+                        success = self._favorites.add(
+                            search_result.category, search_result.tool_name, search_result.tool_module
+                        )
+                        if success:
+                            self.console.print(f"[dim]{t('menu.added', name=search_result.tool_name)}[/dim]")
+                        else:
+                            self.console.print(f"[dim]{t('menu.add_failed_max')}[/dim]")
+                    wait_for_any_key()
+                    return
+
+    def _add_favorite_category_interactive(self) -> None:
+        """카테고리(서비스) 즐겨찾기 추가"""
+        from rich.table import Table
+
+        # 카테고리 목록 표시
+        clear_screen()
+        self.console.print()
+        self.console.print(f"[bold]{t('menu.add_category_favorite')}[/bold]")
+        self.console.print()
+
+        # 카테고리 테이블
+        table = Table(
+            show_header=True,
+            header_style="dim",
+            box=None,
+            padding=(0, 1),
+        )
+        table.add_column("#", style="dim", width=3, justify="right")
+        table.add_column(t("menu.header_service"), width=20)
+        table.add_column(t("menu.header_tools"), width=6, justify="right")
+        table.add_column(t("menu.header_description"), style="dim")
+
+        # 이미 즐겨찾기에 있는 카테고리 표시
+        assert self._favorites is not None
+        for i, cat in enumerate(self._categories, 1):
+            cat_name = cat.get("name", "")
+            display_name = cat.get("display_name", cat_name).upper()
+            tool_count = len(cat.get("tools", []))
+            desc = cat.get("description", "")[:40] if self.lang == "ko" else cat.get("description_en", "")[:40]
+            is_fav = self._favorites.is_category_favorite(cat_name)
+            marker = " *" if is_fav else ""
+
+            table.add_row(str(i), f"{display_name}{marker}", str(tool_count), desc)
+
+        self.console.print(table)
         self.console.print()
         self.console.print(f"[dim]{t('menu.return_zero')}[/dim]")
 
@@ -865,16 +1140,23 @@ class MainMenu:
 
         if choice.isdigit():
             idx = int(choice)
-            if 1 <= idx <= len(results):
-                selected = results[idx - 1]
-                if self._favorites.is_favorite(selected.category, selected.tool_module):
-                    self.console.print(f"[dim]{t('menu.already_registered', name=selected.tool_name)}[/dim]")
+            if 1 <= idx <= len(self._categories):
+                selected_cat = self._categories[idx - 1]
+                cat_name = selected_cat.get("name", "")
+                display_name = selected_cat.get("display_name", cat_name)
+
+                if self._favorites.is_category_favorite(cat_name):
+                    self.console.print(f"[dim]{t('menu.already_registered', name=display_name)}[/dim]")
                 else:
-                    success = self._favorites.add(selected.category, selected.tool_name, selected.tool_module)
+                    success = self._favorites.add_category(cat_name, display_name)
                     if success:
-                        self.console.print(f"[dim]{t('menu.added', name=selected.tool_name)}[/dim]")
+                        self.console.print(f"[dim]{t('menu.added', name=display_name)}[/dim]")
                     else:
                         self.console.print(f"[dim]{t('menu.add_failed_max')}[/dim]")
+            else:
+                self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(self._categories))}[/dim]")
+
+        wait_for_any_key()
 
     def _remove_favorite_interactive(self, fav_items: list) -> None:
         """즐겨찾기 삭제"""
@@ -891,7 +1173,11 @@ class MainMenu:
             if 1 <= idx <= len(fav_items):
                 item = fav_items[idx - 1]
                 assert self._favorites is not None
-                self._favorites.remove(item.category, item.tool_module)
+                item_type = getattr(item, "item_type", "tool")
+                if item_type == "category":
+                    self._favorites.remove_category(item.category)
+                else:
+                    self._favorites.remove(item.category, item.tool_module)
                 self.console.print(f"[dim]{t('menu.deleted', name=item.tool_name)}[/dim]")
             else:
                 self.console.print(f"[dim]{t('menu.range_info', min=1, max=len(fav_items))}[/dim]")
@@ -1109,8 +1395,6 @@ class MainMenu:
 
     def _show_tools_in_area(self, area: "AreaInfo", all_tools: list) -> None:
         """영역 내 도구 목록 표시 및 선택"""
-        from rich.table import Table
-
         area_key = area["key"]
         tools = [tl for tl in all_tools if tl.get("area") == area_key]
         area_label = area.get("label_en", area["label"]) if self.lang == "en" else area["label"]
@@ -1120,64 +1404,30 @@ class MainMenu:
             wait_for_any_key()
             return
 
-        while True:
-            # 화면 클리어
-            clear_screen()
-
-            self.console.print()
-            table = Table(
-                title=f"[bold][{area['color']}]{area_label}[/{area['color']}][/bold] ({t('menu.count_suffix', count=len(tools))})",
-                show_header=True,
-                header_style="dim",
-                box=None,
-                padding=(0, 1),
-                title_justify="left",
-            )
-            table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_service"), width=14)  # 12 → 14
-            table.add_column(t("menu.header_tools"), width=28)  # 25 → 28
-            table.add_column(t("menu.header_permission"), width=6)
-            table.add_column(t("menu.header_description"), style="dim")
-
-            for i, tool in enumerate(tools, 1):
-                perm = tool.get("permission", "read")
-                perm_color = PERMISSION_COLORS.get(perm, "green")
-                table.add_row(
-                    str(i),
-                    tool.get("category_display", tool["category"]).upper(),
-                    self._get_tool_name(tool),
-                    f"[{perm_color}]{perm}[/{perm_color}]",
-                    (self._get_tool_desc(tool) or "")[:50],
-                )
-
-            self.console.print(table)
-            self.console.print()
-            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
-
-            choice = self.console.input("> ").strip()
-
-            if not choice:
-                continue
-
-            if choice == "0" or choice.lower() == "q":
-                return
-
-            if choice.isdigit():
-                idx = int(choice)
-                if 1 <= idx <= len(tools):
-                    selected_tool = tools[idx - 1]
-                    self._run_tool_directly(selected_tool["category"], selected_tool["tool_module"])
-                    return
-                else:
-                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
+        self._show_tool_list(
+            tools=tools,
+            title=f"[bold][{area['color']}]{area_label}[/{area['color']}][/bold] ({t('menu.count_suffix', count=len(tools))})",
+            columns=[
+                ("menu.header_number", 3, "dim", "right"),
+                ("menu.header_service", 14, None, "left"),
+                ("menu.header_tools", 28, None, "left"),
+                ("menu.header_permission", 6, None, "left"),
+                ("menu.header_description", None, "dim", "left"),
+            ],
+            row_renderer=self._render_tool_row_with_service,
+            get_category=lambda tl: tl["category"],
+            get_module=lambda tl: tl["tool_module"],
+        )
 
     def _show_scheduled_operations(self) -> None:
         """정기 작업 메뉴"""
         from reports.scheduled.menu import show_scheduled_menu
 
-        action, task = show_scheduled_menu(self.console, self.lang)
+        action, tasks = show_scheduled_menu(self.console, self.lang)
 
-        if action == "run" and task:
+        if action == "run" and tasks:
+            # 첫 번째 작업만 실행 (일괄 실행은 menu.py에서 처리)
+            task = tasks[0]
             # tool_ref에서 category/module 분리
             parts = task.tool_ref.split("/")
             if len(parts) >= 2:
@@ -1245,10 +1495,6 @@ class MainMenu:
 
     def _show_report_tools(self, category: dict) -> None:
         """리포트 카테고리의 도구 목록"""
-        from rich.table import Table
-
-        from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
-
         tools = category.get("tools", [])
         category_name = category.get("name", "")
 
@@ -1257,61 +1503,21 @@ class MainMenu:
             wait_for_any_key()
             return
 
-        while True:
-            # 화면 클리어
-            clear_screen()
-
-            self.console.print()
-            display_name = category.get("display_name", category_name).upper()
-            table = Table(
-                title=f"[bold]{display_name}[/bold] ({t('menu.count_suffix', count=len(tools))})",
-                show_header=True,
-                header_style="dim",
-                box=None,
-                padding=(0, 1),
-                title_justify="left",
-            )
-            table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_tools"), width=30)
-            table.add_column(t("menu.header_permission"), width=6)
-            table.add_column(t("menu.header_area"), width=10)
-            table.add_column(t("menu.header_description"), style="dim")
-
-            for i, tool in enumerate(tools, 1):
-                perm = tool.get("permission", "read")
-                perm_color = PERMISSION_COLORS.get(perm, "green")
-                area = tool.get("area", "")
-                area_info = AREA_DISPLAY.get(area, {"label": area, "color": "dim"})
-
-                table.add_row(
-                    str(i),
-                    self._get_tool_name(tool),
-                    f"[{perm_color}]{perm}[/{perm_color}]",
-                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
-                    (self._get_tool_desc(tool) or "")[:50],
-                )
-
-            self.console.print(table)
-            self.console.print()
-            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
-
-            choice = self.console.input("> ").strip()
-
-            if not choice:
-                continue
-
-            if choice == "0" or choice.lower() == "q":
-                return
-
-            if choice.isdigit():
-                idx = int(choice)
-                if 1 <= idx <= len(tools):
-                    selected_tool = tools[idx - 1]
-                    tool_module = selected_tool.get("module", "")
-                    self._run_tool_directly(category_name, tool_module)
-                    return
-                else:
-                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
+        display_name = category.get("display_name", category_name).upper()
+        self._show_tool_list(
+            tools=tools,
+            title=f"[bold]{display_name}[/bold] ({t('menu.count_suffix', count=len(tools))})",
+            columns=[
+                ("menu.header_number", 3, "dim", "right"),
+                ("menu.header_tools", 30, None, "left"),
+                ("menu.header_permission", 6, None, "left"),
+                ("menu.header_area", 10, None, "left"),
+                ("menu.header_description", None, "dim", "left"),
+            ],
+            row_renderer=self._render_tool_row_with_area,
+            get_category=lambda _: category_name,
+            get_module=lambda tl: tl.get("module", ""),
+        )
 
     def _show_aws_category_view(self) -> None:
         """AWS 카테고리별 탐색 뷰"""
@@ -1319,7 +1525,8 @@ class MainMenu:
 
         from core.tools.aws_categories import get_aws_category_view
 
-        aws_categories = get_aws_category_view()
+        # 모든 AWS 카테고리 표시 (도구 없는 것 포함)
+        aws_categories = get_aws_category_view(include_empty=True)
 
         if not aws_categories:
             self.console.print()
@@ -1333,7 +1540,7 @@ class MainMenu:
 
             self.console.print()
             table = Table(
-                title=f"[bold]{t('menu.aws_category')}[/bold]",
+                title=f"[bold]{t('menu.by_category')}[/bold]",
                 show_header=True,
                 header_style="dim",
                 box=None,
@@ -1341,19 +1548,31 @@ class MainMenu:
                 title_justify="left",
             )
             table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_category"), width=38)  # 30 → 38
+            table.add_column(t("menu.header_category"), width=38)
             table.add_column(t("menu.header_service"), width=6, justify="right")
             table.add_column(t("menu.header_tools"), width=6, justify="right")
 
             for i, cat in enumerate(aws_categories, 1):
                 # 언어에 따라 영어 또는 한국어만 표시
                 cat_name = cat["name"] if self.lang == "en" else cat["name_ko"]
-                table.add_row(
-                    str(i),
-                    cat_name,
-                    str(len(cat["plugins"])),
-                    str(cat["tool_count"]),
-                )
+                tool_count = cat["tool_count"]
+                plugin_count = len(cat["plugins"])
+
+                # 도구가 없으면 흐리게 표시
+                if tool_count == 0:
+                    table.add_row(
+                        f"[dim]{i}[/dim]",
+                        f"[dim]{cat_name}[/dim]",
+                        f"[dim]{plugin_count}[/dim]",
+                        f"[dim]{tool_count}[/dim]",
+                    )
+                else:
+                    table.add_row(
+                        str(i),
+                        cat_name,
+                        str(plugin_count),
+                        str(tool_count),
+                    )
 
             self.console.print(table)
             self.console.print()
@@ -1380,9 +1599,11 @@ class MainMenu:
         from rich.table import Table
 
         plugins = aws_category.get("plugins", [])
+        cat_name = aws_category["name"] if self.lang == "en" else aws_category["name_ko"]
 
         if not plugins:
-            self.console.print(f"[yellow]{t('menu.no_services_in_category')}[/]")
+            self.console.print()
+            self.console.print(f"[yellow]{t('menu.category_coming_soon', category=cat_name)}[/]")
             wait_for_any_key()
             return
 
@@ -1434,10 +1655,6 @@ class MainMenu:
 
     def _show_tools_in_service(self, plugin: dict) -> None:
         """서비스 내 도구 목록 표시 및 선택"""
-        from rich.table import Table
-
-        from core.tools.types import AREA_DISPLAY_BY_KEY as AREA_DISPLAY
-
         tools = plugin.get("tools", [])
         category_name = plugin.get("name", "")
 
@@ -1446,61 +1663,21 @@ class MainMenu:
             wait_for_any_key()
             return
 
-        while True:
-            # 화면 클리어
-            clear_screen()
-
-            self.console.print()
-            display_name = plugin.get("display_name", category_name).upper()
-            table = Table(
-                title=f"[bold]{display_name}[/bold] ({t('menu.count_suffix', count=len(tools))})",
-                show_header=True,
-                header_style="dim",
-                box=None,
-                padding=(0, 1),
-                title_justify="left",
-            )
-            table.add_column("#", style="dim", width=3, justify="right")
-            table.add_column(t("menu.header_tools"), width=30)  # 25 → 30
-            table.add_column(t("menu.header_permission"), width=6)
-            table.add_column(t("menu.header_area"), width=10)
-            table.add_column(t("menu.header_description"), style="dim")
-
-            for i, tool in enumerate(tools, 1):
-                perm = tool.get("permission", "read")
-                perm_color = PERMISSION_COLORS.get(perm, "green")
-                area = tool.get("area", "")
-                area_info = AREA_DISPLAY.get(area, {"label": area, "color": "dim"})
-
-                table.add_row(
-                    str(i),
-                    self._get_tool_name(tool),
-                    f"[{perm_color}]{perm}[/{perm_color}]",
-                    f"[{area_info['color']}]{area_info['label']}[/{area_info['color']}]" if area else "",
-                    (self._get_tool_desc(tool) or "")[:50],
-                )
-
-            self.console.print(table)
-            self.console.print()
-            self.console.print(f"[dim]0: {t('menu.go_back')}[/dim]")
-
-            choice = self.console.input("> ").strip()
-
-            if not choice:
-                continue
-
-            if choice == "0" or choice.lower() == "q":
-                return
-
-            if choice.isdigit():
-                idx = int(choice)
-                if 1 <= idx <= len(tools):
-                    selected_tool = tools[idx - 1]
-                    tool_module = selected_tool.get("module", "")
-                    self._run_tool_directly(category_name, tool_module)
-                    return
-                else:
-                    self.console.print(f"[red]{t('menu.range_info', min=1, max=len(tools))}[/]")
+        display_name = plugin.get("display_name", category_name).upper()
+        self._show_tool_list(
+            tools=tools,
+            title=f"[bold]{display_name}[/bold] ({t('menu.count_suffix', count=len(tools))})",
+            columns=[
+                ("menu.header_number", 3, "dim", "right"),
+                ("menu.header_tools", 30, None, "left"),
+                ("menu.header_permission", 6, None, "left"),
+                ("menu.header_area", 10, None, "left"),
+                ("menu.header_description", None, "dim", "left"),
+            ],
+            row_renderer=self._render_tool_row_with_area,
+            get_category=lambda _: category_name,
+            get_module=lambda tl: tl.get("module", ""),
+        )
 
     def _get_profiles_by_kind(self, kind: str) -> list:
         """인증 타입별 프로파일 목록 조회

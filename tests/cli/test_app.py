@@ -158,51 +158,44 @@ class TestBuildHelpText:
 
 
 # =============================================================================
-# Run Command Tests
+# Path-based Tool Execution Tests
 # =============================================================================
 
 
-class TestRunCommand:
-    """Test headless run command"""
+class TestPathBasedExecution:
+    """Test path-based tool execution (aa ec2/unused -p ...)"""
 
     @pytest.fixture
     def runner(self):
         return CliRunner()
 
-    def test_run_requires_auth_option(self, runner):
-        """Run command requires authentication option"""
+    def test_path_execution_requires_auth_option(self, runner):
+        """Path-based execution requires authentication option"""
         from cli.app import cli
 
-        result = runner.invoke(cli, ["run", "ec2/unused"])
+        result = runner.invoke(cli, ["ec2/unused"])
         assert result.exit_code != 0
         # Check that it fails (exit code 1) - message content doesn't matter
 
-    def test_run_with_profile_option(self, runner):
-        """Run command accepts profile option"""
+    def test_path_execution_with_profile_option(self, runner):
+        """Path-based execution accepts profile option"""
         from cli.app import cli
 
         with patch("cli.headless.run_headless", return_value=0):
-            result = runner.invoke(cli, ["run", "ec2/unused", "-p", "my-profile"])
+            result = runner.invoke(cli, ["ec2/unused", "-p", "my-profile"])
             assert result.exit_code == 0
 
-    def test_run_with_multiple_profiles(self, runner):
-        """Run command accepts multiple profiles"""
+    def test_path_execution_single_profile_only(self, runner):
+        """Path-based execution -p accepts single profile only"""
         from cli.app import cli
 
+        # -p는 단일 프로파일만 지원, 다중 프로파일은 -g (profile group) 사용
         with patch("cli.headless.run_headless", return_value=0):
-            result = runner.invoke(cli, ["run", "ec2/unused", "-p", "dev", "-p", "prod"])
+            result = runner.invoke(cli, ["ec2/unused", "-p", "my-profile"])
             assert result.exit_code == 0
 
-    def test_run_with_comma_separated_profiles(self, runner):
-        """Run command accepts comma-separated profiles"""
-        from cli.app import cli
-
-        with patch("cli.headless.run_headless", return_value=0):
-            result = runner.invoke(cli, ["run", "ec2/unused", "-p", "dev,prod,staging"])
-            assert result.exit_code == 0
-
-    def test_run_with_profile_group(self, runner):
-        """Run command accepts profile group"""
+    def test_path_execution_with_profile_group(self, runner):
+        """Path-based execution accepts profile group"""
         from cli.app import cli
 
         mock_group = MagicMock()
@@ -211,27 +204,26 @@ class TestRunCommand:
         with patch("core.tools.history.ProfileGroupsManager") as mock_manager:
             mock_manager.return_value.get_by_name.return_value = mock_group
             with patch("cli.headless.run_headless", return_value=0):
-                result = runner.invoke(cli, ["run", "ec2/unused", "-g", "Dev Team"])
+                result = runner.invoke(cli, ["ec2/unused", "-g", "Dev Team"])
                 assert result.exit_code == 0
 
-    def test_run_with_nonexistent_group(self, runner):
-        """Run command fails with nonexistent group"""
+    def test_path_execution_with_nonexistent_group(self, runner):
+        """Path-based execution fails with nonexistent group"""
         from cli.app import cli
 
         with patch("core.tools.history.ProfileGroupsManager") as mock_manager:
             mock_manager.return_value.get_by_name.return_value = None
-            result = runner.invoke(cli, ["run", "ec2/unused", "-g", "NonExistent"])
+            result = runner.invoke(cli, ["ec2/unused", "-g", "NonExistent"])
             assert result.exit_code != 0
 
-    def test_run_with_sso_session(self, runner):
-        """Run command accepts SSO session options"""
+    def test_path_execution_with_sso_session(self, runner):
+        """Path-based execution accepts SSO session options"""
         from cli.app import cli
 
         with patch("cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
-                    "run",
                     "ec2/unused",
                     "-s",
                     "my-sso",
@@ -243,14 +235,13 @@ class TestRunCommand:
             )
             assert result.exit_code == 0
 
-    def test_run_sso_requires_role(self, runner):
-        """Run with SSO session requires role"""
+    def test_path_execution_sso_requires_role(self, runner):
+        """Path-based execution with SSO session requires role"""
         from cli.app import cli
 
         result = runner.invoke(
             cli,
             [
-                "run",
                 "ec2/unused",
                 "-s",
                 "my-sso",
@@ -260,14 +251,13 @@ class TestRunCommand:
         )
         assert result.exit_code != 0
 
-    def test_run_sso_requires_account(self, runner):
-        """Run with SSO session requires account"""
+    def test_path_execution_sso_requires_account(self, runner):
+        """Path-based execution with SSO session requires account"""
         from cli.app import cli
 
         result = runner.invoke(
             cli,
             [
-                "run",
                 "ec2/unused",
                 "-s",
                 "my-sso",
@@ -277,14 +267,13 @@ class TestRunCommand:
         )
         assert result.exit_code != 0
 
-    def test_run_conflict_auth_options(self, runner):
-        """Run command rejects conflicting auth options"""
+    def test_path_execution_conflict_auth_options(self, runner):
+        """Path-based execution rejects conflicting auth options"""
         from cli.app import cli
 
         result = runner.invoke(
             cli,
             [
-                "run",
                 "ec2/unused",
                 "-p",
                 "profile",
@@ -294,15 +283,14 @@ class TestRunCommand:
         )
         assert result.exit_code != 0
 
-    def test_run_with_regions(self, runner):
-        """Run command accepts region options"""
+    def test_path_execution_with_regions(self, runner):
+        """Path-based execution accepts region options"""
         from cli.app import cli
 
         with patch("cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
-                    "run",
                     "ec2/unused",
                     "-p",
                     "profile",
@@ -314,15 +302,14 @@ class TestRunCommand:
             )
             assert result.exit_code == 0
 
-    def test_run_with_output_format(self, runner):
-        """Run command accepts output format"""
+    def test_path_execution_with_output_format(self, runner):
+        """Path-based execution accepts output format"""
         from cli.app import cli
 
         with patch("cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
-                    "run",
                     "ec2/unused",
                     "-p",
                     "profile",
@@ -332,15 +319,14 @@ class TestRunCommand:
             )
             assert result.exit_code == 0
 
-    def test_run_with_quiet_flag(self, runner):
-        """Run command accepts quiet flag"""
+    def test_path_execution_with_quiet_flag(self, runner):
+        """Path-based execution accepts quiet flag"""
         from cli.app import cli
 
         with patch("cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
-                    "run",
                     "ec2/unused",
                     "-p",
                     "profile",
@@ -668,6 +654,5 @@ class TestGroupedCommandsGroup:
         from cli.app import UTILITY_COMMANDS
 
         assert isinstance(UTILITY_COMMANDS, set)
-        assert "run" in UTILITY_COMMANDS
-        assert "list-tools" in UTILITY_COMMANDS
+        assert "tools" in UTILITY_COMMANDS
         assert "group" in UTILITY_COMMANDS

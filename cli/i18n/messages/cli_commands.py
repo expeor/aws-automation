@@ -38,8 +38,8 @@ CLI_MESSAGES = {
         "en": "Run tools for a specific service",
     },
     "help_headless_mode": {
-        "ko": "[Headless 모드 (CI/CD용)]",
-        "en": "[Headless Mode (for CI/CD)]",
+        "ko": "[비대화형 모드]",
+        "en": "[Non-interactive Mode]",
     },
     "help_run_tool": {
         "ko": "도구 실행",

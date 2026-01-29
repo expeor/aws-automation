@@ -83,7 +83,28 @@ class ALBExcelReporter:
         report_name: str | None,
         progress: Callable[[str, bool], None] | None,
     ) -> str:
-        """Build all sheets."""
+        """Build all sheets.
+
+        Sheet order:
+        1. Summary (분석 요약)
+        2. Country (국가별 통계)
+        3. URL (요청 URL Top 100)
+        4. Client Status (Client 상태코드 통계)
+        5. Target Status (Target 상태코드 통계)
+        6. Response Time (응답 시간 Top 100) - includes processing time breakdown
+        7. Bytes (데이터 전송량)
+        8. TPS Analysis (TPS 분석)
+        9. Target Performance (Target 성능 분석)
+        10. Abuse IP List (악성 IP 목록)
+        11. Security Events (보안 이벤트) - merged abuse requests + security events
+        12. Status Codes (상태 코드 참조)
+
+        HTML-only sections (not in Excel):
+        - SLA Compliance (게이지 차트로 HTML이 더 적합)
+        - Processing Time Breakdown (바 차트로 HTML이 더 적합)
+        - Connection Failure Analysis (도넛 차트로 HTML이 더 적합)
+        - SSL/TLS Security Analysis (파이 차트로 HTML이 더 적합)
+        """
         from .reporter.abuse import AbuseIPSheetWriter, AbuseRequestsSheetWriter
         from .reporter.bytes import BytesSheetWriter
         from .reporter.country import CountrySheetWriter
@@ -94,6 +115,8 @@ class ALBExcelReporter:
             TargetStatusSheetWriter,
         )
         from .reporter.summary import SummarySheetWriter
+        from .reporter.target_performance import TargetPerformanceSheetWriter
+        from .reporter.tps import TPSSheetWriter
         from .reporter.url import URLSheetWriter
 
         def step(msg: str, done: bool = False) -> None:
@@ -131,7 +154,7 @@ class ALBExcelReporter:
             TargetStatusSheetWriter(wb, data, abuse_ips).write()
             step("[bold blue]Target 상태코드 완료", True)
 
-        # 6. Response time
+        # 6. Response time (includes processing time breakdown columns)
         if data.get("long_response_times"):
             step("[bold blue]응답 시간 시트 생성중...")
             ResponseTimeSheetWriter(wb, data, abuse_ips).write()
@@ -143,23 +166,39 @@ class ALBExcelReporter:
             BytesSheetWriter(wb, data, abuse_ips).write()
             step("[bold blue]데이터 전송량 완료", True)
 
-        # 8. Abuse IP
+        # 8. TPS Analysis
+        if data.get("tps_time_series"):
+            step("[bold blue]TPS 분석 시트 생성중...")
+            TPSSheetWriter(wb, data, abuse_ips).write()
+            step("[bold blue]TPS 분석 완료", True)
+
+        # 9. Target Performance
+        if data.get("target_latency_stats"):
+            step("[bold blue]Target 성능 분석 시트 생성중...")
+            TargetPerformanceSheetWriter(wb, data, abuse_ips).write()
+            step("[bold blue]Target 성능 분석 완료", True)
+
+        # 10-11. Abuse IP + Security Events (merged)
         abuse_list, _ = self._get_normalized_abuse_ips(data)
+        security_events = data.get("classification_stats", {}).get("security_events", [])
+
         if abuse_list:
-            step("[bold blue]Abuse IP 시트 생성중...")
+            step("[bold blue]악성 IP 목록 시트 생성중...")
             AbuseIPSheetWriter(wb, data, abuse_ips).write()
-            step("[bold blue]Abuse IP 완료", True)
+            step("[bold blue]악성 IP 목록 완료", True)
 
-            step("[bold blue]악성 IP 요청 시트 생성중...")
+        # Create security events sheet if abuse IPs or security events exist
+        if abuse_list or security_events:
+            step("[bold blue]보안 이벤트 시트 생성중...")
             AbuseRequestsSheetWriter(wb, data, abuse_ips).write()
-            step("[bold blue]악성 IP 요청 완료", True)
+            step("[bold blue]보안 이벤트 완료", True)
 
-        # 9. Status codes
+        # 12. Status codes (Reference)
         step("[bold blue]상태 코드 시트 생성중...")
         StatusCodeSheetWriter(wb, data, abuse_ips).write()
         step("[bold blue]상태 코드 완료", True)
 
-        # 10. Save
+        # Save
         step("[bold blue]파일 저장중...")
         output_path = self._save(wb, data, report_name)
         step("[bold green]완료!", True)

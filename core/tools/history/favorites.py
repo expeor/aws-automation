@@ -13,13 +13,25 @@ from typing import Optional
 
 @dataclass
 class FavoriteItem:
-    """즐겨찾기 항목"""
+    """즐겨찾기 항목
+
+    Attributes:
+        category: 카테고리 이름 (서비스명)
+        tool_name: 도구 표시 이름 (item_type="category"일 경우 카테고리 표시 이름)
+        tool_module: 도구 모듈 이름 (item_type="category"일 경우 빈 문자열)
+        added_at: 추가 일시 (ISO format)
+        order: 정렬 순서 (낮을수록 상위)
+        item_type: 항목 타입 ("tool" 또는 "category")
+        ref: 참조 정보 (category/module 형식, 미래 확장용)
+    """
 
     category: str
     tool_name: str
     tool_module: str
     added_at: str  # ISO format
     order: int = 0  # 정렬 순서 (낮을수록 상위)
+    item_type: str = "tool"  # "tool" 또는 "category"
+    ref: str = ""  # 참조 (category/module 형식)
 
 
 class FavoritesManager:
@@ -54,21 +66,29 @@ class FavoritesManager:
         category: str,
         tool_name: str,
         tool_module: str,
+        item_type: str = "tool",
     ) -> bool:
         """즐겨찾기 추가
 
         Args:
             category: 카테고리 이름
-            tool_name: 도구 표시 이름
-            tool_module: 도구 모듈 이름
+            tool_name: 도구 표시 이름 (item_type="category"일 경우 카테고리 표시 이름)
+            tool_module: 도구 모듈 이름 (item_type="category"일 경우 빈 문자열)
+            item_type: 항목 타입 ("tool" 또는 "category")
 
         Returns:
             추가 성공 여부 (이미 존재하면 False)
         """
         # 중복 체크
         for item in self._items:
-            if item.category == category and item.tool_module == tool_module:
-                return False
+            if item_type == "category":
+                # 카테고리 중복: 같은 카테고리면 중복
+                if item.item_type == "category" and item.category == category:
+                    return False
+            else:
+                # 도구 중복: 같은 카테고리 + 모듈이면 중복
+                if item.item_type == "tool" and item.category == category and item.tool_module == tool_module:
+                    return False
 
         # 최대 개수 체크
         if len(self._items) >= self.MAX_ITEMS:
@@ -77,6 +97,7 @@ class FavoritesManager:
         # 새 항목 추가
         now = datetime.now().isoformat()
         max_order = max((item.order for item in self._items), default=-1)
+        ref = category if item_type == "category" else f"{category}/{tool_module}"
 
         self._items.append(
             FavoriteItem(
@@ -85,11 +106,38 @@ class FavoritesManager:
                 tool_module=tool_module,
                 added_at=now,
                 order=max_order + 1,
+                item_type=item_type,
+                ref=ref,
             )
         )
 
         self._save()
         return True
+
+    def add_category(self, category: str, display_name: str) -> bool:
+        """카테고리(서비스) 즐겨찾기 추가
+
+        Args:
+            category: 카테고리 이름 (예: "ec2", "vpc")
+            display_name: 표시 이름 (예: "EC2", "VPC")
+
+        Returns:
+            추가 성공 여부
+        """
+        return self.add(category, display_name, "", item_type="category")
+
+    def is_category_favorite(self, category: str) -> bool:
+        """카테고리 즐겨찾기 여부 확인"""
+        return any(item.item_type == "category" and item.category == category for item in self._items)
+
+    def remove_category(self, category: str) -> bool:
+        """카테고리 즐겨찾기 삭제"""
+        for i, item in enumerate(self._items):
+            if item.item_type == "category" and item.category == category:
+                self._items.pop(i)
+                self._save()
+                return True
+        return False
 
     def remove(self, category: str, tool_module: str) -> bool:
         """즐겨찾기 삭제

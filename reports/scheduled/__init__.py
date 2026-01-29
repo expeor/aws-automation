@@ -25,15 +25,18 @@ TOOLS = [
         "description": "일간/월간/분기/반기/연간 정기 작업 실행",
         "description_en": "Execute daily/monthly/quarterly/biannual/annual scheduled operations",
         "permission": "read",
-        "module": "_scheduled_menu",
+        "module": "menu",
         "is_menu": True,
         "area": "inventory",  # 관리 도구이므로 inventory 분류
+        "require_session": False,  # 메뉴 진입 시 인증 불필요
     },
 ]
 
 # 외부 API
+from .history import ScheduledRunHistory, ScheduledRunRecord
 from .menu import show_scheduled_menu
 from .registry import get_all_tasks, get_schedule_groups, get_tasks_by_permission, load_config
+from .schedule import format_next_run_date, get_next_run_date, is_due
 from .types import PERMISSION_COLORS, ScheduledTask, ScheduleGroup, TaskCycle
 
 __all__ = [
@@ -48,4 +51,11 @@ __all__ = [
     "get_tasks_by_permission",
     "load_config",
     "show_scheduled_menu",
+    # history
+    "ScheduledRunHistory",
+    "ScheduledRunRecord",
+    # schedule
+    "get_next_run_date",
+    "format_next_run_date",
+    "is_due",
 ]
