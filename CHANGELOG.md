@@ -22,10 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(cli): add code-review skill for self-review checklist
 - feat(ip_search): add region/service filtering for public IP lookup
 - feat(ip_search): add selective provider cache refresh support
+- feat(cli): add service selector UI with 's' shortcut for service-based navigation
 
 ### Changed
 - refactor(cli): main menu UI improvements and banner updates
 - refactor(cli): redesign ASCII banner with mountain-style logo
+- refactor(cli): reorder main menu shortcuts for better UX
 - refactor(log_analyzer): enhance ALB log analyzer with 7 new reporters
 - refactor(scheduled): improve scheduled reports menu with history view
 - refactor(ip_search): enhance private IP lookup functionality
