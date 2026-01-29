@@ -164,25 +164,23 @@ def select_service(
         try:
             num = int(choice)
             if 1 <= num <= total_count:
-                selected = menu_items[num - 1]["svc"]
+                selected: dict[str, Any] = menu_items[num - 1]["svc"]
                 if on_select:
                     result = on_select(selected)
                     if result is False:
                         continue  # 콜백이 False 반환 시 메뉴 유지
-                    return selected
                 return selected
             console.print(f"[dim]{t('menu.range_info', min=1, max=total_count)}[/dim]")
         except ValueError:
             # 키워드 검색
             matched = _search_by_keyword(menu_items, choice)
             if matched:
-                selected = matched["svc"]
+                matched_svc: dict[str, Any] = matched["svc"]
                 if on_select:
-                    result = on_select(selected)
+                    result = on_select(matched_svc)
                     if result is False:
                         continue
-                    return selected
-                return selected
+                return matched_svc
             console.print(f"[dim]{t('menu.no_match')}[/dim]")
 
 
