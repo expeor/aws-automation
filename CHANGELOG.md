@@ -20,12 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(log_analyzer): add security events reporter
 - feat(scheduled): add execution history tracking
 - feat(cli): add code-review skill for self-review checklist
+- feat(ip_search): add region/service filtering for public IP lookup
+- feat(ip_search): add selective provider cache refresh support
 
 ### Changed
 - refactor(cli): main menu UI improvements and banner updates
+- refactor(cli): redesign ASCII banner with mountain-style logo
 - refactor(log_analyzer): enhance ALB log analyzer with 7 new reporters
 - refactor(scheduled): improve scheduled reports menu with history view
 - refactor(ip_search): enhance private IP lookup functionality
+- refactor(ip_search): improve public IP search result display
 
 ## [0.3.1] - 2026-01-24
 
