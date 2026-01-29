@@ -318,9 +318,9 @@ class HTMLReport:
         """내부 헬퍼: 차트 추가 및 pending section_title 적용"""
         section_title = self._pending_section_title
         self._pending_section_title = None  # 사용 후 초기화
-        self.charts.append(ChartConfig(
-            self._next_chart_id(), option, height=height, size=size, section_title=section_title
-        ))
+        self.charts.append(
+            ChartConfig(self._next_chart_id(), option, height=height, size=size, section_title=section_title)
+        )
         return self
 
     def add_section_title(self, title: str) -> HTMLReport:
@@ -1353,9 +1353,7 @@ class HTMLReport:
         for chart in self.charts:
             # 섹션 타이틀이 있으면 먼저 추가
             if chart.section_title:
-                boxes.append(
-                    f'<div class="section-title"><h2>{chart.section_title}</h2></div>'
-                )
+                boxes.append(f'<div class="section-title"><h2>{chart.section_title}</h2></div>')
             size_class = chart.size.value  # "small", "medium", "large", "xlarge"
             boxes.append(
                 f'<div class="chart-box {size_class}"><div id="{chart.chart_id}" class="chart-container"></div></div>'

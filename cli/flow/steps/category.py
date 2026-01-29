@@ -459,7 +459,7 @@ class CategoryStep:
 
         is_menu: True인 도구가 유일하면 자동 선택 (선택 UI 스킵)
         """
-        tools = category.get("tools", [])
+        tools: list[dict] = category.get("tools", [])
 
         # is_menu 도구 자동 선택: 도구가 1개이고 is_menu=True이면 바로 반환
         if len(tools) == 1 and tools[0].get("is_menu"):

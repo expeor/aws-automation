@@ -110,7 +110,9 @@ class GroupedCommandsGroup(click.Group):
         @click.option("--role", "role", help="Role 이름 (SSO Session용)")
         @click.option("--fallback-role", "fallback_role", help="Fallback Role (SSO Session용)")
         @click.option("-r", "--region", multiple=True, default=["ap-northeast-2"], help="리전 (다중 가능)")
-        @click.option("-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both")
+        @click.option(
+            "-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both"
+        )
         @click.option("-o", "--output", default=None, help="출력 파일 경로")
         @click.option("-q", "--quiet", is_flag=True, help="최소 출력 모드")
         @click.pass_context

@@ -299,7 +299,9 @@ def run(ctx: ExecutionContext) -> None:
                 f"  {r.account_name}/{r.region}: [red]암호화되지 않은 볼륨 {r.unencrypted_count}개 ({', '.join(parts)})[/red]"
             )
         elif r.total_volumes_checked > 0:
-            console.print(f"  {r.account_name}/{r.region}: [green]모든 볼륨 암호화됨 ({r.total_volumes_checked}개)[/green]")
+            console.print(
+                f"  {r.account_name}/{r.region}: [green]모든 볼륨 암호화됨 ({r.total_volumes_checked}개)[/green]"
+            )
 
     # 전체 통계
     totals = {

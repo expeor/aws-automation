@@ -1081,13 +1081,15 @@ class MainMenu:
             if sub_choice.isdigit():
                 sub_idx = int(sub_choice)
                 if 1 <= sub_idx <= len(results):
-                    selected = results[sub_idx - 1]
-                    if self._favorites.is_favorite(selected.category, selected.tool_module):
-                        self.console.print(f"[dim]{t('menu.already_registered', name=selected.tool_name)}[/dim]")
+                    search_result = results[sub_idx - 1]
+                    if self._favorites.is_favorite(search_result.category, search_result.tool_module):
+                        self.console.print(f"[dim]{t('menu.already_registered', name=search_result.tool_name)}[/dim]")
                     else:
-                        success = self._favorites.add(selected.category, selected.tool_name, selected.tool_module)
+                        success = self._favorites.add(
+                            search_result.category, search_result.tool_name, search_result.tool_module
+                        )
                         if success:
-                            self.console.print(f"[dim]{t('menu.added', name=selected.tool_name)}[/dim]")
+                            self.console.print(f"[dim]{t('menu.added', name=search_result.tool_name)}[/dim]")
                         else:
                             self.console.print(f"[dim]{t('menu.add_failed_max')}[/dim]")
                     wait_for_any_key()
@@ -1421,9 +1423,11 @@ class MainMenu:
         """정기 작업 메뉴"""
         from reports.scheduled.menu import show_scheduled_menu
 
-        action, task = show_scheduled_menu(self.console, self.lang)
+        action, tasks = show_scheduled_menu(self.console, self.lang)
 
-        if action == "run" and task:
+        if action == "run" and tasks:
+            # 첫 번째 작업만 실행 (일괄 실행은 menu.py에서 처리)
+            task = tasks[0]
             # tool_ref에서 category/module 분리
             parts = task.tool_ref.split("/")
             if len(parts) >= 2:
