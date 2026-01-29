@@ -197,18 +197,22 @@ class TestBanner:
         print_simple_banner(console)
 
     def test_compact_logo_defined(self):
-        """COMPACT_LOGO 상수 정의됨"""
-        from cli.ui.banner import COMPACT_LOGO
+        """COMPACT_LOGO_LINES 상수 정의됨"""
+        from cli.ui.banner import COMPACT_LOGO_LINES
 
-        assert isinstance(COMPACT_LOGO, str)
-        assert "{version}" in COMPACT_LOGO
+        assert isinstance(COMPACT_LOGO_LINES, list)
+        assert len(COMPACT_LOGO_LINES) > 0
+        # 각 라인은 (style, ascii_art, suffix) 튜플
+        for line in COMPACT_LOGO_LINES:
+            assert isinstance(line, tuple)
+            assert len(line) == 3
 
     def test_full_logo_defined(self):
-        """FULL_LOGO 상수 정의됨"""
-        from cli.ui.banner import FULL_LOGO
+        """FULL_LOGO_LINES 상수 정의됨"""
+        from cli.ui.banner import FULL_LOGO_LINES
 
-        assert isinstance(FULL_LOGO, str)
-        assert len(FULL_LOGO) > 0  # 로고가 정의되어 있음
+        assert isinstance(FULL_LOGO_LINES, list)
+        assert len(FULL_LOGO_LINES) > 0  # 로고가 정의되어 있음
 
 
 # =============================================================================

@@ -82,9 +82,7 @@ def get_current_context() -> str:
     return f"[dim]{t('common.profile_not_set')}[/]"
 
 
-def _render_logo_lines(
-    console: Console, lines: list[tuple[str, str, str]], format_vars: dict[str, str]
-) -> None:
+def _render_logo_lines(console: Console, lines: list[tuple[str, str, str]], format_vars: dict[str, str]) -> None:
     """로고 라인 렌더링 (백슬래시 이스케이프 처리)"""
     from rich.text import Text
 
