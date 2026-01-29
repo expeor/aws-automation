@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-01-30
+
+### Added
+- feat(iam): add user snapshot report with Excel/HTML output
+- feat(iam): add unused roles detection tool
+- feat(ec2): add unencrypted EBS volume detection tool
+- feat(log_analyzer): add TPS (transactions per second) reporter
+- feat(log_analyzer): add SLA compliance reporter
+- feat(log_analyzer): add SSL/TLS security reporter
+- feat(log_analyzer): add connection failure reporter
+- feat(log_analyzer): add processing time reporter
+- feat(log_analyzer): add target performance reporter
+- feat(log_analyzer): add security events reporter
+- feat(scheduled): add execution history tracking
+- feat(cli): add code-review skill for self-review checklist
+
+### Changed
+- refactor(cli): main menu UI improvements and banner updates
+- refactor(log_analyzer): enhance ALB log analyzer with 7 new reporters
+- refactor(scheduled): improve scheduled reports menu with history view
+- refactor(ip_search): enhance private IP lookup functionality
+
 ## [0.3.1] - 2026-01-24
 
 ### Changed
