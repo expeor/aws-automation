@@ -42,7 +42,8 @@ SHORTCUTS = {
     "h": "help",
     "?": "help",
     "a": "all_tools",
-    "c": "aws_category",  # 분야별 (Compute, Storage...)
+    "s": "by_service",  # 서비스별 (EC2, VPC, Lambda...)
+    "c": "aws_category",  # 카테고리별 (Compute, Storage...)
     "t": "trusted_advisor",  # 목적별 (보안, 비용, 성능...)
     "r": "reports",  # 종합 보고서 (비용, 인벤토리, IP 검색, 로그)
     "d": "scheduled",  # 정기 작업 (Daily/Monthly/Quarterly...)
@@ -278,18 +279,18 @@ class MainMenu:
         cmd_table.add_row(
             "[dim]a[/dim]",
             t("menu.all_tools"),
+            "[dim]s[/dim]",
+            t("menu.by_service"),
             "[dim]t[/dim]",
             t("menu.by_purpose"),
-            "[dim]c[/dim]",
-            t("menu.by_category"),
         )
         cmd_table.add_row(
+            "[dim]c[/dim]",
+            t("menu.by_category"),
             "[dim]r[/dim]",
             t("menu.reports"),
             "[dim]d[/dim]",
             t("menu.scheduled_operations"),
-            "",
-            "",
         )
         self.console.print(cmd_table)
 
@@ -395,6 +396,11 @@ class MainMenu:
 
         if action == "all_tools":
             self._list_all_tools()
+            return True
+
+        if action == "by_service":
+            # 서비스별 탐색 (EC2, VPC, Lambda...)
+            self._show_by_service_view()
             return True
 
         if action == "aws_category":
@@ -1517,6 +1523,24 @@ class MainMenu:
             row_renderer=self._render_tool_row_with_area,
             get_category=lambda _: category_name,
             get_module=lambda tl: tl.get("module", ""),
+        )
+
+    def _show_by_service_view(self) -> None:
+        """서비스별 탐색 뷰 (EC2, VPC, Lambda...)"""
+        from cli.ui.service_selector import select_service
+
+        # 도구가 있는 서비스만 수집
+        services = [cat for cat in self._categories if cat.get("tools")]
+
+        def on_select(svc: dict) -> bool:
+            self._show_tools_in_service(svc)
+            return False  # 메뉴 유지
+
+        select_service(
+            self.console,
+            services,
+            show_description=True,
+            on_select=on_select,
         )
 
     def _show_aws_category_view(self) -> None:

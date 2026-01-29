@@ -467,6 +467,14 @@ MENU_MESSAGES = {
         "ko": "카테고리별",
         "en": "By Category",
     },
+    "by_service": {
+        "ko": "서비스별",
+        "en": "By Service",
+    },
+    "no_services_available": {
+        "ko": "사용 가능한 서비스가 없습니다.",
+        "en": "No services available.",
+    },
     "reports": {
         "ko": "종합 보고서",
         "en": "Reports",

@@ -1,14 +1,10 @@
 # AA (AWS Automation)
 
-[![PyPI](https://img.shields.io/pypi/v/aws-automation?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/aws-automation/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/aws-automation?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/aws-automation/)
 [![CI](https://github.com/expeor/aws-automation/actions/workflows/ci.yml/badge.svg)](https://github.com/expeor/aws-automation/actions/workflows/ci.yml)
 [![Codecov](https://codecov.io/gh/expeor/aws-automation/branch/master/graph/badge.svg)](https://codecov.io/gh/expeor/aws-automation)
 [![Python](https://img.shields.io/badge/Python-3.10--3.14-3776AB?logo=python&logoColor=white)](https://python.org/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/expeor/aws-automation?logo=github)](https://github.com/expeor/aws-automation/releases)
-
 AWS 운영 자동화를 위한 CLI 도구입니다.
 
 미사용 리소스 탐지, 보안 점검, IAM 감사, 로그 분석 등 **70개 이상**의 AWS 운영 도구를 제공합니다 (**35개 서비스**). 멀티 계정·멀티 리전을 지원하며, 결과는 Excel로 저장됩니다.
