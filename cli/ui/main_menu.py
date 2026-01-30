@@ -1526,22 +1526,21 @@ class MainMenu:
         )
 
     def _show_by_service_view(self) -> None:
-        """서비스별 탐색 뷰 (EC2, VPC, Lambda...)"""
-        from cli.ui.service_selector import select_service
+        """서비스별 탐색 뷰 - CategoryStep 사용 (3열 레이아웃)"""
+        from cli.flow.context import ExecutionContext
+        from cli.flow.steps.category import CategoryStep
 
-        # 도구가 있는 서비스만 수집
-        services = [cat for cat in self._categories if cat.get("tools")]
+        try:
+            ctx = ExecutionContext()
+            step = CategoryStep()
+            ctx = step.execute(ctx)
 
-        def on_select(svc: dict) -> bool:
-            self._show_tools_in_service(svc)
-            return False  # 메뉴 유지
-
-        select_service(
-            self.console,
-            services,
-            show_description=True,
-            on_select=on_select,
-        )
+            if ctx.tool:
+                # 선택된 도구 실행 (module 또는 name 사용)
+                tool_module = ctx.tool.module or ctx.tool.name
+                self._run_tool_directly(ctx.category, tool_module, ctx.tool.name)
+        except (KeyboardInterrupt, RuntimeError):
+            pass  # 취소 또는 오류 시 메인 메뉴로
 
     def _show_aws_category_view(self) -> None:
         """AWS 카테고리별 탐색 뷰"""

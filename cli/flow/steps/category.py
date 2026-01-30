@@ -52,6 +52,7 @@ def _convert_to_tool_info(tool: dict, category_name: str) -> ToolInfo:
         description=tool.get("description", ""),
         category=category_name,
         permission=tool.get("permission", "read"),
+        module=tool.get("module", ""),
         # 플러그인 메타데이터 키와 ToolInfo 키 매핑
         supports_single_region_only=tool.get("single_region_only", False),
         supports_single_account_only=tool.get("single_account_only", False),
@@ -241,6 +242,9 @@ class CategoryStep:
                 name = "REPORT"
             tools_count = len(cat.get("tools", []))
             menu_items.append({"cat": cat, "name": name, "count": tools_count})
+
+        # 알파벳순 정렬 (main_menu의 서비스별 뷰와 일관성 유지)
+        menu_items.sort(key=lambda x: x["name"].lower())
 
         total_count = len(menu_items)
         total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE

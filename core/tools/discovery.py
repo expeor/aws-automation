@@ -305,6 +305,33 @@ def discover_categories(
     # 모든 경로 스캔
     for base_module, path in SCAN_PATHS:
         source = path.name  # analysis, aws_services, tools
+
+        # 루트 폴더의 __init__.py도 확인 (reports/__init__.py 등)
+        try:
+            root_module = importlib.import_module(base_module)
+            if hasattr(root_module, "CATEGORY") and hasattr(root_module, "TOOLS"):
+                raw_category = root_module.CATEGORY
+                raw_tools = root_module.TOOLS
+
+                if validate:
+                    cat_info, warnings = _validate_category_metadata(base_module, raw_category, raw_tools)
+                    validation_warnings.extend(warnings)
+                else:
+                    cat_info = raw_category.copy()
+                    cat_info["tools"] = raw_tools
+
+                cat_info["module_path"] = base_module
+                cat_info["_source"] = source
+                categories.append(cat_info)
+                logger.debug(f"루트 카테고리 발견: {base_module} (source={source})")
+        except ImportError as e:
+            logger.debug(f"루트 모듈 로드 스킵: {base_module} - {e}")
+        except MetadataValidationError as e:
+            logger.error(f"루트 메타데이터 검증 실패: {e}")
+        except Exception as e:
+            logger.warning(f"루트 모듈 로드 오류: {base_module} - {e}")
+
+        # 하위 디렉토리 스캔
         scan_directory(path, base_module, source)
 
     # 검증 경고 로깅

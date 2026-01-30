@@ -133,6 +133,9 @@ class ToolInfo:
     category: str
     permission: PermissionType
 
+    # 도구 모듈 이름 (파일명)
+    module: str = ""
+
     # 도구 실행 함수
     runner: Callable[[ExecutionContext], None] | None = None
 
