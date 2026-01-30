@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 AWS 운영 자동화를 위한 CLI 도구입니다.
 
-미사용 리소스 탐지, 보안 점검, IAM 감사, 로그 분석 등 **70개 이상**의 AWS 운영 도구를 제공합니다 (**35개 서비스**). 멀티 계정·멀티 리전을 지원하며, 결과는 Excel로 저장됩니다.
+미사용 리소스 탐지, 보안 점검, IAM 감사, 로그 분석 등 **80개 이상**의 AWS 운영 도구를 제공합니다 (**35개+ 서비스**). 멀티 계정·멀티 리전을 지원하며, 결과는 Excel/HTML로 저장됩니다.
 
 ## 주요 기능
 
@@ -87,8 +87,9 @@ aa [전역 옵션] <명령어> [명령어 옵션]
 ```
 
 **명령어 유형:**
-- **서비스 명령어**: `aa ec2`, `aa vpc` - AWS 서비스 대화형 메뉴
-- **유틸리티 명령어**: `aa run`, `aa list-tools`, `aa group` - 기능별 명령
+- **서비스 명령어**: `aa ec2`, `aa vpc`, `aa report` - AWS 서비스 대화형 메뉴
+- **유틸리티 명령어**: `aa tools`, `aa group` - 기능별 명령
+- **직접 실행**: `aa ec2/ebs_audit -p profile` - 도구 경로로 바로 실행
 
 ### 전역 옵션
 
@@ -110,29 +111,32 @@ aa --lang en ec2    # 영문 출력으로 EC2 도구 실행
 
 ### Headless 모드
 
-대화형 프롬프트 없이 도구를 실행합니다. SSO Profile 또는 Access Key 프로파일을 지원합니다.
+대화형 프롬프트 없이 도구를 실행합니다. SSO Profile, SSO Session, Access Key를 지원합니다.
 
 ```bash
 # 도구 경로 확인
-aa list-tools
+aa tools
 
 # 기본 실행
-aa run ec2/ebs_audit -p my-profile -r ap-northeast-2
+aa ec2/ebs_audit -p my-profile -r ap-northeast-2
 
 # 다중 리전
-aa run ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
+aa ec2/ebs_audit -p my-profile -r ap-northeast-2 -r us-east-1
 
 # 전체 리전
-aa run ec2/ebs_audit -p my-profile -r all
+aa ec2/ebs_audit -p my-profile -r all
+
+# SSO Session으로 멀티 계정 실행
+aa ec2/ebs_audit -s my-sso --account 111122223333 --account 444455556666 --role ReadOnly
 
 # 프로파일 그룹으로 실행
-aa run ec2/ebs_audit -g "개발 환경" -r ap-northeast-2
+aa ec2/ebs_audit -g "개발 환경" -r ap-northeast-2
 
 # Excel + HTML 보고서 (기본값)
-aa run ec2/ebs_audit -p my-profile -f both
+aa ec2/ebs_audit -p my-profile -f both
 
 # JSON 출력
-aa run ec2/ebs_audit -p my-profile -f json -o result.json
+aa ec2/ebs_audit -p my-profile -f json -o result.json
 ```
 
 **옵션:**
@@ -140,6 +144,9 @@ aa run ec2/ebs_audit -p my-profile -f json -o result.json
 | 옵션 | 설명 |
 | ---- | ---- |
 | `-p, --profile` | SSO Profile 또는 Access Key 프로파일 |
+| `-s, --sso-session` | SSO Session 이름 (멀티 계정) |
+| `--account` | 계정 ID (SSO Session용, 다중 가능) |
+| `--role` | Role 이름 (SSO Session용) |
 | `-g, --profile-group` | 저장된 프로파일 그룹 이름 |
 | `-r, --region` | 리전 (다중 가능, `all` 또는 패턴) |
 | `-f, --format` | 출력 형식: `both` (기본), `excel`, `html`, `console`, `json`, `csv` |
@@ -149,9 +156,9 @@ aa run ec2/ebs_audit -p my-profile -f json -o result.json
 ### 도구 목록 조회
 
 ```bash
-aa list-tools              # 전체 도구 목록
-aa list-tools -c ec2       # EC2 카테고리만
-aa list-tools --json       # JSON 출력 (스크립트 연동용)
+aa tools              # 전체 도구 목록
+aa tools -c ec2       # EC2 카테고리만
+aa tools --json       # JSON 출력 (스크립트 연동용)
 ```
 
 ### 프로파일 그룹 관리
@@ -185,17 +192,22 @@ aa group delete "개발 환경" # 그룹 삭제
 
 **CI/CD 파이프라인:**
 ```bash
-aa run ec2/ebs_audit -p prod-profile -r all -f json -o report.json -q
+aa ec2/ebs_audit -p prod-profile -r all -f json -o report.json -q
 ```
 
-**멀티 계정 분석:**
+**SSO Session 멀티 계정 분석:**
 ```bash
-aa run iam/user_audit -g "전체 계정" -r ap-northeast-2 -f excel
+aa iam/user_audit -s my-sso --account 111122223333 --account 444455556666 --role ReadOnly -f excel
+```
+
+**프로파일 그룹으로 분석:**
+```bash
+aa iam/user_audit -g "전체 계정" -r ap-northeast-2 -f excel
 ```
 
 **스크립트에서 결과 파싱:**
 ```bash
-aa list-tools --json | jq '.[] | select(.category=="ec2")'
+aa tools --json | jq '.[] | select(.category=="ec2")'
 ```
 
 ## 지원 서비스
