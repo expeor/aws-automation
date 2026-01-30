@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-01-30
+
+### Added
+- feat: add CLI VIEW and favorites commands
+- feat: add service selector UI for main menu ([#68](https://github.com/expeor/aws-automation/pull/68))
+- feat: enhance public IP search and banner UI ([#66](https://github.com/expeor/aws-automation/pull/66))
+
 ## [0.4.0] - 2026-01-30
 
 ### Added
@@ -143,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD 파이프라인 보안 강화
 - ruff, mypy, bandit 린팅/타입 체크
 
+[0.5.0]: https://github.com/expeor/aws-automation/compare/v0.4.0...v0.5.0
 [0.3.0]: https://github.com/expeor/aws-automation/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/expeor/aws-automation/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/expeor/aws-automation/compare/v0.1.0...v0.1.1
