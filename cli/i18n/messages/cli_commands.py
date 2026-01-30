@@ -310,4 +310,106 @@ CLI_MESSAGES = {
         "ko": "오류: {message}",
         "en": "Error: {message}",
     },
+    # =========================================================================
+    # VIEW Commands (aa all, aa service, aa purpose, aa category)
+    # =========================================================================
+    "view_all_desc": {
+        "ko": "전체 도구 목록",
+        "en": "List all tools",
+    },
+    "view_service_desc": {
+        "ko": "서비스별 도구 탐색",
+        "en": "Browse tools by service",
+    },
+    "view_purpose_desc": {
+        "ko": "목적별 도구 탐색 (보안/비용/미사용 등)",
+        "en": "Browse tools by purpose (security/cost/unused etc.)",
+    },
+    "view_category_desc": {
+        "ko": "AWS 카테고리별 도구 탐색",
+        "en": "Browse tools by AWS category",
+    },
+    # =========================================================================
+    # Favorites Commands (aa fav)
+    # =========================================================================
+    "fav_group_desc": {
+        "ko": "즐겨찾기 관리",
+        "en": "Manage favorites",
+    },
+    "fav_list_desc": {
+        "ko": "즐겨찾기 목록 조회",
+        "en": "List favorites",
+    },
+    "fav_add_desc": {
+        "ko": "즐겨찾기 추가",
+        "en": "Add to favorites",
+    },
+    "fav_rm_desc": {
+        "ko": "즐겨찾기 삭제",
+        "en": "Remove from favorites",
+    },
+    "fav_run_desc": {
+        "ko": "즐겨찾기 도구 실행",
+        "en": "Run a favorite tool",
+    },
+    "fav_clear_desc": {
+        "ko": "즐겨찾기 전체 삭제",
+        "en": "Clear all favorites",
+    },
+    "fav_empty": {
+        "ko": "저장된 즐겨찾기가 없습니다.",
+        "en": "No favorites saved.",
+    },
+    "fav_item_tool": {
+        "ko": "🔧 {name} ({category})",
+        "en": "🔧 {name} ({category})",
+    },
+    "fav_item_category": {
+        "ko": "📁 {name}",
+        "en": "📁 {name}",
+    },
+    "fav_not_found": {
+        "ko": "오류: 즐겨찾기 #{number}를 찾을 수 없습니다.",
+        "en": "Error: Favorite #{number} not found.",
+    },
+    "fav_added": {
+        "ko": "즐겨찾기에 추가됨: {name}",
+        "en": "Added to favorites: {name}",
+    },
+    "fav_removed": {
+        "ko": "즐겨찾기에서 삭제됨: {name}",
+        "en": "Removed from favorites: {name}",
+    },
+    "fav_cleared": {
+        "ko": "모든 즐겨찾기가 삭제되었습니다.",
+        "en": "All favorites cleared.",
+    },
+    "fav_tool_not_found": {
+        "ko": "오류: 도구를 찾을 수 없습니다: {path}",
+        "en": "Error: Tool not found: {path}",
+    },
+    "fav_category_not_found": {
+        "ko": "오류: 카테고리를 찾을 수 없습니다: {name}",
+        "en": "Error: Category not found: {name}",
+    },
+    "fav_already_exists": {
+        "ko": "이미 즐겨찾기에 등록되어 있습니다.",
+        "en": "Already in favorites.",
+    },
+    "fav_max_reached": {
+        "ko": "오류: 최대 즐겨찾기 개수({max})에 도달했습니다.",
+        "en": "Error: Maximum favorites ({max}) reached.",
+    },
+    "fav_confirm_clear": {
+        "ko": "모든 즐겨찾기를 삭제하시겠습니까?",
+        "en": "Clear all favorites?",
+    },
+    "fav_hint_add": {
+        "ko": "사용법: aa fav add ec2/ebs_audit 또는 aa fav add -c ec2",
+        "en": "Usage: aa fav add ec2/ebs_audit or aa fav add -c ec2",
+    },
+    "fav_hint_manage": {
+        "ko": "관리: aa fav list | aa fav add <path> | aa fav rm <number>",
+        "en": "Manage: aa fav list | aa fav add <path> | aa fav rm <number>",
+    },
 }

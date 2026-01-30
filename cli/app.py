@@ -76,7 +76,7 @@ def get_version() -> str:
 VERSION = get_version()
 
 # 유틸리티 명령어 목록 (서비스 명령어와 분리 표시용)
-UTILITY_COMMANDS = {"tools", "group"}
+UTILITY_COMMANDS = {"tools", "group", "fav", "all", "service", "purpose", "category"}
 
 
 class GroupedCommandsGroup(click.Group):
@@ -682,6 +682,489 @@ def group_delete(name: str, yes: bool) -> None:
     else:
         console.print(f"[red]{t('cli.delete_failed')}[/red]")
         raise SystemExit(1)
+
+
+# =============================================================================
+# VIEW 명령어 (aa all, aa service, aa purpose, aa category)
+# =============================================================================
+
+
+@cli.command("all")
+@click.pass_context
+def all_cmd(ctx: Context) -> None:
+    """전체 도구 목록
+
+    \b
+    모든 서비스의 도구를 페이지네이션으로 표시합니다.
+
+    \b
+    Examples:
+        aa all
+    """
+    from cli.ui.main_menu import MainMenu
+
+    lang = ctx.obj.get("lang", "ko") if ctx.obj else "ko"
+    menu = MainMenu(lang=lang)
+    menu._ensure_initialized()
+    menu._list_all_tools()
+
+
+@cli.command("service")
+@click.pass_context
+def service_cmd(ctx: Context) -> None:
+    """서비스별 도구 탐색
+
+    \b
+    AWS 서비스별로 도구를 탐색합니다.
+    (EC2, VPC, Lambda, RDS 등)
+
+    \b
+    Examples:
+        aa service
+    """
+    from cli.ui.main_menu import MainMenu
+
+    lang = ctx.obj.get("lang", "ko") if ctx.obj else "ko"
+    menu = MainMenu(lang=lang)
+    menu._ensure_initialized()
+    menu._show_by_service_view()
+
+
+# 별칭: services, svc
+@cli.command("services", hidden=True)
+@click.pass_context
+def services_alias(ctx: Context) -> None:
+    """서비스별 도구 탐색 (별칭: aa service 사용 권장)"""
+    ctx.invoke(service_cmd)
+
+
+@cli.command("svc", hidden=True)
+@click.pass_context
+def svc_alias(ctx: Context) -> None:
+    """서비스별 도구 탐색 (별칭: aa service 사용 권장)"""
+    ctx.invoke(service_cmd)
+
+
+@cli.command("purpose")
+@click.pass_context
+def purpose_cmd(ctx: Context) -> None:
+    """목적별 도구 탐색
+
+    \b
+    보안, 비용, 미사용 리소스 등 목적별로 도구를 탐색합니다.
+    (Trusted Advisor 영역 기반)
+
+    \b
+    Examples:
+        aa purpose
+    """
+    from cli.ui.main_menu import MainMenu
+
+    lang = ctx.obj.get("lang", "ko") if ctx.obj else "ko"
+    menu = MainMenu(lang=lang)
+    menu._ensure_initialized()
+    menu._show_trusted_advisor_view()
+
+
+# 별칭: purposes
+@cli.command("purposes", hidden=True)
+@click.pass_context
+def purposes_alias(ctx: Context) -> None:
+    """목적별 도구 탐색 (별칭: aa purpose 사용 권장)"""
+    ctx.invoke(purpose_cmd)
+
+
+@cli.command("category")
+@click.pass_context
+def category_cmd(ctx: Context) -> None:
+    """AWS 카테고리별 도구 탐색
+
+    \b
+    Compute, Storage, Database 등 AWS 서비스 카테고리별로
+    도구를 탐색합니다.
+
+    \b
+    Examples:
+        aa category
+    """
+    from cli.ui.main_menu import MainMenu
+
+    lang = ctx.obj.get("lang", "ko") if ctx.obj else "ko"
+    menu = MainMenu(lang=lang)
+    menu._ensure_initialized()
+    menu._show_aws_category_view()
+
+
+# 별칭: categories, cat
+@cli.command("categories", hidden=True)
+@click.pass_context
+def categories_alias(ctx: Context) -> None:
+    """AWS 카테고리별 도구 탐색 (별칭: aa category 사용 권장)"""
+    ctx.invoke(category_cmd)
+
+
+@cli.command("cat", hidden=True)
+@click.pass_context
+def cat_alias(ctx: Context) -> None:
+    """AWS 카테고리별 도구 탐색 (별칭: aa category 사용 권장)"""
+    ctx.invoke(category_cmd)
+
+
+# =============================================================================
+# 즐겨찾기 명령어 (aa fav)
+# =============================================================================
+
+
+class FavoriteGroup(click.Group):
+    """숫자 직접 실행을 지원하는 즐겨찾기 그룹
+
+    aa fav 1  -> 1번 즐겨찾기 실행
+    aa fav list -> 목록 조회
+    """
+
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
+        """명령어 조회 - 숫자면 run 명령어로 라우팅"""
+        # 등록된 명령어가 있으면 그대로 반환
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            return cmd
+
+        # 숫자면 run 명령어로 라우팅
+        if cmd_name.isdigit():
+            return self._create_run_by_number(int(cmd_name))
+
+        return None
+
+    def _create_run_by_number(self, number: int) -> Command:
+        """번호 기반 실행을 위한 동적 명령어 생성"""
+
+        @click.command(name=str(number))
+        @click.option("-p", "--profile", "profile", help="AWS 프로파일")
+        @click.option("-r", "--region", multiple=True, default=["ap-northeast-2"], help="리전")
+        @click.option("-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both")
+        @click.pass_context
+        def number_run_cmd(
+            ctx: Context,
+            profile: str | None,
+            region: tuple[str, ...],
+            format: str,
+        ) -> None:
+            """즐겨찾기 도구 실행"""
+            _run_favorite_by_number(ctx, number, profile, region, format)
+
+        return number_run_cmd
+
+
+def _run_favorite_by_number(
+    ctx: Context,
+    number: int,
+    profile: str | None,
+    region: tuple[str, ...],
+    format: str,
+) -> None:
+    """즐겨찾기 번호로 도구 실행"""
+    from core.tools.history import FavoritesManager
+
+    manager = FavoritesManager()
+    item = manager.get_by_index(number)
+
+    if not item:
+        click.echo(t("cli.fav_not_found", number=number), err=True)
+        raise SystemExit(1)
+
+    # 카테고리 즐겨찾기: 대화형으로 서비스 메뉴 진입
+    if item.item_type == "category":
+        from cli.flow import create_flow_runner
+
+        runner = create_flow_runner()
+        runner.run(item.category)
+        return
+
+    # 도구 즐겨찾기
+    tool_path = f"{item.category}/{item.tool_module}"
+
+    if profile:
+        # 비대화형 실행
+        from cli.headless import run_headless
+
+        exit_code = run_headless(
+            tool_path=tool_path,
+            profile=profile,
+            regions=list(region),
+            format=format,
+        )
+        raise SystemExit(exit_code)
+    else:
+        # 대화형 실행
+        from cli.flow import create_flow_runner
+
+        runner = create_flow_runner()
+        runner.run_tool_directly(item.category, item.tool_module, item.tool_name)
+
+
+@cli.group("fav", cls=FavoriteGroup, invoke_without_command=True)
+@click.pass_context
+def fav_cmd(ctx: Context) -> None:
+    """즐겨찾기 관리
+
+    \b
+    자주 사용하는 도구/서비스를 즐겨찾기로 관리합니다.
+
+    \b
+    Examples:
+        aa fav                    # 대화형 관리 메뉴
+        aa fav list              # 목록 조회
+        aa fav 1                 # 1번 실행 (대화형)
+        aa fav 1 -p profile      # 1번 실행 (비대화형)
+        aa fav add ec2/ebs_audit # 도구 추가
+        aa fav add -c ec2        # 카테고리 추가
+        aa fav rm 1              # 1번 삭제
+        aa fav clear             # 전체 삭제
+    """
+    if ctx.invoked_subcommand is None:
+        # 서브 명령어 없이 실행 시 대화형 메뉴
+        from cli.ui.main_menu import MainMenu
+
+        lang = ctx.obj.get("lang", "ko") if ctx.obj else "ko"
+        menu = MainMenu(lang=lang)
+        menu._ensure_initialized()
+        menu._manage_favorites()
+
+
+@fav_cmd.command("list")
+@click.option("--json", "as_json", is_flag=True, help="JSON 형식으로 출력")
+def fav_list(as_json: bool) -> None:
+    """즐겨찾기 목록
+
+    \b
+    Examples:
+        aa fav list           # 목록 출력
+        aa fav list --json    # JSON 출력
+    """
+    import json as json_module
+
+    from rich.console import Console
+    from rich.table import Table
+
+    from core.tools.history import FavoritesManager
+
+    console = Console()
+    manager = FavoritesManager()
+    items = manager.get_all()
+
+    if not items:
+        if as_json:
+            click.echo("[]")
+        else:
+            console.print(f"[dim]{t('cli.fav_empty')}[/dim]")
+            console.print(f"[dim]{t('cli.fav_hint_add')}[/dim]")
+        return
+
+    if as_json:
+        output_list = []
+        for i, item in enumerate(items, 1):
+            output_list.append({
+                "index": i,
+                "type": item.item_type,
+                "category": item.category,
+                "tool_name": item.tool_name,
+                "tool_module": item.tool_module,
+                "ref": item.ref,
+                "added_at": item.added_at,
+            })
+        click.echo(json_module.dumps(output_list, ensure_ascii=False, indent=2))
+    else:
+        table = Table(title=t("menu.favorites"), show_header=True)
+        table.add_column("#", style="dim", width=3)
+        table.add_column(t("cli.col_type"), width=10)
+        table.add_column(t("cli.col_name"), width=30)
+        table.add_column("Ref", style="dim")
+
+        for i, item in enumerate(items, 1):
+            if item.item_type == "category":
+                table.add_row(str(i), "[cyan]Category[/cyan]", item.tool_name, item.category)
+            else:
+                table.add_row(str(i), "[green]Tool[/green]", item.tool_name, item.ref)
+
+        console.print(table)
+        console.print()
+        console.print(f"[dim]{t('cli.fav_hint_manage')}[/dim]")
+
+
+@fav_cmd.command("run")
+@click.argument("number", type=int)
+@click.option("-p", "--profile", "profile", help="AWS 프로파일")
+@click.option("-r", "--region", multiple=True, default=["ap-northeast-2"], help="리전")
+@click.option("-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both")
+@click.pass_context
+def fav_run(
+    ctx: Context,
+    number: int,
+    profile: str | None,
+    region: tuple[str, ...],
+    format: str,
+) -> None:
+    """즐겨찾기 도구 실행
+
+    \b
+    Examples:
+        aa fav run 1                        # 대화형 실행
+        aa fav run 1 -p my-profile          # 비대화형 실행
+        aa fav run 1 -p my-profile -r all   # 전체 리전
+    """
+    _run_favorite_by_number(ctx, number, profile, region, format)
+
+
+@fav_cmd.command("add")
+@click.argument("path", required=False)
+@click.option("-c", "--category", "category_name", help="카테고리 즐겨찾기 추가")
+def fav_add(path: str | None, category_name: str | None) -> None:
+    """즐겨찾기 추가
+
+    \b
+    Examples:
+        aa fav add ec2/ebs_audit    # 도구 추가
+        aa fav add -c ec2           # 카테고리 추가
+    """
+    from rich.console import Console
+
+    from core.tools.discovery import get_category, load_tool
+    from core.tools.history import FavoritesManager
+
+    console = Console()
+    manager = FavoritesManager()
+
+    # 카테고리 추가
+    if category_name:
+        cat = get_category(category_name)
+        if not cat:
+            click.echo(t("cli.fav_category_not_found", name=category_name), err=True)
+            raise SystemExit(1)
+
+        display_name = cat.get("display_name", category_name)
+        if manager.is_category_favorite(cat["name"]):
+            console.print(f"[yellow]{t('cli.fav_already_exists')}[/yellow]")
+            return
+
+        if manager.add_category(cat["name"], display_name):
+            console.print(f"[green]{t('cli.fav_added', name=display_name)}[/green]")
+        else:
+            console.print(f"[red]{t('cli.fav_max_reached', max=manager.MAX_ITEMS)}[/red]")
+        return
+
+    # 도구 추가
+    if not path:
+        # 대화형 추가
+        from cli.ui.main_menu import MainMenu
+
+        menu = MainMenu()
+        menu._ensure_initialized()
+        menu._add_favorite_interactive()
+        return
+
+    # path 파싱 (category/module 형식)
+    if "/" not in path:
+        click.echo(t("cli.fav_tool_not_found", path=path), err=True)
+        console.print(f"[dim]{t('cli.fav_hint_add')}[/dim]")
+        raise SystemExit(1)
+
+    parts = path.split("/", 1)
+    category, module = parts[0], parts[1]
+
+    # 도구 검증
+    cat = get_category(category)
+    if not cat:
+        click.echo(t("cli.fav_category_not_found", name=category), err=True)
+        raise SystemExit(1)
+
+    # 도구 찾기
+    tool_meta = None
+    for tool in cat.get("tools", []):
+        if tool.get("module") == module:
+            tool_meta = tool
+            break
+
+    if not tool_meta:
+        click.echo(t("cli.fav_tool_not_found", path=path), err=True)
+        raise SystemExit(1)
+
+    tool_name = tool_meta.get("name", module)
+
+    if manager.is_favorite(category, module):
+        console.print(f"[yellow]{t('cli.fav_already_exists')}[/yellow]")
+        return
+
+    if manager.add(category, tool_name, module):
+        console.print(f"[green]{t('cli.fav_added', name=tool_name)}[/green]")
+    else:
+        console.print(f"[red]{t('cli.fav_max_reached', max=manager.MAX_ITEMS)}[/red]")
+
+
+@fav_cmd.command("rm")
+@click.argument("number", type=int)
+@click.option("-y", "--yes", is_flag=True, help="확인 없이 삭제")
+def fav_rm(number: int, yes: bool) -> None:
+    """즐겨찾기 삭제
+
+    \b
+    Examples:
+        aa fav rm 1        # 1번 삭제 (확인)
+        aa fav rm 1 -y     # 1번 삭제 (확인 없이)
+    """
+    from rich.console import Console
+
+    from core.tools.history import FavoritesManager
+
+    console = Console()
+    manager = FavoritesManager()
+    item = manager.get_by_index(number)
+
+    if not item:
+        click.echo(t("cli.fav_not_found", number=number), err=True)
+        raise SystemExit(1)
+
+    if not yes:
+        console.print(f"[yellow]{item.tool_name}[/yellow]")
+        if not click.confirm(t("cli.delete_prompt")):
+            console.print(f"[dim]{t('cli.cancelled')}[/dim]")
+            return
+
+    if manager.remove_by_index(number):
+        console.print(f"[green]{t('cli.fav_removed', name=item.tool_name)}[/green]")
+    else:
+        console.print(f"[red]{t('cli.delete_failed')}[/red]")
+
+
+@fav_cmd.command("clear")
+@click.option("-y", "--yes", is_flag=True, help="확인 없이 삭제")
+def fav_clear(yes: bool) -> None:
+    """즐겨찾기 전체 삭제
+
+    \b
+    Examples:
+        aa fav clear       # 전체 삭제 (확인)
+        aa fav clear -y    # 전체 삭제 (확인 없이)
+    """
+    from rich.console import Console
+
+    from core.tools.history import FavoritesManager
+
+    console = Console()
+    manager = FavoritesManager()
+    items = manager.get_all()
+
+    if not items:
+        console.print(f"[dim]{t('cli.fav_empty')}[/dim]")
+        return
+
+    if not yes:
+        console.print(f"[yellow]{t('cli.fav_confirm_clear')} ({len(items)} items)[/yellow]")
+        if not click.confirm(t("cli.delete_prompt")):
+            console.print(f"[dim]{t('cli.cancelled')}[/dim]")
+            return
+
+    manager.clear()
+    console.print(f"[green]{t('cli.fav_cleared')}[/green]")
 
 
 def _register_category_commands():

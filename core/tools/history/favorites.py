@@ -241,3 +241,34 @@ class FavoritesManager:
     def reload(self) -> None:
         """파일에서 다시 로드"""
         self._load()
+
+    def get_by_index(self, index: int) -> Optional[FavoriteItem]:
+        """인덱스로 즐겨찾기 항목 조회 (1-based)
+
+        Args:
+            index: 1부터 시작하는 인덱스 번호
+
+        Returns:
+            해당 인덱스의 FavoriteItem 또는 None (범위 초과 시)
+        """
+        items = self.get_all()
+        if 1 <= index <= len(items):
+            return items[index - 1]
+        return None
+
+    def remove_by_index(self, index: int) -> bool:
+        """인덱스로 즐겨찾기 삭제 (1-based)
+
+        Args:
+            index: 1부터 시작하는 인덱스 번호
+
+        Returns:
+            삭제 성공 여부
+        """
+        item = self.get_by_index(index)
+        if not item:
+            return False
+
+        if item.item_type == "category":
+            return self.remove_category(item.category)
+        return self.remove(item.category, item.tool_module)
