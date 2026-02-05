@@ -19,6 +19,32 @@ from ..context import ExecutionContext, ToolInfo
 
 console = Console()
 
+
+def _display_width(text: str) -> int:
+    """문자열의 터미널 표시 폭 (한글=2, 영문=1)"""
+    import unicodedata
+
+    width = 0
+    for char in text:
+        if unicodedata.east_asian_width(char) in ("F", "W"):
+            width += 2
+        else:
+            width += 1
+    return width
+
+
+def _truncate_to_width(text: str, max_width: int) -> str:
+    """표시 폭 기준으로 문자열 잘라내기 (한글 폭 고려)"""
+    import unicodedata
+
+    width = 0
+    for i, char in enumerate(text):
+        cw = 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+        if width + cw > max_width:
+            return text[:i]
+        width += cw
+    return text
+
 # 권한별 색상 (ANSI)
 PERMISSION_COLORS = {
     "read": "green",  # 안전 - 조회만
@@ -516,11 +542,12 @@ class CategoryStep:
                 sorted_tools = self._sort_tools(area_tools)
                 half = (len(sorted_tools) + 1) // 2
 
+                col_width = 26
                 for i in range(half):
                     left = sorted_tools[i]
                     left_perm = left.get("permission", "read")
                     left_color = PERMISSION_COLORS.get(left_perm, "green")
-                    left_name = left["name"][:26]
+                    left_name = _truncate_to_width(left["name"], col_width)
                     left_num = f"[{left_color}]{tool_index:>2}[/{left_color}]"
                     index_map[tool_index] = left
                     tool_index += 1
@@ -529,24 +556,24 @@ class CategoryStep:
                         right = sorted_tools[i + half]
                         right_perm = right.get("permission", "read")
                         right_color = PERMISSION_COLORS.get(right_perm, "green")
-                        right_name = right["name"][:26]
+                        right_name = _truncate_to_width(right["name"], col_width)
                         right_num = f"[{right_color}]{tool_index:>2}[/{right_color}]"
                         index_map[tool_index] = right
                         tool_index += 1
                         # 2열 출력 (Rich Table 사용)
                         row_table = Table(show_header=False, box=None, padding=(0, 1), pad_edge=False)
-                        row_table.add_column(width=3, justify="right")
-                        row_table.add_column(width=26)  # 20 → 26
-                        row_table.add_column(width=3, justify="right")
-                        row_table.add_column(width=26)  # 20 → 26
+                        row_table.add_column(width=3, justify="right", no_wrap=True)
+                        row_table.add_column(width=col_width, no_wrap=True)
+                        row_table.add_column(width=3, justify="right", no_wrap=True)
+                        row_table.add_column(width=col_width, no_wrap=True)
                         row_table.add_row(left_num, left_name, right_num, right_name)
                         console.print("[bold #FF9900]│[/]   ", end="")
                         console.print(row_table)
                     else:
                         # 1열만 출력
                         row_table = Table(show_header=False, box=None, padding=(0, 1), pad_edge=False)
-                        row_table.add_column(width=3, justify="right")
-                        row_table.add_column(width=26)  # 20 → 26
+                        row_table.add_column(width=3, justify="right", no_wrap=True)
+                        row_table.add_column(width=col_width, no_wrap=True)
                         row_table.add_row(left_num, left_name)
                         console.print("[bold #FF9900]│[/]   ", end="")
                         console.print(row_table)

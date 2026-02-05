@@ -29,7 +29,7 @@ Note: Tests use mocking for AWS Lambda and CloudWatch API calls.
 """
 
 from datetime import date, datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from botocore.exceptions import ClientError
@@ -51,7 +51,6 @@ from shared.aws.lambda_.runtime_eol import (
     get_runtime_info,
     get_runtime_status,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -790,7 +789,7 @@ class TestRuntimeEOL:
 
     def test_get_runtime_status_supported(self):
         """Test runtime status for supported runtime"""
-        status = get_runtime_status("python3.12")
+        status = get_runtime_status("python3.13")
 
         assert status == EOLStatus.SUPPORTED
 
@@ -828,20 +827,20 @@ class TestRuntimeEOL:
 
     def test_get_recommended_upgrade(self):
         """Test getting recommended upgrade path"""
-        # Python 2.7 should recommend Python 3.12
+        # Python 2.7 should recommend Python 3.13
         upgrade = get_recommended_upgrade("python2.7")
-        assert upgrade == "python3.12"
+        assert upgrade == "python3.13"
 
-        # Node.js 16 should recommend Node.js 20
+        # Node.js 16 should recommend Node.js 22
         upgrade = get_recommended_upgrade("nodejs16.x")
-        assert upgrade == "nodejs20.x"
+        assert upgrade == "nodejs22.x"
 
         # Java 8 should recommend Java 21
         upgrade = get_recommended_upgrade("java8")
         assert upgrade == "java21"
 
-        # Supported runtime should have no recommendation
-        upgrade = get_recommended_upgrade("python3.12")
+        # Active runtime with no upgrade path should have no recommendation
+        upgrade = get_recommended_upgrade("python3.13")
         assert upgrade is None
 
 

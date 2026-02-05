@@ -27,5 +27,6 @@ TOOLS = [
         "permission": "read",
         "module": "inventory",
         "area": "inventory",
+        "timeline_phases": ["리소스 수집", "Excel 생성", "요약"],
     },
 ]

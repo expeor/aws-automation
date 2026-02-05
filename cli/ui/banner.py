@@ -30,7 +30,7 @@ def get_version() -> str:
     try:
         current = Path(__file__).resolve()
         candidate_dirs = [
-            current.parent.parent.parent.parent,  # project root
+            current.parent.parent.parent,  # cli/ui/banner.py → project root
         ]
         for base in candidate_dirs:
             version_file = base / "version.txt"
@@ -55,9 +55,9 @@ COMPACT_LOGO_LINES: list[tuple[str, str, str]] = [
 # (style, ascii_art, suffix) 형식
 FULL_LOGO_LINES: list[tuple[str, str, str]] = [
     ("#FF9900", "    /\\      /\\", ""),
-    ("#FF9900", "   /  \\    /  \\", "     [bold white]AWS Automation CLI[/]"),
-    ("#CC7700", "  / /\\ \\  / /\\ \\", "    [dim]--------------------[/]"),
-    ("#CC7700", " / ____ \\/ ____ \\", "   [cyan]{tool_count}+ Tools Ready[/]"),
+    ("#FF9900", "   /  \\    /  \\", "     [bold white]AWS Automation CLI[/]  [dim]v{version}[/]"),
+    ("#CC7700", "  / /\\ \\  / /\\ \\", "    [dim cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━[/]"),
+    ("#CC7700", " / ____ \\/ ____ \\", "   [cyan]⚡ {tool_count}+ Tools Ready[/]"),
     ("#995500", "/_/    \\_\\/    \\_\\", ""),
 ]
 
@@ -114,7 +114,7 @@ def print_banner(console: Console, compact: bool = False) -> None:
         }
         _render_logo_lines(console, COMPACT_LOGO_LINES, format_vars)
     else:
-        format_vars = {"tool_count": str(get_tool_count())}
+        format_vars = {"tool_count": str(get_tool_count()), "version": get_version()}
         _render_logo_lines(console, FULL_LOGO_LINES, format_vars)
     console.print()
 

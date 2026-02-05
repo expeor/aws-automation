@@ -17,9 +17,12 @@ import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError
+
+if TYPE_CHECKING:
+    from .session_cache import MetricSessionCache
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,9 @@ def batch_get_metrics(
     end_time: datetime,
     period: int = 86400,
     max_retries: int = 3,
+    cache: MetricSessionCache | None = None,
 ) -> dict[str, float]:
-    """CloudWatch 메트릭 배치 조회 (Pagination + Retry 포함)
+    """CloudWatch 메트릭 배치 조회 (Pagination + Retry + 캐싱 지원)
 
     Args:
         cloudwatch_client: boto3 CloudWatch client
@@ -60,6 +64,7 @@ def batch_get_metrics(
         end_time: 조회 종료 시간
         period: 집계 주기 (초, 기본 86400=1일)
         max_retries: Throttling 시 재시도 횟수
+        cache: 세션 캐시 (선택적, None이면 전역 캐시 자동 사용)
 
     Returns:
         {query_id: aggregated_value} 딕셔너리
@@ -68,10 +73,78 @@ def batch_get_metrics(
         - GetMetricData API 제한: 50 TPS/리전
         - 요청당 최대 500개 메트릭
         - Throttling 시 exponential backoff 적용
+        - cache=None이면 전역 캐시(get_global_cache()) 자동 사용
     """
     if not queries:
         return {}
 
+    # 전역 캐시 자동 사용
+    if cache is None:
+        from .session_cache import get_global_cache
+
+        cache = get_global_cache()
+
+    results: dict[str, float] = {}
+    queries_to_fetch: list[MetricQuery] = []
+
+    # 캐시 키 생성 함수
+    def make_cache_key(q: MetricQuery) -> str:
+        dims = "|".join(f"{k}={v}" for k, v in sorted(q.dimensions.items()))
+        return f"{q.namespace}|{q.metric_name}|{dims}|{q.stat}|{period}|{start_time.isoformat()}|{end_time.isoformat()}"
+
+    # 캐시에서 먼저 조회
+    if cache:
+        for q in queries:
+            cache_key = make_cache_key(q)
+            cached_value = cache.get(cache_key)
+            if cached_value is not None:
+                results[q.id] = cached_value
+            else:
+                queries_to_fetch.append(q)
+
+        if queries_to_fetch:
+            logger.debug(
+                f"CloudWatch 캐시: {len(queries) - len(queries_to_fetch)}/{len(queries)} 히트, "
+                f"{len(queries_to_fetch)}개 API 호출 필요"
+            )
+    else:
+        queries_to_fetch = queries
+
+    # 캐시 미스된 쿼리만 API 호출
+    if queries_to_fetch:
+        fetched = _fetch_metrics(cloudwatch_client, queries_to_fetch, start_time, end_time, period, max_retries)
+        results.update(fetched)
+
+        # 결과를 캐시에 저장
+        if cache:
+            for q in queries_to_fetch:
+                cache_key = make_cache_key(q)
+                cache.set(cache_key, fetched.get(q.id, 0.0))
+
+    return results
+
+
+def _fetch_metrics(
+    cloudwatch_client: Any,
+    queries: list[MetricQuery],
+    start_time: datetime,
+    end_time: datetime,
+    period: int,
+    max_retries: int,
+) -> dict[str, float]:
+    """CloudWatch API 호출 (내부 함수)
+
+    Args:
+        cloudwatch_client: boto3 CloudWatch client
+        queries: 메트릭 쿼리 목록
+        start_time: 조회 시작 시간
+        end_time: 조회 종료 시간
+        period: 집계 주기 (초)
+        max_retries: Throttling 시 재시도 횟수
+
+    Returns:
+        {query_id: aggregated_value} 딕셔너리
+    """
     results: dict[str, float] = {}
 
     # 500개 단위로 분할 (API 제한)

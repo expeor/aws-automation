@@ -76,4 +76,22 @@ TOOLS = [
         "module": "inventory",
         "area": "inventory",
     },
+    {
+        "name": "미사용 EBS Snapshot 정리",
+        "name_en": "Unused EBS Snapshot Cleanup",
+        "description": "고아/오래된 EBS Snapshot 삭제 (Dry-run 지원)",
+        "description_en": "Delete orphaned/old EBS Snapshots (dry-run supported)",
+        "permission": "delete",
+        "module": "snapshot_cleanup",
+        "area": "unused",
+    },
+    {
+        "name": "미사용 AMI 정리",
+        "name_en": "Unused AMI Cleanup",
+        "description": "미사용 AMI 및 연관 스냅샷 삭제 (Dry-run 지원)",
+        "description_en": "Delete unused AMIs and associated snapshots (dry-run supported)",
+        "permission": "delete",
+        "module": "ami_cleanup",
+        "area": "unused",
+    },
 ]

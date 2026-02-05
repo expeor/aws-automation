@@ -20,6 +20,7 @@ CloudWatch 메트릭:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -28,13 +29,17 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from shared.aws.pricing.dynamodb import get_dynamodb_monthly_cost
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -136,17 +141,22 @@ class DynamoDBAnalysisResult:
 
 
 def collect_dynamodb_tables(session, account_id: str, account_name: str, region: str) -> list[TableInfo]:
-    """DynamoDB 테이블 수집"""
+    """DynamoDB 테이블 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 테이블당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
     dynamodb = get_client(session, "dynamodb", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    tables = []
+    tables: list[TableInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
+        # 1단계: 테이블 목록 수집
         paginator = dynamodb.get_paginator("list_tables")
         for page in paginator.paginate():
             for table_name in page.get("TableNames", []):
@@ -173,64 +183,111 @@ def collect_dynamodb_tables(session, account_id: str, account_name: str, region:
                         provisioned_write=throughput.get("WriteCapacityUnits", 0),
                         created_at=t.get("CreationDateTime"),
                     )
-
-                    # CloudWatch 지표 조회
-                    try:
-                        # ConsumedReadCapacityUnits
-                        read_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/DynamoDB",
-                            MetricName="ConsumedReadCapacityUnits",
-                            Dimensions=[{"Name": "TableName", "Value": table_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if read_resp.get("Datapoints"):
-                            table.consumed_read = sum(d["Sum"] for d in read_resp["Datapoints"]) / len(
-                                read_resp["Datapoints"]
-                            )
-
-                        # ConsumedWriteCapacityUnits
-                        write_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/DynamoDB",
-                            MetricName="ConsumedWriteCapacityUnits",
-                            Dimensions=[{"Name": "TableName", "Value": table_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if write_resp.get("Datapoints"):
-                            table.consumed_write = sum(d["Sum"] for d in write_resp["Datapoints"]) / len(
-                                write_resp["Datapoints"]
-                            )
-
-                        # ThrottledRequests
-                        throttle_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/DynamoDB",
-                            MetricName="ThrottledRequests",
-                            Dimensions=[{"Name": "TableName", "Value": table_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if throttle_resp.get("Datapoints"):
-                            table.throttled_requests = sum(d["Sum"] for d in throttle_resp["Datapoints"])
-
-                    except ClientError:
-                        pass
-
                     tables.append(table)
 
-                except ClientError:
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category == ErrorCategory.ACCESS_DENIED:
+                        logger.info(f"DynamoDB 권한 없음: {table_name} ({get_error_code(e)})")
+                    elif category != ErrorCategory.NOT_FOUND:
+                        logger.warning(f"DynamoDB 테이블 조회 오류: {table_name} ({get_error_code(e)})")
                     continue
 
-    except ClientError:
-        pass
+        # 2단계: 배치 메트릭 조회
+        if tables:
+            _collect_dynamodb_metrics_batch(cloudwatch, tables, start_time, now)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"DynamoDB ListTables 권한 없음: {account_name}/{region}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"DynamoDB API 쓰로틀링: {account_name}/{region}")
+        else:
+            logger.warning(f"DynamoDB 목록 조회 오류: {account_name}/{region} ({get_error_code(e)})")
 
     return tables
+
+
+def _collect_dynamodb_metrics_batch(
+    cloudwatch,
+    tables: list[TableInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """DynamoDB 테이블 메트릭 배치 수집 (내부 함수)
+
+    최적화:
+    - 기존: 테이블당 3 API 호출 (read, write, throttle)
+    - 최적화: 전체 테이블 1-2 API 호출 (500개 단위 자동 분할)
+    """
+    from botocore.exceptions import ClientError
+
+    # 쿼리 생성
+    queries: list[MetricQuery] = []
+    for table in tables:
+        safe_id = sanitize_metric_id(table.table_name)
+        dimensions = {"TableName": table.table_name}
+
+        # ConsumedReadCapacityUnits (Sum)
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_read",
+                namespace="AWS/DynamoDB",
+                metric_name="ConsumedReadCapacityUnits",
+                dimensions=dimensions,
+                stat="Sum",
+            )
+        )
+
+        # ConsumedWriteCapacityUnits (Sum)
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_write",
+                namespace="AWS/DynamoDB",
+                metric_name="ConsumedWriteCapacityUnits",
+                dimensions=dimensions,
+                stat="Sum",
+            )
+        )
+
+        # ThrottledRequests (Sum)
+        queries.append(
+            MetricQuery(
+                id=f"{safe_id}_throttle",
+                namespace="AWS/DynamoDB",
+                metric_name="ThrottledRequests",
+                dimensions=dimensions,
+                stat="Sum",
+            )
+        )
+
+    try:
+        # 배치 조회 (내장 pagination + retry)
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        # 결과 매핑 - 일평균 계산
+        days = (end_time - start_time).days
+        if days <= 0:
+            days = 1
+
+        for table in tables:
+            safe_id = sanitize_metric_id(table.table_name)
+
+            # 일평균 소비 용량 (Sum / days)
+            table.consumed_read = results.get(f"{safe_id}_read", 0.0) / days
+            table.consumed_write = results.get(f"{safe_id}_write", 0.0) / days
+            # 총 쓰로틀 횟수
+            table.throttled_requests = results.get(f"{safe_id}_throttle", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_tables(tables: list[TableInfo], account_id: str, account_name: str, region: str) -> DynamoDBAnalysisResult:

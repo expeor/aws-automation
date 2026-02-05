@@ -476,8 +476,8 @@ MENU_MESSAGES = {
         "en": "No services available.",
     },
     "reports": {
-        "ko": "종합 보고서",
-        "en": "Reports",
+        "ko": "통합 분석",
+        "en": "Cross-Service",
     },
     "reports_desc": {
         "ko": "미사용 리소스, 인벤토리, IP 검색, 로그 분석",
@@ -704,8 +704,8 @@ MENU_MESSAGES = {
         "en": "By area (Security, Cost, Performance...)",
     },
     "help_reports_desc": {
-        "ko": "종합 보고서 모음 (미사용, 인벤토리, IP, 로그)",
-        "en": "Comprehensive reports collection",
+        "ko": "통합 분석 모음 (미사용, 인벤토리, IP, 로그)",
+        "en": "Cross-service analysis collection",
     },
     "help_favorites_desc": {
         "ko": "자주 사용하는 도구 추가/제거",
@@ -779,8 +779,8 @@ MENU_MESSAGES = {
         "en": "Scheduled Operations",
     },
     "comprehensive_reports": {
-        "ko": "종합 보고서",
-        "en": "Comprehensive Reports",
+        "ko": "통합 분석",
+        "en": "Cross-Service Analysis",
     },
     "header_cycle": {
         "ko": "주기",

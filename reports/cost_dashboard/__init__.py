@@ -39,6 +39,7 @@ TOOLS = [
         "permission": "read",
         "module": "orchestrator",
         "area": "cost",
+        "timeline_phases": ["리소스 수집", "보고서"],
     },
 ]
 

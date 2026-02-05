@@ -12,8 +12,13 @@ from .collector import (
     collect_functions_with_metrics,
 )
 from .runtime_eol import (
+    OS_AL1,
+    OS_AL2,
+    OS_AL2023,
+    RUNTIME_EOL_DATA,
     EOLStatus,
     RuntimeInfo,
+    get_os_runtimes,
     get_recommended_upgrade,
     get_runtime_info,
 )
@@ -28,6 +33,11 @@ __all__: list[str] = [
     # runtime_eol
     "EOLStatus",
     "RuntimeInfo",
+    "RUNTIME_EOL_DATA",
+    "OS_AL1",
+    "OS_AL2",
+    "OS_AL2023",
     "get_runtime_info",
     "get_recommended_upgrade",
+    "get_os_runtimes",
 ]

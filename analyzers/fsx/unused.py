@@ -9,6 +9,7 @@ plugins/fsx/unused.py - Amazon FSx 미사용 파일 시스템 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,13 +18,17 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from shared.aws.pricing.fsx import get_fsx_monthly_cost
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -122,17 +127,22 @@ class FSxAnalysisResult:
 
 
 def collect_filesystems(session, account_id: str, account_name: str, region: str) -> list[FSxFileSystemInfo]:
-    """FSx 파일 시스템 수집"""
+    """FSx 파일 시스템 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 파일시스템당 5 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
     fsx = get_client(session, "fsx", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    filesystems = []
+    filesystems: list[FSxFileSystemInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
+        # 1단계: 파일 시스템 목록 수집
         paginator = fsx.get_paginator("describe_file_systems")
         for page in paginator.paginate():
             for fs in page.get("FileSystems", []):
@@ -181,39 +191,106 @@ def collect_filesystems(session, account_id: str, account_name: str, region: str
                     created_time=fs.get("CreationTime"),
                     estimated_monthly_cost=monthly_cost,
                 )
-
-                # CloudWatch 지표 조회 (AVAILABLE 상태인 경우만)
-                if info.lifecycle == "AVAILABLE":
-                    metrics_to_fetch = [
-                        ("DataReadOperations", "data_read_ops"),
-                        ("DataWriteOperations", "data_write_ops"),
-                        ("MetadataOperations", "metadata_ops"),
-                        ("DataReadBytes", "data_read_bytes"),
-                        ("DataWriteBytes", "data_write_bytes"),
-                    ]
-
-                    for metric_name, attr_name in metrics_to_fetch:
-                        try:
-                            resp = cloudwatch.get_metric_statistics(
-                                Namespace="AWS/FSx",
-                                MetricName=metric_name,
-                                Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
-                                StartTime=start_time,
-                                EndTime=now,
-                                Period=86400 * ANALYSIS_DAYS,  # 전체 기간
-                                Statistics=["Sum"],
-                            )
-                            if resp.get("Datapoints"):
-                                setattr(info, attr_name, sum(d["Sum"] for d in resp["Datapoints"]))
-                        except ClientError:
-                            pass
-
                 filesystems.append(info)
 
-    except ClientError:
-        pass
+        # 2단계: AVAILABLE 상태인 파일 시스템만 배치 메트릭 조회
+        available_fs = [fs for fs in filesystems if fs.lifecycle == "AVAILABLE"]
+        if available_fs:
+            _collect_fsx_metrics_batch(cloudwatch, available_fs, start_time, now)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"FSx 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"FSx 조회 오류: {get_error_code(e)}")
 
     return filesystems
+
+
+def _collect_fsx_metrics_batch(
+    cloudwatch,
+    filesystems: list[FSxFileSystemInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """FSx 메트릭 배치 수집 (내부 함수)
+
+    메트릭:
+    - DataReadOperations (Sum)
+    - DataWriteOperations (Sum)
+    - MetadataOperations (Sum)
+    - DataReadBytes (Sum)
+    - DataWriteBytes (Sum)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+
+    for fs in filesystems:
+        safe_id = sanitize_metric_id(fs.file_system_id)
+        dimensions = {"FileSystemId": fs.file_system_id}
+
+        queries.extend([
+            MetricQuery(
+                id=f"{safe_id}_read_ops",
+                namespace="AWS/FSx",
+                metric_name="DataReadOperations",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_write_ops",
+                namespace="AWS/FSx",
+                metric_name="DataWriteOperations",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_metadata_ops",
+                namespace="AWS/FSx",
+                metric_name="MetadataOperations",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_read_bytes",
+                namespace="AWS/FSx",
+                metric_name="DataReadBytes",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_write_bytes",
+                namespace="AWS/FSx",
+                metric_name="DataWriteBytes",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+        ])
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for fs in filesystems:
+            safe_id = sanitize_metric_id(fs.file_system_id)
+            fs.data_read_ops = results.get(f"{safe_id}_read_ops", 0.0)
+            fs.data_write_ops = results.get(f"{safe_id}_write_ops", 0.0)
+            fs.metadata_ops = results.get(f"{safe_id}_metadata_ops", 0.0)
+            fs.data_read_bytes = results.get(f"{safe_id}_read_bytes", 0.0)
+            fs.data_write_bytes = results.get(f"{safe_id}_write_bytes", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_filesystems(

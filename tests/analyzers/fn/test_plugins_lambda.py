@@ -95,7 +95,7 @@ class TestGetRuntimeStatus:
 
     def test_supported_runtime(self):
         """지원 중인 런타임"""
-        status = get_runtime_status("python3.12")
+        status = get_runtime_status("python3.13")
         assert status == EOLStatus.SUPPORTED
 
     def test_deprecated_runtime(self):
@@ -138,18 +138,18 @@ class TestGetRecommendedUpgrade:
 
     def test_python_upgrade(self):
         """Python 업그레이드 권장"""
-        assert get_recommended_upgrade("python3.8") == "python3.12"
-        assert get_recommended_upgrade("python3.7") == "python3.12"
+        assert get_recommended_upgrade("python3.8") == "python3.13"
+        assert get_recommended_upgrade("python3.7") == "python3.13"
 
     def test_nodejs_upgrade(self):
         """Node.js 업그레이드 권장"""
-        assert get_recommended_upgrade("nodejs16.x") == "nodejs20.x"
-        assert get_recommended_upgrade("nodejs14.x") == "nodejs20.x"
+        assert get_recommended_upgrade("nodejs16.x") == "nodejs22.x"
+        assert get_recommended_upgrade("nodejs14.x") == "nodejs22.x"
 
     def test_no_upgrade_needed(self):
         """업그레이드 불필요"""
-        assert get_recommended_upgrade("python3.12") is None
-        assert get_recommended_upgrade("nodejs20.x") is None
+        assert get_recommended_upgrade("python3.13") is None
+        assert get_recommended_upgrade("nodejs22.x") is None
 
     def test_java_upgrade(self):
         """Java 업그레이드 권장"""
@@ -157,31 +157,45 @@ class TestGetRecommendedUpgrade:
 
     def test_dotnet_upgrade(self):
         """.NET 업그레이드 권장"""
-        assert get_recommended_upgrade("dotnet6") == "dotnet8"
-        assert get_recommended_upgrade("dotnetcore3.1") == "dotnet8"
+        assert get_recommended_upgrade("dotnet6") == "dotnet10"
+        assert get_recommended_upgrade("dotnetcore3.1") == "dotnet10"
 
 
 class TestRuntimeEOLData:
     """런타임 EOL 데이터 테스트"""
 
-    def test_current_python_runtimes_supported(self):
+    def test_current_python_runtimes_active(self):
         """현재 Python 런타임 지원 확인"""
-        for version in ["python3.12", "python3.11", "python3.10", "python3.9"]:
+        for version in ["python3.13", "python3.12", "python3.11", "python3.10"]:
             info = RUNTIME_EOL_DATA.get(version)
             assert info is not None
             assert info.status in [EOLStatus.SUPPORTED, EOLStatus.LOW, EOLStatus.MEDIUM]
 
-    def test_current_nodejs_runtimes_supported(self):
-        """현재 Node.js 런타임 지원 확인"""
-        for version in ["nodejs20.x", "nodejs18.x"]:
+    def test_current_nodejs_runtimes_active(self):
+        """현재 Node.js 런타임 지원 확인 (미종료)"""
+        for version in ["nodejs22.x", "nodejs20.x"]:
             info = RUNTIME_EOL_DATA.get(version)
             assert info is not None
-            assert info.status == EOLStatus.SUPPORTED
+            assert info.is_deprecated is False
 
     def test_old_runtimes_deprecated(self):
         """이전 런타임 지원 종료 확인"""
-        deprecated = ["python2.7", "python3.6", "nodejs12.x"]
+        deprecated = ["python2.7", "python3.6", "python3.8", "python3.9", "nodejs12.x", "nodejs18.x"]
         for version in deprecated:
             info = RUNTIME_EOL_DATA.get(version)
             assert info is not None
             assert info.is_deprecated is True
+
+    def test_os_version_set(self):
+        """OS 버전 필드 확인"""
+        from analyzers.fn.common.runtime_eol import OS_AL1, OS_AL2, OS_AL2023
+
+        assert RUNTIME_EOL_DATA["python3.13"].os_version == OS_AL2023
+        assert RUNTIME_EOL_DATA["python3.10"].os_version == OS_AL2
+        assert RUNTIME_EOL_DATA["python3.7"].os_version == OS_AL1
+
+    def test_recommended_upgrade_field(self):
+        """recommended_upgrade 필드 확인"""
+        assert RUNTIME_EOL_DATA["python3.8"].recommended_upgrade == "python3.13"
+        assert RUNTIME_EOL_DATA["nodejs16.x"].recommended_upgrade == "nodejs22.x"
+        assert RUNTIME_EOL_DATA["python3.13"].recommended_upgrade == ""

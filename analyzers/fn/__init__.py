@@ -42,6 +42,16 @@ TOOLS = [
         "module": "comprehensive",
         "area": "inventory",
     },
+    # Security
+    {
+        "name": "런타임 지원 종료 분석",
+        "name_en": "Runtime Deprecation Analysis",
+        "description": "Lambda 런타임 지원 종료 현황 분석 (종료됨/곧 종료/안전 분류, OS 버전, 업그레이드 경로)",
+        "description_en": "Lambda runtime deprecation analysis (deprecated/soon/safe, OS version, upgrade path)",
+        "permission": "read",
+        "module": "runtime_deprecated",
+        "area": "security",
+    },
     # Cost optimization
     {
         "name": "Provisioned Concurrency 비용 최적화",

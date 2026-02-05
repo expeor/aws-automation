@@ -9,6 +9,7 @@ plugins/apigateway/unused.py - API Gateway 미사용 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,12 +18,16 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -92,15 +97,12 @@ class APIGatewayAnalysisResult:
     findings: list[APIFinding] = field(default_factory=list)
 
 
-def collect_rest_apis(session, account_id: str, account_name: str, region: str, cloudwatch) -> list[APIInfo]:
-    """REST API 수집"""
+def collect_rest_apis(session, account_id: str, account_name: str, region: str) -> list[APIInfo]:
+    """REST API 수집 (메트릭 제외)"""
     from botocore.exceptions import ClientError
 
     apigw = get_client(session, "apigateway", region_name=region)
     apis = []
-
-    now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = apigw.get_paginator("get_rest_apis")
@@ -114,8 +116,10 @@ def collect_rest_apis(session, account_id: str, account_name: str, region: str, 
                 try:
                     stages = apigw.get_stages(restApiId=api_id)
                     stage_count = len(stages.get("item", []))
-                except ClientError:
-                    pass
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"REST API 스테이지 조회 실패: {api_id} ({get_error_code(e)})")
 
                 # 엔드포인트 타입
                 endpoint_config = api.get("endpointConfiguration", {})
@@ -134,66 +138,24 @@ def collect_rest_apis(session, account_id: str, account_name: str, region: str, 
                     stage_count=stage_count,
                     created_date=api.get("createdDate"),
                 )
-
-                # CloudWatch 지표 조회
-                if stage_count > 0:
-                    try:
-                        count_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/ApiGateway",
-                            MetricName="Count",
-                            Dimensions=[{"Name": "ApiName", "Value": api_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if count_resp.get("Datapoints"):
-                            info.total_requests = sum(d["Sum"] for d in count_resp["Datapoints"])
-
-                        err4_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/ApiGateway",
-                            MetricName="4XXError",
-                            Dimensions=[{"Name": "ApiName", "Value": api_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if err4_resp.get("Datapoints"):
-                            info.error_4xx = sum(d["Sum"] for d in err4_resp["Datapoints"])
-
-                        err5_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/ApiGateway",
-                            MetricName="5XXError",
-                            Dimensions=[{"Name": "ApiName", "Value": api_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if err5_resp.get("Datapoints"):
-                            info.error_5xx = sum(d["Sum"] for d in err5_resp["Datapoints"])
-
-                    except ClientError:
-                        pass
-
                 apis.append(info)
 
-    except ClientError:
-        pass
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"REST API 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"REST API 조회 오류: {get_error_code(e)}")
 
     return apis
 
 
-def collect_http_apis(session, account_id: str, account_name: str, region: str, cloudwatch) -> list[APIInfo]:
-    """HTTP API (API Gateway v2) 수집"""
+def collect_http_apis(session, account_id: str, account_name: str, region: str) -> list[APIInfo]:
+    """HTTP API (API Gateway v2) 수집 (메트릭 제외)"""
     from botocore.exceptions import ClientError
 
     apigwv2 = get_client(session, "apigatewayv2", region_name=region)
     apis = []
-
-    now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
         paginator = apigwv2.get_paginator("get_apis")
@@ -208,8 +170,10 @@ def collect_http_apis(session, account_id: str, account_name: str, region: str, 
                 try:
                     stages = apigwv2.get_stages(ApiId=api_id)
                     stage_count = len(stages.get("Items", []))
-                except ClientError:
-                    pass
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"HTTP API 스테이지 조회 실패: {api_id} ({get_error_code(e)})")
 
                 info = APIInfo(
                     account_id=account_id,
@@ -223,41 +187,117 @@ def collect_http_apis(session, account_id: str, account_name: str, region: str, 
                     stage_count=stage_count,
                     created_date=api.get("CreatedDate"),
                 )
-
-                # CloudWatch 지표 조회
-                if stage_count > 0:
-                    try:
-                        count_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/ApiGateway",
-                            MetricName="Count",
-                            Dimensions=[{"Name": "ApiId", "Value": api_id}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if count_resp.get("Datapoints"):
-                            info.total_requests = sum(d["Sum"] for d in count_resp["Datapoints"])
-
-                    except ClientError:
-                        pass
-
                 apis.append(info)
 
-    except ClientError:
-        pass
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"HTTP API 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"HTTP API 조회 오류: {get_error_code(e)}")
 
     return apis
 
 
 def collect_apis(session, account_id: str, account_name: str, region: str) -> list[APIInfo]:
-    """모든 API Gateway 수집"""
-    cloudwatch = get_client(session, "cloudwatch", region_name=region)
+    """모든 API Gateway 수집 (배치 메트릭 최적화)
 
-    rest_apis = collect_rest_apis(session, account_id, account_name, region, cloudwatch)
-    http_apis = collect_http_apis(session, account_id, account_name, region, cloudwatch)
+    최적화:
+    - 기존: API당 1-3 API 호출 → 최적화: 전체 1-2 API 호출
+    """
+    rest_apis = collect_rest_apis(session, account_id, account_name, region)
+    http_apis = collect_http_apis(session, account_id, account_name, region)
 
-    return rest_apis + http_apis
+    all_apis = rest_apis + http_apis
+
+    # 스테이지가 있는 API만 메트릭 조회
+    apis_with_stages = [api for api in all_apis if api.stage_count > 0]
+    if apis_with_stages:
+        cloudwatch = get_client(session, "cloudwatch", region_name=region)
+        now = datetime.now(timezone.utc)
+        start_time = now - timedelta(days=ANALYSIS_DAYS)
+        _collect_apigateway_metrics_batch(cloudwatch, apis_with_stages, start_time, now)
+
+    return all_apis
+
+
+def _collect_apigateway_metrics_batch(
+    cloudwatch,
+    apis: list[APIInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """API Gateway 메트릭 배치 수집 (내부 함수)
+
+    최적화:
+    - REST API: Count, 4XXError, 5XXError (ApiName 차원)
+    - HTTP/WebSocket API: Count (ApiId 차원)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+
+    for api in apis:
+        safe_id = sanitize_metric_id(api.api_id)
+
+        if api.api_type == "REST":
+            # REST API는 ApiName 차원 사용
+            queries.extend([
+                MetricQuery(
+                    id=f"{safe_id}_count",
+                    namespace="AWS/ApiGateway",
+                    metric_name="Count",
+                    dimensions={"ApiName": api.api_name},
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_4xx",
+                    namespace="AWS/ApiGateway",
+                    metric_name="4XXError",
+                    dimensions={"ApiName": api.api_name},
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_5xx",
+                    namespace="AWS/ApiGateway",
+                    metric_name="5XXError",
+                    dimensions={"ApiName": api.api_name},
+                    stat="Sum",
+                ),
+            ])
+        else:
+            # HTTP/WebSocket API는 ApiId 차원 사용
+            queries.append(
+                MetricQuery(
+                    id=f"{safe_id}_count",
+                    namespace="AWS/ApiGateway",
+                    metric_name="Count",
+                    dimensions={"ApiId": api.api_id},
+                    stat="Sum",
+                )
+            )
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for api in apis:
+            safe_id = sanitize_metric_id(api.api_id)
+            api.total_requests = results.get(f"{safe_id}_count", 0.0)
+            if api.api_type == "REST":
+                api.error_4xx = results.get(f"{safe_id}_4xx", 0.0)
+                api.error_5xx = results.get(f"{safe_id}_5xx", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_apis(apis: list[APIInfo], account_id: str, account_name: str, region: str) -> APIGatewayAnalysisResult:

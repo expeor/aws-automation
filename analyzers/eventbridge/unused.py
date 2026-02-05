@@ -9,6 +9,7 @@ plugins/eventbridge/unused.py - EventBridge 미사용 규칙 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,12 +18,16 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 미사용 기준: 7일간 트리거 0
 UNUSED_DAYS_THRESHOLD = 7
@@ -92,12 +97,16 @@ class EventBridgeAnalysisResult:
 
 
 def collect_rules(session, account_id: str, account_name: str, region: str) -> list[RuleInfo]:
-    """EventBridge 규칙 수집"""
+    """EventBridge 규칙 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 규칙당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
     events = get_client(session, "events", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    rules = []
+    rules: list[RuleInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=UNUSED_DAYS_THRESHOLD)
@@ -110,9 +119,12 @@ def collect_rules(session, account_id: str, account_name: str, region: str) -> l
             bus_name = bus.get("Name", "")
             if bus_name and bus_name != "default":
                 event_buses.append(bus_name)
-    except ClientError:
-        pass
+    except ClientError as e:
+        category = categorize_error(e)
+        if category != ErrorCategory.NOT_FOUND:
+            logger.debug(f"EventBridge 버스 목록 조회 실패: {get_error_code(e)}")
 
+    # 1단계: 규칙 목록 수집
     for bus_name in event_buses:
         try:
             paginator = events.get_paginator("list_rules")
@@ -133,8 +145,10 @@ def collect_rules(session, account_id: str, account_name: str, region: str) -> l
                             targets_kwargs["EventBusName"] = bus_name
                         targets = events.list_targets_by_rule(**targets_kwargs)
                         target_count = len(targets.get("Targets", []))
-                    except ClientError:
-                        pass
+                    except ClientError as e:
+                        category = categorize_error(e)
+                        if category != ErrorCategory.NOT_FOUND:
+                            logger.debug(f"EventBridge 타겟 조회 실패: {rule_name} ({get_error_code(e)})")
 
                     info = RuleInfo(
                         account_id=account_id,
@@ -148,58 +162,89 @@ def collect_rules(session, account_id: str, account_name: str, region: str) -> l
                         event_pattern=rule.get("EventPattern", "")[:100] if rule.get("EventPattern") else "",
                         target_count=target_count,
                     )
-
-                    # CloudWatch 지표 조회 (활성화된 규칙만)
-                    if info.state == "ENABLED":
-                        try:
-                            # TriggeredRules
-                            trig_resp = cloudwatch.get_metric_statistics(
-                                Namespace="AWS/Events",
-                                MetricName="TriggeredRules",
-                                Dimensions=[{"Name": "RuleName", "Value": rule_name}],
-                                StartTime=start_time,
-                                EndTime=now,
-                                Period=86400,
-                                Statistics=["Sum"],
-                            )
-                            if trig_resp.get("Datapoints"):
-                                info.triggered_rules = sum(d["Sum"] for d in trig_resp["Datapoints"])
-
-                            # Invocations
-                            inv_resp = cloudwatch.get_metric_statistics(
-                                Namespace="AWS/Events",
-                                MetricName="Invocations",
-                                Dimensions=[{"Name": "RuleName", "Value": rule_name}],
-                                StartTime=start_time,
-                                EndTime=now,
-                                Period=86400,
-                                Statistics=["Sum"],
-                            )
-                            if inv_resp.get("Datapoints"):
-                                info.invocations = sum(d["Sum"] for d in inv_resp["Datapoints"])
-
-                            # FailedInvocations
-                            fail_resp = cloudwatch.get_metric_statistics(
-                                Namespace="AWS/Events",
-                                MetricName="FailedInvocations",
-                                Dimensions=[{"Name": "RuleName", "Value": rule_name}],
-                                StartTime=start_time,
-                                EndTime=now,
-                                Period=86400,
-                                Statistics=["Sum"],
-                            )
-                            if fail_resp.get("Datapoints"):
-                                info.failed_invocations = sum(d["Sum"] for d in fail_resp["Datapoints"])
-
-                        except ClientError:
-                            pass
-
                     rules.append(info)
 
-        except ClientError:
+        except ClientError as e:
+            category = categorize_error(e)
+            if category == ErrorCategory.ACCESS_DENIED:
+                logger.info(f"EventBridge 권한 없음: {account_name}/{region}/{bus_name}")
+            elif category != ErrorCategory.NOT_FOUND:
+                logger.warning(f"EventBridge 규칙 조회 오류: {get_error_code(e)}")
             continue
 
+    # 2단계: 활성화된 규칙만 배치 메트릭 조회
+    enabled_rules = [r for r in rules if r.state == "ENABLED"]
+    if enabled_rules:
+        _collect_eventbridge_metrics_batch(cloudwatch, enabled_rules, start_time, now)
+
     return rules
+
+
+def _collect_eventbridge_metrics_batch(
+    cloudwatch,
+    rules: list[RuleInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """EventBridge 메트릭 배치 수집 (내부 함수)
+
+    메트릭:
+    - TriggeredRules (Sum)
+    - Invocations (Sum)
+    - FailedInvocations (Sum)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+
+    for rule in rules:
+        safe_id = sanitize_metric_id(rule.rule_name)
+        dimensions = {"RuleName": rule.rule_name}
+
+        queries.extend([
+            MetricQuery(
+                id=f"{safe_id}_triggered",
+                namespace="AWS/Events",
+                metric_name="TriggeredRules",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_invocations",
+                namespace="AWS/Events",
+                metric_name="Invocations",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_failed",
+                namespace="AWS/Events",
+                metric_name="FailedInvocations",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+        ])
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for rule in rules:
+            safe_id = sanitize_metric_id(rule.rule_name)
+            rule.triggered_rules = results.get(f"{safe_id}_triggered", 0.0)
+            rule.invocations = results.get(f"{safe_id}_invocations", 0.0)
+            rule.failed_invocations = results.get(f"{safe_id}_failed", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_rules(rules: list[RuleInfo], account_id: str, account_name: str, region: str) -> EventBridgeAnalysisResult:

@@ -8,6 +8,7 @@ import logging
 import platform
 import sys
 
+from rich.columns import Columns as RichColumns
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
@@ -20,7 +21,9 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from rich.rule import Rule
 from rich.table import Table
+from rich.tree import Tree
 
 from cli.i18n import t
 
@@ -404,7 +407,7 @@ def print_tool_start(tool_name: str, description: str = "") -> None:
     console.print(f"[bold #FF9900]▶ {tool_name}[/]")
     if description:
         console.print(f"  [dim]{description}[/]")
-    console.print("[dim]" + "─" * 50 + "[/]")
+    console.print(Rule(style="dim"))
 
 
 def print_tool_complete(message: str | None = None, elapsed: float | None = None) -> None:
@@ -417,11 +420,132 @@ def print_tool_complete(message: str | None = None, elapsed: float | None = None
     if message is None:
         message = t("common.completed")
     console.print()
-    console.print("[dim]" + "─" * 50 + "[/]")
+    console.print(Rule(style="dim"))
     if elapsed:
         console.print(f"[green]* {message}[/] [dim]({elapsed:.1f}s)[/]")
     else:
         console.print(f"[green]* {message}[/]")
+
+
+# =============================================================================
+# Rich 유틸리티 함수
+# =============================================================================
+
+
+def print_rule(title: str = "", style: str = "dim") -> None:
+    """Rich Rule로 구분선 출력
+
+    Args:
+        title: 구분선 제목 (빈 문자열이면 제목 없는 구분선)
+        style: 스타일 (기본: dim)
+    """
+    if title:
+        console.print(Rule(title=title, style=style))
+    else:
+        console.print(Rule(style=style))
+
+
+def print_result_tree(title: str, sections: list[dict]) -> None:
+    """계층적 결과 트리 출력
+
+    Args:
+        title: 트리 루트 제목
+        sections: 섹션 리스트. 각 섹션은:
+            - label: 섹션 라벨
+            - items: (label, value, style) 튜플 리스트
+
+    Example:
+        print_result_tree("분석 결과", [
+            {"label": "EC2", "items": [("미사용", 5, "red"), ("저사용", 12, "yellow")]},
+            {"label": "RDS", "items": [("미사용", 2, "red")]},
+        ])
+    """
+    tree = Tree(f"[bold]{title}[/bold]")
+    for section in sections:
+        branch = tree.add(f"[cyan]{section['label']}[/cyan]")
+        for item in section.get("items", []):
+            label, value, style = item
+            branch.add(f"[{style}]{label}: {value}[/{style}]")
+    console.print(tree)
+
+
+def print_error_tree(errors: list[tuple[str, list[str]]], title: str = "오류 요약") -> None:
+    """에러를 카테고리별 계층 트리로 출력
+
+    Args:
+        errors: (category, [detail_items]) 튜플 리스트
+        title: 트리 루트 제목
+
+    Example:
+        print_error_tree([
+            ("AccessDenied", ["ap-northeast-2", "us-east-1"]),
+            ("ThrottlingException", ["eu-west-1"]),
+        ])
+    """
+    tree = Tree(f"[bold yellow]{title}[/bold yellow]")
+    for category, items in errors:
+        branch = tree.add(f"[red]{category}[/red] ({len(items)}건)")
+        for item in items[:3]:
+            branch.add(f"[dim]{item}[/dim]")
+        if len(items) > 3:
+            branch.add(f"[dim]... 외 {len(items) - 3}건[/dim]")
+    console.print(tree)
+
+
+def print_stat_columns(*panels: Panel) -> None:
+    """Panel들을 동일 너비 컬럼으로 나란히 출력
+
+    Args:
+        *panels: Rich Panel 인스턴스들
+
+    Example:
+        from rich.panel import Panel
+        print_stat_columns(
+            Panel("10개", title="성공"),
+            Panel("2개", title="실패"),
+        )
+    """
+    console.print(RichColumns(list(panels), expand=True, equal=True))
+
+
+def print_execution_summary(
+    tool_name: str,
+    profile: str = "",
+    regions: list[str] | None = None,
+    accounts: int = 0,
+) -> None:
+    """실행 요약 박스 출력
+
+    Args:
+        tool_name: 도구 이름
+        profile: 프로파일 이름
+        regions: 리전 목록
+        accounts: 계정 수
+    """
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold cyan", width=12)
+    table.add_column()
+    table.add_row(t("runner.summary_tool") if t("runner.summary_tool") != "runner.summary_tool" else "도구", f"[bold]{tool_name}[/bold]")
+    if profile:
+        table.add_row("프로필", profile)
+    if regions:
+        table.add_row("리전", ", ".join(regions) if len(regions) <= 3 else f"{len(regions)}개 리전")
+    if accounts > 0:
+        table.add_row("계정", f"{accounts}개")
+    console.print(Panel(table, title="실행 요약", border_style="#FF9900"))
+
+
+def print_results_json(data: list[dict], pretty: bool = True) -> None:
+    """JSON 형식으로 데이터 출력 (Rich syntax highlighting)
+
+    Args:
+        data: 출력할 데이터 (dict 리스트)
+        pretty: 들여쓰기 여부 (기본: True)
+    """
+    import json
+
+    json_str = json.dumps(data, ensure_ascii=False, indent=2 if pretty else None, default=str)
+    console.print_json(json_str)
 
 
 # =============================================================================

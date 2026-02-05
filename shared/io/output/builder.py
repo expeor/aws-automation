@@ -282,7 +282,7 @@ def print_report_complete(
     from rich.console import Console
 
     console = Console()
-    console.print(f"\n[bold green]✓ {message}[/bold green]")
+    console.print(f"[bold green]✓ {message}[/bold green]")
 
     if isinstance(paths, str):
         console.print(f"   [bold]경로[/bold]: {paths}")

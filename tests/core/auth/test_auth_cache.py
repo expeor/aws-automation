@@ -5,10 +5,8 @@ core/auth/cache/cache.py 단위 테스트
 CacheEntry, TokenCache, TokenCacheManager, AccountCache, CredentialsCache 테스트.
 """
 
-import tempfile
 import threading
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from core.auth.cache.cache import (
     AccountCache,
@@ -241,15 +239,14 @@ class TestTokenCacheManager:
         assert manager.session_name == "my-session"
         assert manager.start_url == "https://example.awsapps.com/start"
 
-    def test_init_custom_cache_dir(self):
+    def test_init_custom_cache_dir(self, tmp_path):
         """커스텀 캐시 디렉토리"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="test",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
-            assert manager.cache_dir == Path(tmpdir)
+        manager = TokenCacheManager(
+            session_name="test",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
+        assert manager.cache_dir == tmp_path
 
     def test_cache_key_generation(self):
         """캐시 키(해시) 생성"""
@@ -272,93 +269,87 @@ class TestTokenCacheManager:
         )
         assert manager1._cache_key == manager2._cache_key
 
-    def test_cache_path(self):
+    def test_cache_path(self, tmp_path):
         """캐시 파일 경로"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="test",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
-            path = manager.cache_path
-            assert path.parent == Path(tmpdir)
-            assert path.suffix == ".json"
+        manager = TokenCacheManager(
+            session_name="test",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
+        path = manager.cache_path
+        assert path.parent == tmp_path
+        assert path.suffix == ".json"
 
-    def test_save_and_load(self):
+    def test_save_and_load(self, tmp_path):
         """저장 및 로드"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="test",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
+        manager = TokenCacheManager(
+            session_name="test",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
 
-            token = TokenCache(
-                access_token="my-access-token",
-                expires_at="2025-12-31T23:59:59Z",
-                client_id="client-123",
-                client_secret="secret-456",
-            )
+        token = TokenCache(
+            access_token="my-access-token",
+            expires_at="2025-12-31T23:59:59Z",
+            client_id="client-123",
+            client_secret="secret-456",
+        )
 
-            manager.save(token)
-            loaded = manager.load()
+        manager.save(token)
+        loaded = manager.load()
 
-            assert loaded is not None
-            assert loaded.access_token == "my-access-token"
-            assert loaded.client_id == "client-123"
+        assert loaded is not None
+        assert loaded.access_token == "my-access-token"
+        assert loaded.client_id == "client-123"
 
-    def test_load_nonexistent(self):
+    def test_load_nonexistent(self, tmp_path):
         """존재하지 않는 파일 로드"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="nonexistent",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
-            assert manager.load() is None
+        manager = TokenCacheManager(
+            session_name="nonexistent",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
+        assert manager.load() is None
 
-    def test_load_invalid_json(self):
+    def test_load_invalid_json(self, tmp_path):
         """잘못된 JSON 파일"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="test",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
+        manager = TokenCacheManager(
+            session_name="test",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
 
-            # 잘못된 JSON 작성
-            manager.cache_dir.mkdir(parents=True, exist_ok=True)
-            with open(manager.cache_path, "w") as f:
-                f.write("not valid json")
+        # 잘못된 JSON 작성
+        manager.cache_dir.mkdir(parents=True, exist_ok=True)
+        with open(manager.cache_path, "w") as f:
+            f.write("not valid json")
 
-            assert manager.load() is None
+        assert manager.load() is None
 
-    def test_delete(self):
+    def test_delete(self, tmp_path):
         """캐시 삭제"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="test",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
+        manager = TokenCacheManager(
+            session_name="test",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
 
-            token = TokenCache(access_token="test", expires_at="2025-01-01T00:00:00Z")
-            manager.save(token)
-            assert manager.exists() is True
+        token = TokenCache(access_token="test", expires_at="2025-01-01T00:00:00Z")
+        manager.save(token)
+        assert manager.exists() is True
 
-            result = manager.delete()
-            assert result is True
-            assert manager.exists() is False
+        result = manager.delete()
+        assert result is True
+        assert manager.exists() is False
 
-    def test_delete_nonexistent(self):
+    def test_delete_nonexistent(self, tmp_path):
         """존재하지 않는 파일 삭제"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = TokenCacheManager(
-                session_name="nonexistent",
-                start_url="https://example.com",
-                cache_dir=tmpdir,
-            )
-            assert manager.delete() is True  # 에러 없이 성공
+        manager = TokenCacheManager(
+            session_name="nonexistent",
+            start_url="https://example.com",
+            cache_dir=str(tmp_path),
+        )
+        assert manager.delete() is True  # 에러 없이 성공
 
 
 # =============================================================================

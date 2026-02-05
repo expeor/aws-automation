@@ -9,6 +9,7 @@ plugins/sns/unused.py - SNS 미사용 토픽 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,12 +18,16 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 분석 기간 (일) - AWS 권장 14일 이상
 ANALYSIS_DAYS = 14
@@ -92,17 +97,22 @@ class SNSAnalysisResult:
 
 
 def collect_sns_topics(session, account_id: str, account_name: str, region: str) -> list[SNSTopicInfo]:
-    """SNS 토픽 수집"""
+    """SNS 토픽 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 토픽당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
     sns = get_client(session, "sns", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    topics = []
+    topics: list[SNSTopicInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
+        # 1단계: 토픽 목록 수집
         paginator = sns.get_paginator("list_topics")
         for page in paginator.paginate():
             for topic in page.get("Topics", []):
@@ -115,8 +125,10 @@ def collect_sns_topics(session, account_id: str, account_name: str, region: str)
                     sub_paginator = sns.get_paginator("list_subscriptions_by_topic")
                     for sub_page in sub_paginator.paginate(TopicArn=topic_arn):
                         subscription_count += len(sub_page.get("Subscriptions", []))
-                except ClientError:
-                    pass
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"SNS 구독 조회 실패: {topic_name} ({get_error_code(e)})")
 
                 info = SNSTopicInfo(
                     account_id=account_id,
@@ -126,57 +138,87 @@ def collect_sns_topics(session, account_id: str, account_name: str, region: str)
                     topic_arn=topic_arn,
                     subscription_count=subscription_count,
                 )
-
-                # CloudWatch 지표 조회
-                try:
-                    # NumberOfMessagesPublished
-                    pub_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/SNS",
-                        MetricName="NumberOfMessagesPublished",
-                        Dimensions=[{"Name": "TopicName", "Value": topic_name}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Sum"],
-                    )
-                    if pub_resp.get("Datapoints"):
-                        info.messages_published = sum(d["Sum"] for d in pub_resp["Datapoints"])
-
-                    # NumberOfNotificationsDelivered
-                    del_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/SNS",
-                        MetricName="NumberOfNotificationsDelivered",
-                        Dimensions=[{"Name": "TopicName", "Value": topic_name}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Sum"],
-                    )
-                    if del_resp.get("Datapoints"):
-                        info.notifications_delivered = sum(d["Sum"] for d in del_resp["Datapoints"])
-
-                    # NumberOfNotificationsFailed
-                    fail_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/SNS",
-                        MetricName="NumberOfNotificationsFailed",
-                        Dimensions=[{"Name": "TopicName", "Value": topic_name}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Sum"],
-                    )
-                    if fail_resp.get("Datapoints"):
-                        info.notifications_failed = sum(d["Sum"] for d in fail_resp["Datapoints"])
-
-                except ClientError:
-                    pass
-
                 topics.append(info)
 
-    except ClientError:
-        pass
+        # 2단계: 배치 메트릭 조회
+        if topics:
+            _collect_sns_metrics_batch(cloudwatch, topics, start_time, now)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"SNS 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"SNS 조회 오류: {get_error_code(e)}")
 
     return topics
+
+
+def _collect_sns_metrics_batch(
+    cloudwatch,
+    topics: list[SNSTopicInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """SNS 메트릭 배치 수집 (내부 함수)
+
+    메트릭:
+    - NumberOfMessagesPublished (Sum)
+    - NumberOfNotificationsDelivered (Sum)
+    - NumberOfNotificationsFailed (Sum)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+
+    for topic in topics:
+        safe_id = sanitize_metric_id(topic.topic_name)
+        dimensions = {"TopicName": topic.topic_name}
+
+        queries.extend([
+            MetricQuery(
+                id=f"{safe_id}_published",
+                namespace="AWS/SNS",
+                metric_name="NumberOfMessagesPublished",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_delivered",
+                namespace="AWS/SNS",
+                metric_name="NumberOfNotificationsDelivered",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_failed",
+                namespace="AWS/SNS",
+                metric_name="NumberOfNotificationsFailed",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+        ])
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for topic in topics:
+            safe_id = sanitize_metric_id(topic.topic_name)
+            topic.messages_published = results.get(f"{safe_id}_published", 0.0)
+            topic.notifications_delivered = results.get(f"{safe_id}_delivered", 0.0)
+            topic.notifications_failed = results.get(f"{safe_id}_failed", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_topics(topics: list[SNSTopicInfo], account_id: str, account_name: str, region: str) -> SNSAnalysisResult:

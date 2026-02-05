@@ -68,6 +68,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
+    from cli.ui.timeline import TimelineTracker
     from core.auth import AccountInfo, Provider
     from core.filter import AccountFilter
     from core.tools.io.config import OutputConfig
@@ -307,6 +308,15 @@ class ExecutionContext:
     # 실행 결과
     result: Any | None = None
     error: Exception | None = None
+
+    # Timeline tracking (자동 주입)
+    _timeline: TimelineTracker | None = field(default=None, repr=False)
+    _timeline_collect_phase: int = field(default=0, repr=False)
+
+    @property
+    def timeline(self) -> TimelineTracker | None:
+        """현재 타임라인 트래커 반환"""
+        return self._timeline
 
     def is_sso(self) -> bool:
         """SSO 기반 인증인지 확인 (SSO Session 또는 SSO Profile)"""
