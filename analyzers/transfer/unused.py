@@ -9,6 +9,7 @@ plugins/transfer/unused.py - AWS Transfer Family 미사용 서버 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,13 +18,17 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from shared.aws.pricing.transfer import get_transfer_monthly_cost
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 필요한 AWS 권한 목록
 REQUIRED_PERMISSIONS = {
@@ -110,17 +115,22 @@ class TransferAnalysisResult:
 
 
 def collect_servers(session, account_id: str, account_name: str, region: str) -> list[TransferServerInfo]:
-    """Transfer Family 서버 수집"""
+    """Transfer Family 서버 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 서버당 4 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
     transfer = get_client(session, "transfer", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    servers = []
+    servers: list[TransferServerInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
+        # 1단계: 서버 목록 수집
         paginator = transfer.get_paginator("list_servers")
         for page in paginator.paginate():
             for server_summary in page.get("Servers", []):
@@ -138,8 +148,10 @@ def collect_servers(session, account_id: str, account_name: str, region: str) ->
                     try:
                         users_resp = transfer.list_users(ServerId=server_id)
                         user_count = len(users_resp.get("Users", []))
-                    except ClientError:
-                        pass
+                    except ClientError as e:
+                        category = categorize_error(e)
+                        if category != ErrorCategory.NOT_FOUND:
+                            logger.debug(f"Transfer 사용자 조회 실패: {server_id} ({get_error_code(e)})")
 
                     # 월 비용 계산 (pricing 모듈 사용)
                     monthly_cost = get_transfer_monthly_cost(region, protocols=protocols, session=session)
@@ -156,41 +168,103 @@ def collect_servers(session, account_id: str, account_name: str, region: str) ->
                         user_count=user_count,
                         estimated_monthly_cost=monthly_cost,
                     )
-
-                    # CloudWatch 지표 조회 (서버가 ONLINE인 경우만)
-                    if info.state == "ONLINE":
-                        metrics_to_fetch = [
-                            ("FilesIn", "files_in"),
-                            ("FilesOut", "files_out"),
-                            ("BytesIn", "bytes_in"),
-                            ("BytesOut", "bytes_out"),
-                        ]
-
-                        for metric_name, attr_name in metrics_to_fetch:
-                            try:
-                                resp = cloudwatch.get_metric_statistics(
-                                    Namespace="AWS/Transfer",
-                                    MetricName=metric_name,
-                                    Dimensions=[{"Name": "ServerId", "Value": server_id}],
-                                    StartTime=start_time,
-                                    EndTime=now,
-                                    Period=86400 * ANALYSIS_DAYS,  # 전체 기간
-                                    Statistics=["Sum"],
-                                )
-                                if resp.get("Datapoints"):
-                                    setattr(info, attr_name, sum(d["Sum"] for d in resp["Datapoints"]))
-                            except ClientError:
-                                pass
-
                     servers.append(info)
 
-                except ClientError:
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"Transfer 서버 상세 조회 실패: {server_id} ({get_error_code(e)})")
                     continue
 
-    except ClientError:
-        pass
+        # 2단계: ONLINE 상태인 서버만 배치 메트릭 조회
+        online_servers = [s for s in servers if s.state == "ONLINE"]
+        if online_servers:
+            _collect_transfer_metrics_batch(cloudwatch, online_servers, start_time, now)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"Transfer 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"Transfer 조회 오류: {get_error_code(e)}")
 
     return servers
+
+
+def _collect_transfer_metrics_batch(
+    cloudwatch,
+    servers: list[TransferServerInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """Transfer Family 메트릭 배치 수집 (내부 함수)
+
+    메트릭:
+    - FilesIn (Sum)
+    - FilesOut (Sum)
+    - BytesIn (Sum)
+    - BytesOut (Sum)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+
+    for server in servers:
+        safe_id = sanitize_metric_id(server.server_id)
+        dimensions = {"ServerId": server.server_id}
+
+        queries.extend([
+            MetricQuery(
+                id=f"{safe_id}_files_in",
+                namespace="AWS/Transfer",
+                metric_name="FilesIn",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_files_out",
+                namespace="AWS/Transfer",
+                metric_name="FilesOut",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_bytes_in",
+                namespace="AWS/Transfer",
+                metric_name="BytesIn",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_bytes_out",
+                namespace="AWS/Transfer",
+                metric_name="BytesOut",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+        ])
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for server in servers:
+            safe_id = sanitize_metric_id(server.server_id)
+            server.files_in = results.get(f"{safe_id}_files_in", 0.0)
+            server.files_out = results.get(f"{safe_id}_files_out", 0.0)
+            server.bytes_in = results.get(f"{safe_id}_bytes_in", 0.0)
+            server.bytes_out = results.get(f"{safe_id}_bytes_out", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_servers(

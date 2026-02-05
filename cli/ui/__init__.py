@@ -7,7 +7,7 @@ CLI 전용 UI 컴포넌트들 (대화형 선택, 콘솔 출력 등)
 
 # Direct imports (rich/questionary are commonly used, no lazy import needed)
 from .banner import print_banner, print_simple_banner
-from .console import (  # 섹션 박스 UI
+from .console import (  # 섹션 박스 UI; Rich 유틸리티
     BOX_STYLE,
     BOX_WIDTH,
     INDENT,
@@ -25,11 +25,17 @@ from .console import (  # 섹션 박스 UI
     print_box_line,
     print_box_start,
     print_error,
+    print_error_tree,
+    print_execution_summary,
     print_header,
     print_info,
     print_legend,
     print_panel_header,
+    print_result_tree,
+    print_results_json,
+    print_rule,
     print_section_box,
+    print_stat_columns,
     print_step,
     print_step_header,
     print_sub_error,
@@ -58,6 +64,11 @@ from .search import (
     ToolSearchEngine,
     get_search_engine,
     init_search_engine,
+)
+from .timeline import (
+    TimelineParallelTracker,
+    TimelineTracker,
+    timeline_progress,
 )
 
 __all__: list[str] = [
@@ -115,4 +126,15 @@ __all__: list[str] = [
     "step_progress",
     "download_progress",
     "indeterminate_progress",
+    # Timeline
+    "TimelineTracker",
+    "TimelineParallelTracker",
+    "timeline_progress",
+    # Rich utilities
+    "print_rule",
+    "print_result_tree",
+    "print_error_tree",
+    "print_stat_columns",
+    "print_execution_summary",
+    "print_results_json",
 ]

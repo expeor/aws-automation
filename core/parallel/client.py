@@ -28,6 +28,7 @@ DEFAULT_MAX_ATTEMPTS = 5
 DEFAULT_RETRY_MODE: RetryMode = "adaptive"  # adaptive: 동적 조정, standard: 고정
 DEFAULT_CONNECT_TIMEOUT = 10  # 초
 DEFAULT_READ_TIMEOUT = 30  # 초
+DEFAULT_MAX_POOL_CONNECTIONS = 25  # max_workers(20) 이상 권장
 
 
 def get_client(
@@ -38,6 +39,7 @@ def get_client(
     retry_mode: RetryMode = DEFAULT_RETRY_MODE,
     connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
     read_timeout: int = DEFAULT_READ_TIMEOUT,
+    max_pool_connections: int = DEFAULT_MAX_POOL_CONNECTIONS,
     **kwargs: Any,
 ) -> Any:
     """Retry가 적용된 boto3 client 생성
@@ -50,6 +52,7 @@ def get_client(
         retry_mode: 재시도 모드 ('adaptive' 또는 'standard')
         connect_timeout: 연결 타임아웃 (초)
         read_timeout: 읽기 타임아웃 (초)
+        max_pool_connections: HTTP 연결 풀 크기 (기본: 25, max_workers 이상 권장)
         **kwargs: session.client()에 전달할 추가 인자
 
     Returns:
@@ -67,6 +70,7 @@ def get_client(
         retries={"max_attempts": max_attempts, "mode": retry_mode},  # pyright: ignore[reportArgumentType]
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
+        max_pool_connections=max_pool_connections,
     )
 
     # 기존 config가 있으면 병합
@@ -90,6 +94,7 @@ def get_resource(
     region_name: str | None = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     retry_mode: RetryMode = DEFAULT_RETRY_MODE,
+    max_pool_connections: int = DEFAULT_MAX_POOL_CONNECTIONS,
     **kwargs: Any,
 ) -> Any:
     """Retry가 적용된 boto3 resource 생성
@@ -100,6 +105,7 @@ def get_resource(
         region_name: 리전 (None이면 세션 기본값)
         max_attempts: 최대 시도 횟수
         retry_mode: 재시도 모드
+        max_pool_connections: HTTP 연결 풀 크기 (기본: 25, max_workers 이상 권장)
         **kwargs: session.resource()에 전달할 추가 인자
 
     Returns:
@@ -109,6 +115,7 @@ def get_resource(
 
     config = Config(
         retries={"max_attempts": max_attempts, "mode": retry_mode},  # pyright: ignore[reportArgumentType]
+        max_pool_connections=max_pool_connections,
     )
 
     if "config" in kwargs:

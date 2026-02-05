@@ -242,7 +242,7 @@ class MainMenu:
             return []
 
         count_info = f" ({len(fav_items)}/{len(all_favs)})" if len(all_favs) > 5 else ""
-        self.console.print(f"[bold]{t('menu.favorites')}{count_info}[/bold]")
+        self.console.print(f"[bold yellow]⭐[/] [bold]{t('menu.favorites')}{count_info}[/bold]")
 
         for i, item in enumerate(fav_items, 1):
             item_type = getattr(item, "item_type", "tool")
@@ -260,7 +260,7 @@ class MainMenu:
         from rich.table import Table
 
         self.console.print()
-        self.console.print(f"[bold]{t('menu.tool_navigation')}[/bold]")
+        self.console.print(f"[bold cyan]🔍[/] [bold]{t('menu.tool_navigation')}[/bold]")
 
         # Rich Table로 정렬
         cmd_table = Table(
@@ -277,25 +277,25 @@ class MainMenu:
         cmd_table.add_column(width=16)
 
         cmd_table.add_row(
-            "[dim]a[/dim]",
+            "[cyan]a[/]",
             t("menu.all_tools"),
-            "[dim]s[/dim]",
+            "[cyan]s[/]",
             t("menu.by_service"),
-            "[dim]t[/dim]",
+            "[cyan]t[/]",
             t("menu.by_purpose"),
         )
         cmd_table.add_row(
-            "[dim]c[/dim]",
+            "[cyan]c[/]",
             t("menu.by_category"),
-            "[dim]r[/dim]",
+            "[cyan]r[/]",
             t("menu.reports"),
-            "[dim]d[/dim]",
+            "[cyan]d[/]",
             t("menu.scheduled_operations"),
         )
         self.console.print(cmd_table)
 
         self.console.print()
-        self.console.print(f"[bold]{t('menu.settings')}[/bold]")
+        self.console.print(f"[bold]⚙  {t('menu.settings')}[/bold]")
         cmd_table2 = Table(
             show_header=False,
             box=None,
@@ -309,11 +309,11 @@ class MainMenu:
         cmd_table2.add_column(width=3)
         cmd_table2.add_column(width=16)
         cmd_table2.add_row(
-            "[dim]f[/dim]",
+            "[cyan]f[/]",
             t("menu.favorites"),
-            "[dim]p[/dim]",
+            "[cyan]p[/]",
             t("menu.profiles"),
-            "[dim]g[/dim]",
+            "[cyan]g[/]",
             t("menu.profile_groups"),
         )
         self.console.print(cmd_table2)
@@ -340,7 +340,7 @@ class MainMenu:
             (action, data) 튜플
         """
         self.console.print()
-        user_input = self.console.input("> ").strip()
+        user_input = self.console.input("[bold cyan]❯[/] ").strip()
 
         if not user_input:
             return ("show_menu", None)

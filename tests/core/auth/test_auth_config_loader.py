@@ -10,7 +10,6 @@ core/auth/config/loader.py 테스트
 - 모듈 레벨 편의 함수들
 """
 
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -190,22 +189,20 @@ class TestLoader:
         assert loader.config_path == Path("/custom/config")
         assert loader.credentials_path == Path("/custom/credentials")
 
-    def test_load_empty_directory(self):
+    def test_load_empty_directory(self, tmp_path):
         """설정 파일이 없는 경우"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            loader = Loader(
-                config_path=f"{tmpdir}/config",
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            config = loader.load()
-            assert config.profiles == {}
-            assert config.sessions == {}
+        loader = Loader(
+            config_path=str(tmp_path / "config"),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        config = loader.load()
+        assert config.profiles == {}
+        assert config.sessions == {}
 
-    def test_load_config_file_with_sso_session(self):
+    def test_load_config_file_with_sso_session(self, tmp_path):
         """SSO 세션이 있는 config 파일 로드"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [sso-session my-sso]
 sso_start_url = https://example.awsapps.com/start
 sso_region = ap-northeast-2
@@ -217,97 +214,93 @@ sso_account_id = 111111111111
 sso_role_name = AdministratorAccess
 region = ap-northeast-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        parsed = loader.load()
 
-            assert "my-sso" in parsed.sessions
-            assert parsed.sessions["my-sso"].start_url == "https://example.awsapps.com/start"
-            assert "dev" in parsed.profiles
-            assert parsed.profiles["dev"].sso_session == "my-sso"
+        assert "my-sso" in parsed.sessions
+        assert parsed.sessions["my-sso"].start_url == "https://example.awsapps.com/start"
+        assert "dev" in parsed.profiles
+        assert parsed.profiles["dev"].sso_session == "my-sso"
 
-    def test_load_config_file_with_default_profile(self):
+    def test_load_config_file_with_default_profile(self, tmp_path):
         """default 프로파일이 있는 config 파일"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [default]
 region = us-east-1
 output = json
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        parsed = loader.load()
 
-            assert "default" in parsed.profiles
-            assert parsed.default_profile == "default"
-            assert parsed.profiles["default"].region == "us-east-1"
+        assert "default" in parsed.profiles
+        assert parsed.default_profile == "default"
+        assert parsed.profiles["default"].region == "us-east-1"
 
-    def test_load_credentials_file(self):
+    def test_load_credentials_file(self, tmp_path):
         """credentials 파일 로드 및 병합"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            credentials_path = Path(tmpdir) / "credentials"
+        config_path = tmp_path / "config"
+        credentials_path = tmp_path / "credentials"
 
-            config_content = """
+        config_content = """
 [profile dev]
 region = ap-northeast-2
 """
-            credentials_content = """
+        credentials_content = """
 [dev]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 """
-            config_path.write_text(config_content)
-            credentials_path.write_text(credentials_content)
+        config_path.write_text(config_content)
+        credentials_path.write_text(credentials_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=str(credentials_path),
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(credentials_path),
+        )
+        parsed = loader.load()
 
-            profile = parsed.profiles["dev"]
-            assert profile.region == "ap-northeast-2"
-            assert profile.aws_access_key_id == "AKIAIOSFODNN7EXAMPLE"
-            assert profile.aws_secret_access_key is not None
+        profile = parsed.profiles["dev"]
+        assert profile.region == "ap-northeast-2"
+        assert profile.aws_access_key_id == "AKIAIOSFODNN7EXAMPLE"
+        assert profile.aws_secret_access_key is not None
 
-    def test_load_credentials_only_profile(self):
+    def test_load_credentials_only_profile(self, tmp_path):
         """config에 없고 credentials에만 있는 프로파일"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            credentials_path = Path(tmpdir) / "credentials"
-            credentials_content = """
+        credentials_path = tmp_path / "credentials"
+        credentials_content = """
 [new-profile]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 aws_session_token = session-token
 """
-            credentials_path.write_text(credentials_content)
+        credentials_path.write_text(credentials_content)
 
-            loader = Loader(
-                config_path=f"{tmpdir}/config",
-                credentials_path=str(credentials_path),
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(tmp_path / "config"),
+            credentials_path=str(credentials_path),
+        )
+        parsed = loader.load()
 
-            assert "new-profile" in parsed.profiles
-            profile = parsed.profiles["new-profile"]
-            assert profile.aws_access_key_id == "AKIAIOSFODNN7EXAMPLE"
-            assert profile.aws_session_token == "session-token"
+        assert "new-profile" in parsed.profiles
+        profile = parsed.profiles["new-profile"]
+        assert profile.aws_access_key_id == "AKIAIOSFODNN7EXAMPLE"
+        assert profile.aws_session_token == "session-token"
 
-    def test_load_assume_role_profile(self):
+    def test_load_assume_role_profile(self, tmp_path):
         """AssumeRole 프로파일 로드"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile source]
 region = ap-northeast-2
 
@@ -318,46 +311,44 @@ external_id = external-123
 mfa_serial = arn:aws:iam::111111111111:mfa/user
 duration_seconds = 3600
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        parsed = loader.load()
 
-            profile = parsed.profiles["prod"]
-            assert profile.role_arn == "arn:aws:iam::222222222222:role/AdminRole"
-            assert profile.source_profile == "source"
-            assert profile.external_id == "external-123"
-            assert profile.duration_seconds == 3600
+        profile = parsed.profiles["prod"]
+        assert profile.role_arn == "arn:aws:iam::222222222222:role/AdminRole"
+        assert profile.source_profile == "source"
+        assert profile.external_id == "external-123"
+        assert profile.duration_seconds == 3600
 
-    def test_list_profiles(self):
+    def test_list_profiles(self, tmp_path):
         """프로파일 목록 조회"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile dev]
 region = ap-northeast-2
 
 [profile prod]
 region = us-east-1
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            profiles = loader.list_profiles()
-            assert "dev" in profiles
-            assert "prod" in profiles
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        profiles = loader.list_profiles()
+        assert "dev" in profiles
+        assert "prod" in profiles
 
-    def test_list_sso_sessions(self):
+    def test_list_sso_sessions(self, tmp_path):
         """SSO 세션 목록 조회"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [sso-session sso-1]
 sso_start_url = https://example1.awsapps.com/start
 sso_region = ap-northeast-2
@@ -366,15 +357,15 @@ sso_region = ap-northeast-2
 sso_start_url = https://example2.awsapps.com/start
 sso_region = us-east-1
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            sessions = loader.list_sso_sessions()
-            assert "sso-1" in sessions
-            assert "sso-2" in sessions
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        sessions = loader.list_sso_sessions()
+        assert "sso-1" in sessions
+        assert "sso-2" in sessions
 
 
 class TestDetectProviderType:
@@ -499,21 +490,20 @@ class TestWarnLegacySso:
 class TestModuleFunctions:
     """모듈 레벨 편의 함수 테스트"""
 
-    def test_load_config_function(self):
+    def test_load_config_function(self, tmp_path):
         """load_config 편의 함수"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile test]
 region = ap-northeast-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            parsed = load_config(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            assert "test" in parsed.profiles
+        parsed = load_config(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        assert "test" in parsed.profiles
 
     def test_detect_provider_type_function(self):
         """detect_provider_type 편의 함수"""
@@ -525,132 +515,125 @@ region = ap-northeast-2
         result = detect_provider_type(profile)
         assert result == ProviderType.STATIC_CREDENTIALS
 
-    def test_list_profiles_function(self):
+    def test_list_profiles_function(self, tmp_path):
         """list_profiles 편의 함수"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile alpha]
 region = ap-northeast-2
 
 [profile beta]
 region = us-east-1
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            profiles = list_profiles(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            assert "alpha" in profiles
-            assert "beta" in profiles
+        profiles = list_profiles(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        assert "alpha" in profiles
+        assert "beta" in profiles
 
-    def test_list_sso_sessions_function(self):
+    def test_list_sso_sessions_function(self, tmp_path):
         """list_sso_sessions 편의 함수"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [sso-session main-sso]
 sso_start_url = https://main.awsapps.com/start
 sso_region = ap-northeast-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            sessions = list_sso_sessions(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            assert "main-sso" in sessions
+        sessions = list_sso_sessions(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        assert "main-sso" in sessions
 
 
 class TestLoaderEdgeCases:
     """Loader 엣지 케이스 테스트"""
 
-    def test_credentials_without_access_key(self):
+    def test_credentials_without_access_key(self, tmp_path):
         """access_key 없는 credentials 섹션 스킵"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            credentials_path = Path(tmpdir) / "credentials"
-            credentials_content = """
+        credentials_path = tmp_path / "credentials"
+        credentials_content = """
 [incomplete]
 aws_secret_access_key = secret-only
 """
-            credentials_path.write_text(credentials_content)
+        credentials_path.write_text(credentials_content)
 
-            loader = Loader(
-                config_path=f"{tmpdir}/config",
-                credentials_path=str(credentials_path),
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(tmp_path / "config"),
+            credentials_path=str(credentials_path),
+        )
+        parsed = loader.load()
 
-            # access_key가 없으므로 프로파일이 생성되지 않아야 함
-            assert "incomplete" not in parsed.profiles
+        # access_key가 없으므로 프로파일이 생성되지 않아야 함
+        assert "incomplete" not in parsed.profiles
 
-    def test_credentials_without_secret_key(self):
+    def test_credentials_without_secret_key(self, tmp_path):
         """secret_key 없는 credentials 섹션 스킵"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            credentials_path = Path(tmpdir) / "credentials"
-            credentials_content = """
+        credentials_path = tmp_path / "credentials"
+        credentials_content = """
 [incomplete]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 """
-            credentials_path.write_text(credentials_content)
+        credentials_path.write_text(credentials_content)
 
-            loader = Loader(
-                config_path=f"{tmpdir}/config",
-                credentials_path=str(credentials_path),
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(tmp_path / "config"),
+            credentials_path=str(credentials_path),
+        )
+        parsed = loader.load()
 
-            # secret_key가 없으므로 프로파일이 생성되지 않아야 함
-            assert "incomplete" not in parsed.profiles
+        # secret_key가 없으므로 프로파일이 생성되지 않아야 함
+        assert "incomplete" not in parsed.profiles
 
-    def test_default_profile_fallback(self):
+    def test_default_profile_fallback(self, tmp_path):
         """default 프로파일이 없을 때 첫 번째 프로파일 선택"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile alpha]
 region = ap-northeast-2
 
 [profile beta]
 region = us-east-1
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        parsed = loader.load()
 
-            # default가 없으면 첫 번째 프로파일이 default
-            assert parsed.default_profile in parsed.profiles
+        # default가 없으면 첫 번째 프로파일이 default
+        assert parsed.default_profile in parsed.profiles
 
-    def test_parse_profile_with_credential_process(self):
+    def test_parse_profile_with_credential_process(self, tmp_path):
         """credential_process가 있는 프로파일"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile external]
 credential_process = /usr/local/bin/get-credentials
 region = ap-northeast-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        parsed = loader.load()
 
-            profile = parsed.profiles["external"]
-            assert profile.credential_process == "/usr/local/bin/get-credentials"
+        profile = parsed.profiles["external"]
+        assert profile.credential_process == "/usr/local/bin/get-credentials"
 
-    def test_multiple_sso_sessions_and_profiles(self):
+    def test_multiple_sso_sessions_and_profiles(self, tmp_path):
         """여러 SSO 세션과 프로파일"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [sso-session company-sso]
 sso_start_url = https://company.awsapps.com/start
 sso_region = ap-northeast-2
@@ -678,58 +661,56 @@ sso_account_id = 333333333333
 sso_role_name = ReadOnly
 region = us-west-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            parsed = loader.load()
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        parsed = loader.load()
 
-            # SSO 세션 확인
-            assert len(parsed.sessions) == 2
-            assert "company-sso" in parsed.sessions
-            assert "partner-sso" in parsed.sessions
-            assert parsed.sessions["company-sso"].registration_scopes == "sso:account:access"
+        # SSO 세션 확인
+        assert len(parsed.sessions) == 2
+        assert "company-sso" in parsed.sessions
+        assert "partner-sso" in parsed.sessions
+        assert parsed.sessions["company-sso"].registration_scopes == "sso:account:access"
 
-            # 프로파일 확인
-            assert len(parsed.profiles) == 3
-            assert parsed.profiles["dev-company"].sso_session == "company-sso"
-            assert parsed.profiles["partner-access"].sso_session == "partner-sso"
+        # 프로파일 확인
+        assert len(parsed.profiles) == 3
+        assert parsed.profiles["dev-company"].sso_session == "company-sso"
+        assert parsed.profiles["partner-access"].sso_session == "partner-sso"
 
-    def test_list_profiles_auto_load(self):
+    def test_list_profiles_auto_load(self, tmp_path):
         """config 인자 없이 list_profiles 호출"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [profile test]
 region = ap-northeast-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            # config 인자 없이 호출
-            profiles = loader.list_profiles()
-            assert "test" in profiles
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        # config 인자 없이 호출
+        profiles = loader.list_profiles()
+        assert "test" in profiles
 
-    def test_list_sso_sessions_auto_load(self):
+    def test_list_sso_sessions_auto_load(self, tmp_path):
         """config 인자 없이 list_sso_sessions 호출"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
-            config_content = """
+        config_path = tmp_path / "config"
+        config_content = """
 [sso-session test-sso]
 sso_start_url = https://test.awsapps.com/start
 sso_region = ap-northeast-2
 """
-            config_path.write_text(config_content)
+        config_path.write_text(config_content)
 
-            loader = Loader(
-                config_path=str(config_path),
-                credentials_path=f"{tmpdir}/credentials",
-            )
-            # config 인자 없이 호출
-            sessions = loader.list_sso_sessions()
-            assert "test-sso" in sessions
+        loader = Loader(
+            config_path=str(config_path),
+            credentials_path=str(tmp_path / "credentials"),
+        )
+        # config 인자 없이 호출
+        sessions = loader.list_sso_sessions()
+        assert "test-sso" in sessions

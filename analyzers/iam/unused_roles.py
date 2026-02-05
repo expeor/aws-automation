@@ -103,7 +103,7 @@ def _print_summary(iam_data_list: list[IAMData]) -> None:
             if is_unused:
                 unused_roles += 1
 
-    console.print("\n  [bold]Role 현황[/bold]")
+    console.print("  [bold]Role 현황[/bold]")
     console.print(f"    총 Role: {total_roles}개")
     console.print(f"    Service-linked Role: {service_linked_roles}개")
     if unused_roles > 0:

@@ -375,7 +375,11 @@ def _render_expanded_view(
         if not filtered_tasks:
             continue
 
-        branch = tree.add(f"[{group.color}]{group.icon} {group.display_name}[/{group.color}]")
+        task_count = len(filtered_tasks)
+        branch = tree.add(
+            f"[bold {group.color}]{group.icon} {group.display_name}[/bold {group.color}]"
+            f" [dim]({task_count})[/dim]"
+        )
         for task in filtered_tasks:
             perm_color = PERMISSION_COLORS.get(task.permission, "dim")
             name = task.name if lang == "ko" else task.name_en

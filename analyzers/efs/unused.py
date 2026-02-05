@@ -21,6 +21,7 @@ CloudWatch 메트릭:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -29,12 +30,16 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 분석 기간 (일) - CloudFix 권장 30일
 ANALYSIS_DAYS = 30
@@ -121,18 +126,23 @@ class EFSAnalysisResult:
 
 
 def collect_efs_filesystems(session, account_id: str, account_name: str, region: str) -> list[EFSInfo]:
-    """EFS 파일시스템 수집"""
+    """EFS 파일시스템 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 파일시스템당 4 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
-    efs = get_client(session, "efs", region_name=region)
+    efs_client = get_client(session, "efs", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    filesystems = []
+    filesystems: list[EFSInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
-        paginator = efs.get_paginator("describe_file_systems")
+        # 1단계: 파일시스템 목록 수집
+        paginator = efs_client.get_paginator("describe_file_systems")
         for page in paginator.paginate():
             for fs in page.get("FileSystems", []):
                 fs_id = fs.get("FileSystemId", "")
@@ -147,10 +157,12 @@ def collect_efs_filesystems(session, account_id: str, account_name: str, region:
                 # 마운트 타겟 수 확인
                 mount_target_count = 0
                 try:
-                    mt_resp = efs.describe_mount_targets(FileSystemId=fs_id)
+                    mt_resp = efs_client.describe_mount_targets(FileSystemId=fs_id)
                     mount_target_count = len(mt_resp.get("MountTargets", []))
-                except ClientError:
-                    pass
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"EFS 마운트 타겟 조회 실패: {fs_id} ({get_error_code(e)})")
 
                 info = EFSInfo(
                     account_id=account_id,
@@ -165,71 +177,98 @@ def collect_efs_filesystems(session, account_id: str, account_name: str, region:
                     mount_target_count=mount_target_count,
                     created_at=fs.get("CreationTime"),
                 )
-
-                # CloudWatch 지표 조회
-                try:
-                    # ClientConnections
-                    conn_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/EFS",
-                        MetricName="ClientConnections",
-                        Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Average"],
-                    )
-                    if conn_resp.get("Datapoints"):
-                        info.avg_client_connections = sum(d["Average"] for d in conn_resp["Datapoints"]) / len(
-                            conn_resp["Datapoints"]
-                        )
-
-                    # MeteredIOBytes (과금 대상 I/O - 더 정확한 사용량 지표)
-                    metered_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/EFS",
-                        MetricName="MeteredIOBytes",
-                        Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Sum"],
-                    )
-                    if metered_resp.get("Datapoints"):
-                        info.metered_io_bytes = sum(d["Sum"] for d in metered_resp["Datapoints"])
-
-                    # DataReadIOBytes
-                    read_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/EFS",
-                        MetricName="DataReadIOBytes",
-                        Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Sum"],
-                    )
-                    if read_resp.get("Datapoints"):
-                        info.data_read_bytes = sum(d["Sum"] for d in read_resp["Datapoints"])
-
-                    # DataWriteIOBytes
-                    write_resp = cloudwatch.get_metric_statistics(
-                        Namespace="AWS/EFS",
-                        MetricName="DataWriteIOBytes",
-                        Dimensions=[{"Name": "FileSystemId", "Value": fs_id}],
-                        StartTime=start_time,
-                        EndTime=now,
-                        Period=86400,
-                        Statistics=["Sum"],
-                    )
-                    if write_resp.get("Datapoints"):
-                        info.data_write_bytes = sum(d["Sum"] for d in write_resp["Datapoints"])
-
-                except ClientError:
-                    pass
-
                 filesystems.append(info)
-    except ClientError:
-        pass
+
+        # 2단계: 배치 메트릭 조회
+        if filesystems:
+            _collect_efs_metrics_batch(cloudwatch, filesystems, start_time, now)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"EFS 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"EFS 조회 오류: {get_error_code(e)}")
 
     return filesystems
+
+
+def _collect_efs_metrics_batch(
+    cloudwatch,
+    filesystems: list[EFSInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """EFS 메트릭 배치 수집 (내부 함수)
+
+    최적화:
+    - ClientConnections (Average)
+    - MeteredIOBytes (Sum)
+    - DataReadIOBytes (Sum)
+    - DataWriteIOBytes (Sum)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+    days = (end_time - start_time).days or 1
+
+    for fs in filesystems:
+        safe_id = sanitize_metric_id(fs.file_system_id)
+        dimensions = {"FileSystemId": fs.file_system_id}
+
+        queries.extend([
+            MetricQuery(
+                id=f"{safe_id}_conn",
+                namespace="AWS/EFS",
+                metric_name="ClientConnections",
+                dimensions=dimensions,
+                stat="Average",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_metered",
+                namespace="AWS/EFS",
+                metric_name="MeteredIOBytes",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_read",
+                namespace="AWS/EFS",
+                metric_name="DataReadIOBytes",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_write",
+                namespace="AWS/EFS",
+                metric_name="DataWriteIOBytes",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+        ])
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for fs in filesystems:
+            safe_id = sanitize_metric_id(fs.file_system_id)
+            # Average는 일별 평균의 합을 일수로 나눔
+            fs.avg_client_connections = results.get(f"{safe_id}_conn", 0.0) / days
+            fs.metered_io_bytes = results.get(f"{safe_id}_metered", 0.0)
+            fs.data_read_bytes = results.get(f"{safe_id}_read", 0.0)
+            fs.data_write_bytes = results.get(f"{safe_id}_write", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_filesystems(

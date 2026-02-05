@@ -2,11 +2,8 @@
 tests/shared/io/excel/test_workbook.py - Excel Workbook 테스트
 """
 
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from shared.io.excel.workbook import ColumnDef, Sheet, SummaryItem, Workbook
 
@@ -137,31 +134,29 @@ class TestWorkbook:
         assert sheet1._ws.title == "시트1"
         assert sheet2._ws.title == "시트2"
 
-    def test_save_creates_file(self):
+    def test_save_creates_file(self, tmp_path):
         """파일 저장"""
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
         sheet = wb.new_sheet(name="테스트", columns=columns)
         sheet.add_row(["value"])
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save(Path(tmpdir) / "test_output.xlsx")
+        filepath = wb.save(tmp_path / "test_output.xlsx")
 
-            assert Path(filepath).exists()
-            assert str(filepath).endswith(".xlsx")
+        assert Path(filepath).exists()
+        assert str(filepath).endswith(".xlsx")
 
-    def test_save_as_creates_file(self):
+    def test_save_as_creates_file(self, tmp_path):
         """save_as로 파일 저장"""
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
         wb.new_sheet(name="테스트", columns=columns)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save_as(str(tmpdir), "test_output", region="ap-northeast-2")
+        filepath = wb.save_as(str(tmp_path), "test_output", region="ap-northeast-2")
 
-            assert Path(filepath).exists()
-            assert "test_output" in str(filepath)
-            assert "ap-northeast-2" in str(filepath)
+        assert Path(filepath).exists()
+        assert "test_output" in str(filepath)
+        assert "ap-northeast-2" in str(filepath)
 
 
 class TestSheet:
@@ -319,7 +314,7 @@ class TestWorkbookSummarySheet:
 class TestWorkbookIntegration:
     """통합 테스트"""
 
-    def test_complete_workflow(self):
+    def test_complete_workflow(self, tmp_path):
         """전체 워크플로우 테스트"""
         wb = Workbook(lang="ko")
 
@@ -345,13 +340,12 @@ class TestWorkbookIntegration:
         data_sheet.add_summary_row(["합계", "-", 450, 1.0])
 
         # 저장
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save(Path(tmpdir) / "integration_test.xlsx")
+        filepath = wb.save(tmp_path / "integration_test.xlsx")
 
-            assert Path(filepath).exists()
-            assert Path(filepath).stat().st_size > 0
+        assert Path(filepath).exists()
+        assert Path(filepath).stat().st_size > 0
 
-    def test_csv_export(self):
+    def test_csv_export(self, tmp_path):
         """CSV 내보내기 (시트별)"""
         wb = Workbook()
         columns = [
@@ -362,14 +356,13 @@ class TestWorkbookIntegration:
         sheet.add_row(["val1", "val2"])
         sheet.add_row(["val3", "val4"])
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Excel 저장
-            filepath = wb.save(Path(tmpdir) / "test.xlsx")
+        # Excel 저장
+        filepath = wb.save(tmp_path / "test.xlsx")
 
-            assert Path(filepath).exists()
+        assert Path(filepath).exists()
 
-            # CSV 내보내기 메서드가 있다면 테스트
-            # wb.export_csv(str(tmpdir), "test")
+        # CSV 내보내기 메서드가 있다면 테스트
+        # wb.export_csv(str(tmp_path), "test")
 
 
 class TestSummarySheetAdvanced:
@@ -440,7 +433,7 @@ class TestSummarySheetAdvanced:
         wb.new_sheet(name="Data", columns=columns)
 
         # 맨 앞에 Summary 시트 추가
-        summary = wb.new_summary_sheet("요약", position=0)
+        wb.new_summary_sheet("요약", position=0)
 
         assert wb._wb.sheetnames[0] == "요약"
 
@@ -467,7 +460,7 @@ class TestSummarySheetAdvanced:
 class TestWorkbookUtilityFunctions:
     """Workbook 유틸리티 함수 테스트"""
 
-    def test_save_to_csv_dict_list(self):
+    def test_save_to_csv_dict_list(self, tmp_path):
         """딕셔너리 리스트를 CSV로 저장"""
         from shared.io.excel.workbook import save_to_csv
 
@@ -476,41 +469,38 @@ class TestWorkbookUtilityFunctions:
             {"Name": "Jane", "Age": "25"},
         ]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = str(Path(tmpdir) / "test.csv")
-            save_to_csv(data, output_file)
+        output_file = str(tmp_path / "test.csv")
+        save_to_csv(data, output_file)
 
-            assert Path(output_file).exists()
-            content = Path(output_file).read_text(encoding="utf-8-sig")
-            assert "Name" in content
-            assert "John" in content
+        assert Path(output_file).exists()
+        content = Path(output_file).read_text(encoding="utf-8-sig")
+        assert "Name" in content
+        assert "John" in content
 
-    def test_save_to_csv_list_list(self):
+    def test_save_to_csv_list_list(self, tmp_path):
         """리스트 리스트를 CSV로 저장"""
         from shared.io.excel.workbook import save_to_csv
 
         data = [["John", "30"], ["Jane", "25"]]
         headers = ["Name", "Age"]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = str(Path(tmpdir) / "test.csv")
-            save_to_csv(data, output_file, headers=headers)
+        output_file = str(tmp_path / "test.csv")
+        save_to_csv(data, output_file, headers=headers)
 
-            assert Path(output_file).exists()
-            content = Path(output_file).read_text(encoding="utf-8-sig")
-            assert "Name" in content
+        assert Path(output_file).exists()
+        content = Path(output_file).read_text(encoding="utf-8-sig")
+        assert "Name" in content
 
-    def test_save_to_csv_empty_data(self):
+    def test_save_to_csv_empty_data(self, tmp_path):
         """빈 데이터 저장"""
         from shared.io.excel.workbook import save_to_csv
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = str(Path(tmpdir) / "empty.csv")
-            save_to_csv([], output_file)
+        output_file = str(tmp_path / "empty.csv")
+        save_to_csv([], output_file)
 
-            assert Path(output_file).exists()
+        assert Path(output_file).exists()
 
-    def test_save_dict_list_to_excel(self):
+    def test_save_dict_list_to_excel(self, tmp_path):
         """딕셔너리 리스트를 Excel로 저장"""
         from shared.io.excel.workbook import save_dict_list_to_excel
 
@@ -519,14 +509,13 @@ class TestWorkbookUtilityFunctions:
             {"Name": "Jane", "Age": 25, "City": "Busan"},
         ]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = str(Path(tmpdir) / "test.xlsx")
-            save_dict_list_to_excel(data, output_file)
+        output_file = str(tmp_path / "test.xlsx")
+        save_dict_list_to_excel(data, output_file)
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
+        assert Path(output_file).exists()
+        assert Path(output_file).stat().st_size > 0
 
-    def test_save_dict_list_to_excel_with_columns(self):
+    def test_save_dict_list_to_excel_with_columns(self, tmp_path):
         """컬럼 순서 지정하여 저장"""
         from shared.io.excel.workbook import save_dict_list_to_excel
 
@@ -535,21 +524,19 @@ class TestWorkbookUtilityFunctions:
             {"Name": "Jane", "Age": 25, "City": "Busan"},
         ]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = str(Path(tmpdir) / "test.xlsx")
-            save_dict_list_to_excel(data, output_file, columns=["City", "Name"])
+        output_file = str(tmp_path / "test.xlsx")
+        save_dict_list_to_excel(data, output_file, columns=["City", "Name"])
 
-            assert Path(output_file).exists()
+        assert Path(output_file).exists()
 
-    def test_save_dict_list_to_excel_empty(self):
+    def test_save_dict_list_to_excel_empty(self, tmp_path):
         """빈 데이터 저장"""
         from shared.io.excel.workbook import save_dict_list_to_excel
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = str(Path(tmpdir) / "empty.xlsx")
-            save_dict_list_to_excel([], output_file)
+        output_file = str(tmp_path / "empty.xlsx")
+        save_dict_list_to_excel([], output_file)
 
-            assert Path(output_file).exists()
+        assert Path(output_file).exists()
 
     def test_add_sheet_from_dict_list(self):
         """기존 Workbook에 시트 추가"""
@@ -793,44 +780,41 @@ class TestWorkbookProperties:
 class TestWorkbookEdgeCases:
     """Workbook 경계 케이스 테스트"""
 
-    def test_save_as_without_region(self):
+    def test_save_as_without_region(self, tmp_path):
         """리전 없이 저장"""
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
         wb.new_sheet(name="Test", columns=columns)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save_as(str(tmpdir), "test_output")
+        filepath = wb.save_as(str(tmp_path), "test_output")
 
-            assert Path(filepath).exists()
-            assert "test_output" in str(filepath)
+        assert Path(filepath).exists()
+        assert "test_output" in str(filepath)
 
-    def test_save_as_with_suffix(self):
+    def test_save_as_with_suffix(self, tmp_path):
         """접미사 포함 저장"""
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
         wb.new_sheet(name="Test", columns=columns)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save_as(str(tmpdir), "test", suffix="final")
+        filepath = wb.save_as(str(tmp_path), "test", suffix="final")
 
-            assert Path(filepath).exists()
-            assert "final" in str(filepath)
+        assert Path(filepath).exists()
+        assert "final" in str(filepath)
 
     @patch("shared.io.output.open_in_explorer")
-    def test_workbook_save_with_one_sheet(self, mock_open):
+    def test_workbook_save_with_one_sheet(self, mock_open, tmp_path):
         """하나의 빈 시트만 있는 Workbook 저장"""
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
         wb.new_sheet(name="Sheet1", columns=columns)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save(Path(tmpdir) / "single_sheet.xlsx")
+        filepath = wb.save(tmp_path / "single_sheet.xlsx")
 
-            assert Path(filepath).exists()
-            wb.close()  # Close to release file handle
+        assert Path(filepath).exists()
+        wb.close()  # Close to release file handle
 
-    def test_sheet_with_no_rows(self):
+    def test_sheet_with_no_rows(self, tmp_path):
         """데이터 없는 시트"""
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
@@ -838,9 +822,8 @@ class TestWorkbookEdgeCases:
 
         assert sheet.row_count == 0
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = wb.save(Path(tmpdir) / "no_rows.xlsx")
-            assert Path(filepath).exists()
+        filepath = wb.save(tmp_path / "no_rows.xlsx")
+        assert Path(filepath).exists()
 
     def test_very_long_sheet_name(self):
         """매우 긴 시트 이름"""

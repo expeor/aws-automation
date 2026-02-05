@@ -9,6 +9,7 @@ plugins/sqs/unused.py - SQS 미사용 큐 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,12 +18,16 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 분석 기간 (일) - AWS 권장 14일 이상
 ANALYSIS_DAYS = 14
@@ -96,17 +101,22 @@ class SQSAnalysisResult:
 
 
 def collect_sqs_queues(session, account_id: str, account_name: str, region: str) -> list[SQSQueueInfo]:
-    """SQS 큐 수집"""
+    """SQS 큐 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: 큐당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from botocore.exceptions import ClientError
 
     sqs = get_client(session, "sqs", region_name=region)
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
-    queues = []
+    queues: list[SQSQueueInfo] = []
 
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
     try:
+        # 1단계: 큐 목록 수집
         paginator = sqs.get_paginator("list_queues")
         for page in paginator.paginate():
             for queue_url in page.get("QueueUrls", []):
@@ -142,60 +152,93 @@ def collect_sqs_queues(session, account_id: str, account_name: str, region: str)
                         approximate_messages_not_visible=int(attrs.get("ApproximateNumberOfMessagesNotVisible", 0)),
                         created_timestamp=created_at,
                     )
-
-                    # CloudWatch 지표 조회
-                    try:
-                        # NumberOfMessagesSent
-                        sent_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/SQS",
-                            MetricName="NumberOfMessagesSent",
-                            Dimensions=[{"Name": "QueueName", "Value": queue_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if sent_resp.get("Datapoints"):
-                            info.messages_sent = sum(d["Sum"] for d in sent_resp["Datapoints"])
-
-                        # NumberOfMessagesReceived
-                        recv_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/SQS",
-                            MetricName="NumberOfMessagesReceived",
-                            Dimensions=[{"Name": "QueueName", "Value": queue_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if recv_resp.get("Datapoints"):
-                            info.messages_received = sum(d["Sum"] for d in recv_resp["Datapoints"])
-
-                        # NumberOfMessagesDeleted
-                        del_resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/SQS",
-                            MetricName="NumberOfMessagesDeleted",
-                            Dimensions=[{"Name": "QueueName", "Value": queue_name}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if del_resp.get("Datapoints"):
-                            info.messages_deleted = sum(d["Sum"] for d in del_resp["Datapoints"])
-
-                    except ClientError:
-                        pass
-
                     queues.append(info)
 
-                except ClientError:
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"SQS 큐 속성 조회 실패: {queue_url} ({get_error_code(e)})")
                     continue
 
-    except ClientError:
-        pass
+        # 2단계: 배치 메트릭 조회
+        if queues:
+            _collect_sqs_metrics_batch(cloudwatch, queues, start_time, now)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"SQS 권한 없음: {account_name}/{region}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"SQS 조회 오류: {get_error_code(e)}")
 
     return queues
+
+
+def _collect_sqs_metrics_batch(
+    cloudwatch,
+    queues: list[SQSQueueInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """SQS 메트릭 배치 수집 (내부 함수)
+
+    메트릭:
+    - NumberOfMessagesSent (Sum)
+    - NumberOfMessagesReceived (Sum)
+    - NumberOfMessagesDeleted (Sum)
+    """
+    from botocore.exceptions import ClientError
+
+    queries: list[MetricQuery] = []
+
+    for queue in queues:
+        safe_id = sanitize_metric_id(queue.queue_name)
+        dimensions = {"QueueName": queue.queue_name}
+
+        queries.extend([
+            MetricQuery(
+                id=f"{safe_id}_sent",
+                namespace="AWS/SQS",
+                metric_name="NumberOfMessagesSent",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_received",
+                namespace="AWS/SQS",
+                metric_name="NumberOfMessagesReceived",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+            MetricQuery(
+                id=f"{safe_id}_deleted",
+                namespace="AWS/SQS",
+                metric_name="NumberOfMessagesDeleted",
+                dimensions=dimensions,
+                stat="Sum",
+            ),
+        ])
+
+    if not queries:
+        return
+
+    try:
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        for queue in queues:
+            safe_id = sanitize_metric_id(queue.queue_name)
+            queue.messages_sent = results.get(f"{safe_id}_sent", 0.0)
+            queue.messages_received = results.get(f"{safe_id}_received", 0.0)
+            queue.messages_deleted = results.get(f"{safe_id}_deleted", 0.0)
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def analyze_queues(queues: list[SQSQueueInfo], account_id: str, account_name: str, region: str) -> SQSAnalysisResult:

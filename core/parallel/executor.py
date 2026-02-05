@@ -422,6 +422,7 @@ def parallel_collect(
             전달 시 자동으로:
             1. set_total(task_count) 호출
             2. 각 task 완료 시 on_complete(success) 호출
+            ctx에 timeline이 있으면 자동으로 TimelineParallelTracker 생성.
 
     Returns:
         ParallelExecutionResult[T]
@@ -451,6 +452,26 @@ def parallel_collect(
         success, failed, total = tracker.stats
         console.print(f"완료: {success}개 성공, {failed}개 실패")
     """
+    # progress_tracker가 없고 ctx에 timeline이 있으면 자동 생성
+    _auto_timeline = False
+    if progress_tracker is None:
+        timeline = getattr(ctx, "_timeline", None)
+        if timeline is not None:
+            collect_phase = getattr(ctx, "_timeline_collect_phase", 0)
+            progress_tracker = timeline.create_parallel_tracker(collect_phase)
+            _auto_timeline = True
+
     config = ParallelConfig(max_workers=max_workers)
     executor = ParallelSessionExecutor(ctx, config)
-    return executor.execute(collector_func, service, progress_tracker=progress_tracker)
+    result = executor.execute(collector_func, service, progress_tracker=progress_tracker)
+
+    # 자동 생성된 timeline tracker인 경우, 수집 phase 완료 후 Live를 중단하여
+    # 이후 도구의 console.print() 출력이 Live 렌더링과 겹치지 않도록 함
+    if _auto_timeline:
+        timeline = getattr(ctx, "_timeline", None)
+        if timeline is not None:
+            collect_phase = getattr(ctx, "_timeline_collect_phase", 0)
+            timeline.complete_phase(collect_phase)
+            timeline.stop()
+
+    return result

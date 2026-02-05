@@ -2,14 +2,10 @@
 tests/shared/io/html/test_report.py - HTML 리포트 테스트
 """
 
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from shared.io.html import (
-    DEFAULT_TOP_N,
     ChartSize,
     HTMLReport,
     aggregate_by_group,
@@ -321,23 +317,22 @@ class TestHTMLReport:
         assert len(report.charts) == 2
         assert len(report.tables) == 1
 
-    def test_save_creates_file(self):
+    def test_save_creates_file(self, tmp_path):
         """파일 저장"""
         report = HTMLReport("테스트 리포트")
         report.add_summary([("항목", 100, None)])
         report.add_pie_chart("차트", [("A", 50), ("B", 50)])
         report.add_table("테이블", ["H1", "H2"], [["V1", "V2"]])
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = report.save(Path(tmpdir) / "test_report.html", auto_open=False)
+        filepath = report.save(tmp_path / "test_report.html", auto_open=False)
 
-            assert Path(filepath).exists()
-            assert str(filepath).endswith(".html")
+        assert Path(filepath).exists()
+        assert str(filepath).endswith(".html")
 
-            # 파일 내용 확인
-            content = Path(filepath).read_text(encoding="utf-8")
-            assert "테스트 리포트" in content
-            assert "echarts" in content
+        # 파일 내용 확인
+        content = Path(filepath).read_text(encoding="utf-8")
+        assert "테스트 리포트" in content
+        assert "echarts" in content
 
     def test_generate_html_structure(self):
         """HTML 구조 생성"""

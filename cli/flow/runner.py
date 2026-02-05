@@ -266,7 +266,7 @@ class FlowRunner:
             return True
 
     def _execute_tool(self, ctx: ExecutionContext) -> None:
-        """도구 실행 (discovery 기반)"""
+        """도구 실행 (discovery 기반, timeline 자동 래핑)"""
         if not ctx.tool or not ctx.category:
             ctx.error = ValueError(t("runner.tool_or_category_not_selected"))
             return
@@ -299,22 +299,56 @@ class FlowRunner:
             if not isinstance(tool, dict):
                 raise TypeError(f"load_tool returned {type(tool).__name__} instead of dict")
 
-            # 커스텀 옵션 수집 (있으면)
+            run_fn = tool.get("run")
+            if not run_fn:
+                raise ValueError(t("runner.no_run_function"))
+
+            # collect_options는 대화형이므로 timeline 밖에서 먼저 실행
             collect_fn = tool.get("collect_options")
             if collect_fn:
                 collect_fn(ctx)
 
-            # 실행
-            run_fn = tool.get("run")
-            if not run_fn:
-                raise ValueError(t("runner.no_run_function"))
-            ctx.result = run_fn(ctx)
+            # 타임라인 phases 결정 (빈 리스트면 timeline 없이 실행)
+            phases = _build_phases(tool)
+
+            if not phases:
+                # 대화형/메뉴 도구: timeline 없이 바로 실행
+                ctx.result = run_fn(ctx)
+            else:
+                # 타임라인 래핑 실행
+                self._execute_with_timeline(ctx, run_fn, phases)
 
         except Exception as e:
+            ctx._timeline = None
             ctx.error = e
             # AccessDenied 오류 시 권한 안내
             self._handle_permission_error(e, required_permissions)
             raise
+
+    def _execute_with_timeline(self, ctx: ExecutionContext, run_fn: Any, phases: list[str]) -> None:
+        """타임라인 래핑으로 도구 실행
+
+        parallel_collect 사용 도구는 내부에서 자동으로:
+        1. 수집 phase 프로그레스 표시
+        2. 수집 완료 후 Live 중단 (도구 출력과 겹침 방지)
+        """
+        from cli.ui.timeline import timeline_progress
+
+        with timeline_progress(phases, console=console) as tl:
+            ctx._timeline = tl
+
+            # Phase 0: 수집 (run)
+            tl.activate_phase(0)
+            ctx._timeline_collect_phase = 0
+            ctx.result = run_fn(ctx)
+
+            # run_fn 완료 후 Live가 아직 살아있으면 정리
+            # (parallel_collect 미사용 도구인 경우)
+            if tl._live is not None:
+                tl.complete_phase(0)
+                tl.stop()
+
+            ctx._timeline = None
 
     def _print_execution_summary(self, ctx: ExecutionContext, required_permissions: Any = None) -> None:
         """실행 전 요약 출력"""
@@ -423,6 +457,34 @@ class FlowRunner:
             console.print()
             console.print(f"[dim]{t('runner.contact_admin')}[/dim]")
         console.print("[yellow]━━━━━━━━━━━━━━━━━[/yellow]")
+
+
+def _build_phases(tool: dict) -> list[str]:
+    """도구 메타데이터에서 타임라인 phases를 결정
+
+    Args:
+        tool: load_tool()이 반환한 도구 딕셔너리
+              tool["meta"]에 TOOLS 배열의 메타데이터가 들어있음
+
+    Returns:
+        Phase 이름 리스트. 빈 리스트면 timeline 없이 실행.
+    """
+    meta = tool.get("meta") or {}
+
+    # 도구가 명시적으로 timeline_phases를 정의한 경우
+    if "timeline_phases" in meta:
+        return list(meta["timeline_phases"])
+
+    # 대화형/메뉴 도구: timeline 비활성화
+    if meta.get("is_menu"):
+        return []
+
+    # 세션 불필요 도구 (대부분 대화형): timeline 비활성화
+    if meta.get("require_session") is False:
+        return []
+
+    # 기본값: 수집만 표시 (보고서는 도구 내부에서 자체 출력)
+    return ["수집"]
 
 
 def create_flow_runner() -> FlowRunner:

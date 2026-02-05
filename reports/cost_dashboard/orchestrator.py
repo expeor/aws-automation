@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from core.parallel import is_quiet, parallel_collect, quiet_mode, set_quiet
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import SharedMetricCache
 
 from .collectors import REGIONAL_COLLECTORS, collect_route53, collect_s3
 from .report import generate_report
@@ -32,7 +33,6 @@ from cli.ui import (
     console,
     print_error,
     print_header,
-    print_step_header,
     print_sub_info,
     print_sub_task_done,
     print_sub_warning,
@@ -131,6 +131,11 @@ def collect_session_resources(
 
     Returns:
         SessionCollectionResult: 수집 결과
+
+    Note:
+        SharedMetricCache를 사용하여 세션 내 동일 메트릭 중복 조회 방지.
+        SharedMetricCache는 스레드 간 공유가 가능하여 ThreadPoolExecutor
+        워커들도 캐시에 접근할 수 있습니다.
     """
     summary = UnusedResourceSummary(
         account_id=account_id,
@@ -147,64 +152,66 @@ def collect_session_resources(
     if selected_resources:
         collectors_to_run = {k: v for k, v in REGIONAL_COLLECTORS.items() if k in selected_resources}
 
-    # 리전별 리소스 병렬 수집 (최대 10개 동시 실행)
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures_map: dict[Future[Any], str] = {}
-        for name, collector in collectors_to_run.items():
-            future = executor.submit(
-                _run_collector_quiet,
-                collector,
-                session,
-                account_id,
-                account_name,
-                region,
-                parent_quiet,
-            )
-            futures_map[future] = name
-
-        for future in as_completed(futures_map):
-            resource_type = futures_map[future]
-            try:
-                data = future.result()
-                _apply_result(summary, result, resource_type, data)
-            except Exception as e:
-                result.errors.append(f"{resource_type}: {e}")
-
-    # 글로벌 서비스 (계정당 한 번만 수집)
-    # 선택적 스캔: route53, s3가 선택되었는지 확인
-    collect_route53_flag = not selected_resources or "route53" in selected_resources
-    collect_s3_flag = not selected_resources or "s3" in selected_resources
-
-    if _should_collect_global(account_id) and (collect_route53_flag or collect_s3_flag):
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            global_futures: dict[str, Future[Any]] = {}
-
-            if collect_route53_flag:
-                global_futures["route53"] = executor.submit(
-                    _run_global_collector_quiet,
-                    collect_route53,
+    # SharedMetricCache로 세션 내 메트릭 캐싱 활성화 (스레드 간 공유 가능)
+    with SharedMetricCache():
+        # 리전별 리소스 병렬 수집 (최대 10개 동시 실행)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures_map: dict[Future[Any], str] = {}
+            for name, collector in collectors_to_run.items():
+                future = executor.submit(
+                    _run_collector_quiet,
+                    collector,
                     session,
                     account_id,
                     account_name,
+                    region,
                     parent_quiet,
                 )
+                futures_map[future] = name
 
-            if collect_s3_flag:
-                global_futures["s3"] = executor.submit(
-                    _run_global_collector_quiet,
-                    collect_s3,
-                    session,
-                    account_id,
-                    account_name,
-                    parent_quiet,
-                )
-
-            for resource_type, future in global_futures.items():
+            for future in as_completed(futures_map):
+                resource_type = futures_map[future]
                 try:
                     data = future.result()
                     _apply_result(summary, result, resource_type, data)
                 except Exception as e:
                     result.errors.append(f"{resource_type}: {e}")
+
+        # 글로벌 서비스 (계정당 한 번만 수집)
+        # 선택적 스캔: route53, s3가 선택되었는지 확인
+        collect_route53_flag = not selected_resources or "route53" in selected_resources
+        collect_s3_flag = not selected_resources or "s3" in selected_resources
+
+        if _should_collect_global(account_id) and (collect_route53_flag or collect_s3_flag):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                global_futures: dict[str, Future[Any]] = {}
+
+                if collect_route53_flag:
+                    global_futures["route53"] = executor.submit(
+                        _run_global_collector_quiet,
+                        collect_route53,
+                        session,
+                        account_id,
+                        account_name,
+                        parent_quiet,
+                    )
+
+                if collect_s3_flag:
+                    global_futures["s3"] = executor.submit(
+                        _run_global_collector_quiet,
+                        collect_s3,
+                        session,
+                        account_id,
+                        account_name,
+                        parent_quiet,
+                    )
+
+                for resource_type, future in global_futures.items():
+                    try:
+                        data = future.result()
+                        _apply_result(summary, result, resource_type, data)
+                    except Exception as e:
+                        result.errors.append(f"{resource_type}: {e}")
 
     return result
 
@@ -302,10 +309,8 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
             print_error(f"알 수 없는 리소스: {', '.join(invalid)}")
             print_sub_info(f"사용 가능: {', '.join(RESOURCE_FIELD_MAP.keys())}")
             return
-        print_step_header(1, f"선택된 리소스 분석: {', '.join(resources)}")
     else:
         selected = None
-        print_step_header(1, "미사용 리소스 종합 분석 (병렬 처리)")
 
     # 전역 서비스 추적 초기화
     _reset_global_tracking()
@@ -315,6 +320,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
         return collect_session_resources(session, account_id, account_name, region, selected_resources=selected)
 
     # 병렬 수집 실행 (quiet_mode로 콘솔 출력 억제)
+    # timeline이 ctx에 있으면 parallel_collect가 자동으로 프로그레스 연결
     if parallel_progress is not None:
         with parallel_progress("리소스 수집", console=console) as tracker, quiet_mode():
             parallel_result = parallel_collect(
@@ -325,7 +331,6 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
                 progress_tracker=tracker,
             )
     else:
-        # Fallback: parallel_progress 없이 실행
         with quiet_mode():
             parallel_result = parallel_collect(
                 ctx,
@@ -358,8 +363,9 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
     total_waste = sum(sum(getattr(s, field, 0) for field in WASTE_FIELDS) for s in final_result.summaries)
 
     # 요약 출력 (RESOURCE_FIELD_MAP 활용)
-    print_step_header(2, "종합 결과")
-    console.print("=" * 50)
+    from cli.ui.console import print_rule
+
+    print_rule("종합 결과")
 
     for resource_key, cfg in RESOURCE_FIELD_MAP.items():
         # 선택적 스캔인 경우 선택된 리소스만 출력
@@ -380,7 +386,6 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
     print_sub_info(f"계정/리전: {parallel_result.success_count}개 성공, {parallel_result.error_count}개 실패")
 
     # 보고서 생성
-    print_step_header(3, "Excel 보고서 생성")
 
     if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
         identifier = ctx.accounts[0].id

@@ -18,6 +18,7 @@ plugins/elb/unused.py - 미사용 ELB 분석
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -26,13 +27,17 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, is_quiet, parallel_collect
+from core.parallel.decorators import categorize_error, get_error_code
+from core.parallel.types import ErrorCategory
 from core.tools.output import OutputPath, open_in_explorer
+from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from shared.aws.pricing import get_elb_monthly_cost
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # 분석 기간 (일) - AWS Trusted Advisor 기준 7일
 ANALYSIS_DAYS = 7
@@ -174,12 +179,16 @@ class LBAnalysisResult:
 
 
 def collect_v2_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
-    """ALB/NLB/GWLB 목록 수집"""
+    """ALB/NLB/GWLB 목록 수집 (배치 메트릭 최적화)
+
+    최적화:
+    - 기존: LB당 1 API 호출 → 최적화: 전체 1-2 API 호출
+    """
     from datetime import timedelta, timezone
 
     from botocore.exceptions import ClientError
 
-    load_balancers = []
+    load_balancers: list[LoadBalancerInfo] = []
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(days=ANALYSIS_DAYS)
 
@@ -187,7 +196,7 @@ def collect_v2_load_balancers(session, account_id: str, account_name: str, regio
         elbv2 = get_client(session, "elbv2", region_name=region)
         cloudwatch = get_client(session, "cloudwatch", region_name=region)
 
-        # Load Balancers 조회
+        # 1단계: Load Balancers 목록 수집
         paginator = elbv2.get_paginator("describe_load_balancers")
         for page in paginator.paginate():
             for data in page.get("LoadBalancers", []):
@@ -203,8 +212,10 @@ def collect_v2_load_balancers(session, account_id: str, account_name: str, regio
                             key = t.get("Key", "")
                             if not key.startswith("aws:"):
                                 tags[key] = t.get("Value", "")
-                except ClientError:
-                    pass
+                except ClientError as e:
+                    category = categorize_error(e)
+                    if category != ErrorCategory.NOT_FOUND:
+                        logger.debug(f"ELB 태그 조회 실패: {lb_arn} ({get_error_code(e)})")
 
                 lb = LoadBalancerInfo(
                     arn=lb_arn,
@@ -225,40 +236,100 @@ def collect_v2_load_balancers(session, account_id: str, account_name: str, regio
 
                 # 타겟 그룹 조회
                 lb.target_groups = _get_target_groups(elbv2, lb_arn)
-
-                # CloudWatch 메트릭 조회 (AWS Trusted Advisor 기준)
-                try:
-                    # ALB: RequestCount, NLB: ProcessedBytes
-                    metric_name = "RequestCount" if lb_type == "application" else "ProcessedBytes"
-
-                    # ALB/NLB의 ARN suffix 추출 (app/my-lb/123456 or net/my-lb/123456)
-                    arn_parts = lb_arn.split("loadbalancer/")
-                    if len(arn_parts) > 1:
-                        lb_dimension = arn_parts[1]
-
-                        resp = cloudwatch.get_metric_statistics(
-                            Namespace="AWS/ApplicationELB" if lb_type == "application" else "AWS/NetworkELB",
-                            MetricName=metric_name,
-                            Dimensions=[{"Name": "LoadBalancer", "Value": lb_dimension}],
-                            StartTime=start_time,
-                            EndTime=now,
-                            Period=86400,
-                            Statistics=["Sum"],
-                        )
-                        if resp.get("Datapoints"):
-                            lb.request_count = sum(d["Sum"] for d in resp["Datapoints"])
-                            lb.avg_requests_per_day = lb.request_count / ANALYSIS_DAYS
-                except ClientError:
-                    pass
-
                 load_balancers.append(lb)
 
+        # 2단계: 배치 메트릭 조회 (ALB/NLB만)
+        v2_lbs = [lb for lb in load_balancers if lb.lb_type in ("application", "network")]
+        if v2_lbs:
+            _collect_elb_metrics_batch(cloudwatch, v2_lbs, start_time, now)
+
     except ClientError as e:
-        error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        if not is_quiet():
-            console.print(f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]")
+        category = categorize_error(e)
+        error_code = get_error_code(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"ELBv2 권한 없음: {account_name}/{region} ({error_code})")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"ELBv2 API 쓰로틀링: {account_name}/{region}")
+        else:
+            if not is_quiet():
+                console.print(f"    [yellow]{account_name}/{region} ELBv2 수집 오류: {error_code}[/yellow]")
 
     return load_balancers
+
+
+def _collect_elb_metrics_batch(
+    cloudwatch,
+    load_balancers: list[LoadBalancerInfo],
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """ELB 메트릭 배치 수집 (내부 함수)
+
+    최적화:
+    - 기존: LB당 1 API 호출
+    - 최적화: 전체 LB 1-2 API 호출 (500개 단위 자동 분할)
+    """
+    from botocore.exceptions import ClientError
+
+    # 쿼리 생성
+    queries: list[MetricQuery] = []
+    for lb in load_balancers:
+        # ARN suffix 추출 (app/my-lb/123456 or net/my-lb/123456)
+        arn_parts = lb.arn.split("loadbalancer/")
+        if len(arn_parts) <= 1:
+            continue
+
+        lb_dimension = arn_parts[1]
+        safe_id = sanitize_metric_id(lb.name)
+
+        # ALB: RequestCount, NLB: ProcessedBytes
+        if lb.lb_type == "application":
+            queries.append(
+                MetricQuery(
+                    id=f"{safe_id}_requests",
+                    namespace="AWS/ApplicationELB",
+                    metric_name="RequestCount",
+                    dimensions={"LoadBalancer": lb_dimension},
+                    stat="Sum",
+                )
+            )
+        elif lb.lb_type == "network":
+            queries.append(
+                MetricQuery(
+                    id=f"{safe_id}_bytes",
+                    namespace="AWS/NetworkELB",
+                    metric_name="ProcessedBytes",
+                    dimensions={"LoadBalancer": lb_dimension},
+                    stat="Sum",
+                )
+            )
+
+    if not queries:
+        return
+
+    try:
+        # 배치 조회 (내장 pagination + retry)
+        results = batch_get_metrics(cloudwatch, queries, start_time, end_time, period=86400)
+
+        # 결과 매핑
+        for lb in load_balancers:
+            safe_id = sanitize_metric_id(lb.name)
+
+            if lb.lb_type == "application":
+                lb.request_count = results.get(f"{safe_id}_requests", 0.0)
+            elif lb.lb_type == "network":
+                lb.request_count = results.get(f"{safe_id}_bytes", 0.0)
+
+            lb.avg_requests_per_day = lb.request_count / ANALYSIS_DAYS
+
+    except ClientError as e:
+        category = categorize_error(e)
+        if category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CloudWatch 권한 없음: {get_error_code(e)}")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CloudWatch API 쓰로틀링: {get_error_code(e)}")
+        elif category != ErrorCategory.NOT_FOUND:
+            logger.warning(f"CloudWatch 메트릭 조회 오류: {get_error_code(e)}")
 
 
 def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
@@ -287,8 +358,10 @@ def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
                         healthy += 1
                     else:
                         unhealthy += 1
-            except ClientError:
-                pass
+            except ClientError as e:
+                category = categorize_error(e)
+                if category != ErrorCategory.NOT_FOUND:
+                    logger.debug(f"타겟 헬스 조회 실패: {tg_arn} ({get_error_code(e)})")
 
             target_groups.append(
                 TargetGroupInfo(
@@ -301,8 +374,10 @@ def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
                 )
             )
 
-    except ClientError:
-        pass
+    except ClientError as e:
+        category = categorize_error(e)
+        if category != ErrorCategory.NOT_FOUND:
+            logger.debug(f"타겟 그룹 조회 실패: {lb_arn} ({get_error_code(e)})")
 
     return target_groups
 
@@ -335,8 +410,10 @@ def collect_classic_load_balancers(session, account_id: str, account_name: str, 
                         key = t.get("Key", "")
                         if not key.startswith("aws:"):
                             tags[key] = t.get("Value", "")
-            except ClientError:
-                pass
+            except ClientError as e:
+                category = categorize_error(e)
+                if category != ErrorCategory.NOT_FOUND:
+                    logger.debug(f"CLB 태그 조회 실패: {lb_name} ({get_error_code(e)})")
 
             # 인스턴스 헬스 조회
             instances = data.get("Instances", [])
@@ -347,8 +424,10 @@ def collect_classic_load_balancers(session, account_id: str, account_name: str, 
                     for state in health_response.get("InstanceStates", []):
                         if state.get("State") == "InService":
                             healthy += 1
-            except ClientError:
-                pass
+            except ClientError as e:
+                category = categorize_error(e)
+                if category != ErrorCategory.NOT_FOUND:
+                    logger.debug(f"CLB 인스턴스 헬스 조회 실패: {lb_name} ({get_error_code(e)})")
 
             lb = LoadBalancerInfo(
                 arn=f"arn:aws:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}",
@@ -371,9 +450,17 @@ def collect_classic_load_balancers(session, account_id: str, account_name: str, 
             load_balancers.append(lb)
 
     except ClientError as e:
+        category = categorize_error(e)
+        error_code = get_error_code(e)
+
         # CLB가 없는 리전도 있음
-        if "not available" not in str(e).lower():
-            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if "not available" in str(e).lower():
+            logger.debug(f"CLB 서비스 미지원: {account_name}/{region}")
+        elif category == ErrorCategory.ACCESS_DENIED:
+            logger.info(f"CLB 권한 없음: {account_name}/{region} ({error_code})")
+        elif category == ErrorCategory.THROTTLING:
+            logger.warning(f"CLB API 쓰로틀링: {account_name}/{region}")
+        else:
             if not is_quiet():
                 console.print(f"    [yellow]{account_name}/{region} CLB 수집 오류: {error_code}[/yellow]")
 
