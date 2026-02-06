@@ -100,8 +100,16 @@ class TestCollectEfsFilesystems:
         mock_efs.get_paginator.return_value = mock_paginator
         mock_efs.describe_mount_targets.return_value = {"MountTargets": [{"MountTargetId": "mt-1"}]}
 
-        # CloudWatch 응답 설정
-        mock_cloudwatch.get_metric_statistics.return_value = {"Datapoints": [{"Average": 1.0, "Sum": 1000.0}]}
+        # CloudWatch 응답 설정 (batch_get_metrics → get_metric_data API)
+        mock_cloudwatch.get_metric_data.return_value = {
+            "MetricDataResults": [
+                {"Id": "fs_12345678_conn", "Values": [1.0]},
+                {"Id": "fs_12345678_metered", "Values": [1000.0]},
+                {"Id": "fs_12345678_read", "Values": [500.0]},
+                {"Id": "fs_12345678_write", "Values": [300.0]},
+            ],
+            "NextToken": None,
+        }
 
         # Act
         with patch("analyzers.efs.unused.get_client", side_effect=get_client_mock):
@@ -201,7 +209,16 @@ class TestCollectEfsFilesystems:
         ]
         mock_efs.get_paginator.return_value = mock_paginator
         mock_efs.describe_mount_targets.return_value = {"MountTargets": []}
-        mock_cloudwatch.get_metric_statistics.return_value = {"Datapoints": []}
+        # CloudWatch 응답 설정 (batch_get_metrics → get_metric_data API)
+        mock_cloudwatch.get_metric_data.return_value = {
+            "MetricDataResults": [
+                {"Id": "fs_no_name_conn", "Values": []},
+                {"Id": "fs_no_name_metered", "Values": []},
+                {"Id": "fs_no_name_read", "Values": []},
+                {"Id": "fs_no_name_write", "Values": []},
+            ],
+            "NextToken": None,
+        }
 
         with patch("analyzers.efs.unused.get_client", side_effect=get_client_mock):
             result = collect_efs_filesystems(

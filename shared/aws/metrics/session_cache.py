@@ -519,9 +519,10 @@ class FileBackedMetricCache:
             try:
                 with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
-                    value = data.get("value")
-                    if value is not None:
+                    raw_value = data.get("value")
+                    if raw_value is not None:
                         # 메모리 캐시에 로드
+                        value = float(raw_value)
                         self._memory_cache.set(key, value)
                         self._stats.add_hit()
                         self._file_hits += 1

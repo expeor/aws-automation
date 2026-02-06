@@ -1028,7 +1028,7 @@ def fav_add(path: str | None, category_name: str | None) -> None:
     """
     from rich.console import Console
 
-    from core.tools.discovery import get_category, load_tool
+    from core.tools.discovery import get_category
     from core.tools.history import FavoritesManager
 
     console = Console()

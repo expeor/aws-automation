@@ -4,11 +4,12 @@ pkg/history/favorites.py - 즐겨찾기 관리
 사용자가 직접 등록한 즐겨찾기 도구 관리
 """
 
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -38,9 +39,9 @@ class FavoritesManager:
     """즐겨찾기 관리"""
 
     MAX_ITEMS = 20
-    _instance: Optional["FavoritesManager"] = None
+    _instance: FavoritesManager | None = None
 
-    def __new__(cls) -> "FavoritesManager":
+    def __new__(cls) -> FavoritesManager:
         """싱글톤 패턴"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -242,7 +243,7 @@ class FavoritesManager:
         """파일에서 다시 로드"""
         self._load()
 
-    def get_by_index(self, index: int) -> Optional[FavoriteItem]:
+    def get_by_index(self, index: int) -> FavoriteItem | None:
         """인덱스로 즐겨찾기 항목 조회 (1-based)
 
         Args:
