@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.pricing import get_endpoint_monthly_cost
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -256,7 +256,7 @@ def analyze_endpoints(
 
 def generate_report(results: list[EndpointAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -386,12 +386,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"Gateway Endpoint: {total_gateway}개 (무료)")
 
     # 보고서
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("vpc", "cost").with_date().build()
     filepath = generate_report(results, output_path)

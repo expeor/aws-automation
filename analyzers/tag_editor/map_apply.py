@@ -504,14 +504,9 @@ def run(ctx: ExecutionContext) -> None:
         console.print("[dim]실제 적용하려면 dry-run 모드를 해제하고 다시 실행하세요.[/dim]")
 
     # 보고서 생성
-    from core.tools.output import OutputPath, open_in_explorer
+    from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("tag", "compliance").with_date().build()
     filepath = generate_apply_report(results, output_path)

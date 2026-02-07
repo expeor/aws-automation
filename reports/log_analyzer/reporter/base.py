@@ -105,8 +105,7 @@ class BaseSheetWriter:
         max_rows = self.config.MAX_ROWS_PER_SHEET
         if len(data_list) > max_rows:
             logger.warning(
-                f"[{sheet_name}] Data rows ({len(data_list):,}) exceed Excel limit. "
-                f"Truncating to {max_rows:,} rows."
+                f"[{sheet_name}] Data rows ({len(data_list):,}) exceed Excel limit. Truncating to {max_rows:,} rows."
             )
             return data_list[:max_rows]
         return data_list

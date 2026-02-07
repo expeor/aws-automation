@@ -2,7 +2,7 @@
 plugins/cost/coh/reporter.py - Cost Optimization Hub 리포트 생성기
 
 수집된 권장사항을 Excel 형식으로 출력합니다.
-프로젝트의 core.tools.io.excel 모듈을 사용합니다.
+프로젝트의 shared.io.excel 모듈을 사용합니다.
 
 사용법:
     from analyzers.cost.coh.reporter import CostOptimizationReporter
@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Styles, Workbook
+from shared.io.excel import ColumnDef, Styles, Workbook
 
 from .analyzer import Recommendation
 from .collector import CollectionResult

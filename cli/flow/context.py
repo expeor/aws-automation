@@ -71,8 +71,8 @@ if TYPE_CHECKING:
     from cli.ui.timeline import TimelineTracker
     from core.auth import AccountInfo, Provider
     from core.filter import AccountFilter
-    from core.tools.io.config import OutputConfig
     from shared.aws.inventory import InventoryCollector
+    from shared.io.config import OutputConfig
 
 # core.exceptions에서 BackToMenuError 재사용
 from core.exceptions import BackToMenuError
@@ -448,7 +448,7 @@ class ExecutionContext:
     def get_output_config(self) -> OutputConfig:
         """출력 설정 반환 (없으면 기본값 생성)"""
         if self.output_config is None:
-            from core.tools.io.config import OutputConfig
+            from shared.io.config import OutputConfig
 
             return OutputConfig(lang=self.lang)
 

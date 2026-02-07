@@ -18,10 +18,8 @@ from analyzers.iam.iam_audit_analysis.collector import (
 from analyzers.iam.user_snapshot import _collect_user_data, run
 from analyzers.iam.user_snapshot_reporter import (
     OLD_KEY_THRESHOLD_DAYS,
-    UserSnapshotAnalysis,
     UserSnapshotReporter,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -337,7 +335,7 @@ class TestRun:
         mock_reporter.assert_not_called()
 
     @patch("analyzers.iam.user_snapshot.open_in_explorer")
-    @patch("core.tools.output.print_report_complete")
+    @patch("shared.io.output.print_report_complete")
     @patch("analyzers.iam.user_snapshot.UserSnapshotReporter")
     @patch("analyzers.iam.user_snapshot.parallel_collect")
     @patch("analyzers.iam.user_snapshot.OutputPath")
@@ -362,7 +360,7 @@ class TestRun:
         mock_reporter_instance.generate.assert_called_once()
 
     @patch("analyzers.iam.user_snapshot.open_in_explorer")
-    @patch("core.tools.output.print_report_complete")
+    @patch("shared.io.output.print_report_complete")
     @patch("analyzers.iam.user_snapshot.UserSnapshotReporter")
     @patch("analyzers.iam.user_snapshot.parallel_collect")
     @patch("analyzers.iam.user_snapshot.OutputPath")

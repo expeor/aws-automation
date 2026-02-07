@@ -334,7 +334,7 @@ VALID_PERMISSIONS: frozenset[str] = frozenset(
 )
 
 # 유효한 area 값 (ReportType 10 + ToolType 5)
-# 참조: core/tools/output/report_types.py, core/tools/types.py
+# 참조: shared/io/output/report_types.py
 VALID_AREAS: frozenset[str] = frozenset(
     {
         # ReportType - Core (5)

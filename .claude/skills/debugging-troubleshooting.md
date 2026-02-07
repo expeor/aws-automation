@@ -132,8 +132,8 @@ with quiet_mode():
 ### 5. 테스트에서 import 실패
 
 ```python
-# 문제: core.tools.output (deprecated) 사용
-from core.tools.output import OutputPath  # DeprecationWarning
+# 문제: shared.io.output (deprecated) 사용
+from shared.io.output import OutputPath  # DeprecationWarning
 
 # 해결: shared.io.output 사용
 from shared.io.output import OutputPath

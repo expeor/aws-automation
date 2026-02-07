@@ -404,7 +404,9 @@ class TestCollectFunctions:
 
     @patch("shared.aws.lambda_.collector.get_client")
     @patch("shared.aws.lambda_.collector.try_or_default")
-    def test_collect_functions_with_tags(self, mock_try_or_default, mock_get_client, mock_session, sample_function_data):
+    def test_collect_functions_with_tags(
+        self, mock_try_or_default, mock_get_client, mock_session, sample_function_data
+    ):
         """Test function collection with tags"""
         mock_lambda_client = Mock()
         mock_get_client.return_value = mock_lambda_client
@@ -676,9 +678,7 @@ class TestCollectFunctionsWithMetrics:
 
     @patch("shared.aws.lambda_.collector.collect_all_function_metrics")
     @patch("shared.aws.lambda_.collector.collect_functions")
-    def test_collect_functions_with_metrics_basic(
-        self, mock_collect_functions, mock_collect_metrics, mock_session
-    ):
+    def test_collect_functions_with_metrics_basic(self, mock_collect_functions, mock_collect_metrics, mock_session):
         """Test combined function and metrics collection"""
         # Mock function collection
         func1 = LambdaFunctionInfo(
@@ -728,9 +728,7 @@ class TestCollectFunctionsWithMetrics:
         """Test combined collection with no functions"""
         mock_collect_functions.return_value = []
 
-        functions = collect_functions_with_metrics(
-            mock_session, "123456789012", "test-account", "ap-northeast-2"
-        )
+        functions = collect_functions_with_metrics(mock_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert functions == []
         mock_collect_metrics.assert_not_called()

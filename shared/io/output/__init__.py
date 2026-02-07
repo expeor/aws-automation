@@ -1,5 +1,5 @@
 """
-core/tools/output - 출력 관리 모듈
+shared/io/output - 출력 관리 모듈
 
 OutputPath: 프로파일/계정별 출력 경로를 체계적으로 생성
 renderers: 다양한 출력 형식 지원 (Console, Excel, HTML, JSON)
@@ -8,7 +8,7 @@ renderers: 다양한 출력 형식 지원 (Console, Excel, HTML, JSON)
 타입 체계:
   - Reports: inventory, security, cost, unused, audit,
              compliance, performance, network, backup, quota
-  - Tools: log, search
+  - Tools: log, search, cleanup, tag, sync
 """
 
 from .builder import (
@@ -21,6 +21,7 @@ from .builder import (
     print_report_complete,
     single_report_directory,
 )
+from .helpers import create_output_path, get_context_identifier
 from .report_types import (
     REPORT_TYPE_DESCRIPTIONS,
     TOOL_CATEGORIES,
@@ -43,6 +44,8 @@ __all__: list[str] = [
     "OutputPath",
     "OutputResult",
     "DatePattern",
+    "get_context_identifier",
+    "create_output_path",
     "create_report_directory",
     "single_report_directory",
     "open_in_explorer",

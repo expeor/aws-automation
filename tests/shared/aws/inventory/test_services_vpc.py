@@ -6,17 +6,14 @@ VPC, Subnet, Route Table 등 네트워크 리소스 수집 함수를 테스트�
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from shared.aws.inventory.services.vpc import (
-    collect_vpcs,
-    collect_subnets,
-    collect_route_tables,
-    collect_internet_gateways,
     collect_elastic_ips,
+    collect_internet_gateways,
     collect_nat_gateways,
+    collect_route_tables,
+    collect_subnets,
+    collect_vpcs,
 )
-from shared.aws.inventory.types import VPC, Subnet, RouteTable
 
 
 class TestCollectVPCs:
@@ -255,9 +252,7 @@ class TestCollectRouteTables:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
-            route_tables = collect_route_tables(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            route_tables = collect_route_tables(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(route_tables) == 1
         assert route_tables[0].route_table_id == "rtb-12345678"
@@ -294,9 +289,7 @@ class TestCollectRouteTables:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
-            route_tables = collect_route_tables(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            route_tables = collect_route_tables(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert route_tables[0].is_main is True
 
@@ -325,9 +318,7 @@ class TestCollectRouteTables:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
-            route_tables = collect_route_tables(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            route_tables = collect_route_tables(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(route_tables[0].subnet_ids) == 3
         assert "subnet-1" in route_tables[0].subnet_ids

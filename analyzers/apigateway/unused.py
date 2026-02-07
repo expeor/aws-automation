@@ -20,8 +20,8 @@ from rich.console import Console
 from core.parallel import get_client, parallel_collect
 from core.parallel.decorators import categorize_error, get_error_code
 from core.parallel.types import ErrorCategory
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -242,29 +242,31 @@ def _collect_apigateway_metrics_batch(
 
         if api.api_type == "REST":
             # REST API는 ApiName 차원 사용
-            queries.extend([
-                MetricQuery(
-                    id=f"{safe_id}_count",
-                    namespace="AWS/ApiGateway",
-                    metric_name="Count",
-                    dimensions={"ApiName": api.api_name},
-                    stat="Sum",
-                ),
-                MetricQuery(
-                    id=f"{safe_id}_4xx",
-                    namespace="AWS/ApiGateway",
-                    metric_name="4XXError",
-                    dimensions={"ApiName": api.api_name},
-                    stat="Sum",
-                ),
-                MetricQuery(
-                    id=f"{safe_id}_5xx",
-                    namespace="AWS/ApiGateway",
-                    metric_name="5XXError",
-                    dimensions={"ApiName": api.api_name},
-                    stat="Sum",
-                ),
-            ])
+            queries.extend(
+                [
+                    MetricQuery(
+                        id=f"{safe_id}_count",
+                        namespace="AWS/ApiGateway",
+                        metric_name="Count",
+                        dimensions={"ApiName": api.api_name},
+                        stat="Sum",
+                    ),
+                    MetricQuery(
+                        id=f"{safe_id}_4xx",
+                        namespace="AWS/ApiGateway",
+                        metric_name="4XXError",
+                        dimensions={"ApiName": api.api_name},
+                        stat="Sum",
+                    ),
+                    MetricQuery(
+                        id=f"{safe_id}_5xx",
+                        namespace="AWS/ApiGateway",
+                        metric_name="5XXError",
+                        dimensions={"ApiName": api.api_name},
+                        stat="Sum",
+                    ),
+                ]
+            )
         else:
             # HTTP/WebSocket API는 ApiId 차원 사용
             queries.append(
@@ -363,7 +365,7 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
@@ -470,12 +472,7 @@ def run(ctx: ExecutionContext) -> None:
         f"저사용: {total_low}개"
     )
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("apigateway", "unused").with_date().build()
     filepath = generate_report(results, output_path)

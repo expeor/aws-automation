@@ -156,7 +156,7 @@ TOOLS = [
 """도구 설명 (docstring)"""
 
 from core.parallel import get_client, parallel_collect
-from core.tools.io import generate_reports
+from shared.io.compat import generate_reports
 
 
 def _collect_and_analyze(

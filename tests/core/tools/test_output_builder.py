@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 from unittest.mock import patch
 
-from core.tools.output.builder import (
+from shared.io.output.builder import (
     DatePattern,
     OutputPath,
     OutputResult,
@@ -179,7 +179,7 @@ class TestOutputPathBuild:
         """문자열 날짜 패턴 테스트"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
             path = OutputPath("test-profile").with_date("monthly").build()
@@ -191,7 +191,7 @@ class TestOutputPathBuild:
         """Enum 날짜 패턴 테스트"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
             path = OutputPath("test-profile").with_date(DatePattern.YEARLY).build()
@@ -259,7 +259,7 @@ class TestOutputPathChaining:
         """전체 체이닝 테스트"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
 
@@ -390,7 +390,7 @@ class TestCreateReportDirectory:
         """tools 하위 디렉토리 생성"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
 
@@ -405,7 +405,7 @@ class TestCreateReportDirectory:
         """기본 identifier 사용"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
 
@@ -417,7 +417,7 @@ class TestCreateReportDirectory:
         """날짜 패턴 적용"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 10)
 
@@ -503,7 +503,7 @@ class TestWeeklyDatePattern:
 
     def test_first_week_of_month(self):
         """월 첫째 주 테스트"""
-        with patch("core.tools.output.builder.datetime") as mock_dt:
+        with patch("shared.io.output.builder.datetime") as mock_dt:
             # 2025년 12월 1일 (월요일)
             mock_dt.now.return_value = datetime(2025, 12, 1)
             mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -517,7 +517,7 @@ class TestWeeklyDatePattern:
 
     def test_second_week_of_month(self):
         """월 둘째 주 테스트"""
-        with patch("core.tools.output.builder.datetime") as mock_dt:
+        with patch("shared.io.output.builder.datetime") as mock_dt:
             # 2025년 12월 10일
             mock_dt.now.return_value = datetime(2025, 12, 10)
             mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -528,7 +528,7 @@ class TestWeeklyDatePattern:
 
     def test_last_week_of_month(self):
         """월 마지막 주 테스트"""
-        with patch("core.tools.output.builder.datetime") as mock_dt:
+        with patch("shared.io.output.builder.datetime") as mock_dt:
             # 2025년 12월 31일
             mock_dt.now.return_value = datetime(2025, 12, 31)
             mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -549,7 +549,7 @@ class TestPrintReportComplete:
 
     def test_single_path_output(self, capsys):
         """단일 경로 출력"""
-        from core.tools.output.builder import print_report_complete
+        from shared.io.output.builder import print_report_complete
 
         print_report_complete("/path/to/report.xlsx")
 
@@ -559,7 +559,7 @@ class TestPrintReportComplete:
 
     def test_multiple_paths_output(self, capsys):
         """여러 경로 출력"""
-        from core.tools.output.builder import print_report_complete
+        from shared.io.output.builder import print_report_complete
 
         paths = {
             "excel": "/path/to/report.xlsx",
@@ -573,7 +573,7 @@ class TestPrintReportComplete:
 
     def test_custom_message(self, capsys):
         """커스텀 메시지 출력"""
-        from core.tools.output.builder import print_report_complete
+        from shared.io.output.builder import print_report_complete
 
         print_report_complete("/path/to/report.xlsx", message="분석 완료!")
 
@@ -582,7 +582,7 @@ class TestPrintReportComplete:
 
     def test_empty_path_in_dict(self, capsys):
         """딕셔너리에 빈 경로 포함"""
-        from core.tools.output.builder import print_report_complete
+        from shared.io.output.builder import print_report_complete
 
         paths = {
             "excel": "/path/to/report.xlsx",
@@ -606,11 +606,11 @@ class TestSingleReportDirectory:
 
     def test_creates_reports_subdirectory(self, tmp_path):
         """reports 하위 디렉토리 생성"""
-        from core.tools.output.builder import single_report_directory
+        from shared.io.output.builder import single_report_directory
 
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 31)
 
@@ -623,11 +623,11 @@ class TestSingleReportDirectory:
 
     def test_uses_daily_pattern(self, tmp_path):
         """DAILY 패턴 사용 확인"""
-        from core.tools.output.builder import single_report_directory
+        from shared.io.output.builder import single_report_directory
 
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 1, 15)
 
@@ -648,7 +648,7 @@ class TestIntegration:
         """파일 저장 전체 워크플로우"""
         with (
             patch.object(OutputPath, "_get_project_root", return_value=str(tmp_path)),
-            patch("core.tools.output.builder.datetime") as mock_dt,
+            patch("shared.io.output.builder.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2025, 12, 25)
 

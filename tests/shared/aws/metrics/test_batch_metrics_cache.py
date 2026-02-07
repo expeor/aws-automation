@@ -324,9 +324,7 @@ class TestBatchGetMetricsCacheEdgeCases:
         )
 
         mock_client = MagicMock()
-        mock_client.get_metric_data.return_value = {
-            "MetricDataResults": [{"Id": "q1", "Values": [50.0]}]
-        }
+        mock_client.get_metric_data.return_value = {"MetricDataResults": [{"Id": "q1", "Values": [50.0]}]}
 
         # MetricSessionCache 인스턴스 생성하지만 context manager 외부
         cache = MetricSessionCache()
@@ -361,9 +359,7 @@ class TestBatchGetMetricsCacheEdgeCases:
         )
 
         mock_client = MagicMock()
-        mock_client.get_metric_data.return_value = {
-            "MetricDataResults": [{"Id": "q1", "Values": [50.0]}]
-        }
+        mock_client.get_metric_data.return_value = {"MetricDataResults": [{"Id": "q1", "Values": [50.0]}]}
 
         with MetricSessionCache() as cache:
             result1 = batch_get_metrics(

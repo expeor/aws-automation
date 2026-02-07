@@ -250,11 +250,7 @@ def _confirm_and_run_tasks(
         for task in tasks:
             if task.requires_confirm:
                 name = task.name if lang == "ko" else task.name_en
-                confirm = (
-                    console.input(f"[red]{t('menu.delete_confirm_prompt', name=name)}: [/red]")
-                    .strip()
-                    .lower()
-                )
+                confirm = console.input(f"[red]{t('menu.delete_confirm_prompt', name=name)}: [/red]").strip().lower()
                 if confirm == "y":
                     confirmed_tasks.append(task)
             else:
@@ -369,16 +365,13 @@ def _render_expanded_view(
     current_idx = 1
     for group in groups:
         # 필터 적용 시 해당 그룹에 표시할 작업이 있는지 확인
-        filtered_tasks = [
-            task for task in group.tasks if not permission_filter or task.permission == permission_filter
-        ]
+        filtered_tasks = [task for task in group.tasks if not permission_filter or task.permission == permission_filter]
         if not filtered_tasks:
             continue
 
         task_count = len(filtered_tasks)
         branch = tree.add(
-            f"[bold {group.color}]{group.icon} {group.display_name}[/bold {group.color}]"
-            f" [dim]({task_count})[/dim]"
+            f"[bold {group.color}]{group.icon} {group.display_name}[/bold {group.color}] [dim]({task_count})[/dim]"
         )
         for task in filtered_tasks:
             perm_color = PERMISSION_COLORS.get(task.permission, "dim")
@@ -651,11 +644,7 @@ def _show_search_view(
             # 확인 필요 시
             if selected.requires_confirm:
                 name = selected.name if lang == "ko" else selected.name_en
-                confirm = (
-                    console.input(f"[red]{t('menu.delete_confirm_prompt', name=name)}: [/red]")
-                    .strip()
-                    .lower()
-                )
+                confirm = console.input(f"[red]{t('menu.delete_confirm_prompt', name=name)}: [/red]").strip().lower()
                 if confirm != "y":
                     return None
             return ("run", [selected])

@@ -51,6 +51,24 @@
 | `pptx` | PowerPoint 생성 | 프레젠테이션 |
 | `docx` | Word 문서 처리 | 문서 생성 |
 
+### 텍스트 품질 (humanizer)
+
+| Skill | 설명 | 용도 |
+|-------|------|------|
+| `humanizer` | AI 생성 영문 텍스트 패턴 감지/수정 (24개 패턴) | README, CHANGELOG, description_en |
+
+### UI/UX 디자인 (ui-ux-pro-max)
+
+| Skill | 설명 | 용도 |
+|-------|------|------|
+| `ui-ux-pro-max` | 50개 스타일, 21개 팔레트, 차트 가이드라인 | HTML 리포트 시각 품질 개선 |
+
+### 스킬 관리 (find-skills)
+
+| Skill | 설명 | 용도 |
+|-------|------|------|
+| `find-skills` | 스킬 검색/설치/업데이트 (`npx skills`) | 스킬 인프라 관리 |
+
 ---
 
 ## 프로젝트 Skills
@@ -86,6 +104,12 @@
 | [`analyzers-vs-reports.md`](./analyzers-vs-reports.md) | analyzers/ vs reports/ 경계 | 단일 서비스 vs 종합 오케스트레이션 |
 | [`debugging-troubleshooting.md`](./debugging-troubleshooting.md) | 디버깅/트러블슈팅 | moto, conftest, 병렬 실행 디버깅 |
 
+### 텍스트 품질
+
+| Skill | 설명 | 주요 내용 |
+|-------|------|----------|
+| [`korean-humanizer`](./korean-humanizer/) | 한국어 AI 작문 패턴 제거 | 12개 한국어 패턴, 도구 설명/CHANGELOG/docstring |
+
 ### 개발 워크플로우
 
 | Skill | 설명 | 주요 내용 |
@@ -106,10 +130,14 @@
 | CloudWatch 메트릭 | `cloudwatch-metrics-patterns.md` | - |
 | 테스트 작성 | `tdd-workflow`, `debugging-troubleshooting.md` | `python-testing-patterns`, `test-driven-development` |
 | 보안 검토 | `security-review` | `property-based-testing`, `codeql` |
-| 리포트 생성 | `output-patterns` | `xlsx` |
+| 리포트 생성 | `output-patterns` | `xlsx`, `ui-ux-pro-max` |
+| HTML 리포트 디자인 | `output-patterns` | `ui-ux-pro-max` |
 | GitHub Actions | - | `github-actions-templates` |
 | 에러 처리 | `error-handling-patterns` | - |
 | 디버깅 | `debugging-troubleshooting.md` | `systematic-debugging` |
+| 영문 텍스트 품질 | - | `humanizer` |
+| 한국어 텍스트 품질 | `korean-humanizer` | - |
+| 스킬 검색/설치 | - | `find-skills` |
 
 ---
 
@@ -159,6 +187,7 @@ from shared.io.output import print_report_complete, open_in_explorer
 | `/make-test` | 테스트 스캐폴딩 | `tdd-workflow` |
 | `/lint` | 코드 품질 검사 | `python-best-practices` |
 | `/coverage` | 테스트 커버리지 | `tdd-workflow` |
+| `/review` | 2단계 리뷰 (스펙 + 품질) | `commit`, `security-review` |
 | `/sync-index` | 인덱스 갱신 | - |
 
 ---

@@ -40,8 +40,8 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 
 from core.parallel import get_client, is_quiet, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.pricing import get_elb_monthly_cost
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -623,7 +623,7 @@ def generate_report(results: list[MigrationAnalysisResult], output_dir: str) -> 
     """Excel 보고서 생성"""
     from openpyxl.styles import Font, PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -801,12 +801,7 @@ def run(ctx: ExecutionContext) -> None:
     # 보고서 생성
     console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("elb", "inventory").with_date().build()
     filepath = generate_report(all_results, output_path)

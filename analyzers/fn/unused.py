@@ -21,12 +21,12 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.lambda_ import LambdaFunctionInfo, collect_functions_with_metrics
 from shared.aws.pricing import (
     get_lambda_monthly_cost,
     get_lambda_provisioned_monthly_cost,
 )
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -191,7 +191,7 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Workbook
+    from shared.io.excel import ColumnDef, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
@@ -387,12 +387,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print(f"[red]월간 낭비 비용: ${total_waste:,.2f}[/red]")
 
     # 보고서
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("lambda", "unused").with_date().build()
     filepath = generate_report(results, output_path)

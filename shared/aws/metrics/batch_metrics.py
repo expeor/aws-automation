@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 from botocore.exceptions import ClientError
 
 if TYPE_CHECKING:
-    from .session_cache import MetricSessionCache
+    from .session_cache import MetricSessionCache, SharedMetricCache
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def batch_get_metrics(
     end_time: datetime,
     period: int = 86400,
     max_retries: int = 3,
-    cache: MetricSessionCache | None = None,
+    cache: MetricSessionCache | SharedMetricCache | None = None,
 ) -> dict[str, float]:
     """CloudWatch 메트릭 배치 조회 (Pagination + Retry + 캐싱 지원)
 
@@ -82,7 +82,7 @@ def batch_get_metrics(
     if cache is None:
         from .session_cache import get_global_cache
 
-        cache = get_global_cache()
+        cache = get_global_cache()  # type: ignore[assignment]
 
     results: dict[str, float] = {}
     queries_to_fetch: list[MetricQuery] = []

@@ -13,8 +13,8 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 from core.parallel import is_quiet, parallel_collect, quiet_mode, set_quiet
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import SharedMetricCache
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 from .collectors import REGIONAL_COLLECTORS, collect_route53, collect_s3
 from .report import generate_report
@@ -387,12 +387,7 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
 
     # 보고서 생성
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("cost", "unused-all").with_date().build()
     filepath = generate_report(final_result, output_path)

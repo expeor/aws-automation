@@ -2,42 +2,21 @@
 tests/shared/aws/inventory/test_types.py - Inventory 타입 테스트
 """
 
-from datetime import datetime
-
-import pytest
-
 from shared.aws.inventory.types import (
-    AMI,
-    ENI,
     VPC,
     CloudFormationStack,
-    CloudWatchAlarm,
     DynamoDBTable,
     EBSVolume,
     EC2Instance,
-    ECSCluster,
-    ECSService,
-    ElastiCacheCluster,
-    ElasticIP,
     IAMRole,
-    IAMUser,
     KMSKey,
     LambdaFunction,
     LoadBalancer,
     NATGateway,
-    RDSCluster,
     RDSInstance,
-    Route53HostedZone,
-    RouteTable,
     S3Bucket,
-    Secret,
     SecurityGroup,
-    Snapshot,
-    SNSTopic,
-    SQSQueue,
     Subnet,
-    TargetGroup,
-    VPCEndpoint,
 )
 
 

@@ -142,9 +142,9 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=cli --cov=core --cov=analyzers --cov-report=xml --cov-report=term-missing --cov-fail-under=20 -v
+          pytest tests/ --cov=cli --cov=core --cov=analyzers --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=25 -v
         # NOTE: 커버리지 목표치 (현재 26%, 목표 50%+)
-        # 테스트 추가 후 점진적으로 상향 조정
+        # 테스트 추가 후 점진적으로 상향 조정 (20 → 25 → 30)
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'

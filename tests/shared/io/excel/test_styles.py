@@ -2,8 +2,6 @@
 tests/shared/io/excel/test_styles.py - Excel 스타일 테스트
 """
 
-import pytest
-
 
 class TestStyles:
     """Styles 클래스 테스트"""

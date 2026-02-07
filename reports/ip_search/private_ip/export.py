@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from core.tools.output.builder import OutputPath
+from shared.io.output.builder import OutputPath
 
 if TYPE_CHECKING:
     from .cache import PrivateIPResult
@@ -144,7 +144,7 @@ def export_excel(
         Filepath of created Excel file, or empty string on failure
     """
     try:
-        from core.tools.io.excel import ColumnDef, Workbook
+        from shared.io.excel import ColumnDef, Workbook
     except ImportError:
         return ""
 

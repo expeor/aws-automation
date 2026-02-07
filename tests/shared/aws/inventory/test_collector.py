@@ -4,21 +4,18 @@ tests/shared/aws/inventory/test_collector.py - InventoryCollector 테스트
 InventoryCollector 클래스의 초기화, 리소스 수집, 캐싱, 에러 처리를 검증합니다.
 """
 
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
-from botocore.exceptions import ClientError
+from unittest.mock import Mock, patch
 
 from shared.aws.inventory.collector import InventoryCollector
 from shared.aws.inventory.types import (
-    EC2Instance,
-    EBSVolume,
     VPC,
+    EBSVolume,
+    EC2Instance,
+    LambdaFunction,
+    LoadBalancer,
+    RDSInstance,
     S3Bucket,
     SecurityGroup,
-    LambdaFunction,
-    RDSInstance,
-    LoadBalancer,
 )
 
 

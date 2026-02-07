@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -287,7 +287,7 @@ def generate_report(results: list[GlueAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -400,12 +400,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"미사용: [red]{total_unused}개[/red] / 연속실패: [yellow]{total_failed}개[/yellow]")
     console.print("[dim](Glue 작업은 실행 시에만 과금됨)[/dim]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("glue", "unused").with_date().build()
     filepath = generate_report(results, output_path)

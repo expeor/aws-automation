@@ -4,8 +4,6 @@ tests/analyzers/cost/pricing/test_rds.py - RDS 가격 조회 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestGetRdsPrices:
     """get_rds_prices 함수 테스트"""
@@ -152,12 +150,8 @@ class TestGetRdsMonthlyCost:
         """다양한 인스턴스 클래스 비용"""
         from shared.aws.pricing.rds import get_rds_monthly_cost
 
-        micro_cost = get_rds_monthly_cost(
-            region="ap-northeast-2", instance_class="db.t3.micro", storage_gb=20
-        )
-        large_cost = get_rds_monthly_cost(
-            region="ap-northeast-2", instance_class="db.m6g.large", storage_gb=20
-        )
+        micro_cost = get_rds_monthly_cost(region="ap-northeast-2", instance_class="db.t3.micro", storage_gb=20)
+        large_cost = get_rds_monthly_cost(region="ap-northeast-2", instance_class="db.m6g.large", storage_gb=20)
 
         # larger instance should cost more
         assert large_cost > micro_cost
@@ -166,12 +160,8 @@ class TestGetRdsMonthlyCost:
         """스토리지 크기 영향"""
         from shared.aws.pricing.rds import get_rds_monthly_cost
 
-        small_storage = get_rds_monthly_cost(
-            region="ap-northeast-2", instance_class="db.t3.micro", storage_gb=20
-        )
-        large_storage = get_rds_monthly_cost(
-            region="ap-northeast-2", instance_class="db.t3.micro", storage_gb=500
-        )
+        small_storage = get_rds_monthly_cost(region="ap-northeast-2", instance_class="db.t3.micro", storage_gb=20)
+        large_storage = get_rds_monthly_cost(region="ap-northeast-2", instance_class="db.t3.micro", storage_gb=500)
 
         assert large_storage > small_storage
 
@@ -190,15 +180,7 @@ class TestGetRdsPricesFromApi:
             "PriceList": [
                 {
                     "product": {"attributes": {"instanceType": "db.t3.micro"}},
-                    "terms": {
-                        "OnDemand": {
-                            "term1": {
-                                "priceDimensions": {
-                                    "dim1": {"pricePerUnit": {"USD": "0.020"}}
-                                }
-                            }
-                        }
-                    },
+                    "terms": {"OnDemand": {"term1": {"priceDimensions": {"dim1": {"pricePerUnit": {"USD": "0.020"}}}}}},
                 }
             ]
         }

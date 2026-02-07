@@ -5,14 +5,9 @@ EC2 관련 도구의 유틸리티 함수 및 데이터 변환 로직 테스트
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
-
-import pytest
-from moto import mock_aws
+from unittest.mock import patch
 
 from analyzers.ec2.ami_audit import (
-    RECENT_DAYS,
-    AMIFinding,
     AMIInfo,
     Severity,
     UsageStatus,
@@ -20,7 +15,6 @@ from analyzers.ec2.ami_audit import (
     analyze_amis,
 )
 from analyzers.ec2.eip_audit import (
-    EIPFinding,
     EIPInfo,
     _analyze_single_eip,
     analyze_eips,
@@ -28,9 +22,7 @@ from analyzers.ec2.eip_audit import (
 from analyzers.ec2.eip_audit import Severity as EIPSeverity
 from analyzers.ec2.eip_audit import UsageStatus as EIPUsageStatus
 from analyzers.ec2.unused import (
-    EC2AnalysisResult,
     EC2InstanceInfo,
-    InstanceFinding,
     InstanceStatus,
     analyze_instances,
 )

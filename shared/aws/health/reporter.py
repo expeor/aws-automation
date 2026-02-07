@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Styles, Workbook
+from shared.io.excel import ColumnDef, Styles, Workbook
 
 from .collector import CollectionResult, PatchItem
 

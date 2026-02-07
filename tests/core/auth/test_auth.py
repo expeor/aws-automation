@@ -13,24 +13,18 @@ core/auth 모듈 통합 테스트
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
-import boto3
 import pytest
 from botocore.exceptions import ClientError
 
 from core.auth import (
-    Manager,
-    SSOProfileConfig,
-    SSOProfileProvider,
+    SessionIterator,
     SSOSessionConfig,
     SSOSessionProvider,
-    SessionIterator,
     StaticCredentialsConfig,
     StaticCredentialsProvider,
     create_manager,
-    get_session,
-    iter_context_sessions,
 )
 from core.auth.cache import TokenCache
 from core.auth.types import (
@@ -38,7 +32,6 @@ from core.auth.types import (
     NotAuthenticatedError,
     ProviderError,
     ProviderType,
-    TokenExpiredError,
 )
 
 # =============================================================================
@@ -473,7 +466,9 @@ class TestManagerMultiAccountIntegration:
             results.append(account_info.id)
             return f"processed-{account_info.id}"
 
-        output = manager.for_each_account_parallel(work_func, accounts=custom_accounts, role_name="AdminRole", max_workers=2)
+        output = manager.for_each_account_parallel(
+            work_func, accounts=custom_accounts, role_name="AdminRole", max_workers=2
+        )
 
         assert len(output) == 1
         assert len(results) == 1

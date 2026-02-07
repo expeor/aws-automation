@@ -187,7 +187,7 @@ from enum import Enum
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 console = Console()
 
@@ -253,7 +253,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 def run(ctx) -> None:
     """{tool_name}"""
-    from core.tools.io.compat import generate_reports
+    from shared.io.compat import generate_reports
 
     console.print("[bold]분석 시작...[/bold]\n")
 
@@ -307,7 +307,7 @@ def run(ctx) -> None:
 ## Output 경로 설정
 
 ```python
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 # 경로 형식: output/{identifier}/{service}/{type}/{date}/
 output_path = OutputPath(identifier).sub("{service}", "{type}").with_date().build()
@@ -324,25 +324,25 @@ output_path = OutputPath(identifier).sub("{service}", "{type}").with_date().buil
 ```python
 # 필수
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 # 리포트 출력 (Excel + HTML 동시 생성)
-from core.tools.io.compat import generate_reports
+from shared.io.compat import generate_reports
 
 # 선택 (출력 설정)
-from core.tools.io import OutputConfig, OutputFormat
+from shared.io.compat import OutputConfig, OutputFormat
 
 # 선택 (Quiet 모드)
 from core.parallel import is_quiet
 
 # 선택 (타입 상수)
-from core.tools.output import ReportType, ToolType
+from shared.io.output import ReportType, ToolType
 
 # 선택 (Excel 유틸리티)
-from core.tools.io.excel import Workbook, ColumnDef, Styles
+from shared.io.excel import Workbook, ColumnDef, Styles
 
 # 선택 (HTML 유틸리티)
-from core.tools.io.html import AWSReport, ResourceItem, create_aws_report
+from shared.io.html import AWSReport, ResourceItem, create_aws_report
 ```
 
 ---
@@ -420,7 +420,7 @@ TOOLS = [
 
 ### 코드 참조
 - 기존 도구 확인: `plugins/{service}/` 폴더의 다른 `.py` 파일들
-- 타입 정의: `core/tools/output/report_types.py`
+- 타입 정의: `shared/io/output/report_types.py`
 - Excel + HTML 통합: `plugins/ec2/unused.py` (참고 구현)
 
 ### Skills 참조

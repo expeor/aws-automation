@@ -20,7 +20,6 @@ from core.auth.auth import Manager, create_manager
 from core.auth.config import AWSProfile, AWSSession, ParsedConfig
 from core.auth.types import (
     AccountInfo,
-    AuthError,
     NotAuthenticatedError,
     Provider,
     ProviderError,

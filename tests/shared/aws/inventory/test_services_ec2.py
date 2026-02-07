@@ -7,15 +7,12 @@ EC2 및 Security Group 수집 함수를 직접 테스트합니다.
 from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
-from botocore.exceptions import ClientError
-
 from shared.aws.inventory.services.ec2 import (
+    _populate_sg_attachments,
     collect_ec2_instances,
     collect_security_groups,
-    _populate_sg_attachments,
 )
-from shared.aws.inventory.types import EC2Instance, SecurityGroup
+from shared.aws.inventory.types import SecurityGroup
 
 
 class TestCollectEC2Instances:
@@ -55,9 +52,7 @@ class TestCollectEC2Instances:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
-            instances = collect_ec2_instances(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances) == 1
         assert instances[0].instance_id == "i-1234567890abcdef0"
@@ -105,9 +100,7 @@ class TestCollectEC2Instances:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
-            instances = collect_ec2_instances(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances[0].ebs_volume_ids) == 2
         assert "vol-12345678" in instances[0].ebs_volume_ids
@@ -145,9 +138,7 @@ class TestCollectEC2Instances:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
-            instances = collect_ec2_instances(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances[0].security_group_ids) == 2
         assert "sg-12345678" in instances[0].security_group_ids
@@ -171,9 +162,7 @@ class TestCollectEC2Instances:
                             "Tags": [],
                             "BlockDeviceMappings": [],
                             "SecurityGroups": [],
-                            "IamInstanceProfile": {
-                                "Arn": "arn:aws:iam::123456789012:instance-profile/WebServerRole"
-                            },
+                            "IamInstanceProfile": {"Arn": "arn:aws:iam::123456789012:instance-profile/WebServerRole"},
                         }
                     ]
                 }
@@ -184,9 +173,7 @@ class TestCollectEC2Instances:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
-            instances = collect_ec2_instances(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert instances[0].iam_role == "WebServerRole"
 
@@ -230,9 +217,7 @@ class TestCollectEC2Instances:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
-            instances = collect_ec2_instances(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances) == 2
         assert instances[0].instance_id == "i-instance1"
@@ -251,9 +236,7 @@ class TestCollectEC2Instances:
         mock_ec2.get_paginator.return_value = mock_paginator
 
         with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
-            instances = collect_ec2_instances(
-                mock_boto3_session, "123456789012", "test-account", "ap-northeast-2"
-            )
+            instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances) == 0
 

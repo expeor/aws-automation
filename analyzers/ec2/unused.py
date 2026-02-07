@@ -34,9 +34,9 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from shared.aws.pricing import get_ec2_monthly_cost
+from shared.io.output import OutputPath, get_context_identifier
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -399,7 +399,7 @@ def generate_report(
     Returns:
         생성된 파일 경로 딕셔너리 {"excel": "...", "html": "..."}
     """
-    from core.tools.io.compat import generate_reports
+    from shared.io.compat import generate_reports
 
     # HTML 생성용 flat 데이터
     flat_data = []
@@ -456,7 +456,7 @@ def _save_excel(results: list[EC2AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성 (내부 함수)"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -595,18 +595,13 @@ def run(ctx: ExecutionContext) -> None:
         f"정지: {total_stopped}개 (${stopped_cost:,.2f}/월)"
     )
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("ec2", "unused").with_date().build()
 
     # Excel + HTML 동시 생성 (ctx.output_config 설정에 따라)
     report_paths = generate_report(results, output_path, ctx)
 
-    from core.tools.output import print_report_complete
+    from shared.io.output import print_report_complete
 
     print_report_complete(report_paths, "분석 완료!")

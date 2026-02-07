@@ -29,6 +29,9 @@ venv/
 .claude/skills/trailofbits-skills/
 .claude/skills/wshobson-agents/
 
+# Universal Skills (installed via npx skills)
+.agents/
+
 # Testing
 .coverage
 coverage.xml

@@ -37,12 +37,11 @@ Total: 63 tests covering the most commonly used pricing functions.
 Note: Tests use mocking for PricingService to avoid external API calls.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from shared.aws.pricing.constants import HOURS_PER_MONTH, LAMBDA_FREE_TIER_GB_SECONDS, LAMBDA_FREE_TIER_REQUESTS
-
 
 # =============================================================================
 # Fixtures
@@ -823,7 +822,7 @@ class TestPricingUtils:
 
     def test_pricing_service_singleton(self):
         """Test that pricing_service is a singleton"""
-        from shared.aws.pricing.utils import pricing_service, PricingService
+        from shared.aws.pricing.utils import PricingService, pricing_service
 
         instance1 = PricingService()
         instance2 = PricingService()

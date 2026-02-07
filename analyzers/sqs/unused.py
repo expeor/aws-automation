@@ -20,8 +20,8 @@ from rich.console import Console
 from core.parallel import get_client, parallel_collect
 from core.parallel.decorators import categorize_error, get_error_code
 from core.parallel.types import ErrorCategory
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -195,29 +195,31 @@ def _collect_sqs_metrics_batch(
         safe_id = sanitize_metric_id(queue.queue_name)
         dimensions = {"QueueName": queue.queue_name}
 
-        queries.extend([
-            MetricQuery(
-                id=f"{safe_id}_sent",
-                namespace="AWS/SQS",
-                metric_name="NumberOfMessagesSent",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-            MetricQuery(
-                id=f"{safe_id}_received",
-                namespace="AWS/SQS",
-                metric_name="NumberOfMessagesReceived",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-            MetricQuery(
-                id=f"{safe_id}_deleted",
-                namespace="AWS/SQS",
-                metric_name="NumberOfMessagesDeleted",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-        ])
+        queries.extend(
+            [
+                MetricQuery(
+                    id=f"{safe_id}_sent",
+                    namespace="AWS/SQS",
+                    metric_name="NumberOfMessagesSent",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_received",
+                    namespace="AWS/SQS",
+                    metric_name="NumberOfMessagesReceived",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_deleted",
+                    namespace="AWS/SQS",
+                    metric_name="NumberOfMessagesDeleted",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+            ]
+        )
 
     if not queries:
         return
@@ -306,7 +308,7 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Workbook
+    from shared.io.excel import ColumnDef, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
@@ -412,12 +414,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("\n[bold]종합 결과[/bold]")
     console.print(f"미사용 큐: [red]{total_unused}개[/red] / 빈 DLQ: [yellow]{total_empty_dlq}개[/yellow]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("sqs", "unused").with_date().build()
     filepath = generate_report(results, output_path)

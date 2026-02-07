@@ -17,7 +17,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-
 # =============================================================================
 # get_version Tests
 # =============================================================================
@@ -86,19 +85,17 @@ class TestCLI:
         """--lang ko sets Korean language"""
         from cli.app import cli
 
-        with patch("cli.i18n.set_lang") as mock_set_lang:
-            with patch("cli.ui.main_menu.show_main_menu"):
-                runner.invoke(cli, ["--lang", "ko"])
-                mock_set_lang.assert_called_once_with("ko")
+        with patch("cli.i18n.set_lang") as mock_set_lang, patch("cli.ui.main_menu.show_main_menu"):
+            runner.invoke(cli, ["--lang", "ko"])
+            mock_set_lang.assert_called_once_with("ko")
 
     def test_lang_option_en(self, runner):
         """--lang en sets English language"""
         from cli.app import cli
 
-        with patch("cli.i18n.set_lang") as mock_set_lang:
-            with patch("cli.ui.main_menu.show_main_menu"):
-                runner.invoke(cli, ["--lang", "en"])
-                mock_set_lang.assert_called_once_with("en")
+        with patch("cli.i18n.set_lang") as mock_set_lang, patch("cli.ui.main_menu.show_main_menu"):
+            runner.invoke(cli, ["--lang", "en"])
+            mock_set_lang.assert_called_once_with("en")
 
     @patch("cli.ui.main_menu.show_main_menu")
     def test_invoke_without_command_shows_menu(self, mock_menu, runner):

@@ -28,8 +28,8 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -284,7 +284,7 @@ def generate_report(results: list[KinesisAnalysisResult], output_dir: str) -> st
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -402,12 +402,7 @@ def run(ctx: ExecutionContext) -> None:
         f"저사용: [yellow]{total_low}개[/yellow] (${low_cost:,.2f}/월)"
     )
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("kinesis", "unused").with_date().build()
     filepath = generate_report(results, output_path)

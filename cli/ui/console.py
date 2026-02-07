@@ -525,7 +525,10 @@ def print_execution_summary(
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold cyan", width=12)
     table.add_column()
-    table.add_row(t("runner.summary_tool") if t("runner.summary_tool") != "runner.summary_tool" else "도구", f"[bold]{tool_name}[/bold]")
+    table.add_row(
+        t("runner.summary_tool") if t("runner.summary_tool") != "runner.summary_tool" else "도구",
+        f"[bold]{tool_name}[/bold]",
+    )
     if profile:
         table.add_row("프로필", profile)
     if regions:

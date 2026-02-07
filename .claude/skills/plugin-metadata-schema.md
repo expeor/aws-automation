@@ -275,6 +275,6 @@ AWS_SERVICE_NAMES = {
 - `plugins/efs/__init__.py` - 단순 서비스 예시
 - `plugins/elb/__init__.py` - 서브타입 서비스 예시
 - `core/tools/discovery.py` - 서비스 등록
-- `core/tools/output/report_types.py` - ReportType, ToolType 정의
+- `shared/io/output/report_types.py` - ReportType, ToolType 정의
 - `.claude/commands/make-plugin-service.md` - 새 서비스 생성 가이드
 - `.claude/commands/add-plugin-tool.md` - 기존 서비스에 도구 추가

@@ -194,7 +194,7 @@ def run(ctx) -> None:
         print(result.get_error_summary())
 
     # 보고서 생성
-    from core.tools.io import generate_reports
+    from shared.io.compat import generate_reports
     generate_reports(ctx, data, columns=[...])
 ```
 
@@ -274,11 +274,11 @@ if not result.is_valid:
     print(result.get_summary())  # 누락된 필수 태그: Owner
 ```
 
-### 파일 출력 (core.tools.io)
+### 파일 출력 (shared.io)
 
 ```python
 # Excel 출력
-from core.tools.io.excel import Workbook, ColumnDef
+from shared.io.excel import Workbook, ColumnDef
 
 wb = Workbook()
 columns = [
@@ -292,7 +292,7 @@ for row in data:
 wb.save("output.xlsx")
 
 # HTML 보고서 (ECharts 시각화)
-from core.tools.io.html import AWSReport, create_aws_report
+from shared.io.html import AWSReport, create_aws_report
 
 report = create_aws_report(
     title="EC2 미사용",
@@ -304,7 +304,7 @@ report = create_aws_report(
 report.save("output.html")
 
 # 듀얼 출력 (Excel + HTML)
-from core.tools.io import generate_reports
+from shared.io.compat import generate_reports
 
 generate_reports(ctx, data, columns=[...], charts=[...])
 ```

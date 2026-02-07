@@ -12,14 +12,12 @@ Tests cover:
 - Execution context management
 """
 
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from cli.flow.context import ExecutionContext, ToolInfo
 from cli.flow.runner import FlowRunner
-
 
 # =============================================================================
 # FlowRunner Creation Tests

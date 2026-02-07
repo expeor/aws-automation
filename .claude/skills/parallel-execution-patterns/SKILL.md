@@ -311,7 +311,7 @@ def run(ctx):
 
 ```python
 from core.parallel import parallel_collect, get_client
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 from rich.console import Console
 
 console = Console()

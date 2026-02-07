@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from core.parallel import get_client, parallel_collect
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -324,7 +324,7 @@ def run(ctx: ExecutionContext) -> None:
     """CloudTrail 전체 계정 보고서 생성"""
     from rich.console import Console
 
-    from core.tools.output import OutputPath, open_in_explorer
+    from shared.io.output import OutputPath, open_in_explorer
 
     console = Console()
     console.print("[bold]CloudTrail 전체 계정 보고서 생성 시작...[/bold]\n")
@@ -344,12 +344,9 @@ def run(ctx: ExecutionContext) -> None:
     reporter.print_summary()
 
     # 출력 경로 생성
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    from shared.io.output import get_context_identifier
+
+    identifier = get_context_identifier(ctx)
 
     output_dir = OutputPath(identifier).sub("cloudtrail", "inventory").with_date().build()
     output_path = reporter.generate_report(output_dir=output_dir, file_prefix="cloudtrail_audit")

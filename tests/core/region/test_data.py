@@ -64,7 +64,7 @@ class TestAllRegions:
     def test_regions_sorted(self):
         """리전이 알파벳 순으로 정렬되어 있어야 함"""
         sorted_regions = sorted(ALL_REGIONS)
-        assert ALL_REGIONS == sorted_regions
+        assert sorted_regions == ALL_REGIONS
 
 
 class TestRegionNames:

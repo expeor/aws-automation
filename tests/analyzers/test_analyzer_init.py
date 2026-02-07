@@ -16,24 +16,9 @@ from typing import Any
 
 import pytest
 
-from core.config import get_analyzers_path
+from core.config import VALID_AREAS, VALID_PERMISSIONS, get_analyzers_path
 
 logger = logging.getLogger(__name__)
-
-# Valid area types as per CLAUDE.md
-VALID_AREAS = {
-    "unused",
-    "cost",
-    "inventory",
-    "security",
-    "search",
-    "log",
-    "tag",
-    "sync",
-}
-
-# Valid permission types
-VALID_PERMISSIONS = {"read", "write"}
 
 # Required CATEGORY fields
 REQUIRED_CATEGORY_FIELDS = {

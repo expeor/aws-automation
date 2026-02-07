@@ -45,6 +45,7 @@ def _truncate_to_width(text: str, max_width: int) -> str:
         width += cw
     return text
 
+
 # 권한별 색상 (ANSI)
 PERMISSION_COLORS = {
     "read": "green",  # 안전 - 조회만

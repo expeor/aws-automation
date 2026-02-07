@@ -29,8 +29,7 @@ Note: Tests use mocking for AWS Health API to avoid external API calls.
 """
 
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -45,7 +44,6 @@ from shared.aws.health import (
     PatchItem,
     PatchReporter,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -93,9 +91,7 @@ def sample_issue_event():
 @pytest.fixture
 def sample_event_detail():
     """Sample event detail response"""
-    return {
-        "eventDescription": {"latestDescription": "Your instance i-1234567890abcdef0 is scheduled for retirement."}
-    }
+    return {"eventDescription": {"latestDescription": "Your instance i-1234567890abcdef0 is scheduled for retirement."}}
 
 
 @pytest.fixture

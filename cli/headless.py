@@ -153,7 +153,7 @@ class HeadlessRunner:
 
     def _build_context(self, tool_meta: dict) -> ExecutionContext:
         """ExecutionContext 구성"""
-        from core.tools.io.config import OutputConfig
+        from shared.io.config import OutputConfig
 
         ctx = ExecutionContext()
         ctx.category = self.config.category

@@ -5,7 +5,6 @@ internal/tools/discovery.py 단위 테스트
 플러그인 자동 발견 시스템 테스트.
 """
 
-import threading
 import time
 from unittest.mock import MagicMock, patch
 

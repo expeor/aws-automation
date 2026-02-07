@@ -242,7 +242,7 @@ class FavoritesManager:
         """파일에서 다시 로드"""
         self._load()
 
-    def get_by_index(self, index: int) -> Optional[FavoriteItem]:
+    def get_by_index(self, index: int) -> FavoriteItem | None:
         """인덱스로 즐겨찾기 항목 조회 (1-based)
 
         Args:

@@ -20,9 +20,9 @@ from rich.console import Console
 from core.parallel import get_client, parallel_collect
 from core.parallel.decorators import categorize_error, get_error_code
 from core.parallel.types import ErrorCategory
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
 from shared.aws.pricing.transfer import get_transfer_monthly_cost
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -213,36 +213,38 @@ def _collect_transfer_metrics_batch(
         safe_id = sanitize_metric_id(server.server_id)
         dimensions = {"ServerId": server.server_id}
 
-        queries.extend([
-            MetricQuery(
-                id=f"{safe_id}_files_in",
-                namespace="AWS/Transfer",
-                metric_name="FilesIn",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-            MetricQuery(
-                id=f"{safe_id}_files_out",
-                namespace="AWS/Transfer",
-                metric_name="FilesOut",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-            MetricQuery(
-                id=f"{safe_id}_bytes_in",
-                namespace="AWS/Transfer",
-                metric_name="BytesIn",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-            MetricQuery(
-                id=f"{safe_id}_bytes_out",
-                namespace="AWS/Transfer",
-                metric_name="BytesOut",
-                dimensions=dimensions,
-                stat="Sum",
-            ),
-        ])
+        queries.extend(
+            [
+                MetricQuery(
+                    id=f"{safe_id}_files_in",
+                    namespace="AWS/Transfer",
+                    metric_name="FilesIn",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_files_out",
+                    namespace="AWS/Transfer",
+                    metric_name="FilesOut",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_bytes_in",
+                    namespace="AWS/Transfer",
+                    metric_name="BytesIn",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+                MetricQuery(
+                    id=f"{safe_id}_bytes_out",
+                    namespace="AWS/Transfer",
+                    metric_name="BytesOut",
+                    dimensions=dimensions,
+                    stat="Sum",
+                ),
+            ]
+        )
 
     if not queries:
         return
@@ -347,7 +349,7 @@ def generate_report(results: list[TransferAnalysisResult], output_dir: str) -> s
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
@@ -466,12 +468,7 @@ def run(ctx: ExecutionContext) -> None:
     )
     console.print(f"예상 월 낭비: [red]${total_waste:,.2f}[/red]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("transfer", "unused").with_date().build()
     filepath = generate_report(results, output_path)

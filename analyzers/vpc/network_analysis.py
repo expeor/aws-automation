@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 from .endpoint_audit import EndpointAnalysisResult, analyze_endpoints, collect_endpoints
 from .endpoint_audit import generate_report as generate_endpoint_report
@@ -132,7 +132,7 @@ def _collect_all(session, account_id: str, account_name: str, region: str) -> di
 
 def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> str:
     """Generate combined Excel report for all network resources"""
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -267,12 +267,7 @@ def run(ctx: ExecutionContext) -> None:
     # Generate reports
     console.print("\n[cyan]Step 3: Generating reports...[/cyan]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("vpc", "network").with_date().build()
 

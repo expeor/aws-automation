@@ -5,8 +5,8 @@ Tests for the DuckDB-based ALB log analyzer.
 Note: These tests focus on structure and logic; actual DuckDB operations are mocked.
 """
 
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, Mock, patch
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 
