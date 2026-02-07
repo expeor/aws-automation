@@ -103,6 +103,7 @@ class TestCreateOutputDirectory:
         mock_ctx = MagicMock()
         mock_ctx.is_sso_session.return_value = False
         mock_ctx.profile_name = None
+        mock_ctx.profiles = []
 
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance

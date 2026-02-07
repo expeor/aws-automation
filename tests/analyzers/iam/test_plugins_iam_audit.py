@@ -189,22 +189,24 @@ class TestCreateOutputDirectory:
 
     @patch("analyzers.iam.iam_audit.OutputPath")
     def test_with_sso_session(self, mock_output_path):
-        """SSO 세션이 있는 경우"""
+        """SSO 세션이 있는 경우 (프로파일명 사용)"""
         from analyzers.iam.iam_audit import _create_output_directory
 
         mock_ctx = MagicMock()
         mock_ctx.is_sso_session.return_value = True
+        mock_ctx.profile_name = "sso-profile"
+        mock_ctx.profiles = []
         mock_ctx.accounts = [MagicMock(id="123456789012")]
 
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
         mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/123456789012/iam/security/2024-01-01"
+        mock_path_instance.build.return_value = "/output/sso-profile/iam/security/2024-01-01"
         mock_output_path.return_value = mock_path_instance
 
         _create_output_directory(mock_ctx)
 
-        mock_output_path.assert_called_once_with("123456789012")
+        mock_output_path.assert_called_once_with("sso-profile")
         mock_path_instance.sub.assert_called_once_with("iam", "security")
 
     @patch("analyzers.iam.iam_audit.OutputPath")
@@ -234,6 +236,7 @@ class TestCreateOutputDirectory:
         mock_ctx = MagicMock()
         mock_ctx.is_sso_session.return_value = False
         mock_ctx.profile_name = None
+        mock_ctx.profiles = []
 
         mock_path_instance = MagicMock()
         mock_path_instance.sub.return_value = mock_path_instance
