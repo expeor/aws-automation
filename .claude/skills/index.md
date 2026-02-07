@@ -70,14 +70,21 @@
 |-------|------|----------|
 | [`python-best-practices`](./python-best-practices/) | Python 코딩 스타일 | ruff, mypy, 타입 힌트 |
 | [`parallel-execution-patterns`](./parallel-execution-patterns/) | 병렬 실행 | parallel_collect, Rate Limiter |
-| [`error-handling-patterns`](./error-handling-patterns/) | 에러 처리 | ErrorCollector, try_or_default |
+| [`error-handling-patterns`](./error-handling-patterns/) | 에러 처리 | ErrorCollector, @safe_aws_call, try_or_default |
 
 ### 출력 및 리포트
 
 | Skill | 설명 | 주요 내용 |
 |-------|------|----------|
-| [`output-patterns`](./output-patterns/) | 리포트 생성 | Excel, HTML, generate_reports |
+| [`output-patterns`](./output-patterns/) | 리포트 생성 | Excel, HTML, generate_dual_report |
 | [`cli-output-style.md`](./cli-output-style.md) | 콘솔 출력 스타일 | 심볼, 색상, Step 패턴 |
+
+### 아키텍처 가이드
+
+| Skill | 설명 | 주요 내용 |
+|-------|------|----------|
+| [`analyzers-vs-reports.md`](./analyzers-vs-reports.md) | analyzers/ vs reports/ 경계 | 단일 서비스 vs 종합 오케스트레이션 |
+| [`debugging-troubleshooting.md`](./debugging-troubleshooting.md) | 디버깅/트러블슈팅 | moto, conftest, 병렬 실행 디버깅 |
 
 ### 개발 워크플로우
 
@@ -95,13 +102,14 @@
 
 | 작업 | 프로젝트 Skill | 외부 Skill |
 |------|---------------|-----------|
-| 새 플러그인 생성 | `plugin-metadata-schema.md` | - |
+| 새 플러그인 생성 | `plugin-metadata-schema.md`, `analyzers-vs-reports.md` | - |
 | CloudWatch 메트릭 | `cloudwatch-metrics-patterns.md` | - |
-| 테스트 작성 | `tdd-workflow` | `python-testing-patterns`, `test-driven-development` |
+| 테스트 작성 | `tdd-workflow`, `debugging-troubleshooting.md` | `python-testing-patterns`, `test-driven-development` |
 | 보안 검토 | `security-review` | `property-based-testing`, `codeql` |
 | 리포트 생성 | `output-patterns` | `xlsx` |
 | GitHub Actions | - | `github-actions-templates` |
 | 에러 처리 | `error-handling-patterns` | - |
+| 디버깅 | `debugging-troubleshooting.md` | `systematic-debugging` |
 
 ---
 
@@ -109,12 +117,14 @@
 
 ### 플러그인 개발 체크리스트
 
-1. **메타데이터** → `plugin-metadata-schema.md`
-2. **수집 로직** → `parallel-execution-patterns`
-3. **CloudWatch** → `cloudwatch-metrics-patterns.md`
-4. **인벤토리** → `inventory-collector-patterns.md`
-5. **리포트** → `output-patterns`
-6. **테스트** → `tdd-workflow` + `python-testing-patterns`
+1. **위치 결정** → `analyzers-vs-reports.md` (단일 서비스: analyzers/, 종합: reports/)
+2. **메타데이터** → `plugin-metadata-schema.md`
+3. **수집 로직** → `parallel-execution-patterns`
+4. **CloudWatch** → `cloudwatch-metrics-patterns.md`
+5. **인벤토리** → `inventory-collector-patterns.md`
+6. **에러 처리** → `error-handling-patterns` (@safe_aws_call, ErrorCollector)
+7. **리포트** → `output-patterns` (generate_dual_report + create_output_path)
+8. **테스트** → `tdd-workflow` + `debugging-troubleshooting.md`
 
 ### 자주 사용하는 import
 
@@ -124,6 +134,7 @@ from core.parallel import parallel_collect, get_client, quiet_mode
 
 # 에러 처리
 from core.parallel.errors import ErrorCollector, ErrorSeverity, try_or_default
+from core.parallel.decorators import safe_aws_call, RetryConfig
 
 # CloudWatch 메트릭
 from shared.aws.metrics import batch_get_metrics, MetricQuery
@@ -132,7 +143,9 @@ from shared.aws.metrics import batch_get_metrics, MetricQuery
 from shared.aws.inventory import InventoryCollector
 
 # 리포트 출력
-from shared.io.compat import generate_reports
+from shared.io.compat import generate_dual_report
+from shared.io.output.helpers import create_output_path
+from shared.io.output import print_report_complete, open_in_explorer
 ```
 
 ---

@@ -96,69 +96,6 @@ class TestPrintSummary:
         assert mock_console.print.called
 
 
-class TestCreateOutputDirectory:
-    """_create_output_directory 함수 테스트"""
-
-    @patch("analyzers.vpc.nat_audit.OutputPath")
-    def test_with_sso_session(self, mock_output_path):
-        """SSO 세션이 있는 경우"""
-        from analyzers.vpc.nat_audit import _create_output_directory
-
-        mock_ctx = MagicMock()
-        mock_ctx.is_sso_session.return_value = True
-        mock_ctx.accounts = [MagicMock(id="123456789012")]
-
-        mock_path_instance = MagicMock()
-        mock_path_instance.sub.return_value = mock_path_instance
-        mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/123456789012/vpc/cost/2024-01-01"
-        mock_output_path.return_value = mock_path_instance
-
-        result = _create_output_directory(mock_ctx)
-
-        mock_output_path.assert_called_once_with("123456789012")
-        mock_path_instance.sub.assert_called_once_with("vpc", "cost")
-        assert result == "/output/123456789012/vpc/cost/2024-01-01"
-
-    @patch("analyzers.vpc.nat_audit.OutputPath")
-    def test_with_profile_name(self, mock_output_path):
-        """프로파일명이 있는 경우"""
-        from analyzers.vpc.nat_audit import _create_output_directory
-
-        mock_ctx = MagicMock()
-        mock_ctx.is_sso_session.return_value = False
-        mock_ctx.profile_name = "my-profile"
-
-        mock_path_instance = MagicMock()
-        mock_path_instance.sub.return_value = mock_path_instance
-        mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/my-profile/vpc/cost/2024-01-01"
-        mock_output_path.return_value = mock_path_instance
-
-        _create_output_directory(mock_ctx)
-
-        mock_output_path.assert_called_once_with("my-profile")
-
-    @patch("analyzers.vpc.nat_audit.OutputPath")
-    def test_default_identifier(self, mock_output_path):
-        """기본 식별자 사용"""
-        from analyzers.vpc.nat_audit import _create_output_directory
-
-        mock_ctx = MagicMock()
-        mock_ctx.is_sso_session.return_value = False
-        mock_ctx.profile_name = None
-
-        mock_path_instance = MagicMock()
-        mock_path_instance.sub.return_value = mock_path_instance
-        mock_path_instance.with_date.return_value = mock_path_instance
-        mock_path_instance.build.return_value = "/output/default/vpc/cost/2024-01-01"
-        mock_output_path.return_value = mock_path_instance
-
-        _create_output_directory(mock_ctx)
-
-        mock_output_path.assert_called_once_with("default")
-
-
 class TestCollectAndAnalyze:
     """_collect_and_analyze 함수 테스트"""
 
@@ -210,7 +147,7 @@ class TestRun:
 
     @patch("analyzers.vpc.nat_audit.open_in_explorer")
     @patch("analyzers.vpc.nat_audit.NATExcelReporter")
-    @patch("analyzers.vpc.nat_audit._create_output_directory")
+    @patch("analyzers.vpc.nat_audit.create_output_path")
     @patch("analyzers.vpc.nat_audit._print_summary")
     @patch("analyzers.vpc.nat_audit.parallel_collect")
     @patch("analyzers.vpc.nat_audit.console")
@@ -239,8 +176,9 @@ class TestRun:
         mock_reporter.assert_not_called()
 
     @patch("analyzers.vpc.nat_audit.open_in_explorer")
+    @patch("analyzers.vpc.nat_audit.generate_dual_report")
     @patch("analyzers.vpc.nat_audit.NATExcelReporter")
-    @patch("analyzers.vpc.nat_audit._create_output_directory")
+    @patch("analyzers.vpc.nat_audit.create_output_path")
     @patch("analyzers.vpc.nat_audit._print_summary")
     @patch("analyzers.vpc.nat_audit.parallel_collect")
     @patch("analyzers.vpc.nat_audit.console")
@@ -251,13 +189,15 @@ class TestRun:
         mock_print,
         mock_output,
         mock_reporter_cls,
+        mock_dual_report,
         mock_explorer,
     ):
         """결과가 있는 경우"""
         from analyzers.vpc.nat_audit import run
 
-        mock_analysis = {"results": []}
-        mock_stats = {"total": 2}
+        mock_analysis = MagicMock()
+        mock_analysis.findings = []
+        mock_stats = {"total_nat_count": 2, "unused_count": 0, "low_usage_count": 0, "total_monthly_waste": 0}
 
         mock_result = MagicMock()
         mock_result.get_data.return_value = [(mock_analysis, mock_stats)]
@@ -265,9 +205,9 @@ class TestRun:
         mock_parallel.return_value = mock_result
 
         mock_output.return_value = "/output/path"
+        mock_dual_report.return_value = {"excel": "/output/path/report.xlsx"}
 
         mock_reporter = MagicMock()
-        mock_reporter.generate.return_value = "/output/path/report.xlsx"
         mock_reporter_cls.return_value = mock_reporter
 
         mock_ctx = MagicMock()
@@ -276,12 +216,13 @@ class TestRun:
 
         # 보고서가 생성됨
         mock_reporter_cls.assert_called_once()
-        mock_reporter.generate.assert_called_once_with("/output/path")
+        mock_dual_report.assert_called_once()
         mock_explorer.assert_called_once_with("/output/path")
 
     @patch("analyzers.vpc.nat_audit.open_in_explorer")
+    @patch("analyzers.vpc.nat_audit.generate_dual_report")
     @patch("analyzers.vpc.nat_audit.NATExcelReporter")
-    @patch("analyzers.vpc.nat_audit._create_output_directory")
+    @patch("analyzers.vpc.nat_audit.create_output_path")
     @patch("analyzers.vpc.nat_audit._print_summary")
     @patch("analyzers.vpc.nat_audit.parallel_collect")
     @patch("analyzers.vpc.nat_audit.console")
@@ -292,13 +233,15 @@ class TestRun:
         mock_print,
         mock_output,
         mock_reporter_cls,
+        mock_dual_report,
         mock_explorer,
     ):
         """에러가 있는 경우"""
         from analyzers.vpc.nat_audit import run
 
-        mock_analysis = {"results": []}
-        mock_stats = {"total": 2}
+        mock_analysis = MagicMock()
+        mock_analysis.findings = []
+        mock_stats = {"total_nat_count": 2, "unused_count": 0, "low_usage_count": 0, "total_monthly_waste": 0}
 
         mock_result = MagicMock()
         mock_result.get_data.return_value = [(mock_analysis, mock_stats)]
@@ -307,9 +250,9 @@ class TestRun:
         mock_parallel.return_value = mock_result
 
         mock_output.return_value = "/output/path"
+        mock_dual_report.return_value = {"excel": "/output/path/report.xlsx"}
 
         mock_reporter = MagicMock()
-        mock_reporter.generate.return_value = "/output/path/report.xlsx"
         mock_reporter_cls.return_value = mock_reporter
 
         mock_ctx = MagicMock()

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Styles, Workbook
+from shared.io.excel import ColumnDef, Styles, Workbook
 
 from .analyzer import NATAnalysisResult, Severity, UsageStatus
 
@@ -32,8 +32,8 @@ class NATExcelReporter:
         self.results = results
         self.stats_list = stats_list
 
-    def generate(self, output_dir: str) -> str:
-        """Excel 보고서 생성"""
+    def build_workbook(self) -> Workbook:
+        """Excel Workbook 빌더 (저장하지 않고 반환)"""
         wb = Workbook()
 
         # 시트 생성
@@ -41,6 +41,11 @@ class NATExcelReporter:
         self._create_findings_sheet(wb)
         self._create_all_nat_sheet(wb)
 
+        return wb
+
+    def generate(self, output_dir: str) -> str:
+        """Excel 보고서 생성 (후방 호환용)"""
+        wb = self.build_workbook()
         return str(wb.save_as(output_dir, "NAT_Gateway_Audit"))
 
     def _create_summary_sheet(self, wb: Workbook) -> None:

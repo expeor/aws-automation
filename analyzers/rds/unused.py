@@ -34,8 +34,10 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
+from shared.io.compat import generate_dual_report
+from shared.io.output import open_in_explorer, print_report_complete
+from shared.io.output.helpers import create_output_path
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -312,11 +314,11 @@ def analyze_instances(
     return result
 
 
-def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+def _build_excel(results: list[RDSAnalysisResult]):
+    """Excel Workbook 빌더 (저장하지 않고 반환)"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -410,7 +412,7 @@ def generate_report(results: list[RDSAnalysisResult], output_dir: str) -> str:
                     style=style,
                 )
 
-    return str(wb.save_as(output_dir, "RDS_Unused"))
+    return wb
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> RDSAnalysisResult | None:
@@ -435,6 +437,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print("\n[yellow]분석 결과 없음[/yellow]")
         return
 
+    total_instances = sum(r.total_instances for r in results)
     total_unused = sum(r.unused_instances for r in results)
     total_low = sum(r.low_usage_instances for r in results)
     total_stopped = sum(r.stopped_instances for r in results)
@@ -448,15 +451,41 @@ def run(ctx: ExecutionContext) -> None:
         f"정지: {total_stopped}개"
     )
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    # HTML용 flat 데이터
+    flat_data = []
+    for r in results:
+        for f in r.findings:
+            if f.status != InstanceStatus.NORMAL:
+                inst = f.instance
+                flat_data.append(
+                    {
+                        "account_id": inst.account_id,
+                        "account_name": inst.account_name,
+                        "region": inst.region,
+                        "resource_id": inst.db_instance_id,
+                        "resource_name": inst.db_instance_id,
+                        "status": f.status.value,
+                        "reason": f.recommendation,
+                        "cost": inst.estimated_monthly_cost,
+                    }
+                )
 
-    output_path = OutputPath(identifier).sub("rds", "unused").with_date().build()
-    filepath = generate_report(results, output_path)
+    output_path = create_output_path(ctx, "rds", "unused")
+    report_paths = generate_dual_report(
+        ctx,
+        data=flat_data,
+        output_dir=output_path,
+        prefix="RDS_Unused",
+        excel_builder=lambda: _build_excel(results),
+        html_config={
+            "title": "RDS 유휴 인스턴스 분석",
+            "service": "RDS",
+            "tool_name": "unused",
+            "total": total_instances,
+            "found": total_unused + total_low + total_stopped,
+            "savings": unused_cost + low_cost,
+        },
+    )
 
-    console.print(f"\n[bold green]완료![/bold green] {filepath}")
+    print_report_complete(report_paths)
     open_in_explorer(output_path)
