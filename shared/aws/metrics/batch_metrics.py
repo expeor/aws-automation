@@ -82,7 +82,7 @@ def batch_get_metrics(
     if cache is None:
         from .session_cache import get_global_cache
 
-        cache = get_global_cache()  # type: ignore[assignment]
+        cache = get_global_cache()
 
     results: dict[str, float] = {}
     queries_to_fetch: list[MetricQuery] = []
