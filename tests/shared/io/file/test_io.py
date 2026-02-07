@@ -296,9 +296,7 @@ class TestReadJson:
     def test_read_nested_json(self, tmp_path):
         """중첩된 JSON 읽기"""
         temp_file = tmp_path / "nested.json"
-        temp_file.write_text(
-            json.dumps({"user": {"name": "John", "address": {"city": "Seoul"}}}), encoding="utf-8"
-        )
+        temp_file.write_text(json.dumps({"user": {"name": "John", "address": {"city": "Seoul"}}}), encoding="utf-8")
 
         data = read_json(str(temp_file))
 
@@ -344,9 +342,7 @@ class TestReadJson:
     def test_read_json_with_special_types(self, tmp_path):
         """특수 타입 포함 JSON 읽기"""
         temp_file = tmp_path / "special.json"
-        temp_file.write_text(
-            json.dumps({"null": None, "bool": True, "number": 3.14}), encoding="utf-8"
-        )
+        temp_file.write_text(json.dumps({"null": None, "bool": True, "number": 3.14}), encoding="utf-8")
 
         data = read_json(str(temp_file))
 

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 from .iam_audit_analysis import IAMCollector
 from .user_snapshot_reporter import UserSnapshotReporter
@@ -70,7 +70,7 @@ def run(ctx: ExecutionContext) -> None:
     reporter = UserSnapshotReporter(iam_data_list)
     filepath = reporter.generate(output_path)
 
-    from core.tools.output import print_report_complete
+    from shared.io.output import print_report_complete
 
     print_report_complete(filepath)
     open_in_explorer(output_path)
@@ -108,12 +108,7 @@ def _print_summary(iam_data_list: list[IAMData]) -> None:
 
 def _create_output_directory(ctx) -> str:
     """출력 디렉토리 생성"""
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("iam", "user_snapshot").with_date().build()
     return output_path

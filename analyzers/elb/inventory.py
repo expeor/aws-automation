@@ -17,9 +17,9 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.table import Table
 
-from core.tools.io.excel import ColumnDef, Workbook
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.inventory import InventoryCollector
+from shared.io.excel import ColumnDef, Workbook
+from shared.io.output import OutputPath, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext

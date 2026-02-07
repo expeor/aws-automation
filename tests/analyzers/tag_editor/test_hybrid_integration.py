@@ -6,16 +6,13 @@ Tagging API + Native API 통합 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from analyzers.tag_editor.map_audit import _aggregate_stats, _collect_and_analyze
 from analyzers.tag_editor.map_apply import apply_map_tag
+from analyzers.tag_editor.map_audit import _aggregate_stats, _collect_and_analyze
 from analyzers.tag_editor.native_api import NATIVE_API_RESOURCE_TYPES
 from analyzers.tag_editor.types import (
     MAP_TAG_KEY,
     MapTagAnalysisResult,
     ResourceTagInfo,
-    ResourceTypeStats,
     TagOperationResult,
 )
 

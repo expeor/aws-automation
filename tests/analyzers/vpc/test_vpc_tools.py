@@ -7,21 +7,17 @@ VPC 관련 도구의 유틸리티 함수 및 데이터 변환 로직 테스트
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-import pytest
-
+from analyzers.vpc.endpoint_audit import (
+    EndpointStatus,
+    VPCEndpointInfo,
+    analyze_endpoints,
+)
 from analyzers.vpc.eni_audit import (
-    ENIFinding,
     ENIInfo,
     Severity,
     UsageStatus,
     _analyze_single_eni,
     analyze_enis,
-)
-from analyzers.vpc.endpoint_audit import (
-    EndpointFinding,
-    EndpointStatus,
-    VPCEndpointInfo,
-    analyze_endpoints,
 )
 
 

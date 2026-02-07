@@ -178,7 +178,7 @@ from enum import Enum
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 console = Console()
 
@@ -249,7 +249,7 @@ def analyze_{resources}(resources: list[{Resource}Info], account_id: str, accoun
 
 def _save_excel(results: list[{Resource}AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성 (내부 함수)"""
-    from core.tools.io.excel import Workbook, ColumnDef, Styles
+    from shared.io.excel import Workbook, ColumnDef, Styles
 
     wb = Workbook()
 
@@ -291,7 +291,7 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 def run(ctx) -> None:
     """{tool_name}"""
-    from core.tools.io.compat import generate_reports
+    from shared.io.compat import generate_reports
 
     console.print("[bold]{display_name} 분석 시작...[/bold]\n")
 
@@ -351,7 +351,7 @@ def run(ctx) -> None:
 ## Output 경로 설정 가이드
 
 ```python
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 # 경로 형식: output/{identifier}/{service}/{type}/{date}/
 output_path = OutputPath(identifier)  # identifier: 계정ID 또는 프로파일명
@@ -469,29 +469,29 @@ def run(ctx): ...              # 통합 실행
 from core.parallel import get_client, parallel_collect
 
 # Output 경로 (필수)
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 # 리포트 출력 - Excel + HTML 동시 생성 (권장)
-from core.tools.io.compat import generate_reports
+from shared.io.compat import generate_reports
 ```
 
 ### 선택 import
 
 ```python
 # 출력 설정
-from core.tools.io import OutputConfig, OutputFormat
+from shared.io.compat import OutputConfig, OutputFormat
 
 # Quiet 모드 체크 (진행 표시 제어)
 from core.parallel import is_quiet, quiet_mode, set_quiet
 
 # Excel 유틸리티 (openpyxl 래퍼 - 더 간단한 API)
-from core.tools.io.excel import Workbook, ColumnDef, Styles
+from shared.io.excel import Workbook, ColumnDef, Styles
 
 # HTML 유틸리티
-from core.tools.io.html import AWSReport, ResourceItem, create_aws_report
+from shared.io.html import AWSReport, ResourceItem, create_aws_report
 
 # 타입 체계 상수
-from core.tools.output import ReportType, ToolType
+from shared.io.output import ReportType, ToolType
 ```
 
 ---
@@ -522,7 +522,7 @@ from core.tools.output import ReportType, ToolType
 - `plugins/efs/__init__.py` - 메타데이터 예시
 - `plugins/efs/unused.py` - 전체 구현 예시
 - `plugins/ec2/unused.py` - Excel + HTML 통합 출력 예시
-- `core/tools/output/report_types.py` - 타입 정의
+- `shared/io/output/report_types.py` - 타입 정의
 - `core/tools/io/config.py` - OutputConfig, OutputFormat
 - `core/tools/io/compat.py` - generate_reports 헬퍼
 

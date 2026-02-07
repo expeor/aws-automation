@@ -186,7 +186,9 @@ class TestCacheBenchmark:
         print(f"{'=' * 60}")
         print(f"{'항목':<20} {'캐시 없음':>15} {'캐시 사용':>15} {'개선':>10}")
         print(f"{'-' * 60}")
-        print(f"{'총 소요 시간':<20} {elapsed_no_cache*1000:>12.1f}ms {elapsed_with_cache*1000:>12.1f}ms {speedup:>8.1f}x")
+        print(
+            f"{'총 소요 시간':<20} {elapsed_no_cache * 1000:>12.1f}ms {elapsed_with_cache * 1000:>12.1f}ms {speedup:>8.1f}x"
+        )
         print(f"{'API 호출 횟수':<20} {api_calls_no_cache:>15} {api_calls_with_cache:>15} {api_reduction:>7.0f}%↓")
         print(f"{'=' * 60}")
 
@@ -258,8 +260,8 @@ class TestCacheBenchmark:
         print("  Collector B: 쿼리 50개 (인스턴스 25-74, 50% 중복)")
         print("  Collector C: 쿼리 50개 (인스턴스 50-99)")
         print(f"{'=' * 60}")
-        print(f"캐시 없음: API 호출 {api_calls_no_cache}회, {elapsed_no_cache*1000:.1f}ms")
-        print(f"캐시 사용: API 호출 {api_calls_with_cache}회, {elapsed_with_cache*1000:.1f}ms")
+        print(f"캐시 없음: API 호출 {api_calls_no_cache}회, {elapsed_no_cache * 1000:.1f}ms")
+        print(f"캐시 사용: API 호출 {api_calls_with_cache}회, {elapsed_with_cache * 1000:.1f}ms")
         print(f"  - 캐시 히트: {stats.hits}개")
         print(f"  - 캐시 미스: {stats.misses}개")
         print(f"  - 히트율: {stats.hit_rate:.1%}")

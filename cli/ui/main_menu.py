@@ -1535,9 +1535,9 @@ class MainMenu:
             step = CategoryStep()
             ctx = step.execute(ctx)
 
-            if ctx.tool:
+            if ctx.tool and ctx.category:
                 # 선택된 도구 실행 (module 또는 name 사용)
-                tool_module = ctx.tool.module or ctx.tool.name
+                tool_module = ctx.tool.module or ctx.tool.name or ""
                 self._run_tool_directly(ctx.category, tool_module, ctx.tool.name)
         except (KeyboardInterrupt, RuntimeError):
             pass  # 취소 또는 오류 시 메인 메뉴로

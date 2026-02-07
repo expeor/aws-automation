@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 logger = logging.getLogger(__name__)
 
@@ -424,7 +424,7 @@ def generate_report(
 def run_search(ctx) -> dict[str, Any] | None:
     """CloudFormation 리소스 검색"""
     from core.auth.session import get_context_session
-    from core.tools.output import OutputPath
+    from shared.io.output import OutputPath
 
     # 첫 번째 리전에서 세션 획득
     region = ctx.regions[0] if ctx.regions else "ap-northeast-2"

@@ -2,8 +2,6 @@
 tests/reports/ip_search/test_parser.py - ENI description parser tests
 """
 
-import pytest
-
 from reports.ip_search.parser import ParsedResource, parse_eni_description, parse_eni_to_display_string
 
 

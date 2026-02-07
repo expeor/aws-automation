@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.compat import generate_dual_report
+from shared.io.output import open_in_explorer, print_report_complete
+from shared.io.output.helpers import create_output_path
 
 from .nat_audit_analysis import NATAnalyzer, NATCollector, NATExcelReporter
 
@@ -80,18 +82,53 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[cyan]Step 2: 분석 결과 요약[/cyan]")
     _print_summary(all_stats)
 
-    # 3. Excel 보고서 생성
-    console.print("[cyan]Step 3: Excel 보고서 생성 중...[/cyan]")
+    # 3. 보고서 생성
+    console.print("[cyan]Step 3: 보고서 생성 중...[/cyan]")
 
-    output_path = _create_output_directory(ctx)
+    # HTML용 flat 데이터
+    flat_data = []
+    for analysis_result in all_results:
+        for finding in analysis_result.findings:
+            nat = finding.nat
+            flat_data.append(
+                {
+                    "account_id": nat.account_id,
+                    "account_name": nat.account_name,
+                    "region": nat.region,
+                    "resource_id": nat.nat_gateway_id,
+                    "resource_name": nat.name,
+                    "status": finding.usage_status.value,
+                    "reason": finding.description,
+                    "cost": finding.monthly_waste,
+                }
+            )
+
+    totals = {
+        "total_nat_count": sum(s.get("total_nat_count", 0) for s in all_stats),
+        "unused_count": sum(s.get("unused_count", 0) for s in all_stats),
+        "low_usage_count": sum(s.get("low_usage_count", 0) for s in all_stats),
+        "total_monthly_waste": sum(s.get("total_monthly_waste", 0) for s in all_stats),
+    }
+
     reporter = NATExcelReporter(all_results, all_stats)
-    filepath = reporter.generate(output_path)
+    output_path = create_output_path(ctx, "vpc", "cost")
+    report_paths = generate_dual_report(
+        ctx,
+        data=flat_data,
+        output_dir=output_path,
+        prefix="NAT_Gateway_Audit",
+        excel_builder=lambda: reporter.build_workbook(),
+        html_config={
+            "title": "NAT Gateway 미사용 분석",
+            "service": "VPC",
+            "tool_name": "nat_audit",
+            "total": totals["total_nat_count"],
+            "found": totals["unused_count"] + totals["low_usage_count"],
+            "savings": totals["total_monthly_waste"],
+        },
+    )
 
-    from core.tools.output import print_report_complete
-
-    print_report_complete(filepath)
-
-    # 폴더 열기
+    print_report_complete(report_paths)
     open_in_explorer(output_path)
 
 
@@ -123,17 +160,3 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
     if totals["total_monthly_waste"] > 0:
         console.print(f"    [red]월간 낭비 추정: ${totals['total_monthly_waste']:,.2f}[/red]")
         console.print(f"    [red]연간 절감 가능: ${totals['total_annual_savings']:,.2f}[/red]")
-
-
-def _create_output_directory(ctx) -> str:
-    """출력 디렉토리 생성"""
-    # identifier 결정
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
-
-    output_path = OutputPath(identifier).sub("vpc", "cost").with_date().build()
-    return output_path

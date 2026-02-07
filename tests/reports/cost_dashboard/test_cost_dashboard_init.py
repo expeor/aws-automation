@@ -2,8 +2,6 @@
 tests/reports/cost_dashboard/test_cost_dashboard_init.py - Cost Dashboard module structure tests
 """
 
-import pytest
-
 from reports.cost_dashboard import (
     CATEGORY,
     RESOURCE_FIELD_MAP,
@@ -193,9 +191,7 @@ class TestUnusedResourceSummary:
 
     def test_summary_creation(self):
         """Should create summary with required fields"""
-        summary = UnusedResourceSummary(
-            account_id="123456789012", account_name="test-account", region="ap-northeast-2"
-        )
+        summary = UnusedResourceSummary(account_id="123456789012", account_name="test-account", region="ap-northeast-2")
 
         assert summary.account_id == "123456789012"
         assert summary.account_name == "test-account"
@@ -203,9 +199,7 @@ class TestUnusedResourceSummary:
 
     def test_summary_default_values(self):
         """Summary should have default values for all metrics"""
-        summary = UnusedResourceSummary(
-            account_id="123456789012", account_name="test-account", region="ap-northeast-2"
-        )
+        summary = UnusedResourceSummary(account_id="123456789012", account_name="test-account", region="ap-northeast-2")
 
         # Test a few default values
         assert summary.ebs_total == 0
@@ -235,9 +229,7 @@ class TestSessionCollectionResult:
 
     def test_session_result_creation(self):
         """Should create session result with summary"""
-        summary = UnusedResourceSummary(
-            account_id="123456789012", account_name="test-account", region="ap-northeast-2"
-        )
+        summary = UnusedResourceSummary(account_id="123456789012", account_name="test-account", region="ap-northeast-2")
         result = SessionCollectionResult(summary=summary)
 
         assert result.summary == summary
@@ -245,9 +237,7 @@ class TestSessionCollectionResult:
 
     def test_session_result_default_values(self):
         """Session result should have None for all analysis results"""
-        summary = UnusedResourceSummary(
-            account_id="123456789012", account_name="test-account", region="ap-northeast-2"
-        )
+        summary = UnusedResourceSummary(account_id="123456789012", account_name="test-account", region="ap-northeast-2")
         result = SessionCollectionResult(summary=summary)
 
         assert result.ebs_result is None
@@ -256,9 +246,7 @@ class TestSessionCollectionResult:
 
     def test_session_result_with_errors(self):
         """Session result should store errors"""
-        summary = UnusedResourceSummary(
-            account_id="123456789012", account_name="test-account", region="ap-northeast-2"
-        )
+        summary = UnusedResourceSummary(account_id="123456789012", account_name="test-account", region="ap-northeast-2")
         result = SessionCollectionResult(summary=summary, errors=["Error 1", "Error 2"])
 
         assert len(result.errors) == 2
@@ -278,12 +266,8 @@ class TestUnusedAllResult:
 
     def test_unused_all_result_with_summaries(self):
         """Should store multiple summaries"""
-        summary1 = UnusedResourceSummary(
-            account_id="123456789012", account_name="account1", region="ap-northeast-2"
-        )
-        summary2 = UnusedResourceSummary(
-            account_id="123456789012", account_name="account1", region="us-east-1"
-        )
+        summary1 = UnusedResourceSummary(account_id="123456789012", account_name="account1", region="ap-northeast-2")
+        summary2 = UnusedResourceSummary(account_id="123456789012", account_name="account1", region="us-east-1")
 
         result = UnusedAllResult(summaries=[summary1, summary2])
 

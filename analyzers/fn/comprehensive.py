@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.lambda_ import (
     EOLStatus,
     LambdaFunctionInfo,
@@ -33,6 +32,9 @@ from shared.aws.pricing import (
     get_lambda_monthly_cost,
     get_lambda_provisioned_monthly_cost,
 )
+from shared.io.compat import generate_dual_report
+from shared.io.output import open_in_explorer, print_report_complete
+from shared.io.output.helpers import create_output_path
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -482,11 +484,11 @@ def analyze_comprehensive(
 # =============================================================================
 
 
-def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+def _build_excel(results: list[ComprehensiveAnalysisResult]):
+    """Excel Workbook 빌더 (저장하지 않고 반환)"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     severity_fills = {
         Severity.CRITICAL: PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid"),
@@ -628,7 +630,7 @@ def generate_report(results: list[ComprehensiveAnalysisResult], output_dir: str)
                 ]
             )
 
-    return str(wb.save_as(output_dir, "Lambda_Comprehensive"))
+    return wb
 
 
 # =============================================================================
@@ -682,16 +684,42 @@ def run(ctx: ExecutionContext) -> None:
     if total_savings > 0:
         console.print(f"[green]절감 가능: ${total_savings:,.2f}[/green]")
 
+    # HTML용 flat 데이터
+    flat_data = []
+    for r in results:
+        for comp in r.results:
+            for issue in comp.issues:
+                fn = comp.function
+                flat_data.append(
+                    {
+                        "account_id": fn.account_id,
+                        "account_name": fn.account_name,
+                        "region": fn.region,
+                        "resource_id": fn.function_name,
+                        "resource_name": fn.function_name,
+                        "status": issue.severity.value,
+                        "reason": f"[{issue.issue_type.value}] {issue.description}",
+                        "cost": issue.potential_savings,
+                    }
+                )
+
     # 보고서
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    output_path = create_output_path(ctx, "lambda", "comprehensive")
+    report_paths = generate_dual_report(
+        ctx,
+        data=flat_data,
+        output_dir=output_path,
+        prefix="Lambda_Comprehensive",
+        excel_builder=lambda: _build_excel(results),
+        html_config={
+            "title": "Lambda 종합 분석",
+            "service": "Lambda",
+            "tool_name": "comprehensive",
+            "total": total_functions,
+            "found": total_issues,
+            "savings": total_savings,
+        },
+    )
 
-    output_path = OutputPath(identifier).sub("lambda", "inventory").with_date().build()
-    filepath = generate_report(results, output_path)
-
-    console.print(f"\n[bold green]완료![/bold green] {filepath}")
+    print_report_complete(report_paths)
     open_in_explorer(output_path)

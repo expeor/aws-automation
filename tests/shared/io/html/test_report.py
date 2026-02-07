@@ -196,11 +196,13 @@ class TestHTMLReport:
         """요약 카드 추가"""
         report = HTMLReport("테스트")
 
-        result = report.add_summary([
-            ("총 리소스", 100, None),
-            ("미사용", 10, "danger"),
-            ("예상 절감", "$500", "success"),
-        ])
+        result = report.add_summary(
+            [
+                ("총 리소스", 100, None),
+                ("미사용", 10, "danger"),
+                ("예상 절감", "$500", "success"),
+            ]
+        )
 
         assert result is report  # 체이닝 지원
         assert len(report.summaries) == 1
@@ -364,10 +366,14 @@ class TestHTMLReport:
         report = HTMLReport("테스트")
 
         data = [
-            {"name": "EC2", "value": 100, "children": [
-                {"name": "t3.micro", "value": 30},
-                {"name": "t3.small", "value": 70},
-            ]},
+            {
+                "name": "EC2",
+                "value": 100,
+                "children": [
+                    {"name": "t3.micro", "value": 30},
+                    {"name": "t3.small", "value": 70},
+                ],
+            },
             {"name": "RDS", "value": 50},
         ]
 

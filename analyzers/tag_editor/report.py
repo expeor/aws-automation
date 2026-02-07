@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime
 
-from core.tools.io.excel import ColumnDef, Styles, Workbook
+from shared.io.excel import ColumnDef, Styles, Workbook
 
 from .types import (
     MAP_TAG_KEY,

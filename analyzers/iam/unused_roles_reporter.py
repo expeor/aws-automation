@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 if TYPE_CHECKING:
     from .iam_audit_analysis.collector import IAMData

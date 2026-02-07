@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 from .sg_audit_analysis import SGAnalyzer, SGCollector, SGExcelReporter
 
@@ -98,7 +98,7 @@ def run(ctx: ExecutionContext) -> None:
     reporter = SGExcelReporter(sg_results, rule_results, summary)
     filepath = reporter.generate(output_path)
 
-    from core.tools.output import print_report_complete
+    from shared.io.output import print_report_complete
 
     print_report_complete(filepath)
 

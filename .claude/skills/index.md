@@ -51,6 +51,24 @@
 | `pptx` | PowerPoint 생성 | 프레젠테이션 |
 | `docx` | Word 문서 처리 | 문서 생성 |
 
+### 텍스트 품질 (humanizer)
+
+| Skill | 설명 | 용도 |
+|-------|------|------|
+| `humanizer` | AI 생성 영문 텍스트 패턴 감지/수정 (24개 패턴) | README, CHANGELOG, description_en |
+
+### UI/UX 디자인 (ui-ux-pro-max)
+
+| Skill | 설명 | 용도 |
+|-------|------|------|
+| `ui-ux-pro-max` | 50개 스타일, 21개 팔레트, 차트 가이드라인 | HTML 리포트 시각 품질 개선 |
+
+### 스킬 관리 (find-skills)
+
+| Skill | 설명 | 용도 |
+|-------|------|------|
+| `find-skills` | 스킬 검색/설치/업데이트 (`npx skills`) | 스킬 인프라 관리 |
+
 ---
 
 ## 프로젝트 Skills
@@ -70,14 +88,27 @@
 |-------|------|----------|
 | [`python-best-practices`](./python-best-practices/) | Python 코딩 스타일 | ruff, mypy, 타입 힌트 |
 | [`parallel-execution-patterns`](./parallel-execution-patterns/) | 병렬 실행 | parallel_collect, Rate Limiter |
-| [`error-handling-patterns`](./error-handling-patterns/) | 에러 처리 | ErrorCollector, try_or_default |
+| [`error-handling-patterns`](./error-handling-patterns/) | 에러 처리 | ErrorCollector, @safe_aws_call, try_or_default |
 
 ### 출력 및 리포트
 
 | Skill | 설명 | 주요 내용 |
 |-------|------|----------|
-| [`output-patterns`](./output-patterns/) | 리포트 생성 | Excel, HTML, generate_reports |
+| [`output-patterns`](./output-patterns/) | 리포트 생성 | Excel, HTML, generate_dual_report |
 | [`cli-output-style.md`](./cli-output-style.md) | 콘솔 출력 스타일 | 심볼, 색상, Step 패턴 |
+
+### 아키텍처 가이드
+
+| Skill | 설명 | 주요 내용 |
+|-------|------|----------|
+| [`analyzers-vs-reports.md`](./analyzers-vs-reports.md) | analyzers/ vs reports/ 경계 | 단일 서비스 vs 종합 오케스트레이션 |
+| [`debugging-troubleshooting.md`](./debugging-troubleshooting.md) | 디버깅/트러블슈팅 | moto, conftest, 병렬 실행 디버깅 |
+
+### 텍스트 품질
+
+| Skill | 설명 | 주요 내용 |
+|-------|------|----------|
+| [`korean-humanizer`](./korean-humanizer/) | 한국어 AI 작문 패턴 제거 | 12개 한국어 패턴, 도구 설명/CHANGELOG/docstring |
 
 ### 개발 워크플로우
 
@@ -95,13 +126,18 @@
 
 | 작업 | 프로젝트 Skill | 외부 Skill |
 |------|---------------|-----------|
-| 새 플러그인 생성 | `plugin-metadata-schema.md` | - |
+| 새 플러그인 생성 | `plugin-metadata-schema.md`, `analyzers-vs-reports.md` | - |
 | CloudWatch 메트릭 | `cloudwatch-metrics-patterns.md` | - |
-| 테스트 작성 | `tdd-workflow` | `python-testing-patterns`, `test-driven-development` |
+| 테스트 작성 | `tdd-workflow`, `debugging-troubleshooting.md` | `python-testing-patterns`, `test-driven-development` |
 | 보안 검토 | `security-review` | `property-based-testing`, `codeql` |
-| 리포트 생성 | `output-patterns` | `xlsx` |
+| 리포트 생성 | `output-patterns` | `xlsx`, `ui-ux-pro-max` |
+| HTML 리포트 디자인 | `output-patterns` | `ui-ux-pro-max` |
 | GitHub Actions | - | `github-actions-templates` |
 | 에러 처리 | `error-handling-patterns` | - |
+| 디버깅 | `debugging-troubleshooting.md` | `systematic-debugging` |
+| 영문 텍스트 품질 | - | `humanizer` |
+| 한국어 텍스트 품질 | `korean-humanizer` | - |
+| 스킬 검색/설치 | - | `find-skills` |
 
 ---
 
@@ -109,12 +145,14 @@
 
 ### 플러그인 개발 체크리스트
 
-1. **메타데이터** → `plugin-metadata-schema.md`
-2. **수집 로직** → `parallel-execution-patterns`
-3. **CloudWatch** → `cloudwatch-metrics-patterns.md`
-4. **인벤토리** → `inventory-collector-patterns.md`
-5. **리포트** → `output-patterns`
-6. **테스트** → `tdd-workflow` + `python-testing-patterns`
+1. **위치 결정** → `analyzers-vs-reports.md` (단일 서비스: analyzers/, 종합: reports/)
+2. **메타데이터** → `plugin-metadata-schema.md`
+3. **수집 로직** → `parallel-execution-patterns`
+4. **CloudWatch** → `cloudwatch-metrics-patterns.md`
+5. **인벤토리** → `inventory-collector-patterns.md`
+6. **에러 처리** → `error-handling-patterns` (@safe_aws_call, ErrorCollector)
+7. **리포트** → `output-patterns` (generate_dual_report + create_output_path)
+8. **테스트** → `tdd-workflow` + `debugging-troubleshooting.md`
 
 ### 자주 사용하는 import
 
@@ -124,6 +162,7 @@ from core.parallel import parallel_collect, get_client, quiet_mode
 
 # 에러 처리
 from core.parallel.errors import ErrorCollector, ErrorSeverity, try_or_default
+from core.parallel.decorators import safe_aws_call, RetryConfig
 
 # CloudWatch 메트릭
 from shared.aws.metrics import batch_get_metrics, MetricQuery
@@ -132,7 +171,9 @@ from shared.aws.metrics import batch_get_metrics, MetricQuery
 from shared.aws.inventory import InventoryCollector
 
 # 리포트 출력
-from shared.io.compat import generate_reports
+from shared.io.compat import generate_dual_report
+from shared.io.output.helpers import create_output_path
+from shared.io.output import print_report_complete, open_in_explorer
 ```
 
 ---
@@ -146,6 +187,7 @@ from shared.io.compat import generate_reports
 | `/make-test` | 테스트 스캐폴딩 | `tdd-workflow` |
 | `/lint` | 코드 품질 검사 | `python-best-practices` |
 | `/coverage` | 테스트 커버리지 | `tdd-workflow` |
+| `/review` | 2단계 리뷰 (스펙 + 품질) | `commit`, `security-review` |
 | `/sync-index` | 인덱스 갱신 | - |
 
 ---

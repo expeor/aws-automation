@@ -127,14 +127,9 @@ def _get_output_config(ctx: ExecutionContext) -> OutputConfig:
 def _get_default_output_dir(ctx: ExecutionContext) -> str:
     """기본 출력 디렉토리 생성"""
     from .output import OutputPath
+    from .output.helpers import get_context_identifier
 
-    # 계정/프로파일 기반 identifier 결정
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     # 카테고리 및 도구명 추출
     category = ctx.category or "report"
@@ -202,7 +197,8 @@ def generate_dual_report(
     output_dir: str,
     prefix: str,
     excel_builder: Callable[[], Any],
-    html_config: dict[str, Any],
+    html_config: dict[str, Any] | None = None,
+    html_builder: Callable[[str], str] | None = None,
     region: str | None = None,
 ) -> dict[str, str]:
     """Excel과 HTML을 동시에 생성하는 고수준 API
@@ -217,7 +213,11 @@ def generate_dual_report(
         prefix: 파일명 접두사 (예: "ec2_unused")
         excel_builder: Excel Workbook 생성 함수 (빌더 패턴)
             () -> Workbook (이미 데이터가 채워진 상태)
-        html_config: HTML 리포트 설정
+        html_config: HTML 리포트 설정 (자동 HTML 생성용)
+            html_builder와 동시 사용 불가.
+        html_builder: 커스텀 HTML 생성 함수 (output_dir -> filepath)
+            복잡한 HTML 리포트가 필요한 경우 사용.
+            html_config와 동시 사용 불가.
         region: 리전 (파일명에 포함, 옵션)
 
     Returns:
@@ -267,11 +267,17 @@ def generate_dual_report(
     # HTML 생성
     if output_config.should_output_html() and data:
         try:
-            html_path = _generate_html_from_data(ctx, data, html_config, output_dir)
-            results["html"] = html_path
+            if html_builder is not None:
+                html_path = html_builder(output_dir)
+            elif html_config is not None:
+                html_path = _generate_html_from_data(ctx, data, html_config, output_dir)
+            else:
+                html_path = None
 
-            if output_config.auto_open:
-                open_in_browser(html_path)
+            if html_path:
+                results["html"] = html_path
+                if output_config.auto_open:
+                    open_in_browser(html_path)
         except Exception as e:
             import logging
 

@@ -1,5 +1,5 @@
 """
-core/tools/output/report_types.py - 보고서/도구 타입 상수 정의
+shared/io/output/report_types.py - 보고서/도구 타입 상수 정의
 
 출력 경로 표준화를 위한 타입 상수.
 경로 구조: output/{profile}/{service}/{type}/{date}/
@@ -11,8 +11,10 @@ core/tools/output/report_types.py - 보고서/도구 타입 상수 정의
 
   Tools (도구 모음) - active operations
     ├─ Analysis (조회/분석): log, search
-    └─ Actions (실행/변경): cleanup, rotate, sync, ...
+    └─ Actions (실행/변경): cleanup, tag, sync
 """
+
+from __future__ import annotations
 
 from enum import Enum
 

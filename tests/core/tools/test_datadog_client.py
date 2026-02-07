@@ -2,8 +2,9 @@
 tests/core/tools/test_datadog_client.py - Datadog 클라이언트 테스트
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
 
 # Skip all tests if datadog_api_client is not installed
 pytest.importorskip("datadog_api_client")
@@ -42,9 +43,10 @@ class TestDatadogClientManager:
         api_keys = {"prod": {"api_key": "key", "app_key": "app"}}
         manager = DatadogClientManager(api_keys)
 
-        with patch("datadog_api_client.v2.api.events_api.EventsApi") as mock_events, patch(
-            "datadog_api_client.v1.api.metrics_api.MetricsApi"
-        ) as mock_metrics:
+        with (
+            patch("datadog_api_client.v2.api.events_api.EventsApi") as mock_events,
+            patch("datadog_api_client.v1.api.metrics_api.MetricsApi") as mock_metrics,
+        ):
             result = manager.get_client("prod")
 
             assert result is not None

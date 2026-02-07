@@ -28,9 +28,15 @@ pkg/cache - 공통 캐시 경로 관리
 """
 
 from .path import CACHE_ROOT, get_cache_dir, get_cache_path
+from .ttl import CACHE_TTL, DEFAULT_TTL, get_or_fetch, get_ttl, is_cache_valid
 
 __all__: list[str] = [
     "get_cache_dir",
     "get_cache_path",
     "CACHE_ROOT",
+    "CACHE_TTL",
+    "DEFAULT_TTL",
+    "get_ttl",
+    "is_cache_valid",
+    "get_or_fetch",
 ]

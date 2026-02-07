@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from core.tools.io.excel import ColumnDef, Styles, Workbook
+from shared.io.excel import ColumnDef, Styles, Workbook
 
 from .types import UnusedAllResult
 

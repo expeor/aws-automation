@@ -22,6 +22,7 @@ def mock_context():
     ctx = MagicMock()
     ctx.lang = "ko"
     ctx.profile_name = "test-profile"
+    ctx.profiles = []
     ctx.category = "test-category"
     ctx.tool = MagicMock()
     ctx.tool.name = "test tool"
@@ -97,18 +98,19 @@ class TestGetDefaultOutputDir:
         assert "ec2" in result
 
     def test_default_output_dir_with_sso_session(self, mock_context):
-        """SSO 세션 기반 출력 디렉토리"""
+        """SSO 세션 기반 출력 디렉토리 (프로파일명 사용)"""
         mock_context.is_sso_session.return_value = True
         account = MagicMock()
         account.id = "123456789012"
         mock_context.accounts = [account]
+        mock_context.profile_name = "sso-profile"
         mock_context.category = "vpc"
         mock_context.tool.name = "security groups"
 
         result = _get_default_output_dir(mock_context)
 
         assert result is not None
-        assert "123456789012" in result
+        assert "sso-profile" in result
         assert "vpc" in result
 
     def test_default_output_dir_no_profile_or_account(self, mock_context):
@@ -286,7 +288,11 @@ class TestGenerateReports:
         html_config = {"title": "Test", "service": "EC2", "tool_name": "test"}
 
         results = generate_reports(
-            mock_context, sample_data, excel_generator=excel_generator, html_config=html_config, output_dir=str(tmp_path)
+            mock_context,
+            sample_data,
+            excel_generator=excel_generator,
+            html_config=html_config,
+            output_dir=str(tmp_path),
         )
 
         assert "excel" in results
@@ -421,9 +427,7 @@ class TestGenerateDualReport:
 
         html_config = {"title": "Test", "service": "EC2", "tool_name": "test"}
 
-        results = generate_dual_report(
-            mock_context, sample_data, str(tmp_path), "ec2_test", excel_builder, html_config
-        )
+        results = generate_dual_report(mock_context, sample_data, str(tmp_path), "ec2_test", excel_builder, html_config)
 
         assert "excel" in results
         assert "html" not in results
@@ -449,9 +453,7 @@ class TestGenerateDualReport:
 
         html_config = {"title": "Test", "service": "EC2", "tool_name": "test"}
 
-        results = generate_dual_report(
-            mock_context, sample_data, str(tmp_path), "ec2_test", excel_builder, html_config
-        )
+        results = generate_dual_report(mock_context, sample_data, str(tmp_path), "ec2_test", excel_builder, html_config)
 
         assert "html" in results
         assert "excel" not in results
@@ -473,9 +475,7 @@ class TestGenerateDualReport:
 
         html_config = {"title": "Test", "service": "EC2", "tool_name": "test"}
 
-        generate_dual_report(
-            mock_context, sample_data, str(output_dir), "ec2_test", excel_builder, html_config
-        )
+        generate_dual_report(mock_context, sample_data, str(output_dir), "ec2_test", excel_builder, html_config)
 
         assert output_dir.exists()
 
@@ -512,9 +512,7 @@ class TestGenerateDualReport:
         html_config = {"title": "Test", "service": "EC2", "tool_name": "test"}
 
         # 에러가 발생해도 예외를 발생시키지 않음
-        results = generate_dual_report(
-            mock_context, sample_data, str(tmp_path), "ec2_test", excel_builder, html_config
-        )
+        results = generate_dual_report(mock_context, sample_data, str(tmp_path), "ec2_test", excel_builder, html_config)
 
         assert "html" not in results
 

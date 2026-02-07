@@ -6,7 +6,6 @@ Rich utility functions: print_rule, print_result_tree, print_error_tree,
 print_stat_columns, print_execution_summary, print_results_json.
 """
 
-
 from rich.panel import Panel
 
 # =============================================================================

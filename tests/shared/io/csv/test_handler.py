@@ -264,9 +264,7 @@ class TestValidateCsvHeaders:
         temp_file = tmp_path / "valid.csv"
         temp_file.write_text("Name,Age,City\nJohn,30,Seoul\n", encoding="utf-8")
 
-        is_valid, message, encoding = validate_csv_headers(
-            str(temp_file), required_headers=["Name", "Age", "City"]
-        )
+        is_valid, message, encoding = validate_csv_headers(str(temp_file), required_headers=["Name", "Age", "City"])
 
         assert is_valid is True
         assert "성공" in message
@@ -287,9 +285,7 @@ class TestValidateCsvHeaders:
         temp_file = tmp_path / "missing.csv"
         temp_file.write_text("Name,Age\nJohn,30\n", encoding="utf-8")
 
-        is_valid, message, encoding = validate_csv_headers(
-            str(temp_file), required_headers=["Name", "Age", "City"]
-        )
+        is_valid, message, encoding = validate_csv_headers(str(temp_file), required_headers=["Name", "Age", "City"])
 
         assert is_valid is False
         assert "누락" in message

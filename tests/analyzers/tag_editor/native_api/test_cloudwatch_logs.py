@@ -6,7 +6,6 @@ CloudWatch Logs 태그 수집/적용 테스트
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from botocore.exceptions import ClientError
 
 from analyzers.tag_editor.native_api.cloudwatch_logs import (

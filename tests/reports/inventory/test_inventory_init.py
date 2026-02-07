@@ -2,8 +2,6 @@
 tests/reports/inventory/test_inventory_init.py - Inventory module structure tests
 """
 
-import pytest
-
 from reports.inventory import CATEGORY, TOOLS
 
 

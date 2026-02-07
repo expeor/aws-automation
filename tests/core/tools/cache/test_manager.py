@@ -8,12 +8,8 @@ Cache path management 테스트
 """
 
 import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-
 
 # =============================================================================
 # Fixtures

@@ -17,7 +17,6 @@ from analyzers.iam.iam_audit_analysis.collector import (
 from analyzers.iam.unused_roles import UNUSED_ROLE_THRESHOLD_DAYS, _collect_role_data, run
 from analyzers.iam.unused_roles_reporter import UnusedRolesReporter
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -365,7 +364,7 @@ class TestRun:
         mock_reporter.assert_not_called()
 
     @patch("analyzers.iam.unused_roles.open_in_explorer")
-    @patch("core.tools.output.print_report_complete")
+    @patch("shared.io.output.print_report_complete")
     @patch("analyzers.iam.unused_roles.UnusedRolesReporter")
     @patch("analyzers.iam.unused_roles.parallel_collect")
     @patch("analyzers.iam.unused_roles.OutputPath")
@@ -390,7 +389,7 @@ class TestRun:
         mock_reporter_instance.generate.assert_called_once()
 
     @patch("analyzers.iam.unused_roles.open_in_explorer")
-    @patch("core.tools.output.print_report_complete")
+    @patch("shared.io.output.print_report_complete")
     @patch("analyzers.iam.unused_roles.UnusedRolesReporter")
     @patch("analyzers.iam.unused_roles.parallel_collect")
     @patch("analyzers.iam.unused_roles.OutputPath")
@@ -416,7 +415,7 @@ class TestRun:
         assert "일부 오류 발생: 2건" in captured.out
 
     @patch("analyzers.iam.unused_roles.open_in_explorer")
-    @patch("core.tools.output.print_report_complete")
+    @patch("shared.io.output.print_report_complete")
     @patch("analyzers.iam.unused_roles.UnusedRolesReporter")
     @patch("analyzers.iam.unused_roles.parallel_collect")
     @patch("analyzers.iam.unused_roles.OutputPath")

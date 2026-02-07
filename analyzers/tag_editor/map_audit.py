@@ -396,14 +396,9 @@ def run(ctx: ExecutionContext) -> None:
     _print_summary_table(results)
 
     # 보고서 생성
-    from core.tools.output import OutputPath, open_in_explorer
+    from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     untagged_only = ctx.options.get("untagged_only", False)
 

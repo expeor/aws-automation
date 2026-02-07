@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -338,7 +338,7 @@ def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")

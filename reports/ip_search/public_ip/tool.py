@@ -17,7 +17,6 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from core.tools.output.builder import OutputPath
 from shared.aws.ip_ranges import (
     ALL_PROVIDERS,
     PublicIPResult,
@@ -29,6 +28,7 @@ from shared.aws.ip_ranges import (
     search_public_cidr,
     search_public_ip,
 )
+from shared.io.output.builder import OutputPath
 
 from .i18n import t
 
@@ -79,9 +79,9 @@ def _export_csv(results: list[PublicIPResult], session_name: str) -> str:
 def _export_excel(results: list[PublicIPResult], session_name: str) -> str:
     """Export results to Excel file."""
     try:
-        from core.tools.io.excel import ColumnDef, Workbook
+        from shared.io.excel import ColumnDef, Workbook
     except ImportError:
-        console.print("[red]core.tools.io.excel not available[/red]")
+        console.print("[red]shared.io.excel not available[/red]")
         return ""
 
     if not results:

@@ -2,8 +2,6 @@
 tests/reports/ip_search/test_ip_search_init.py - IP search module structure tests
 """
 
-import pytest
-
 from reports.ip_search import CATEGORY, TOOLS
 
 

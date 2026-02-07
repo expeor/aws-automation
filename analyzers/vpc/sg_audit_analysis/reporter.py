@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 from .analyzer import RuleAnalysisResult, RuleStatus, SGAnalysisResult, SGStatus
 

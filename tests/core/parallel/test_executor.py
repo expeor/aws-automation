@@ -3,13 +3,13 @@ tests/core/parallel/test_executor.py - ParallelSessionExecutor 테스트
 """
 
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
 
 from core.parallel.executor import ParallelConfig, ParallelSessionExecutor, parallel_collect
-from core.parallel.types import ErrorCategory, ParallelExecutionResult, TaskResult
+from core.parallel.types import ErrorCategory
 
 
 @pytest.fixture
@@ -256,8 +256,6 @@ class TestParallelSessionExecutor:
         concurrent_count = {"value": 0, "max": 0}
 
         def collector_func(session, account_id, account_name, region):
-            import threading
-
             concurrent_count["value"] += 1
             concurrent_count["max"] = max(concurrent_count["max"], concurrent_count["value"])
             time.sleep(0.01)  # 약간 대기

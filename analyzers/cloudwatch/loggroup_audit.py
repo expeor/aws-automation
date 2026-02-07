@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -251,7 +251,7 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE066", end_color="FFE066", fill_type="solid")
@@ -370,12 +370,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print(f"월간 절감 가능: [yellow]${total_cost:,.2f}[/yellow]")
 
     # 보고서 생성
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("cloudwatch", "inventory").with_date().build()
     filepath = generate_report(results, output_path)

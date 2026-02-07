@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 logger = logging.getLogger(__name__)
 
@@ -513,7 +513,7 @@ def analyze_repos(
 def run_audit(ctx) -> dict[str, Any]:
     """CodeCommit 리포지토리 분석"""
     from core.auth.session import get_context_session
-    from core.tools.output import OutputPath
+    from shared.io.output import OutputPath
 
     region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
     session = get_context_session(ctx, region)

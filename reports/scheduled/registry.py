@@ -130,7 +130,9 @@ def get_schedule_groups(
         groups.append(
             ScheduleGroup(
                 cycle=cycle,
-                display_name=data.get("display_name", cycle_code) if lang == "ko" else data.get("display_name_en", data.get("display_name", cycle_code)),
+                display_name=data.get("display_name", cycle_code)
+                if lang == "ko"
+                else data.get("display_name_en", data.get("display_name", cycle_code)),
                 display_name_en=data.get("display_name_en", data.get("display_name", cycle_code)),
                 color=data.get("color", "dim"),
                 icon=data.get("icon", "📄"),

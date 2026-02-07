@@ -1,6 +1,6 @@
 ---
 name: error-handling-patterns
-description: 에러 핸들링 패턴. ErrorCollector, try_or_default, 에러 분류 등.
+description: 에러 핸들링 패턴. ErrorCollector, try_or_default, @safe_aws_call, 에러 분류 등.
 ---
 
 # 에러 핸들링 패턴
@@ -11,6 +11,80 @@ description: 에러 핸들링 패턴. ErrorCollector, try_or_default, 에러 분
 
 ```python
 from core.parallel.errors import ErrorCollector, ErrorSeverity, try_or_default
+```
+
+## @safe_aws_call 데코레이터
+
+Rate limiting + 재시도 + 구조화된 에러 처리를 제공하는 데코레이터:
+
+```python
+from core.parallel.decorators import safe_aws_call, RetryConfig
+from core.parallel.types import TaskError
+
+@safe_aws_call(service="ec2", operation="describe_volumes")
+def get_volumes(session, region):
+    ec2 = session.client("ec2", region_name=region)
+    return ec2.describe_volumes()["Volumes"]
+
+# 사용
+result = get_volumes(session, "ap-northeast-2")
+if isinstance(result, TaskError):
+    print(f"Error: {result.category} - {result.message}")
+else:
+    print(f"Found {len(result)} volumes")
+```
+
+### RetryConfig 설정
+
+```python
+from core.parallel.decorators import RetryConfig, safe_aws_call
+
+# 커스텀 재시도 설정
+config = RetryConfig(
+    max_retries=5,        # 최대 5회 재시도 (기본: 3)
+    base_delay=2.0,       # 기본 대기 2초 (기본: 1.0)
+    max_delay=60.0,       # 최대 대기 60초 (기본: 30.0)
+    exponential_base=2.0, # 지수 백오프 밑수
+    jitter=True,          # 랜덤 지터 추가 (기본: True)
+)
+
+@safe_aws_call(service="rds", operation="describe_instances", retry_config=config)
+def get_rds_instances(session, region):
+    rds = session.client("rds", region_name=region)
+    return rds.describe_db_instances()["DBInstances"]
+```
+
+### 재시도 가능한 에러
+
+자동으로 재시도되는 에러 코드:
+- `Throttling`, `ThrottlingException`, `RequestLimitExceeded`
+- `TooManyRequestsException`, `RateExceeded`
+- `ServiceUnavailable`, `InternalError`
+- `RequestTimeout`, `SlowDown`
+
+재시도하지 않는 에러 (즉시 TaskError 반환):
+- `AccessDenied`, `UnauthorizedAccess`
+- `ResourceNotFound`, `NoSuchEntity`
+- `ValidationException`
+
+## categorize_error() 함수
+
+에러를 자동으로 카테고리로 분류:
+
+```python
+from core.parallel.decorators import categorize_error
+from core.parallel.types import ErrorCategory
+
+try:
+    result = client.describe_instances()
+except Exception as e:
+    category = categorize_error(e)
+    if category == ErrorCategory.THROTTLING:
+        print("API 호출 제한 초과")
+    elif category == ErrorCategory.ACCESS_DENIED:
+        print("권한 없음")
+    elif category == ErrorCategory.EXPIRED_TOKEN:
+        print("토큰 만료 - 재인증 필요")
 ```
 
 ## ErrorCollector 사용
@@ -211,8 +285,8 @@ def collect_volume_info(client, volume_id: str, errors: ErrorCollector):
 | `NOT_FOUND` | NotFound, NoSuch, DoesNotExist |
 | `THROTTLING` | Throttling, RateLimit, TooManyRequests |
 | `TIMEOUT` | Timeout, TimedOut |
-| `INVALID_REQUEST` | Invalid, Validation, Malformed |
-| `SERVICE_ERROR` | Internal, ServiceUnavailable |
+| `EXPIRED_TOKEN` | ExpiredToken, ExpiredTokenException |
+| `NETWORK` | ConnectionError, TimeoutError, OSError |
 | `UNKNOWN` | 기타 |
 
 ## 병렬 처리와 에러 핸들링
@@ -353,4 +427,5 @@ def run(ctx):
 ## 참조
 
 - `core/parallel/errors.py` - ErrorCollector, try_or_default
+- `core/parallel/decorators.py` - safe_aws_call, RetryConfig, categorize_error
 - `core/parallel/types.py` - ErrorCategory, TaskError

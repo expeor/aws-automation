@@ -4,8 +4,6 @@ tests/reports/test_reports_init.py - Reports module structure tests
 Tests for the main reports module initialization and metadata.
 """
 
-import pytest
-
 from reports import CATEGORY, TOOLS
 
 

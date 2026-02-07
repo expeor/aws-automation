@@ -12,10 +12,7 @@ Tests cover:
 - Error handling
 """
 
-import pytest
-
 from cli.i18n import DEFAULT_LANG, SUPPORTED_LANGS, get_lang, get_text, set_lang, t
-
 
 # =============================================================================
 # Language Context Tests

@@ -23,13 +23,13 @@ from rich.console import Console
 from rich.table import Table
 
 from core.parallel import parallel_collect, quiet_mode
-from core.tools.output import OutputPath, open_in_explorer
 from shared.aws.lambda_ import (
     EOLStatus,
     LambdaFunctionInfo,
     collect_functions,
     get_runtime_info,
 )
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -285,7 +285,7 @@ def generate_excel_report(results: list[RuntimeDeprecationResult], output_dir: s
     """Excel 보고서 생성 (6 시트)"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Workbook
+    from shared.io.excel import ColumnDef, Workbook
 
     red_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFE66D", end_color="FFE66D", fill_type="solid")
@@ -708,12 +708,7 @@ def run(ctx: ExecutionContext) -> None:
     _print_console_summary(results)
 
     # 출력 경로
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("lambda", "runtime_deprecated").with_date().build()
 

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 if TYPE_CHECKING:
     from cli.flow.context import ExecutionContext
@@ -313,7 +313,7 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
     from openpyxl.styles import PatternFill
 
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -426,12 +426,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("\n[bold]종합 결과[/bold]")
     console.print(f"빈 버킷: [yellow]{total_empty}개[/yellow], 버전만: [yellow]{total_versioning}개[/yellow]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("s3", "unused").with_date().build()
     filepath = generate_report(results, output_path)

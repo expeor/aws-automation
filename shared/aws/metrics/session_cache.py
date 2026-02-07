@@ -89,10 +89,7 @@ class CacheStats:
 
     def summary(self) -> str:
         """통계 요약 문자열"""
-        return (
-            f"hits={self.hits}, misses={self.misses}, "
-            f"hit_rate={self.hit_rate:.1%}, evictions={self.evictions}"
-        )
+        return f"hits={self.hits}, misses={self.misses}, hit_rate={self.hit_rate:.1%}, evictions={self.evictions}"
 
 
 # =============================================================================
@@ -447,7 +444,9 @@ class FileBackedMetricCache:
         if self._register_global:
             set_global_cache(self)  # type: ignore[arg-type]
         self._cleanup_expired()
-        logger.debug(f"FileBackedMetricCache: 캐시 활성화 (dir={self._cache_dir}, cleanup_on_exit={self._cleanup_on_exit})")
+        logger.debug(
+            f"FileBackedMetricCache: 캐시 활성화 (dir={self._cache_dir}, cleanup_on_exit={self._cleanup_on_exit})"
+        )
         return self
 
     def __exit__(self, *args) -> None:
@@ -525,7 +524,7 @@ class FileBackedMetricCache:
                         self._memory_cache.set(key, value)
                         self._stats.add_hit()
                         self._file_hits += 1
-                        return value
+                        return float(value)
             except (OSError, json.JSONDecodeError):
                 pass
 

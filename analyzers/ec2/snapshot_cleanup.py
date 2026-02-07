@@ -27,7 +27,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from core.parallel import get_client, parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 from .snapshot_audit import (
     UsageStatus,
@@ -140,7 +140,7 @@ def collect_options(ctx: ExecutionContext) -> None:
 
 def _generate_report(results: list[SnapshotCleanupResult], output_dir: str) -> str:
     """Excel 보고서 생성"""
-    from core.tools.io.excel import ColumnDef, Styles, Workbook
+    from shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
 
@@ -289,12 +289,7 @@ def run(ctx: ExecutionContext) -> None:
     # Excel 보고서
     console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
 
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("ebs", "snapshot_cleanup").with_date().build()
     filepath = _generate_report(all_results, output_path)

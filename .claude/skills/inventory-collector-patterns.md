@@ -292,7 +292,7 @@ def run(ctx) -> None:
 ```python
 from shared.aws.inventory import InventoryCollector
 from shared.io.compat import generate_reports
-from core.tools.output import OutputPath
+from shared.io.output import OutputPath
 
 def run(ctx) -> None:
     """VPC 네트워크 인벤토리 수집"""

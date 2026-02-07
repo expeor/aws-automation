@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 from .analyzer import (
     IAMAnalysisResult,

@@ -676,7 +676,7 @@ class TestExecutionContextOutputConfig:
         ctx = ExecutionContext()
         config = ctx.get_output_config()
 
-        from core.tools.io.config import OutputConfig
+        from shared.io.config import OutputConfig
 
         assert isinstance(config, OutputConfig)
 

@@ -40,13 +40,13 @@ This project uses [Ruff](https://github.com/astral-sh/ruff) for linting and form
 
 ```bash
 # Check for issues
-ruff check cli core plugins
+ruff check cli core analyzers
 
 # Auto-fix issues
-ruff check --fix cli core plugins
+ruff check --fix cli core analyzers
 
 # Format code
-ruff format cli core plugins
+ruff format cli core analyzers
 ```
 
 ### Type Checking
@@ -98,7 +98,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/). This ena
 |-------|-------------|
 | `cli` | CLI module |
 | `core` | Core module |
-| `plugins` | Plugins |
+| `analyzers` | Analyzers |
 | `deps` | Dependencies |
 | Service name | Specific AWS service (ec2, vpc, iam, etc.) |
 
@@ -106,7 +106,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/). This ena
 
 ```bash
 # Feature
-feat(plugins): add elasticache unused cluster detection
+feat(analyzers): add elasticache unused cluster detection
 
 # Bug fix
 fix(core): handle SSO token expiration gracefully
@@ -148,8 +148,8 @@ BREAKING CHANGE: -p flag now requires profile name instead of index
    ```
 4. **Run linting**:
    ```bash
-   ruff check cli core plugins
-   ruff format --check cli core plugins
+   ruff check cli core analyzers
+   ruff format --check cli core analyzers
    ```
 5. **Push and create a PR** with a descriptive title following commit conventions
 6. **Fill out the PR template** completely
@@ -161,7 +161,7 @@ BREAKING CHANGE: -p flag now requires profile name instead of index
 PR titles must follow Conventional Commits format:
 
 ```
-feat(plugins): add RDS snapshot audit tool
+feat(analyzers): add RDS snapshot audit tool
 fix(core): handle pagination correctly
 docs: update installation guide
 ```
@@ -176,10 +176,10 @@ pytest tests/ -v
 
 # Run specific module tests
 pytest tests/core/ -v
-pytest tests/plugins/ec2/ -v
+pytest tests/analyzers/ec2/ -v
 
 # Run with coverage
-pytest tests/ --cov=cli --cov=core --cov=plugins
+pytest tests/ --cov=cli --cov=core --cov=analyzers
 ```
 
 ### Writing Tests
@@ -188,16 +188,61 @@ pytest tests/ --cov=cli --cov=core --cov=plugins
 - Use `moto` for AWS service mocking
 - Follow the existing test structure in `tests/`
 
-## Adding a New Plugin Tool
+## Adding a New Analyzer Tool
 
-See [CLAUDE.md](CLAUDE.md) for detailed plugin development patterns.
+See [CLAUDE.md](CLAUDE.md) for detailed analyzer development patterns.
 
 ### Quick Reference
 
-1. Create module in `plugins/{service}/{tool_name}.py`
-2. Add tool entry to `plugins/{service}/__init__.py`
-3. Implement `run(ctx)` function
-4. Add tests in `tests/plugins/{service}/`
+1. Create module in `analyzers/{service}/{tool_name}.py`
+2. Add tool entry to `analyzers/{service}/__init__.py`
+3. Implement `run(ctx)` function using `parallel_collect` pattern
+4. Add tests in `tests/analyzers/{service}/`
+
+### Analyzer Development Workflow
+
+```bash
+# 1. Create your analyzer module
+# analyzers/{service}/{tool_name}.py
+
+# 2. Run and test locally
+aa {service}/{tool_name} -p my-profile -r ap-northeast-2
+
+# 3. Write tests
+pytest tests/analyzers/{service}/ -v
+
+# 4. Lint & format
+ruff check --fix analyzers/{service}/
+ruff format analyzers/{service}/
+```
+
+### Mocking AWS Services with moto
+
+Use the `_make_resource()` factory pattern for test fixtures:
+
+```python
+from unittest.mock import MagicMock, patch
+from analyzers.{service}.{tool} import ResourceInfo
+
+def _make_resource(
+    name: str = "test-resource",
+    region: str = "ap-northeast-2",
+    account_id: str = "123456789012",
+    **kwargs,
+) -> ResourceInfo:
+    """Factory with sensible defaults + overrides"""
+    return ResourceInfo(name=name, region=region, account_id=account_id, **kwargs)
+
+class TestAnalyzer:
+    @patch("analyzers.{service}.{tool}.get_client")
+    def test_collect(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.describe_resources.return_value = {"Resources": [...]}
+
+        result = collect_resources(MagicMock(), "123456789012", "test", "ap-northeast-2")
+        assert len(result) == 1
+```
 
 ## Issue Guidelines
 

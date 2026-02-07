@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.tools.io.excel import ColumnDef, Workbook
+from shared.io.excel import ColumnDef, Workbook
 
 logger = logging.getLogger(__name__)
 
@@ -498,7 +498,7 @@ def run_sync(ctx) -> dict[str, Any] | None:
     from functools import partial
 
     from core.parallel import parallel_collect
-    from core.tools.output import OutputPath
+    from shared.io.output import OutputPath
 
     # 옵션에서 파라미터 추출
     instance_ids = ctx.options.get("instance_ids")
@@ -539,12 +539,9 @@ def run_sync(ctx) -> dict[str, Any] | None:
     has_results = any(s.results for s in all_summaries)
     if has_results:
         # 식별자 결정 (SSO 세션이면 첫 계정 ID, 아니면 프로파일 이름)
-        if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-            identifier = ctx.accounts[0].id
-        elif ctx.profile_name:
-            identifier = ctx.profile_name
-        else:
-            identifier = "default"
+        from shared.io.output import get_context_identifier
+
+        identifier = get_context_identifier(ctx)
 
         output_dir = OutputPath(identifier).sub("tag", "compliance").with_date().build()
 

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from core.parallel import parallel_collect
-from core.tools.output import OutputPath, open_in_explorer
+from shared.io.output import OutputPath, get_context_identifier, open_in_explorer
 
 from .common import (
     LBAnalysisResult,
@@ -91,12 +91,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print(f"\n  [red]미사용 월 비용: ${totals['unused_cost']:.2f}[/red]")
 
     # 보고서
-    if hasattr(ctx, "is_sso_session") and ctx.is_sso_session() and ctx.accounts:
-        identifier = ctx.accounts[0].id
-    elif ctx.profile_name:
-        identifier = ctx.profile_name
-    else:
-        identifier = "default"
+    identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("elb", "unused").with_date().build()
     filepath = generate_unused_report(all_results, output_path, lb_type_name="NLB")

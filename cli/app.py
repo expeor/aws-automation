@@ -841,7 +841,9 @@ class FavoriteGroup(click.Group):
         @click.command(name=str(number))
         @click.option("-p", "--profile", "profile", help="AWS 프로파일")
         @click.option("-r", "--region", multiple=True, default=["ap-northeast-2"], help="리전")
-        @click.option("-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both")
+        @click.option(
+            "-f", "--format", type=click.Choice(["excel", "html", "both", "console", "json", "csv"]), default="both"
+        )
         @click.pass_context
         def number_run_cmd(
             ctx: Context,
@@ -963,15 +965,17 @@ def fav_list(as_json: bool) -> None:
     if as_json:
         output_list = []
         for i, item in enumerate(items, 1):
-            output_list.append({
-                "index": i,
-                "type": item.item_type,
-                "category": item.category,
-                "tool_name": item.tool_name,
-                "tool_module": item.tool_module,
-                "ref": item.ref,
-                "added_at": item.added_at,
-            })
+            output_list.append(
+                {
+                    "index": i,
+                    "type": item.item_type,
+                    "category": item.category,
+                    "tool_name": item.tool_name,
+                    "tool_module": item.tool_module,
+                    "ref": item.ref,
+                    "added_at": item.added_at,
+                }
+            )
         click.echo(json_module.dumps(output_list, ensure_ascii=False, indent=2))
     else:
         table = Table(title=t("menu.favorites"), show_header=True)
@@ -1028,7 +1032,7 @@ def fav_add(path: str | None, category_name: str | None) -> None:
     """
     from rich.console import Console
 
-    from core.tools.discovery import get_category, load_tool
+    from core.tools.discovery import get_category
     from core.tools.history import FavoritesManager
 
     console = Console()
