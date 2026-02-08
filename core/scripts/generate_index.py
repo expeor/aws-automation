@@ -100,7 +100,9 @@ def get_directory_stats() -> dict:
 
 def get_git_status() -> dict:
     """Get git status for recent changes."""
-    result = {"modified": [], "new": [], "branch": "unknown"}
+    modified: list[str] = []
+    new: list[str] = []
+    branch = "unknown"
 
     try:
         # Current branch
@@ -111,7 +113,7 @@ def get_git_status() -> dict:
             cwd=PROJECT_ROOT,
         )
         if branch_result.returncode == 0:
-            result["branch"] = branch_result.stdout.strip()
+            branch = branch_result.stdout.strip()
 
         # Git status
         status_result = subprocess.run(
@@ -128,14 +130,14 @@ def get_git_status() -> dict:
                 file_path = line[3:].strip()
 
                 if status_code.startswith("?"):
-                    result["new"].append(file_path)
+                    new.append(file_path)
                 elif status_code.strip():
-                    result["modified"].append(file_path)
+                    modified.append(file_path)
 
     except FileNotFoundError:
         pass  # git not available
 
-    return result
+    return {"modified": modified, "new": new, "branch": branch}
 
 
 def get_core_modules() -> list[dict]:

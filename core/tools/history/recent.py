@@ -63,6 +63,7 @@ class RecentHistory:
     MAX_ITEMS = 50
     _instance: RecentHistory | None = None
     _lock = threading.Lock()
+    _initialized: bool
 
     def __new__(cls) -> RecentHistory:
         """싱글톤 패턴 (double-check locking)"""
