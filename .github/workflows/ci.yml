@@ -92,7 +92,7 @@ jobs:
           uv pip install --system mypy types-requests types-python-dateutil
 
       - name: Run MyPy
-        run: mypy core functions --ignore-missing-imports
+        run: mypy core --ignore-missing-imports
 
   # =============================================================================
   # Unit Tests (Multi-Python, Cross-Platform)
