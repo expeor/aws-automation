@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-02-08
+
+### Changed
+- refactor: consolidate `analyzers/` and `reports/` into `functions/` (Phase B)
+  - Top-level structure simplified to `core/` + `functions/` + `tests/`
+  - All imports updated: `from analyzers.` → `from functions.analyzers.`, `from reports.` → `from functions.reports.`
+  - Discovery system, config paths, CI workflow updated
+  - Documentation (CLAUDE.md, CONTRIBUTING.md, skills) updated
+
+### Removed
+- `core/cloudwatch/` deprecated compatibility shim (no consumers)
+
 ## [0.4.2] - 2026-02-07
 
 ### Changed

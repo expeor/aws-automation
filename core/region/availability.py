@@ -275,8 +275,9 @@ class RegionAvailabilityChecker:
 # 싱글톤 팩토리
 # =============================================================================
 
-_checkers: dict[int, RegionAvailabilityChecker] = {}
+_checkers: dict[str, RegionAvailabilityChecker] = {}
 _checker_lock = threading.Lock()
+_MAX_CACHED_CHECKERS = 50
 
 
 def get_region_checker(
@@ -292,10 +293,13 @@ def get_region_checker(
     Returns:
         RegionAvailabilityChecker 인스턴스
     """
-    key = id(session)
+    key = getattr(session, "profile_name", "default")
 
     with _checker_lock:
         if key not in _checkers:
+            # 캐시 크기 제한: 최대 초과 시 전체 초기화
+            if len(_checkers) >= _MAX_CACHED_CHECKERS:
+                _checkers.clear()
             _checkers[key] = RegionAvailabilityChecker(session=session, cache_ttl=cache_ttl)
         return _checkers[key]
 

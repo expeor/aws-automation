@@ -4,7 +4,7 @@ tests/test_search_engine.py - 검색 엔진 테스트
 
 import pytest
 
-from cli.ui.search import SearchResult, ToolSearchEngine, get_chosung, normalize_text
+from core.cli.ui.search import SearchResult, ToolSearchEngine, get_chosung, normalize_text
 
 
 class TestTextUtils:

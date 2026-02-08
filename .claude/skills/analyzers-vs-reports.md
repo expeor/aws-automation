@@ -1,4 +1,4 @@
-# analyzers/ vs reports/ 경계 가이드
+# functions/analyzers/ vs functions/reports/ 경계 가이드
 
 코드를 어디에 배치할지 결정하는 기준입니다.
 
@@ -6,10 +6,10 @@
 
 ```
 새 도구 만들기
-  ├── 단일 AWS 서비스? → analyzers/{service}/
+  ├── 단일 AWS 서비스? → functions/analyzers/{service}/
   │   예: EC2 미사용, RDS 유휴, Lambda 런타임
   │
-  └── 여러 서비스 취합/오케스트레이션? → reports/
+  └── 여러 서비스 취합/오케스트레이션? → functions/reports/
       예: 미사용 리소스 종합, 리소스 인벤토리, IP 검색
 ```
 
@@ -18,7 +18,7 @@
 **단일 서비스 분석 도구**. 각 서비스별 폴더에 위치.
 
 ```
-analyzers/
+functions/analyzers/
 ├── ec2/             # EC2 관련 도구들
 │   ├── __init__.py  # CATEGORY + TOOLS 메타데이터
 │   ├── unused.py    # 미사용 인스턴스
@@ -44,7 +44,7 @@ analyzers/
 ### CATEGORY 등록
 
 ```python
-# analyzers/{service}/__init__.py
+# functions/analyzers/{service}/__init__.py
 CATEGORY = {
     "name": "ec2",
     "display_name": "EC2",
@@ -60,7 +60,7 @@ TOOLS = [
         "description": "미사용 EC2 인스턴스 탐지",
         "description_en": "Detect unused EC2 instances",
         "permission": "read",
-        "module": "unused",      # analyzers/{service}/unused.py
+        "module": "unused",      # functions/analyzers/{service}/unused.py
         "area": "unused",
     },
 ]
@@ -69,18 +69,18 @@ TOOLS = [
 ### 도구 모듈 규약
 
 ```python
-# analyzers/{service}/{tool}.py
+# functions/analyzers/{service}/{tool}.py
 def run(ctx: ExecutionContext) -> None:
     """필수 진입점"""
     ...
 ```
 
-## reports/ 디렉토리
+## functions/reports/ 디렉토리
 
 **여러 서비스를 취합하는 종합 리포트**.
 
 ```
-reports/
+functions/reports/
 ├── __init__.py              # CATEGORY + TOOLS (ref 필드 사용)
 ├── cost_dashboard/          # 미사용 리소스 종합
 │   ├── orchestrator.py      # 여러 analyzer 도구 호출
@@ -91,18 +91,18 @@ reports/
 └── log_analyzer/            # 로그 분석
 ```
 
-### reports/__init__.py의 ref 필드
+### functions/reports/__init__.py의 ref 필드
 
 reports는 `module` 대신 `ref` 필드를 사용:
 
 ```python
-# reports/__init__.py
+# functions/reports/__init__.py
 TOOLS = [
     {
         "name": "미사용 리소스 종합",
         "name_en": "Unused Resources Dashboard",
         "permission": "read",
-        "ref": "cost_dashboard/orchestrator",  # reports/ 하위 경로
+        "ref": "cost_dashboard/orchestrator",  # functions/reports/ 하위 경로
         "area": "cost",
     },
 ]
@@ -120,7 +120,7 @@ TOOLS = [
 
 ## 오케스트레이터 패턴
 
-`reports/cost_dashboard/orchestrator.py` 참조:
+`functions/reports/cost_dashboard/orchestrator.py` 참조:
 
 ```python
 def run(ctx) -> None:
@@ -162,8 +162,8 @@ __all__ = ["NATCollector", "NATAnalyzer", "NATExcelReporter"]
 
 ## 참조
 
-- `analyzers/rds/unused.py` - 간단한 단일 서비스 도구
-- `analyzers/fn/comprehensive.py` - 복잡한 단일 서비스 도구
-- `analyzers/vpc/nat_audit.py` - 하위 모듈 패턴
-- `reports/cost_dashboard/orchestrator.py` - 오케스트레이터 패턴
-- `reports/__init__.py` - ref 필드 및 특수 플래그 예시
+- `functions/analyzers/rds/unused.py` - 간단한 단일 서비스 도구
+- `functions/analyzers/fn/comprehensive.py` - 복잡한 단일 서비스 도구
+- `functions/analyzers/vpc/nat_audit.py` - 하위 모듈 패턴
+- `functions/reports/cost_dashboard/orchestrator.py` - 오케스트레이터 패턴
+- `functions/reports/__init__.py` - ref 필드 및 특수 플래그 예시

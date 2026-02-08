@@ -64,7 +64,7 @@ from .types import ProviderType
 if TYPE_CHECKING:
     import boto3
 
-    from cli.flow.context import ExecutionContext
+    from core.cli.flow.context import ExecutionContext
     from core.parallel import ParallelExecutionResult
 
     from .provider import BaseProvider

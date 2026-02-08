@@ -205,14 +205,16 @@ class StaticCredentialsProvider(BaseProvider):
         role_name: str | None = None,
         region: str | None = None,
     ) -> dict[str, Any]:
-        """AWS 설정 정보 반환"""
+        """AWS 설정 정보 반환 (민감 정보 마스킹)"""
         session = self.get_session(region=region)
+        secret = self._config.secret_access_key
+        masked_secret = f"{secret[:4]}****{secret[-4:]}" if len(secret) > 8 else "****"
         return {
             "region_name": session.region_name,
             "credentials": {
                 "access_key_id": self._config.access_key_id,
-                "secret_access_key": self._config.secret_access_key,
-                "session_token": self._config.session_token,
+                "secret_access_key": masked_secret,
+                "session_token": "****" if self._config.session_token else None,
             },
         }
 

@@ -15,7 +15,7 @@ from core.parallel.types import ErrorCategory
 @pytest.fixture
 def sso_context(mock_context):
     """SSO Session용 완전히 설정된 컨텍스트"""
-    from cli.flow.context import FallbackStrategy, RoleSelection
+    from core.cli.flow.context import FallbackStrategy, RoleSelection
 
     # RoleSelection 설정 (필수)
     role_selection = RoleSelection(
@@ -90,7 +90,7 @@ class TestParallelSessionExecutor:
     @patch("core.auth.session.get_session")
     def test_build_task_list_multi_profile(self, mock_get_session):
         """다중 프로파일 작업 목록 생성"""
-        from cli.flow.context import ExecutionContext, ProviderKind
+        from core.cli.flow.context import ExecutionContext, ProviderKind
 
         # Mock session
         mock_session = MagicMock()
@@ -183,7 +183,7 @@ class TestParallelSessionExecutor:
 
     def test_execute_empty_task_list(self):
         """작업 목록이 비어있을 때"""
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         ctx = ExecutionContext()
         ctx.regions = []  # 빈 리전 목록

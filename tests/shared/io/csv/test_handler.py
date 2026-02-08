@@ -4,7 +4,7 @@ tests/shared/io/csv/test_handler.py - CSV 핸들러 테스트
 
 from unittest.mock import patch
 
-from shared.io.csv.handler import (
+from core.shared.io.csv.handler import (
     ENCODING_PRIORITIES,
     detect_csv_encoding,
     get_platform_recommended_encoding,
@@ -77,7 +77,7 @@ class TestDetectCsvEncoding:
         # 빈 파일은 실패할 수 있음
         assert encoding is None or encoding in ENCODING_PRIORITIES
 
-    @patch("shared.io.csv.handler.CHARDET_AVAILABLE", False)
+    @patch("core.shared.io.csv.handler.CHARDET_AVAILABLE", False)
     def test_fallback_without_chardet(self, tmp_path):
         """chardet 없이 폴백 방식"""
         temp_file = tmp_path / "fallback.csv"

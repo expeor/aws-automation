@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli.flow.context import ExecutionContext, RoleSelection
+from core.cli.flow.context import ExecutionContext, RoleSelection
 from core.tools.base import BaseToolRunner, _get_console
 
 # =============================================================================

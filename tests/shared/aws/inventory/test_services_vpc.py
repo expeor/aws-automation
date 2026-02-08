@@ -6,7 +6,7 @@ VPC, Subnet, Route Table 등 네트워크 리소스 수집 함수를 테스트�
 
 from unittest.mock import MagicMock, patch
 
-from shared.aws.inventory.services.vpc import (
+from core.shared.aws.inventory.services.vpc import (
     collect_elastic_ips,
     collect_internet_gateways,
     collect_nat_gateways,
@@ -41,7 +41,7 @@ class TestCollectVPCs:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             vpcs = collect_vpcs(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(vpcs) == 1
@@ -73,7 +73,7 @@ class TestCollectVPCs:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             vpcs = collect_vpcs(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert vpcs[0].is_default is True
@@ -106,7 +106,7 @@ class TestCollectVPCs:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             vpcs = collect_vpcs(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(vpcs) == 2
@@ -141,7 +141,7 @@ class TestCollectSubnets:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             subnets = collect_subnets(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(subnets) == 1
@@ -177,7 +177,7 @@ class TestCollectSubnets:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             subnets = collect_subnets(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert subnets[0].map_public_ip_on_launch is False
@@ -211,7 +211,7 @@ class TestCollectSubnets:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             subnets = collect_subnets(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(subnets) == 2
@@ -251,7 +251,7 @@ class TestCollectRouteTables:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             route_tables = collect_route_tables(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(route_tables) == 1
@@ -288,7 +288,7 @@ class TestCollectRouteTables:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             route_tables = collect_route_tables(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert route_tables[0].is_main is True
@@ -317,7 +317,7 @@ class TestCollectRouteTables:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             route_tables = collect_route_tables(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(route_tables[0].subnet_ids) == 3
@@ -351,7 +351,7 @@ class TestCollectInternetGateways:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             igws = collect_internet_gateways(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(igws) == 1
@@ -378,7 +378,7 @@ class TestCollectInternetGateways:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             igws = collect_internet_gateways(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert igws[0].state == "detached"
@@ -409,7 +409,7 @@ class TestCollectElasticIPs:
 
         mock_ec2.describe_addresses.return_value = mock_response
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             eips = collect_elastic_ips(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(eips) == 1
@@ -436,7 +436,7 @@ class TestCollectElasticIPs:
 
         mock_ec2.describe_addresses.return_value = mock_response
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             eips = collect_elastic_ips(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert eips[0].is_attached is False
@@ -477,7 +477,7 @@ class TestCollectNATGateways:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             nat_gateways = collect_nat_gateways(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(nat_gateways) == 1
@@ -515,7 +515,7 @@ class TestCollectNATGateways:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.vpc.get_client", return_value=mock_ec2):
             nat_gateways = collect_nat_gateways(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert nat_gateways[0].connectivity_type == "private"

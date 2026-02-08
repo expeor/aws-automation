@@ -2,7 +2,7 @@
 tests/shared/aws/inventory/test_types.py - Inventory 타입 테스트
 """
 
-from shared.aws.inventory.types import (
+from core.shared.aws.inventory.types import (
     VPC,
     CloudFormationStack,
     DynamoDBTable,

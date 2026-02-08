@@ -242,7 +242,7 @@ def mock_provider():
 @pytest.fixture
 def mock_context(mock_provider, mock_account_info):
     """테스트용 ExecutionContext"""
-    from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
+    from core.cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
 
     ctx = ExecutionContext()
     ctx.category = "ec2"
@@ -264,7 +264,7 @@ def mock_context(mock_provider, mock_account_info):
 @pytest.fixture
 def mock_static_context():
     """Static credentials용 테스트 ExecutionContext"""
-    from cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
+    from core.cli.flow.context import ExecutionContext, ProviderKind, ToolInfo
 
     ctx = ExecutionContext()
     ctx.category = "s3"

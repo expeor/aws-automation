@@ -29,7 +29,7 @@ class TestErrorCategory:
 
     def test_category_count(self):
         """카테고리 개수 확인"""
-        assert len(ErrorCategory) == 7
+        assert len(ErrorCategory) == 9
 
 
 class TestTaskError:

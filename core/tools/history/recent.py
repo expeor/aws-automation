@@ -1,14 +1,20 @@
 """
-pkg/history/recent.py - 최근 사용 도구 관리
+core/tools/history/recent.py - 최근 사용 도구 관리
 
 LRU 기반으로 최근 사용한 도구 이력 관리
 """
 
+from __future__ import annotations
+
 import json
-from dataclasses import asdict, dataclass
+import logging
+import tempfile
+import threading
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,20 +53,27 @@ class RecentItem:
             return ""
 
 
+# _load()에서 사용할 필드 이름 집합 (모듈 로드 시 1회 계산)
+_RECENT_FIELDS = {f.name for f in fields(RecentItem)}
+
+
 class RecentHistory:
     """최근 사용 이력 관리 (LRU 기반)"""
 
     MAX_ITEMS = 50
-    _instance: Optional["RecentHistory"] = None
+    _instance: RecentHistory | None = None
+    _lock = threading.Lock()
 
-    def __new__(cls) -> "RecentHistory":
-        """싱글톤 패턴"""
+    def __new__(cls) -> RecentHistory:
+        """싱글톤 패턴 (double-check locking)"""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if self._initialized:
             return
         self._path = self._get_history_path()
@@ -170,25 +183,53 @@ class RecentHistory:
         return False
 
     def _load(self) -> None:
-        """파일에서 로드"""
+        """파일에서 로드
+
+        개별 항목 파싱 실패 시 해당 항목만 건너뛰고 나머지는 유지.
+        알 수 없는 필드는 무시하여 스키마 변경에 대한 하위 호환성 보장.
+        """
         if not self._path.exists():
             self._items = []
             return
 
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._items = [RecentItem(**item) for item in data]
-        except (json.JSONDecodeError, TypeError, KeyError):
+            if not isinstance(data, list):
+                self._items = []
+                return
+
+            items: list[RecentItem] = []
+            for raw in data:
+                if not isinstance(raw, dict):
+                    continue
+                try:
+                    filtered = {k: v for k, v in raw.items() if k in _RECENT_FIELDS}
+                    items.append(RecentItem(**filtered))
+                except (TypeError, KeyError):
+                    logger.debug("최근 사용 항목 로드 스킵: %s", raw)
+                    continue
+
+            self._items = items
+        except (json.JSONDecodeError, OSError):
             self._items = []
 
     def _save(self) -> None:
-        """파일에 저장"""
+        """파일에 원자적으로 저장 (write-to-temp-then-rename)"""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = [asdict(item) for item in self._items]
-        self._path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        content = json.dumps(data, ensure_ascii=False, indent=2)
+        try:
+            fd, tmp_path = tempfile.mkstemp(dir=self._path.parent, suffix=".tmp", prefix=".recent_")
+            try:
+                with open(fd, "w", encoding="utf-8") as f:
+                    f.write(content)
+                Path(tmp_path).replace(self._path)
+            except BaseException:
+                Path(tmp_path).unlink(missing_ok=True)
+                raise
+        except OSError:
+            # Fallback: 원자적 쓰기 실패 시 직접 쓰기
+            self._path.write_text(content, encoding="utf-8")
 
     def reload(self) -> None:
         """파일에서 다시 로드 (외부 변경 반영)"""

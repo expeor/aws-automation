@@ -54,8 +54,8 @@ def test_error_handling():
 from unittest.mock import MagicMock, patch
 
 class TestRun:
-    @patch("analyzers.ec2.unused.parallel_collect")
-    @patch("analyzers.ec2.unused.console")
+    @patch("functions.analyzers.ec2.unused.parallel_collect")
+    @patch("functions.analyzers.ec2.unused.console")
     def test_no_results(self, mock_console, mock_parallel):
         mock_result = MagicMock()
         mock_result.get_data.return_value = []
@@ -133,11 +133,11 @@ with quiet_mode():
 
 ```python
 # 문제: shared.io.output (deprecated) 사용
-from shared.io.output import OutputPath  # DeprecationWarning
+from core.shared.io.output import OutputPath  # DeprecationWarning
 
 # 해결: shared.io.output 사용
-from shared.io.output import OutputPath
-from shared.io.output.helpers import create_output_path
+from core.shared.io.output import OutputPath
+from core.shared.io.output.helpers import create_output_path
 ```
 
 ## 디버깅 기법
@@ -175,13 +175,13 @@ print(f"Throttling: {sum(1 for e in errors.all_errors if e.category == ErrorCate
 
 ```bash
 # 특정 모듈 테스트
-pytest tests/analyzers/rds/ -v
+pytest tests/functions/analyzers/rds/ -v
 
 # 특정 클래스
-pytest tests/analyzers/rds/test_plugins_rds.py::TestAnalyzeInstances -v
+pytest tests/functions/analyzers/rds/test_plugins_rds.py::TestAnalyzeInstances -v
 
 # 특정 테스트
-pytest tests/analyzers/rds/test_plugins_rds.py::TestAnalyzeInstances::test_unused_instance -v
+pytest tests/functions/analyzers/rds/test_plugins_rds.py::TestAnalyzeInstances::test_unused_instance -v
 
 # 실패 시 디버깅
 pytest tests/ -v --tb=long  # 상세 트레이스백

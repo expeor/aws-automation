@@ -41,6 +41,7 @@ from core.config import (
     validate_tool_metadata,
 )
 from core.exceptions import MetadataValidationError
+from core.tools.aws_categories import SERVICE_TO_CATEGORY
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +60,8 @@ REPORTS_PATH = get_reports_path()
 
 # 스캔 대상 경로
 SCAN_PATHS = [
-    ("analyzers", ANALYZERS_PATH),  # AWS 서비스별 분석 도구
-    ("reports", REPORTS_PATH),  # 종합 리포트
+    ("functions.analyzers", ANALYZERS_PATH),  # AWS 서비스별 분석 도구
+    ("functions.reports", REPORTS_PATH),  # 종합 리포트
 ]
 
 # =============================================================================
@@ -101,62 +102,8 @@ def clear_discovery_cache() -> None:
 ANALYSIS_CATEGORIES = list(settings.ANALYSIS_CATEGORIES)
 
 # AWS 서비스 카테고리 이름들 (UI 필터링용)
-# plugins/{service}/ 폴더명과 매칭
-AWS_SERVICE_NAMES = {
-    # Compute
-    "ec2",
-    "lambda",
-    "elasticbeanstalk",
-    # Containers
-    "ecr",
-    "ecs",
-    "eks",
-    # Storage
-    "s3",
-    "ebs",
-    "efs",
-    "fsx",
-    "aws_backup",
-    # Database
-    "rds",
-    "dynamodb",
-    "documentdb",
-    "elasticache",
-    "opensearch",
-    # Networking
-    "vpc",
-    "elb",
-    "route53",
-    "apigateway",
-    # Security
-    "iam",
-    "kms",
-    "waf",
-    "guardduty",
-    "secretsmanager",
-    "acm",
-    "cognito",
-    # Management
-    "cloudwatch",
-    "cloudtrail",
-    "config",
-    "ssm",
-    "trusted_advisor",
-    "identity_center",
-    # Analytics
-    "kinesis",
-    "glue",
-    # Integration
-    "sns",
-    "sqs",
-    "eventbridge",
-    "stepfunctions",
-    # Developer Tools
-    "cloudformation",
-    "codecommit",
-    # ML
-    "bedrock",
-}
+# aws_categories.py의 SERVICE_TO_CATEGORY에서 자동 생성
+AWS_SERVICE_NAMES: set[str] = set(SERVICE_TO_CATEGORY.keys())
 
 
 def _validate_category_metadata(
@@ -346,8 +293,9 @@ def discover_categories(
         # 분석 플랫폼 카테고리만
         categories = [c for c in categories if c.get("name") in ANALYSIS_CATEGORIES]
     elif not include_aws_services:
-        # AWS 서비스 카테고리 제외 (분석 카테고리만)
-        categories = [c for c in categories if c.get("name") not in AWS_SERVICE_NAMES]
+        # AWS 서비스 카테고리 제외 (분석 플랫폼 카테고리는 유지)
+        analysis_set = set(ANALYSIS_CATEGORIES)
+        categories = [c for c in categories if c.get("name") not in AWS_SERVICE_NAMES or c.get("name") in analysis_set]
 
     # 우선순위 정렬
     def sort_key(cat):

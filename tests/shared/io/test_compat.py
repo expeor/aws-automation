@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shared.io.compat import (
+from core.shared.io.compat import (
     _generate_html_from_data,
     _get_default_output_dir,
     _get_output_config,
@@ -50,7 +50,7 @@ class TestGetOutputConfig:
 
     def test_get_output_config_from_context(self, mock_context):
         """컨텍스트에서 출력 설정 가져오기"""
-        from shared.io.config import OutputConfig
+        from core.shared.io.config import OutputConfig
 
         output_config = OutputConfig(lang="ko", formats=["excel"])
         mock_context.output_config = output_config
@@ -151,7 +151,7 @@ class TestGetDefaultOutputDir:
 class TestGenerateHtmlFromData:
     """HTML 생성 테스트"""
 
-    @patch("shared.io.html.create_aws_report")
+    @patch("core.shared.io.html.create_aws_report")
     def test_generate_html_basic(self, mock_create_report, mock_context, sample_data, tmp_path):
         """기본 HTML 생성"""
         mock_report = MagicMock()
@@ -171,7 +171,7 @@ class TestGenerateHtmlFromData:
         mock_create_report.assert_called_once()
         mock_report.save.assert_called_once()
 
-    @patch("shared.io.html.create_aws_report")
+    @patch("core.shared.io.html.create_aws_report")
     def test_generate_html_with_metrics(self, mock_create_report, mock_context, sample_data, tmp_path):
         """메트릭 포함 HTML 생성"""
         mock_report = MagicMock()
@@ -194,7 +194,7 @@ class TestGenerateHtmlFromData:
         assert call_kwargs["found"] == 25
         assert call_kwargs["savings"] == 1500.50
 
-    @patch("shared.io.html.create_aws_report")
+    @patch("core.shared.io.html.create_aws_report")
     def test_generate_html_creates_directory(self, mock_create_report, mock_context, sample_data, tmp_path):
         """디렉토리 자동 생성"""
         mock_report = MagicMock()
@@ -216,10 +216,10 @@ class TestGenerateHtmlFromData:
 class TestGenerateReports:
     """리포트 생성 테스트"""
 
-    @patch("shared.io.html.open_in_browser")
+    @patch("core.shared.io.html.open_in_browser")
     def test_generate_reports_excel_only(self, mock_open_browser, mock_context, sample_data, tmp_path):
         """Excel만 생성"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.EXCEL)
 
@@ -242,13 +242,13 @@ class TestGenerateReports:
         assert "html" not in results
         mock_open_browser.assert_not_called()
 
-    @patch("shared.io.html.open_in_browser")
-    @patch("shared.io.compat._generate_html_from_data")
+    @patch("core.shared.io.html.open_in_browser")
+    @patch("core.shared.io.compat._generate_html_from_data")
     def test_generate_reports_html_only(
         self, mock_generate_html, mock_open_browser, mock_context, sample_data, tmp_path
     ):
         """HTML만 생성"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.HTML, auto_open=False)
 
@@ -266,13 +266,13 @@ class TestGenerateReports:
         assert "excel" not in results
         mock_open_browser.assert_not_called()
 
-    @patch("shared.io.html.open_in_browser")
-    @patch("shared.io.compat._generate_html_from_data")
+    @patch("core.shared.io.html.open_in_browser")
+    @patch("core.shared.io.compat._generate_html_from_data")
     def test_generate_reports_both_formats(
         self, mock_generate_html, mock_open_browser, mock_context, sample_data, tmp_path
     ):
         """Excel과 HTML 모두 생성"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.ALL, auto_open=True)
 
@@ -301,10 +301,10 @@ class TestGenerateReports:
         assert results["html"] == html_path
         mock_open_browser.assert_called_once_with(html_path)
 
-    @patch("shared.io.html.open_in_browser")
+    @patch("core.shared.io.html.open_in_browser")
     def test_generate_reports_no_data(self, mock_open_browser, mock_context, tmp_path):
         """데이터 없음"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.HTML)
 
@@ -319,7 +319,7 @@ class TestGenerateReports:
 
     def test_generate_reports_no_output_dir(self, mock_context, sample_data):
         """출력 디렉토리 지정 안 함"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.EXCEL)
 
@@ -339,7 +339,7 @@ class TestGenerateReports:
 
     def test_generate_reports_excel_generation_error(self, mock_context, sample_data, tmp_path):
         """Excel 생성 에러 처리"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.EXCEL)
 
@@ -353,10 +353,10 @@ class TestGenerateReports:
 
         assert "excel" not in results
 
-    @patch("shared.io.compat._generate_html_from_data", side_effect=Exception("HTML generation failed"))
+    @patch("core.shared.io.compat._generate_html_from_data", side_effect=Exception("HTML generation failed"))
     def test_generate_reports_html_generation_error(self, mock_generate_html, mock_context, sample_data, tmp_path):
         """HTML 생성 에러 처리"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.HTML)
 
@@ -373,13 +373,13 @@ class TestGenerateReports:
 class TestGenerateDualReport:
     """듀얼 리포트 생성 테스트"""
 
-    @patch("shared.io.html.open_in_browser")
-    @patch("shared.io.compat._generate_html_from_data")
+    @patch("core.shared.io.html.open_in_browser")
+    @patch("core.shared.io.compat._generate_html_from_data")
     def test_generate_dual_report_both_formats(
         self, mock_generate_html, mock_open_browser, mock_context, sample_data, tmp_path
     ):
         """Excel과 HTML 모두 생성"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.ALL, auto_open=True)
 
@@ -411,10 +411,10 @@ class TestGenerateDualReport:
         mock_wb.save_as.assert_called_once()
         mock_open_browser.assert_called_once_with(html_path)
 
-    @patch("shared.io.html.open_in_browser")
+    @patch("core.shared.io.html.open_in_browser")
     def test_generate_dual_report_excel_only(self, mock_open_browser, mock_context, sample_data, tmp_path):
         """Excel만 생성"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.EXCEL, auto_open=False)
 
@@ -433,13 +433,13 @@ class TestGenerateDualReport:
         assert "html" not in results
         mock_open_browser.assert_not_called()
 
-    @patch("shared.io.html.open_in_browser")
-    @patch("shared.io.compat._generate_html_from_data")
+    @patch("core.shared.io.html.open_in_browser")
+    @patch("core.shared.io.compat._generate_html_from_data")
     def test_generate_dual_report_html_only(
         self, mock_generate_html, mock_open_browser, mock_context, sample_data, tmp_path
     ):
         """HTML만 생성"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.HTML, auto_open=False)
 
@@ -461,7 +461,7 @@ class TestGenerateDualReport:
 
     def test_generate_dual_report_creates_directory(self, mock_context, sample_data, tmp_path):
         """디렉토리 자동 생성"""
-        from shared.io.config import OutputConfig
+        from core.shared.io.config import OutputConfig
 
         mock_context.output_config = OutputConfig(lang="ko", formats=["excel"])
 
@@ -481,7 +481,7 @@ class TestGenerateDualReport:
 
     def test_generate_dual_report_excel_error(self, mock_context, sample_data, tmp_path):
         """Excel 생성 에러 처리"""
-        from shared.io.config import OutputConfig
+        from core.shared.io.config import OutputConfig
 
         mock_context.output_config = OutputConfig(lang="ko", formats=["excel"])
 
@@ -497,10 +497,10 @@ class TestGenerateDualReport:
 
         assert "excel" not in results
 
-    @patch("shared.io.compat._generate_html_from_data", side_effect=Exception("HTML failed"))
+    @patch("core.shared.io.compat._generate_html_from_data", side_effect=Exception("HTML failed"))
     def test_generate_dual_report_html_error(self, mock_generate_html, mock_context, sample_data, tmp_path):
         """HTML 생성 에러 처리"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.HTML)
 
@@ -516,11 +516,11 @@ class TestGenerateDualReport:
 
         assert "html" not in results
 
-    @patch("shared.io.html.open_in_browser")
-    @patch("shared.io.compat._generate_html_from_data")
+    @patch("core.shared.io.html.open_in_browser")
+    @patch("core.shared.io.compat._generate_html_from_data")
     def test_generate_dual_report_no_data(self, mock_generate_html, mock_open_browser, mock_context, tmp_path):
         """데이터 없음"""
-        from shared.io.config import OutputConfig, OutputFormat
+        from core.shared.io.config import OutputConfig, OutputFormat
 
         mock_context.output_config = OutputConfig(lang="ko", formats=OutputFormat.HTML)
 

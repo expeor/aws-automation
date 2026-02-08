@@ -33,7 +33,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shared.aws.health import (
+from core.shared.aws.health import (
     HEALTH_REGION,
     AffectedEntity,
     CollectionResult,
@@ -1111,7 +1111,7 @@ class TestPatchReporter:
         style = reporter._get_row_style(medium_patch)
         assert style is None
 
-    @patch("shared.aws.health.reporter.Workbook")
+    @patch("core.shared.aws.health.reporter.Workbook")
     def test_generate_report(self, mock_workbook, sample_result_for_report, tmp_path):
         """Test generate_report method"""
         # Mock workbook

@@ -63,10 +63,10 @@ jobs:
         run: uv pip install --system ruff
 
       - name: Run ruff check
-        run: ruff check cli core analyzers
+        run: ruff check core functions
 
       - name: Run ruff format check
-        run: ruff format --check cli core analyzers
+        run: ruff format --check core functions
 
   # =============================================================================
   # Type Checking
@@ -92,7 +92,7 @@ jobs:
           uv pip install --system mypy types-requests types-python-dateutil
 
       - name: Run MyPy
-        run: mypy cli core --ignore-missing-imports
+        run: mypy core functions --ignore-missing-imports
 
   # =============================================================================
   # Unit Tests (Multi-Python, Cross-Platform)
@@ -143,7 +143,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --timeout=120 --cov=cli --cov=core --cov=analyzers --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=25 -v
+          pytest tests/ --timeout=120 --cov=core --cov=functions --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=25 -v
         # NOTE: 커버리지 목표치 (현재 26%, 목표 50%+)
         # 테스트 추가 후 점진적으로 상향 조정 (20 → 25 → 30)
 
@@ -225,7 +225,7 @@ jobs:
         continue-on-error: true  # Advisory: doesn't block PR merge
 
       - name: Run Bandit security linter
-        run: bandit -r cli core analyzers -ll --skip B101,B105,B311,B404,B603,B606,B607,B608
+        run: bandit -r core functions -ll --skip B101,B105,B311,B404,B603,B606,B607,B608
         # B101: assert usage (normal in tests)
         # B105: hardcoded password false positives
         # B311: random usage (not for security)
@@ -233,7 +233,7 @@ jobs:
         # B608: DuckDB queries with internal AWS data
 
       - name: Run Bandit with SARIF output
-        run: bandit -r cli core analyzers -f sarif -o bandit.sarif --skip B101,B105,B311,B404,B603,B606,B607,B608
+        run: bandit -r core functions -f sarif -o bandit.sarif --skip B101,B105,B311,B404,B603,B606,B607,B608
         continue-on-error: true
 
       - name: Upload SARIF to GitHub Security

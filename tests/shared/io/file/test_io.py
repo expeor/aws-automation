@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from shared.io.file.io import ensure_dir, read_file, read_json, write_file, write_json
+from core.shared.io.file.io import ensure_dir, read_file, read_json, write_file, write_json
 
 
 class TestEnsureDir:
@@ -456,7 +456,7 @@ class TestWriteJson:
 
     def test_write_json_failure_returns_false(self):
         """쓰기 실패 시 False 반환"""
-        with patch("shared.io.file.io.write_file", return_value=False):
+        with patch("core.shared.io.file.io.write_file", return_value=False):
             result = write_json("/tmp/test.json", {"key": "value"})
 
             assert result is False

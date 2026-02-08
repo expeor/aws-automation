@@ -1,12 +1,12 @@
 try:
-    from cli.app import cli
+    from core.cli.app import cli
 except ModuleNotFoundError:
     # Fallback: ensure project root is on sys.path when invoked via console_script
     import os
     import sys
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from cli.app import cli
+    from core.cli.app import cli
 
 
 def main():

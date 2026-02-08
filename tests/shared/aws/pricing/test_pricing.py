@@ -41,7 +41,7 @@ from unittest.mock import patch
 
 import pytest
 
-from shared.aws.pricing.constants import HOURS_PER_MONTH, LAMBDA_FREE_TIER_GB_SECONDS, LAMBDA_FREE_TIER_REQUESTS
+from core.shared.aws.pricing.constants import HOURS_PER_MONTH, LAMBDA_FREE_TIER_GB_SECONDS, LAMBDA_FREE_TIER_REQUESTS
 
 # =============================================================================
 # Fixtures
@@ -159,13 +159,13 @@ class TestEC2Pricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_ec2_prices):
         """Mock PricingService for EC2"""
-        with patch("shared.aws.pricing.ec2.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.ec2.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_ec2_prices
             yield mock_service
 
     def test_get_ec2_price(self, mock_pricing_service, sample_ec2_prices):
         """Test EC2 instance price lookup"""
-        from shared.aws.pricing.ec2 import get_ec2_price
+        from core.shared.aws.pricing.ec2 import get_ec2_price
 
         price = get_ec2_price("t3.micro", "ap-northeast-2")
 
@@ -174,7 +174,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_price_unknown_instance(self, mock_pricing_service):
         """Test EC2 price lookup for unknown instance type"""
-        from shared.aws.pricing.ec2 import get_ec2_price
+        from core.shared.aws.pricing.ec2 import get_ec2_price
 
         price = get_ec2_price("unknown.instance", "ap-northeast-2")
 
@@ -182,7 +182,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_monthly_cost(self, mock_pricing_service, sample_ec2_prices):
         """Test EC2 monthly cost calculation"""
-        from shared.aws.pricing.ec2 import get_ec2_monthly_cost
+        from core.shared.aws.pricing.ec2 import get_ec2_monthly_cost
 
         monthly_cost = get_ec2_monthly_cost("t3.micro", "ap-northeast-2")
 
@@ -191,7 +191,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_monthly_cost_custom_hours(self, mock_pricing_service, sample_ec2_prices):
         """Test EC2 monthly cost with custom hours"""
-        from shared.aws.pricing.ec2 import get_ec2_monthly_cost
+        from core.shared.aws.pricing.ec2 import get_ec2_monthly_cost
 
         custom_hours = 168  # 1 week
         monthly_cost = get_ec2_monthly_cost("t3.micro", "ap-northeast-2", hours_per_month=custom_hours)
@@ -201,7 +201,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_prices(self, mock_pricing_service, sample_ec2_prices):
         """Test retrieving all EC2 prices"""
-        from shared.aws.pricing.ec2 import get_ec2_prices
+        from core.shared.aws.pricing.ec2 import get_ec2_prices
 
         prices = get_ec2_prices("ap-northeast-2")
 
@@ -209,7 +209,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_prices_bulk_alias(self):
         """Test that get_ec2_prices_bulk is an alias of get_ec2_prices"""
-        from shared.aws.pricing.ec2 import get_ec2_prices, get_ec2_prices_bulk
+        from core.shared.aws.pricing.ec2 import get_ec2_prices, get_ec2_prices_bulk
 
         assert get_ec2_prices_bulk is get_ec2_prices
 
@@ -225,13 +225,13 @@ class TestEBSPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_ebs_prices):
         """Mock PricingService for EBS"""
-        with patch("shared.aws.pricing.ebs.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.ebs.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_ebs_prices
             yield mock_service
 
     def test_get_ebs_price(self, mock_pricing_service, sample_ebs_prices):
         """Test EBS volume price per GB"""
-        from shared.aws.pricing.ebs import get_ebs_price
+        from core.shared.aws.pricing.ebs import get_ebs_price
 
         price = get_ebs_price("gp3", "ap-northeast-2")
 
@@ -239,7 +239,7 @@ class TestEBSPricing:
 
     def test_get_ebs_price_unknown_type(self, mock_pricing_service):
         """Test EBS price lookup for unknown volume type"""
-        from shared.aws.pricing.ebs import get_ebs_price
+        from core.shared.aws.pricing.ebs import get_ebs_price
 
         price = get_ebs_price("unknown", "ap-northeast-2")
 
@@ -247,7 +247,7 @@ class TestEBSPricing:
 
     def test_get_ebs_monthly_cost(self, mock_pricing_service, sample_ebs_prices):
         """Test EBS monthly cost calculation"""
-        from shared.aws.pricing.ebs import get_ebs_monthly_cost
+        from core.shared.aws.pricing.ebs import get_ebs_monthly_cost
 
         monthly_cost = get_ebs_monthly_cost("gp3", 100, "ap-northeast-2")
 
@@ -256,7 +256,7 @@ class TestEBSPricing:
 
     def test_get_ebs_prices(self, mock_pricing_service, sample_ebs_prices):
         """Test retrieving all EBS prices"""
-        from shared.aws.pricing.ebs import get_ebs_prices
+        from core.shared.aws.pricing.ebs import get_ebs_prices
 
         prices = get_ebs_prices("ap-northeast-2")
 
@@ -264,7 +264,7 @@ class TestEBSPricing:
 
     def test_get_ebs_prices_bulk_alias(self):
         """Test that get_ebs_prices_bulk is an alias of get_ebs_prices"""
-        from shared.aws.pricing.ebs import get_ebs_prices, get_ebs_prices_bulk
+        from core.shared.aws.pricing.ebs import get_ebs_prices, get_ebs_prices_bulk
 
         assert get_ebs_prices_bulk is get_ebs_prices
 
@@ -280,13 +280,13 @@ class TestLambdaPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_lambda_prices):
         """Mock PricingService for Lambda"""
-        with patch("shared.aws.pricing.lambda_.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.lambda_.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_lambda_prices
             yield mock_service
 
     def test_get_lambda_prices(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda prices lookup"""
-        from shared.aws.pricing.lambda_ import get_lambda_prices
+        from core.shared.aws.pricing.lambda_ import get_lambda_prices
 
         prices = get_lambda_prices("ap-northeast-2")
 
@@ -294,7 +294,7 @@ class TestLambdaPricing:
 
     def test_get_lambda_request_price(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda request price per million"""
-        from shared.aws.pricing.lambda_ import get_lambda_request_price
+        from core.shared.aws.pricing.lambda_ import get_lambda_request_price
 
         price = get_lambda_request_price("ap-northeast-2")
 
@@ -302,7 +302,7 @@ class TestLambdaPricing:
 
     def test_get_lambda_duration_price(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda duration price per GB-second"""
-        from shared.aws.pricing.lambda_ import get_lambda_duration_price
+        from core.shared.aws.pricing.lambda_ import get_lambda_duration_price
 
         price = get_lambda_duration_price("ap-northeast-2")
 
@@ -310,7 +310,7 @@ class TestLambdaPricing:
 
     def test_get_lambda_provisioned_price(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda provisioned concurrency price"""
-        from shared.aws.pricing.lambda_ import get_lambda_provisioned_price
+        from core.shared.aws.pricing.lambda_ import get_lambda_provisioned_price
 
         price = get_lambda_provisioned_price("ap-northeast-2")
 
@@ -318,7 +318,7 @@ class TestLambdaPricing:
 
     def test_get_lambda_monthly_cost(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda monthly cost calculation"""
-        from shared.aws.pricing.lambda_ import get_lambda_monthly_cost
+        from core.shared.aws.pricing.lambda_ import get_lambda_monthly_cost
 
         # Use higher invocations to exceed free tier for both requests and duration
         monthly_cost = get_lambda_monthly_cost(
@@ -343,7 +343,7 @@ class TestLambdaPricing:
 
     def test_get_lambda_monthly_cost_no_free_tier(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda monthly cost without free tier"""
-        from shared.aws.pricing.lambda_ import get_lambda_monthly_cost
+        from core.shared.aws.pricing.lambda_ import get_lambda_monthly_cost
 
         monthly_cost = get_lambda_monthly_cost(
             region="ap-northeast-2",
@@ -362,7 +362,7 @@ class TestLambdaPricing:
 
     def test_get_lambda_provisioned_monthly_cost(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda provisioned concurrency monthly cost"""
-        from shared.aws.pricing.lambda_ import get_lambda_provisioned_monthly_cost
+        from core.shared.aws.pricing.lambda_ import get_lambda_provisioned_monthly_cost
 
         monthly_cost = get_lambda_provisioned_monthly_cost(
             region="ap-northeast-2",
@@ -377,7 +377,7 @@ class TestLambdaPricing:
 
     def test_estimate_lambda_cost(self, mock_pricing_service, sample_lambda_prices):
         """Test Lambda comprehensive cost estimation"""
-        from shared.aws.pricing.lambda_ import estimate_lambda_cost
+        from core.shared.aws.pricing.lambda_ import estimate_lambda_cost
 
         result = estimate_lambda_cost(
             region="ap-northeast-2",
@@ -407,28 +407,28 @@ class TestRDSPricing:
 
     def test_get_rds_instance_price(self, sample_rds_instance_prices):
         """Test RDS instance price lookup"""
-        from shared.aws.pricing.rds import get_rds_instance_price
+        from core.shared.aws.pricing.rds import get_rds_instance_price
 
-        with patch("shared.aws.pricing.rds.RDS_INSTANCE_PRICES", {"ap-northeast-2": sample_rds_instance_prices}):
+        with patch("core.shared.aws.pricing.rds.RDS_INSTANCE_PRICES", {"ap-northeast-2": sample_rds_instance_prices}):
             price = get_rds_instance_price("ap-northeast-2", "db.t3.micro", "mysql")
 
             assert price == sample_rds_instance_prices["db.t3.micro"]
 
     def test_get_rds_storage_price(self, sample_rds_storage_prices):
         """Test RDS storage price lookup"""
-        from shared.aws.pricing.rds import get_rds_storage_price
+        from core.shared.aws.pricing.rds import get_rds_storage_price
 
-        with patch("shared.aws.pricing.rds.RDS_STORAGE_PRICES", {"ap-northeast-2": sample_rds_storage_prices}):
+        with patch("core.shared.aws.pricing.rds.RDS_STORAGE_PRICES", {"ap-northeast-2": sample_rds_storage_prices}):
             price = get_rds_storage_price("ap-northeast-2", "gp3")
 
             assert price == sample_rds_storage_prices["gp3"]
 
     def test_get_rds_monthly_cost(self, sample_rds_instance_prices, sample_rds_storage_prices):
         """Test RDS monthly cost calculation"""
-        from shared.aws.pricing.rds import get_rds_monthly_cost
+        from core.shared.aws.pricing.rds import get_rds_monthly_cost
 
-        with patch("shared.aws.pricing.rds.RDS_INSTANCE_PRICES", {"ap-northeast-2": sample_rds_instance_prices}):
-            with patch("shared.aws.pricing.rds.RDS_STORAGE_PRICES", {"ap-northeast-2": sample_rds_storage_prices}):
+        with patch("core.shared.aws.pricing.rds.RDS_INSTANCE_PRICES", {"ap-northeast-2": sample_rds_instance_prices}):
+            with patch("core.shared.aws.pricing.rds.RDS_STORAGE_PRICES", {"ap-northeast-2": sample_rds_storage_prices}):
                 monthly_cost = get_rds_monthly_cost(
                     region="ap-northeast-2",
                     instance_class="db.t3.micro",
@@ -445,10 +445,10 @@ class TestRDSPricing:
 
     def test_get_rds_monthly_cost_multi_az(self, sample_rds_instance_prices, sample_rds_storage_prices):
         """Test RDS monthly cost with Multi-AZ"""
-        from shared.aws.pricing.rds import get_rds_monthly_cost
+        from core.shared.aws.pricing.rds import get_rds_monthly_cost
 
-        with patch("shared.aws.pricing.rds.RDS_INSTANCE_PRICES", {"ap-northeast-2": sample_rds_instance_prices}):
-            with patch("shared.aws.pricing.rds.RDS_STORAGE_PRICES", {"ap-northeast-2": sample_rds_storage_prices}):
+        with patch("core.shared.aws.pricing.rds.RDS_INSTANCE_PRICES", {"ap-northeast-2": sample_rds_instance_prices}):
+            with patch("core.shared.aws.pricing.rds.RDS_STORAGE_PRICES", {"ap-northeast-2": sample_rds_storage_prices}):
                 monthly_cost = get_rds_monthly_cost(
                     region="ap-northeast-2",
                     instance_class="db.t3.micro",
@@ -475,13 +475,13 @@ class TestSageMakerPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_sagemaker_prices):
         """Mock PricingService for SageMaker"""
-        with patch("shared.aws.pricing.sagemaker.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.sagemaker.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_sagemaker_prices
             yield mock_service
 
     def test_get_sagemaker_price(self, mock_pricing_service, sample_sagemaker_prices):
         """Test SageMaker instance price lookup"""
-        from shared.aws.pricing.sagemaker import get_sagemaker_price
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_price
 
         price = get_sagemaker_price("ml.m5.large", "ap-northeast-2")
 
@@ -489,7 +489,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_price_unknown_instance(self, mock_pricing_service):
         """Test SageMaker price for unknown instance type"""
-        from shared.aws.pricing.sagemaker import get_sagemaker_price
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_price
 
         price = get_sagemaker_price("ml.unknown.large", "ap-northeast-2")
 
@@ -498,7 +498,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_monthly_cost(self, mock_pricing_service, sample_sagemaker_prices):
         """Test SageMaker monthly cost calculation"""
-        from shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
 
         monthly_cost = get_sagemaker_monthly_cost("ml.m5.large", "ap-northeast-2")
 
@@ -507,7 +507,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_monthly_cost_multiple_instances(self, mock_pricing_service, sample_sagemaker_prices):
         """Test SageMaker monthly cost with multiple instances"""
-        from shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
 
         monthly_cost = get_sagemaker_monthly_cost("ml.m5.large", "ap-northeast-2", instance_count=3)
 
@@ -516,7 +516,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_prices_bulk_alias(self):
         """Test that get_sagemaker_prices_bulk is an alias"""
-        from shared.aws.pricing.sagemaker import get_sagemaker_prices, get_sagemaker_prices_bulk
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_prices, get_sagemaker_prices_bulk
 
         assert get_sagemaker_prices_bulk is get_sagemaker_prices
 
@@ -531,7 +531,7 @@ class TestNATPricing:
 
     def test_get_nat_prices(self):
         """Test NAT Gateway prices lookup"""
-        from shared.aws.pricing.nat import get_nat_prices
+        from core.shared.aws.pricing.nat import get_nat_prices
 
         prices = get_nat_prices("ap-northeast-2")
 
@@ -542,7 +542,7 @@ class TestNATPricing:
 
     def test_get_nat_hourly_price(self):
         """Test NAT Gateway hourly price"""
-        from shared.aws.pricing.nat import get_nat_hourly_price
+        from core.shared.aws.pricing.nat import get_nat_hourly_price
 
         price = get_nat_hourly_price("ap-northeast-2")
 
@@ -550,7 +550,7 @@ class TestNATPricing:
 
     def test_get_nat_data_price(self):
         """Test NAT Gateway data price per GB"""
-        from shared.aws.pricing.nat import get_nat_data_price
+        from core.shared.aws.pricing.nat import get_nat_data_price
 
         price = get_nat_data_price("ap-northeast-2")
 
@@ -558,7 +558,7 @@ class TestNATPricing:
 
     def test_get_nat_monthly_cost(self):
         """Test NAT Gateway monthly cost"""
-        from shared.aws.pricing.nat import get_nat_monthly_cost
+        from core.shared.aws.pricing.nat import get_nat_monthly_cost
 
         monthly_cost = get_nat_monthly_cost("ap-northeast-2", hours=HOURS_PER_MONTH, data_processed_gb=100)
 
@@ -569,7 +569,7 @@ class TestNATPricing:
 
     def test_get_nat_monthly_fixed_cost(self):
         """Test NAT Gateway monthly fixed cost without data"""
-        from shared.aws.pricing.nat import get_nat_monthly_fixed_cost
+        from core.shared.aws.pricing.nat import get_nat_monthly_fixed_cost
 
         fixed_cost = get_nat_monthly_fixed_cost("ap-northeast-2")
 
@@ -578,7 +578,7 @@ class TestNATPricing:
 
     def test_estimate_savings(self):
         """Test NAT Gateway savings estimation"""
-        from shared.aws.pricing.nat import estimate_savings
+        from core.shared.aws.pricing.nat import estimate_savings
 
         result = estimate_savings(nat_count=3, region="ap-northeast-2", months=12)
 
@@ -600,13 +600,13 @@ class TestEIPPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_eip_prices):
         """Mock PricingService for EIP"""
-        with patch("shared.aws.pricing.eip.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.eip.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_eip_prices
             yield mock_service
 
     def test_get_eip_prices(self, mock_pricing_service, sample_eip_prices):
         """Test EIP prices lookup"""
-        from shared.aws.pricing.eip import get_eip_prices
+        from core.shared.aws.pricing.eip import get_eip_prices
 
         prices = get_eip_prices("ap-northeast-2")
 
@@ -614,7 +614,7 @@ class TestEIPPricing:
 
     def test_get_eip_hourly_price(self, mock_pricing_service, sample_eip_prices):
         """Test EIP hourly price"""
-        from shared.aws.pricing.eip import get_eip_hourly_price
+        from core.shared.aws.pricing.eip import get_eip_hourly_price
 
         price = get_eip_hourly_price("ap-northeast-2")
 
@@ -622,7 +622,7 @@ class TestEIPPricing:
 
     def test_get_eip_monthly_cost(self, mock_pricing_service, sample_eip_prices):
         """Test EIP monthly cost"""
-        from shared.aws.pricing.eip import get_eip_monthly_cost
+        from core.shared.aws.pricing.eip import get_eip_monthly_cost
 
         monthly_cost = get_eip_monthly_cost("ap-northeast-2")
 
@@ -641,13 +641,13 @@ class TestELBPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_elb_prices):
         """Mock PricingService for ELB"""
-        with patch("shared.aws.pricing.elb.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.elb.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_elb_prices
             yield mock_service
 
     def test_get_elb_prices(self, mock_pricing_service, sample_elb_prices):
         """Test ELB prices lookup"""
-        from shared.aws.pricing.elb import get_elb_prices
+        from core.shared.aws.pricing.elb import get_elb_prices
 
         prices = get_elb_prices("ap-northeast-2")
 
@@ -655,7 +655,7 @@ class TestELBPricing:
 
     def test_get_elb_hourly_price_alb(self, mock_pricing_service, sample_elb_prices):
         """Test ALB hourly price"""
-        from shared.aws.pricing.elb import get_elb_hourly_price
+        from core.shared.aws.pricing.elb import get_elb_hourly_price
 
         price = get_elb_hourly_price("ap-northeast-2", "application")
 
@@ -663,7 +663,7 @@ class TestELBPricing:
 
     def test_get_elb_hourly_price_nlb(self, mock_pricing_service, sample_elb_prices):
         """Test NLB hourly price"""
-        from shared.aws.pricing.elb import get_elb_hourly_price
+        from core.shared.aws.pricing.elb import get_elb_hourly_price
 
         price = get_elb_hourly_price("ap-northeast-2", "network")
 
@@ -671,7 +671,7 @@ class TestELBPricing:
 
     def test_get_elb_hourly_price_clb(self, mock_pricing_service, sample_elb_prices):
         """Test CLB hourly price"""
-        from shared.aws.pricing.elb import get_elb_hourly_price
+        from core.shared.aws.pricing.elb import get_elb_hourly_price
 
         price = get_elb_hourly_price("ap-northeast-2", "classic")
 
@@ -679,7 +679,7 @@ class TestELBPricing:
 
     def test_get_elb_monthly_cost(self, mock_pricing_service, sample_elb_prices):
         """Test ELB monthly cost"""
-        from shared.aws.pricing.elb import get_elb_monthly_cost
+        from core.shared.aws.pricing.elb import get_elb_monthly_cost
 
         monthly_cost = get_elb_monthly_cost("ap-northeast-2", "application")
 
@@ -698,13 +698,13 @@ class TestSnapshotPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_snapshot_prices):
         """Mock PricingService for Snapshot"""
-        with patch("shared.aws.pricing.snapshot.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.snapshot.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_snapshot_prices
             yield mock_service
 
     def test_get_snapshot_prices(self, mock_pricing_service, sample_snapshot_prices):
         """Test snapshot prices lookup"""
-        from shared.aws.pricing.snapshot import get_snapshot_prices
+        from core.shared.aws.pricing.snapshot import get_snapshot_prices
 
         prices = get_snapshot_prices("ap-northeast-2")
 
@@ -712,7 +712,7 @@ class TestSnapshotPricing:
 
     def test_get_snapshot_price(self, mock_pricing_service, sample_snapshot_prices):
         """Test snapshot GB price"""
-        from shared.aws.pricing.snapshot import get_snapshot_price
+        from core.shared.aws.pricing.snapshot import get_snapshot_price
 
         price = get_snapshot_price("ap-northeast-2")
 
@@ -720,7 +720,7 @@ class TestSnapshotPricing:
 
     def test_get_snapshot_monthly_cost(self, mock_pricing_service, sample_snapshot_prices):
         """Test snapshot monthly cost"""
-        from shared.aws.pricing.snapshot import get_snapshot_monthly_cost
+        from core.shared.aws.pricing.snapshot import get_snapshot_monthly_cost
 
         monthly_cost = get_snapshot_monthly_cost("ap-northeast-2", size_gb=100)
 
@@ -739,13 +739,13 @@ class TestECRPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_ecr_prices):
         """Mock PricingService for ECR"""
-        with patch("shared.aws.pricing.ecr.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.ecr.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_ecr_prices
             yield mock_service
 
     def test_get_ecr_prices(self, mock_pricing_service, sample_ecr_prices):
         """Test ECR prices lookup"""
-        from shared.aws.pricing.ecr import get_ecr_prices
+        from core.shared.aws.pricing.ecr import get_ecr_prices
 
         prices = get_ecr_prices("ap-northeast-2")
 
@@ -753,7 +753,7 @@ class TestECRPricing:
 
     def test_get_ecr_storage_price(self, mock_pricing_service, sample_ecr_prices):
         """Test ECR storage price per GB"""
-        from shared.aws.pricing.ecr import get_ecr_storage_price
+        from core.shared.aws.pricing.ecr import get_ecr_storage_price
 
         price = get_ecr_storage_price("ap-northeast-2")
 
@@ -761,7 +761,7 @@ class TestECRPricing:
 
     def test_get_ecr_monthly_cost(self, mock_pricing_service, sample_ecr_prices):
         """Test ECR monthly cost"""
-        from shared.aws.pricing.ecr import get_ecr_monthly_cost
+        from core.shared.aws.pricing.ecr import get_ecr_monthly_cost
 
         monthly_cost = get_ecr_monthly_cost("ap-northeast-2", storage_gb=50)
 
@@ -779,20 +779,20 @@ class TestConstants:
 
     def test_hours_per_month(self):
         """Test HOURS_PER_MONTH constant"""
-        from shared.aws.pricing.constants import HOURS_PER_MONTH
+        from core.shared.aws.pricing.constants import HOURS_PER_MONTH
 
         assert HOURS_PER_MONTH == 730
 
     def test_lambda_free_tier_constants(self):
         """Test Lambda free tier constants"""
-        from shared.aws.pricing.constants import LAMBDA_FREE_TIER_GB_SECONDS, LAMBDA_FREE_TIER_REQUESTS
+        from core.shared.aws.pricing.constants import LAMBDA_FREE_TIER_GB_SECONDS, LAMBDA_FREE_TIER_REQUESTS
 
         assert LAMBDA_FREE_TIER_REQUESTS == 1_000_000
         assert LAMBDA_FREE_TIER_GB_SECONDS == 400_000
 
     def test_default_prices_structure(self):
         """Test DEFAULT_PRICES structure"""
-        from shared.aws.pricing.constants import DEFAULT_PRICES
+        from core.shared.aws.pricing.constants import DEFAULT_PRICES
 
         assert isinstance(DEFAULT_PRICES, dict)
         assert "ec2" in DEFAULT_PRICES
@@ -802,7 +802,7 @@ class TestConstants:
 
     def test_get_default_prices(self):
         """Test get_default_prices function"""
-        from shared.aws.pricing.constants import get_default_prices
+        from core.shared.aws.pricing.constants import get_default_prices
 
         ec2_prices = get_default_prices("ec2")
         assert isinstance(ec2_prices, dict)
@@ -822,7 +822,7 @@ class TestPricingUtils:
 
     def test_pricing_service_singleton(self):
         """Test that pricing_service is a singleton"""
-        from shared.aws.pricing.utils import PricingService, pricing_service
+        from core.shared.aws.pricing.utils import PricingService, pricing_service
 
         instance1 = PricingService()
         instance2 = PricingService()
@@ -832,7 +832,7 @@ class TestPricingUtils:
 
     def test_pricing_metrics_initialization(self):
         """Test PricingMetrics initialization"""
-        from shared.aws.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
 
@@ -844,7 +844,7 @@ class TestPricingUtils:
 
     def test_pricing_metrics_increment(self):
         """Test PricingMetrics increment methods"""
-        from shared.aws.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
 
@@ -865,7 +865,7 @@ class TestPricingUtils:
 
     def test_pricing_metrics_hit_rate(self):
         """Test PricingMetrics hit rate calculation"""
-        from shared.aws.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
 
@@ -884,7 +884,7 @@ class TestPricingUtils:
 
     def test_pricing_metrics_to_dict(self):
         """Test PricingMetrics to_dict method"""
-        from shared.aws.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
         metrics.api_calls = 5
@@ -900,7 +900,7 @@ class TestPricingUtils:
 
     def test_pricing_metrics_reset(self):
         """Test PricingMetrics reset method"""
-        from shared.aws.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
         metrics.api_calls = 5
@@ -915,7 +915,7 @@ class TestPricingUtils:
 
     def test_get_prices_function(self):
         """Test get_prices function exists and is callable"""
-        from shared.aws.pricing.utils import get_prices
+        from core.shared.aws.pricing.utils import get_prices
 
         assert callable(get_prices)
 
@@ -930,7 +930,7 @@ class TestPricingIntegration:
 
     def test_ec2_to_ebs_cost_comparison(self):
         """Test that EC2 and EBS costs can be combined"""
-        from shared.aws.pricing.constants import HOURS_PER_MONTH
+        from core.shared.aws.pricing.constants import HOURS_PER_MONTH
 
         # Mock EC2 price
         ec2_hourly = 0.0416  # t3.medium

@@ -101,7 +101,7 @@
 
 | Skill | 설명 | 주요 내용 |
 |-------|------|----------|
-| [`analyzers-vs-reports.md`](./analyzers-vs-reports.md) | analyzers/ vs reports/ 경계 | 단일 서비스 vs 종합 오케스트레이션 |
+| [`analyzers-vs-reports.md`](./analyzers-vs-reports.md) | functions/analyzers/ vs functions/reports/ 경계 | 단일 서비스 vs 종합 오케스트레이션 |
 | [`debugging-troubleshooting.md`](./debugging-troubleshooting.md) | 디버깅/트러블슈팅 | moto, conftest, 병렬 실행 디버깅 |
 
 ### 텍스트 품질
@@ -145,7 +145,7 @@
 
 ### 플러그인 개발 체크리스트
 
-1. **위치 결정** → `analyzers-vs-reports.md` (단일 서비스: analyzers/, 종합: reports/)
+1. **위치 결정** → `analyzers-vs-reports.md` (단일 서비스: functions/analyzers/, 종합: reports/)
 2. **메타데이터** → `plugin-metadata-schema.md`
 3. **수집 로직** → `parallel-execution-patterns`
 4. **CloudWatch** → `cloudwatch-metrics-patterns.md`
@@ -165,15 +165,15 @@ from core.parallel.errors import ErrorCollector, ErrorSeverity, try_or_default
 from core.parallel.decorators import safe_aws_call, RetryConfig
 
 # CloudWatch 메트릭
-from shared.aws.metrics import batch_get_metrics, MetricQuery
+from core.shared.aws.metrics import batch_get_metrics, MetricQuery
 
 # 인벤토리 수집
-from shared.aws.inventory import InventoryCollector
+from core.shared.aws.inventory import InventoryCollector
 
 # 리포트 출력
-from shared.io.compat import generate_dual_report
-from shared.io.output.helpers import create_output_path
-from shared.io.output import print_report_complete, open_in_explorer
+from core.shared.io.compat import generate_dual_report
+from core.shared.io.output.helpers import create_output_path
+from core.shared.io.output import print_report_complete, open_in_explorer
 ```
 
 ---

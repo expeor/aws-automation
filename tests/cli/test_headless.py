@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli.headless import HeadlessConfig, HeadlessRunner, run_headless
+from core.cli.headless import HeadlessConfig, HeadlessRunner, run_headless
 
 
 class TestHeadlessConfig:
@@ -70,12 +70,12 @@ class TestHeadlessRunner:
         assert runner.config == basic_config
         assert runner._ctx is None
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_load_tool_not_found(self, mock_console, basic_config):
         """도구를 찾을 수 없을 때"""
         runner = HeadlessRunner(basic_config)
 
-        with patch("cli.headless.HeadlessRunner._load_tool") as mock_load:
+        with patch("core.cli.headless.HeadlessRunner._load_tool") as mock_load:
             mock_load.return_value = None
             result = runner.run()
 
@@ -102,13 +102,13 @@ class TestHeadlessRunner:
         assert ctx.tool.permission == "read"
         assert ctx.tool.supports_single_region_only is False
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_setup_regions_single(self, mock_console, basic_config):
         """단일 리전 설정"""
         runner = HeadlessRunner(basic_config)
 
         # Context 설정
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         runner._ctx = ExecutionContext()
 
@@ -117,7 +117,7 @@ class TestHeadlessRunner:
         assert result is True
         assert runner._ctx.regions == ["ap-northeast-2"]
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_setup_regions_multiple(self, mock_console):
         """다중 리전 설정"""
         config = HeadlessConfig(
@@ -128,7 +128,7 @@ class TestHeadlessRunner:
         )
         runner = HeadlessRunner(config)
 
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         runner._ctx = ExecutionContext()
 
@@ -137,7 +137,7 @@ class TestHeadlessRunner:
         assert result is True
         assert runner._ctx.regions == ["ap-northeast-2", "us-east-1", "eu-west-1"]
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_setup_regions_all(self, mock_console):
         """전체 리전 설정"""
         config = HeadlessConfig(
@@ -148,7 +148,7 @@ class TestHeadlessRunner:
         )
         runner = HeadlessRunner(config)
 
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         runner._ctx = ExecutionContext()
 
@@ -157,7 +157,7 @@ class TestHeadlessRunner:
         assert result is True
         assert len(runner._ctx.regions) > 10  # 많은 리전이 설정되어야 함
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_setup_regions_pattern(self, mock_console):
         """리전 패턴 설정"""
         config = HeadlessConfig(
@@ -168,7 +168,7 @@ class TestHeadlessRunner:
         )
         runner = HeadlessRunner(config)
 
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         runner._ctx = ExecutionContext()
 
@@ -177,7 +177,7 @@ class TestHeadlessRunner:
         assert result is True
         assert all(r.startswith("ap-") for r in runner._ctx.regions)
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_setup_regions_duplicates_removed(self, mock_console):
         """중복 리전 제거"""
         config = HeadlessConfig(
@@ -188,7 +188,7 @@ class TestHeadlessRunner:
         )
         runner = HeadlessRunner(config)
 
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         runner._ctx = ExecutionContext()
 
@@ -197,7 +197,7 @@ class TestHeadlessRunner:
         assert result is True
         assert runner._ctx.regions == ["ap-northeast-2", "us-east-1"]
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_keyboard_interrupt(self, mock_console, basic_config):
         """키보드 인터럽트 처리"""
         runner = HeadlessRunner(basic_config)
@@ -207,7 +207,7 @@ class TestHeadlessRunner:
 
         assert result == 130
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_unexpected_exception(self, mock_console, basic_config):
         """예상치 못한 예외 처리"""
         runner = HeadlessRunner(basic_config)
@@ -221,7 +221,7 @@ class TestHeadlessRunner:
 class TestRunHeadless:
     """run_headless 함수 테스트"""
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_invalid_tool_path_no_slash(self, mock_console):
         """잘못된 도구 경로 (슬래시 없음)"""
         result = run_headless(
@@ -231,7 +231,7 @@ class TestRunHeadless:
         )
         assert result == 1
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_invalid_tool_path_too_many_parts(self, mock_console):
         """잘못된 도구 경로 (너무 많은 부분)"""
         result = run_headless(
@@ -241,7 +241,7 @@ class TestRunHeadless:
         )
         assert result == 1
 
-    @patch("cli.headless.HeadlessRunner.run")
+    @patch("core.cli.headless.HeadlessRunner.run")
     def test_valid_tool_path(self, mock_run):
         """유효한 도구 경로"""
         mock_run.return_value = 0
@@ -255,7 +255,7 @@ class TestRunHeadless:
         assert result == 0
         mock_run.assert_called_once()
 
-    @patch("cli.headless.HeadlessRunner.run")
+    @patch("core.cli.headless.HeadlessRunner.run")
     def test_default_region(self, mock_run):
         """기본 리전 설정"""
         mock_run.return_value = 0
@@ -269,7 +269,7 @@ class TestRunHeadless:
         # HeadlessRunner가 생성되었는지 확인
         mock_run.assert_called_once()
 
-    @patch("cli.headless.HeadlessRunner.run")
+    @patch("core.cli.headless.HeadlessRunner.run")
     def test_with_all_options(self, mock_run):
         """모든 옵션 설정"""
         mock_run.return_value = 0
@@ -299,7 +299,7 @@ class TestHeadlessRunnerAuth:
             regions=["ap-northeast-2"],
         )
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     @patch("core.auth.config.load_config")
     def test_setup_auth_profile_not_found(self, mock_load_config, mock_console, basic_config):
         """프로파일을 찾을 수 없을 때"""
@@ -310,7 +310,7 @@ class TestHeadlessRunnerAuth:
 
         runner = HeadlessRunner(basic_config)
 
-        from cli.flow.context import ExecutionContext
+        from core.cli.flow.context import ExecutionContext
 
         runner._ctx = ExecutionContext()
 
@@ -318,7 +318,7 @@ class TestHeadlessRunnerAuth:
 
         assert result is False
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     @patch("core.auth.config.load_config")
     @patch("core.auth.config.detect_provider_type")
     def test_setup_static_credentials(self, mock_detect, mock_load_config, mock_console, basic_config):
@@ -333,7 +333,7 @@ class TestHeadlessRunnerAuth:
 
         runner = HeadlessRunner(basic_config)
 
-        from cli.flow.context import ExecutionContext, ProviderKind
+        from core.cli.flow.context import ExecutionContext, ProviderKind
 
         runner._ctx = ExecutionContext()
 
@@ -342,7 +342,7 @@ class TestHeadlessRunnerAuth:
         assert result is True
         assert runner._ctx.provider_kind == ProviderKind.STATIC_CREDENTIALS
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     @patch("core.auth.config.load_config")
     @patch("core.auth.config.detect_provider_type")
     def test_setup_sso_profile(self, mock_detect, mock_load_config, mock_console, basic_config):
@@ -357,7 +357,7 @@ class TestHeadlessRunnerAuth:
 
         runner = HeadlessRunner(basic_config)
 
-        from cli.flow.context import ExecutionContext, ProviderKind
+        from core.cli.flow.context import ExecutionContext, ProviderKind
 
         runner._ctx = ExecutionContext()
 
@@ -370,7 +370,7 @@ class TestHeadlessRunnerAuth:
 class TestHeadlessRunnerPrintSummary:
     """HeadlessRunner 요약 출력 테스트"""
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_print_summary_single_region(self, mock_console):
         """단일 리전 요약 출력"""
         config = HeadlessConfig(
@@ -381,7 +381,7 @@ class TestHeadlessRunnerPrintSummary:
         )
         runner = HeadlessRunner(config)
 
-        from cli.flow.context import ExecutionContext, ToolInfo
+        from core.cli.flow.context import ExecutionContext, ToolInfo
 
         runner._ctx = ExecutionContext()
         runner._ctx.tool = ToolInfo(
@@ -398,7 +398,7 @@ class TestHeadlessRunnerPrintSummary:
         # console.print가 호출되었는지 확인
         assert mock_console.print.called
 
-    @patch("cli.headless.console")
+    @patch("core.cli.headless.console")
     def test_print_summary_multiple_regions(self, mock_console):
         """다중 리전 요약 출력"""
         config = HeadlessConfig(
@@ -409,7 +409,7 @@ class TestHeadlessRunnerPrintSummary:
         )
         runner = HeadlessRunner(config)
 
-        from cli.flow.context import ExecutionContext, ToolInfo
+        from core.cli.flow.context import ExecutionContext, ToolInfo
 
         runner._ctx = ExecutionContext()
         runner._ctx.tool = ToolInfo(

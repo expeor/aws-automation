@@ -30,7 +30,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from core.types.aws import Boto3Session
+    import boto3
+
+    Boto3Session = boto3.Session
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +116,7 @@ class _CacheEntry:
     ttl: float
 
     def is_expired(self) -> bool:
-        return time.time() - self.timestamp > self.ttl
+        return time.monotonic() - self.timestamp > self.ttl
 
 
 @dataclass
@@ -165,7 +167,7 @@ class ServiceQuotaChecker:
     def _set_cached(self, key: str, data: Any) -> None:
         """캐시에 값 저장"""
         with self._lock:
-            self._cache[key] = _CacheEntry(data=data, timestamp=time.time(), ttl=self.cache_ttl)
+            self._cache[key] = _CacheEntry(data=data, timestamp=time.monotonic(), ttl=self.cache_ttl)
 
     def get_service_quotas(self, service_code: str) -> list[ServiceQuotaInfo]:
         """서비스의 모든 쿼터 조회
@@ -358,28 +360,35 @@ class ServiceQuotaChecker:
 
     def check_quotas_health(
         self, service_code: str, warning_threshold: float = 80.0
-    ) -> tuple[list[ServiceQuotaInfo], list[ServiceQuotaInfo]]:
+    ) -> tuple[list[ServiceQuotaInfo], list[ServiceQuotaInfo], list[ServiceQuotaInfo]]:
         """서비스 쿼터 건강 상태 확인
+
+        get_service_quotas()는 usage 데이터를 포함하지 않으므로,
+        usage_value가 None인 쿼터는 UNKNOWN으로 별도 분리합니다.
+        사용량 확인이 필요하면 get_quota_with_usage()를 개별 호출하세요.
 
         Args:
             service_code: AWS 서비스 코드
             warning_threshold: 경고 임계치 (%)
 
         Returns:
-            (정상 쿼터 리스트, 경고/위험 쿼터 리스트)
+            (정상 쿼터, 경고/위험 쿼터, 사용량 미확인 쿼터) 튜플
         """
         quotas = self.get_service_quotas(service_code)
 
-        ok_quotas = []
-        warn_quotas = []
+        ok_quotas: list[ServiceQuotaInfo] = []
+        warn_quotas: list[ServiceQuotaInfo] = []
+        unknown_quotas: list[ServiceQuotaInfo] = []
 
         for quota in quotas:
-            if quota.usage_percent >= warning_threshold:
+            if quota.usage_value is None:
+                unknown_quotas.append(quota)
+            elif quota.usage_percent >= warning_threshold:
                 warn_quotas.append(quota)
             else:
                 ok_quotas.append(quota)
 
-        return ok_quotas, warn_quotas
+        return ok_quotas, warn_quotas, unknown_quotas
 
     def clear_cache(self) -> None:
         """캐시 초기화"""
@@ -429,6 +438,7 @@ COMMON_QUOTAS: dict[str, dict[str, str]] = {
 
 _checkers: dict[str, ServiceQuotaChecker] = {}
 _checker_lock = threading.Lock()
+_MAX_CACHED_CHECKERS = 50
 
 
 def get_quota_checker(
@@ -446,10 +456,13 @@ def get_quota_checker(
     Returns:
         ServiceQuotaChecker 인스턴스
     """
-    key = f"{id(session)}:{region}"
+    key = f"{getattr(session, 'profile_name', 'default')}:{region}"
 
     with _checker_lock:
         if key not in _checkers:
+            # 캐시 크기 제한: 최대 초과 시 전체 초기화
+            if len(_checkers) >= _MAX_CACHED_CHECKERS:
+                _checkers.clear()
             _checkers[key] = ServiceQuotaChecker(session=session, region=region, cache_ttl=cache_ttl)
         return _checkers[key]
 

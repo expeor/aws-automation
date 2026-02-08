@@ -6,7 +6,7 @@ Fuzzy 검색, 별칭 검색, 카테고리 필터 테스트
 
 import pytest
 
-from cli.ui.search import ToolSearchEngine, get_chosung, normalize_text
+from core.cli.ui.search import ToolSearchEngine, get_chosung, normalize_text
 
 
 # 테스트용 카테고리 데이터

@@ -8,6 +8,7 @@ TaskError, TaskResult, ParallelExecutionResult 등
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from functools import cached_property
 from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
@@ -25,6 +26,8 @@ class ErrorCategory(Enum):
     NETWORK = "network"  # 네트워크 오류 (재시도 가능)
     TIMEOUT = "timeout"  # 타임아웃 (재시도 가능)
     EXPIRED_TOKEN = "expired_token"  # 토큰 만료 (재인증 필요)
+    INVALID_REQUEST = "invalid_request"  # 잘못된 요청 (재시도 불가)
+    SERVICE_ERROR = "service_error"  # AWS 서비스 오류 (재시도 가능)
     UNKNOWN = "unknown"  # 기타
 
 
@@ -127,14 +130,14 @@ class ParallelExecutionResult(Generic[T]):
 
     results: list[TaskResult[T]] = field(default_factory=list)
 
-    @property
+    @cached_property
     def successful(self) -> list[TaskResult[T]]:
-        """성공한 결과만 반환"""
+        """성공한 결과만 반환 (캐싱됨)"""
         return [r for r in self.results if r.success]
 
-    @property
+    @cached_property
     def failed(self) -> list[TaskResult[T]]:
-        """실패한 결과만 반환"""
+        """실패한 결과만 반환 (캐싱됨)"""
         return [r for r in self.results if not r.success]
 
     @property
@@ -152,9 +155,9 @@ class ParallelExecutionResult(Generic[T]):
         """전체 작업 수"""
         return len(self.results)
 
-    @property
+    @cached_property
     def total_duration_ms(self) -> float:
-        """전체 실행 시간 (밀리초)"""
+        """전체 실행 시간 (밀리초, 캐싱됨)"""
         return sum(r.duration_ms for r in self.results)
 
     def has_any_success(self) -> bool:

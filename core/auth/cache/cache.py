@@ -71,8 +71,9 @@ class TokenEncryption:
             machine_id = f"{os.getenv('USERNAME', os.getenv('USER', 'default'))}"
             machine_id += str(Path.home())
 
-            # PBKDF2로 키 유도
-            salt = b"aws_automation_toolkit_v1"
+            # 랜덤 솔트 로드 또는 생성
+            salt = self._load_or_create_salt()
+
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA256(),
                 length=32,
@@ -89,6 +90,28 @@ class TokenEncryption:
         except Exception as e:
             logger.warning(f"암호화 초기화 실패 - 토큰이 평문으로 저장됩니다: {e}")
             self._encryption_available = False
+
+    @staticmethod
+    def _load_or_create_salt() -> bytes:
+        """~/.aws/sso/cache/.salt에서 랜덤 솔트를 로드하거나 새로 생성"""
+        salt_path = Path.home() / ".aws" / "sso" / "cache" / ".salt"
+        try:
+            if salt_path.exists():
+                return salt_path.read_bytes()
+        except OSError:
+            pass
+
+        # 새 랜덤 솔트 생성
+        salt = os.urandom(32)
+        try:
+            salt_path.parent.mkdir(parents=True, exist_ok=True)
+            salt_path.write_bytes(salt)
+            if os.name != "nt":
+                os.chmod(salt_path, 0o600)
+        except OSError as e:
+            logger.debug(f"솔트 파일 저장 실패, 인메모리 사용: {e}")
+
+        return salt
 
     @property
     def is_available(self) -> bool:
@@ -360,6 +383,12 @@ class TokenCacheManager:
         """캐시 파일 전체 경로"""
         return self.cache_dir / f"{self._cache_key}.json"
 
+    def _get_lock(self):
+        """파일 잠금 객체 반환"""
+        import filelock
+
+        return filelock.FileLock(str(self.cache_path) + ".lock", timeout=5)
+
     def load(self) -> TokenCache | None:
         """토큰 캐시를 파일에서 로드
 
@@ -370,7 +399,7 @@ class TokenCacheManager:
             if not self.cache_path.exists():
                 return None
 
-            with open(self.cache_path, encoding="utf-8") as f:
+            with self._get_lock(), open(self.cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             return TokenCache.from_dict(data)
@@ -393,11 +422,15 @@ class TokenCacheManager:
         Raises:
             IOError: 파일 저장 실패 시
         """
-        # 캐시 디렉토리 생성
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        with open(self.cache_path, "w", encoding="utf-8") as f:
-            json.dump(token_cache.to_dict(), f, indent=2)
+        with self._get_lock():
+            with open(self.cache_path, "w", encoding="utf-8") as f:
+                json.dump(token_cache.to_dict(), f, indent=2)
+
+            # 토큰 파일은 소유자만 읽기/쓰기 가능하도록 설정
+            if os.name != "nt":
+                os.chmod(self.cache_path, 0o600)
 
     def delete(self) -> bool:
         """캐시 파일 삭제

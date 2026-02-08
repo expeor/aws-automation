@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch  # noqa: F401
 
 import pytest
 
-from cli.flow.context import ExecutionContext, FlowResult, ProviderKind, ToolInfo
-from cli.flow.runner import FlowRunner, create_flow_runner
+from core.cli.flow.context import ExecutionContext, FlowResult, ProviderKind, ToolInfo
+from core.cli.flow.runner import FlowRunner, create_flow_runner
 
 # =============================================================================
 # Fixtures
@@ -295,7 +295,7 @@ class TestPrintExecutionSummary:
 
     def test_with_role_selection(self, flow_runner):
         """Role Selection 포함"""
-        from cli.flow.context import RoleSelection
+        from core.cli.flow.context import RoleSelection
 
         tool = ToolInfo(
             name="테스트",
@@ -352,7 +352,7 @@ class TestRunOnce:
 
     @patch.object(FlowRunner, "_execute_tool")
     @patch.object(FlowRunner, "_tool_requires_session")
-    @patch("cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.CategoryStep")
     def test_run_once_no_session_required(self, mock_cat_step, mock_requires, mock_execute, flow_runner):
         """세션 불필요 도구 실행"""
         # Setup
@@ -381,9 +381,9 @@ class TestRunOnce:
 
     @patch.object(FlowRunner, "_execute_tool")
     @patch.object(FlowRunner, "_tool_requires_session")
-    @patch("cli.flow.runner.RegionStep")
-    @patch("cli.flow.runner.ProfileStep")
-    @patch("cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.RegionStep")
+    @patch("core.cli.flow.runner.ProfileStep")
+    @patch("core.cli.flow.runner.CategoryStep")
     def test_run_once_with_session_required(
         self,
         mock_cat_step,
@@ -425,11 +425,11 @@ class TestRunOnce:
 
     @patch.object(FlowRunner, "_execute_tool")
     @patch.object(FlowRunner, "_tool_requires_session")
-    @patch("cli.flow.runner.RoleStep")
-    @patch("cli.flow.runner.AccountStep")
-    @patch("cli.flow.runner.RegionStep")
-    @patch("cli.flow.runner.ProfileStep")
-    @patch("cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.RoleStep")
+    @patch("core.cli.flow.runner.AccountStep")
+    @patch("core.cli.flow.runner.RegionStep")
+    @patch("core.cli.flow.runner.ProfileStep")
+    @patch("core.cli.flow.runner.CategoryStep")
     def test_run_once_with_multi_account(
         self,
         mock_cat_step,
@@ -493,7 +493,7 @@ class TestRun:
         flow_runner.run()
 
     @patch.object(FlowRunner, "_run_once")
-    @patch("cli.flow.runner.console")
+    @patch("core.cli.flow.runner.console")
     def test_run_exception_continue(self, mock_console, mock_run_once, flow_runner):
         """예외 발생 후 계속"""
         # 첫 번째 호출: 예외, 두 번째: KeyboardInterrupt
@@ -508,7 +508,7 @@ class TestRun:
         assert mock_run_once.call_count == 2
 
     @patch.object(FlowRunner, "_run_once")
-    @patch("cli.flow.runner.console")
+    @patch("core.cli.flow.runner.console")
     def test_run_exception_exit(self, mock_console, mock_run_once, flow_runner):
         """예외 발생 후 종료"""
         mock_run_once.side_effect = ValueError("테스트 오류")
@@ -680,10 +680,10 @@ class TestRunToolDirectly:
 
     @patch.object(FlowRunner, "_save_history")
     @patch.object(FlowRunner, "_execute_tool")
-    @patch("cli.flow.runner.RegionStep")
-    @patch("cli.flow.runner.RoleStep")
-    @patch("cli.flow.runner.AccountStep")
-    @patch("cli.flow.runner.ProfileStep")
+    @patch("core.cli.flow.runner.RegionStep")
+    @patch("core.cli.flow.runner.RoleStep")
+    @patch("core.cli.flow.runner.AccountStep")
+    @patch("core.cli.flow.runner.ProfileStep")
     @patch.object(FlowRunner, "_find_tool_meta")
     def test_run_tool_with_session(
         self,

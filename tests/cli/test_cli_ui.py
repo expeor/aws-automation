@@ -18,7 +18,7 @@ class TestConsoleUtilities:
         """get_console이 Console 인스턴스 반환"""
         from rich.console import Console
 
-        from cli.ui.console import get_console
+        from core.cli.ui.console import get_console
 
         console = get_console()
         assert isinstance(console, Console)
@@ -27,7 +27,7 @@ class TestConsoleUtilities:
         """get_progress가 Progress 인스턴스 반환"""
         from rich.progress import Progress
 
-        from cli.ui.console import get_progress
+        from core.cli.ui.console import get_progress
 
         progress = get_progress()
         assert isinstance(progress, Progress)
@@ -36,7 +36,7 @@ class TestConsoleUtilities:
         """전역 console 인스턴스 확인"""
         from rich.console import Console
 
-        from cli.ui.console import console
+        from core.cli.ui.console import console
 
         assert isinstance(console, Console)
 
@@ -46,44 +46,44 @@ class TestPrintFunctions:
 
     def test_print_success_no_error(self):
         """print_success 호출 시 에러 없음"""
-        from cli.ui.console import print_success
+        from core.cli.ui.console import print_success
 
         # 에러 없이 실행되는지 확인
         print_success("테스트 성공 메시지")
 
     def test_print_error_no_error(self):
         """print_error 호출 시 에러 없음"""
-        from cli.ui.console import print_error
+        from core.cli.ui.console import print_error
 
         print_error("테스트 에러 메시지")
 
     def test_print_warning_no_error(self):
         """print_warning 호출 시 에러 없음"""
-        from cli.ui.console import print_warning
+        from core.cli.ui.console import print_warning
 
         print_warning("테스트 경고 메시지")
 
     def test_print_info_no_error(self):
         """print_info 호출 시 에러 없음"""
-        from cli.ui.console import print_info
+        from core.cli.ui.console import print_info
 
         print_info("테스트 정보 메시지")
 
     def test_print_header_no_error(self):
         """print_header 호출 시 에러 없음"""
-        from cli.ui.console import print_header
+        from core.cli.ui.console import print_header
 
         print_header("테스트 헤더")
 
     def test_print_step_no_error(self):
         """print_step 호출 시 에러 없음"""
-        from cli.ui.console import print_step
+        from core.cli.ui.console import print_step
 
         print_step(1, 5, "테스트 단계")
 
     def test_print_table_no_error(self):
         """print_table 호출 시 에러 없음"""
-        from cli.ui.console import print_table
+        from core.cli.ui.console import print_table
 
         print_table(
             "테스트 테이블",
@@ -97,26 +97,26 @@ class TestSectionBox:
 
     def test_print_section_box(self):
         """print_section_box 호출 시 에러 없음"""
-        from cli.ui.console import print_section_box
+        from core.cli.ui.console import print_section_box
 
         print_section_box("테스트 박스", ["내용1", "내용2"])
 
     def test_print_section_box_without_content(self):
         """내용 없는 섹션 박스"""
-        from cli.ui.console import print_section_box
+        from core.cli.ui.console import print_section_box
 
         print_section_box("테스트 박스")
 
     def test_print_box_line(self):
         """print_box_line 호출 시 에러 없음"""
-        from cli.ui.console import print_box_line
+        from core.cli.ui.console import print_box_line
 
         print_box_line("테스트 라인")
         print_box_line("")  # 빈 라인
 
     def test_print_box_start_end(self):
         """박스 시작/끝 함수 테스트"""
-        from cli.ui.console import print_box_end, print_box_start
+        from core.cli.ui.console import print_box_end, print_box_start
 
         print_box_start("테스트 박스")
         print_box_end()
@@ -127,13 +127,13 @@ class TestPrintLegend:
 
     def test_print_legend_single_item(self):
         """단일 항목 범례"""
-        from cli.ui.console import print_legend
+        from core.cli.ui.console import print_legend
 
         print_legend([("yellow", "사용 중")])
 
     def test_print_legend_multiple_items(self):
         """다중 항목 범례"""
-        from cli.ui.console import print_legend
+        from core.cli.ui.console import print_legend
 
         print_legend(
             [
@@ -145,7 +145,7 @@ class TestPrintLegend:
 
     def test_print_legend_unknown_color(self):
         """알 수 없는 색상도 처리"""
-        from cli.ui.console import print_legend
+        from core.cli.ui.console import print_legend
 
         print_legend([("unknown_color", "설명")])
 
@@ -155,13 +155,13 @@ class TestPrintPanelHeader:
 
     def test_panel_header_title_only(self):
         """제목만 있는 패널"""
-        from cli.ui.console import print_panel_header
+        from core.cli.ui.console import print_panel_header
 
         print_panel_header("테스트 제목")
 
     def test_panel_header_with_subtitle(self):
         """부제목 있는 패널"""
-        from cli.ui.console import print_panel_header
+        from core.cli.ui.console import print_panel_header
 
         print_panel_header("테스트 제목", "테스트 부제목")
 
@@ -176,7 +176,7 @@ class TestBanner:
 
     def test_get_version(self):
         """버전 문자열 반환"""
-        from cli.ui.banner import get_version
+        from core.cli.ui.banner import get_version
 
         version = get_version()
         assert isinstance(version, str)
@@ -184,21 +184,21 @@ class TestBanner:
 
     def test_print_banner(self):
         """배너 출력 시 에러 없음"""
-        from cli.ui.banner import print_banner
-        from cli.ui.console import console
+        from core.cli.ui.banner import print_banner
+        from core.cli.ui.console import console
 
         print_banner(console)
 
     def test_print_simple_banner(self):
         """간단한 배너 출력 시 에러 없음"""
-        from cli.ui.banner import print_simple_banner
-        from cli.ui.console import console
+        from core.cli.ui.banner import print_simple_banner
+        from core.cli.ui.console import console
 
         print_simple_banner(console)
 
     def test_compact_logo_defined(self):
         """COMPACT_LOGO_LINES 상수 정의됨"""
-        from cli.ui.banner import COMPACT_LOGO_LINES
+        from core.cli.ui.banner import COMPACT_LOGO_LINES
 
         assert isinstance(COMPACT_LOGO_LINES, list)
         assert len(COMPACT_LOGO_LINES) > 0
@@ -209,7 +209,7 @@ class TestBanner:
 
     def test_full_logo_defined(self):
         """FULL_LOGO_LINES 상수 정의됨"""
-        from cli.ui.banner import FULL_LOGO_LINES
+        from core.cli.ui.banner import FULL_LOGO_LINES
 
         assert isinstance(FULL_LOGO_LINES, list)
         assert len(FULL_LOGO_LINES) > 0  # 로고가 정의되어 있음
@@ -224,8 +224,8 @@ class TestUIModuleExports:
     """UI 모듈 export 테스트"""
 
     def test_import_from_ui(self):
-        """cli.ui에서 주요 함수 import 가능"""
-        from cli.ui import (
+        """core.cli.ui에서 주요 함수 import 가능"""
+        from core.cli.ui import (
             console,
             print_error,
             print_info,
@@ -252,7 +252,7 @@ class TestLogger:
         """get_logger 반환 확인"""
         import logging
 
-        from cli.ui.console import get_logger
+        from core.cli.ui.console import get_logger
 
         logger = get_logger("test_logger")
         assert isinstance(logger, logging.Logger)
@@ -261,6 +261,6 @@ class TestLogger:
         """전역 logger 인스턴스 확인"""
         import logging
 
-        from cli.ui.console import logger
+        from core.cli.ui.console import logger
 
         assert isinstance(logger, logging.Logger)

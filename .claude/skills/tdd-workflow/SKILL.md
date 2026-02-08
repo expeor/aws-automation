@@ -223,7 +223,7 @@ def test_ebs_audit_full_workflow():
 전체 CLI 플로우 테스트:
 ```python
 from click.testing import CliRunner
-from cli.app import cli
+from core.cli.app import cli
 
 def test_list_tools_command():
     runner = CliRunner()

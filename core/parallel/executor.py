@@ -22,8 +22,8 @@ from .types import ErrorCategory, ParallelExecutionResult, TaskError, TaskResult
 if TYPE_CHECKING:
     import boto3
 
-    from cli.flow.context import ExecutionContext
-    from cli.ui.progress import ParallelTracker
+    from core.cli.flow.context import ExecutionContext
+    from core.cli.ui.progress import ParallelTracker
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +94,6 @@ class ParallelSessionExecutor:
         self.ctx = ctx
         self.config = config or ParallelConfig()
 
-        # Rate Limiter 초기화
-        limiter_config = self.config.rate_limiter_config or RateLimiterConfig()
-        self._rate_limiter = TokenBucketRateLimiter(limiter_config)
-
         # 재시도 설정
         self._retry_config = self.config.retry_config or RetryConfig()
 
@@ -139,6 +135,11 @@ class ParallelSessionExecutor:
         # 부모 스레드의 quiet 상태를 저장하여 워커 스레드에 전파
         parent_quiet = is_quiet()
 
+        # 서비스별 rate limiter 사용
+        from .rate_limiter import get_rate_limiter
+
+        rate_limiter = get_rate_limiter(service)
+
         with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
             # 모든 작업 제출 (quiet 상태 전파)
             futures = {}
@@ -149,6 +150,7 @@ class ParallelSessionExecutor:
                     task,
                     service,
                     parent_quiet,
+                    rate_limiter,
                 )
                 futures[future] = task
 
@@ -165,6 +167,7 @@ class ParallelSessionExecutor:
                 except Exception as e:
                     # 예상치 못한 executor 에러
                     logger.error(f"작업 실행 중 예외 [{task.account_id}/{task.region}]: {e}")
+                    e.__traceback__ = None  # prevent traceback memory leak
                     results.append(
                         TaskResult(
                             identifier=task.account_id,
@@ -290,6 +293,7 @@ class ParallelSessionExecutor:
         task: _TaskSpec,
         service: str,
         quiet: bool = False,
+        rate_limiter: TokenBucketRateLimiter | None = None,
     ) -> TaskResult[T]:
         """단일 작업 실행 (스레드 내에서)"""
         # 워커 스레드에 quiet 상태 전파
@@ -297,8 +301,8 @@ class ParallelSessionExecutor:
         start_time = time.monotonic()
 
         try:
-            # Rate limiting
-            if not self._rate_limiter.acquire():
+            # Rate limiting (서비스별 limiter 사용)
+            if rate_limiter and not rate_limiter.acquire():
                 return TaskResult(
                     identifier=task.account_id,
                     region=task.region,
@@ -321,6 +325,7 @@ class ParallelSessionExecutor:
 
         except Exception as e:
             # 세션 획득 실패 등
+            e.__traceback__ = None  # prevent traceback memory leak
             return TaskResult(
                 identifier=task.account_id,
                 region=task.region,
@@ -363,6 +368,7 @@ class ParallelSessionExecutor:
 
                 # 재시도 가능 여부 확인
                 if not is_retryable(e) or attempt >= self._retry_config.max_retries:
+                    e.__traceback__ = None  # prevent traceback memory leak
                     return TaskResult(
                         identifier=task.account_id,
                         region=task.region,
@@ -385,6 +391,8 @@ class ParallelSessionExecutor:
                 time.sleep(delay)
 
         # 재시도 소진 (도달하면 안 됨)
+        if last_error is not None:
+            last_error.__traceback__ = None  # prevent traceback memory leak
         return TaskResult(
             identifier=task.account_id,
             region=task.region,
@@ -441,7 +449,7 @@ def parallel_collect(
             print(result.get_error_summary())
 
     Example (progress_tracker 사용):
-        from cli.ui import parallel_progress
+        from core.cli.ui import parallel_progress
 
         with parallel_progress("리소스 수집") as tracker:
             with quiet_mode():

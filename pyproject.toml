@@ -30,7 +30,7 @@ Homepage = "https://github.com/expeor/aws-automation"
 Issues = "https://github.com/expeor/aws-automation/issues"
 
 [project.scripts]
-aa = "cli.app:cli"
+aa = "core.cli.app:cli"
 
 [project.optional-dependencies]
 dev = [
@@ -97,7 +97,7 @@ types = [
 ]
 
 [tool.setuptools]
-packages = {find = {exclude = ["tests*", "scripts*", "output*"]}}
+packages = {find = {exclude = ["tests*", "output*"]}}
 
 [tool.setuptools.dynamic]
 version = {file = "version.txt"}
@@ -149,7 +149,7 @@ skips = ["B101", "B105", "B311", "B404", "B603", "B606", "B607", "B608"]
 # B608: DuckDB queries with internal AWS data, not user input
 
 [tool.coverage.run]
-source = ["cli", "core", "shared", "analyzers", "reports"]
+source = ["core", "functions"]
 omit = ["*/tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]

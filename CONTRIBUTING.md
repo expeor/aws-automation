@@ -40,20 +40,20 @@ This project uses [Ruff](https://github.com/astral-sh/ruff) for linting and form
 
 ```bash
 # Check for issues
-ruff check cli core analyzers
+ruff check core functions
 
 # Auto-fix issues
-ruff check --fix cli core analyzers
+ruff check --fix core functions
 
 # Format code
-ruff format cli core analyzers
+ruff format core functions
 ```
 
 ### Type Checking
 
 ```bash
 # Run mypy
-mypy cli core --ignore-missing-imports
+mypy core functions --ignore-missing-imports
 ```
 
 ### Style Rules
@@ -98,7 +98,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/). This ena
 |-------|-------------|
 | `cli` | CLI module |
 | `core` | Core module |
-| `analyzers` | Analyzers |
+| `functions` | Functions (analyzers, reports) |
 | `deps` | Dependencies |
 | Service name | Specific AWS service (ec2, vpc, iam, etc.) |
 
@@ -148,7 +148,7 @@ BREAKING CHANGE: -p flag now requires profile name instead of index
    ```
 4. **Run linting**:
    ```bash
-   ruff check cli core analyzers
+   ruff check core functions
    ruff format --check cli core analyzers
    ```
 5. **Push and create a PR** with a descriptive title following commit conventions
@@ -176,10 +176,10 @@ pytest tests/ -v
 
 # Run specific module tests
 pytest tests/core/ -v
-pytest tests/analyzers/ec2/ -v
+pytest tests/functions/analyzers/ec2/ -v
 
 # Run with coverage
-pytest tests/ --cov=cli --cov=core --cov=analyzers
+pytest tests/ --cov=core --cov=functions
 ```
 
 ### Writing Tests
@@ -194,26 +194,26 @@ See [CLAUDE.md](CLAUDE.md) for detailed analyzer development patterns.
 
 ### Quick Reference
 
-1. Create module in `analyzers/{service}/{tool_name}.py`
-2. Add tool entry to `analyzers/{service}/__init__.py`
+1. Create module in `functions/analyzers/{service}/{tool_name}.py`
+2. Add tool entry to `functions/analyzers/{service}/__init__.py`
 3. Implement `run(ctx)` function using `parallel_collect` pattern
-4. Add tests in `tests/analyzers/{service}/`
+4. Add tests in `tests/functions/analyzers/{service}/`
 
 ### Analyzer Development Workflow
 
 ```bash
 # 1. Create your analyzer module
-# analyzers/{service}/{tool_name}.py
+# functions/analyzers/{service}/{tool_name}.py
 
 # 2. Run and test locally
 aa {service}/{tool_name} -p my-profile -r ap-northeast-2
 
 # 3. Write tests
-pytest tests/analyzers/{service}/ -v
+pytest tests/functions/analyzers/{service}/ -v
 
 # 4. Lint & format
-ruff check --fix analyzers/{service}/
-ruff format analyzers/{service}/
+ruff check --fix functions/analyzers/{service}/
+ruff format functions/analyzers/{service}/
 ```
 
 ### Mocking AWS Services with moto
@@ -222,7 +222,7 @@ Use the `_make_resource()` factory pattern for test fixtures:
 
 ```python
 from unittest.mock import MagicMock, patch
-from analyzers.{service}.{tool} import ResourceInfo
+from functions.analyzers.{service}.{tool} import ResourceInfo
 
 def _make_resource(
     name: str = "test-resource",
@@ -234,7 +234,7 @@ def _make_resource(
     return ResourceInfo(name=name, region=region, account_id=account_id, **kwargs)
 
 class TestAnalyzer:
-    @patch("analyzers.{service}.{tool}.get_client")
+    @patch("functions.analyzers.{service}.{tool}.get_client")
     def test_collect(self, mock_get_client):
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client

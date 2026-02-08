@@ -6,7 +6,7 @@ ContextVar가 ThreadPoolExecutor 워커에서 접근 불가능함을 확인합�
 
 from concurrent.futures import ThreadPoolExecutor
 
-from shared.aws.metrics.session_cache import MetricSessionCache, is_cache_active
+from core.shared.aws.metrics.session_cache import MetricSessionCache, is_cache_active
 
 
 def test_contextvar_thread_isolation_issue():

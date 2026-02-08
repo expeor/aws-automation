@@ -5,7 +5,7 @@ tests/shared/io/html/test_report.py - HTML 리포트 테스트
 from datetime import datetime
 from pathlib import Path
 
-from shared.io.html import (
+from core.shared.io.html import (
     ChartSize,
     HTMLReport,
     aggregate_by_group,

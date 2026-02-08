@@ -12,12 +12,8 @@ from core.config import (
     TOOL_REQUIRED_FIELDS,
     VALID_AREAS,
     VALID_PERMISSIONS,
-    LogConfig,
     get_analyzers_path,
-    get_default_profile,
     get_default_region,
-    get_env_bool,
-    get_env_int,
     get_project_root,
     get_version,
     settings,
@@ -38,10 +34,6 @@ class TestSettings:
     def test_default_values(self):
         """기본값 확인"""
         assert settings.DEFAULT_REGION == "ap-northeast-2"
-        assert settings.API_TIMEOUT == 30
-        assert settings.API_RETRY_COUNT == 3
-        assert settings.SESSION_DURATION_SECONDS == 3600
-        assert settings.CACHE_TTL_SECONDS == 300
 
     def test_security_settings(self):
         """보안 설정 확인"""
@@ -75,7 +67,7 @@ class TestProjectPaths:
         assert isinstance(root, Path)
         assert root.exists()
         assert (root / "core").exists()
-        assert (root / "analyzers").exists()
+        assert (root / "functions" / "analyzers").exists()
 
     def test_get_analyzers_path(self):
         """분석기 경로"""
@@ -83,34 +75,11 @@ class TestProjectPaths:
         assert isinstance(analyzers, Path)
         assert analyzers.exists()
         assert analyzers.name == "analyzers"
+        assert analyzers.parent.name == "functions"
 
 
 class TestEnvironmentHelpers:
     """환경변수 헬퍼 함수 테스트"""
-
-    def test_get_default_profile_from_aws_profile(self):
-        """AWS_PROFILE 환경변수에서 프로파일 가져오기"""
-        with patch.dict(os.environ, {"AWS_PROFILE": "test-profile"}, clear=False):
-            assert get_default_profile() == "test-profile"
-
-    def test_get_default_profile_from_aws_default_profile(self):
-        """AWS_DEFAULT_PROFILE 환경변수에서 프로파일 가져오기"""
-        with patch.dict(
-            os.environ,
-            {"AWS_DEFAULT_PROFILE": "default-profile"},
-            clear=False,
-        ):
-            # AWS_PROFILE 제거
-            env = os.environ.copy()
-            env.pop("AWS_PROFILE", None)
-            env["AWS_DEFAULT_PROFILE"] = "default-profile"
-            with patch.dict(os.environ, env, clear=True):
-                assert get_default_profile() == "default-profile"
-
-    def test_get_default_profile_none(self):
-        """프로파일 환경변수 없을 때"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_default_profile() is None
 
     def test_get_default_region_from_aws_region(self):
         """AWS_REGION 환경변수에서 리전 가져오기"""
@@ -121,67 +90,6 @@ class TestEnvironmentHelpers:
         """리전 환경변수 없을 때 기본값"""
         with patch.dict(os.environ, {}, clear=True):
             assert get_default_region() == settings.DEFAULT_REGION
-
-    def test_get_env_bool_true_values(self):
-        """환경변수 bool 변환 - True 값들"""
-        for val in ["true", "1", "yes", "on", "TRUE", "Yes"]:
-            with patch.dict(os.environ, {"TEST_BOOL": val}):
-                assert get_env_bool("TEST_BOOL") is True
-
-    def test_get_env_bool_false_values(self):
-        """환경변수 bool 변환 - False 값들"""
-        for val in ["false", "0", "no", "off", "FALSE", "No"]:
-            with patch.dict(os.environ, {"TEST_BOOL": val}):
-                assert get_env_bool("TEST_BOOL") is False
-
-    def test_get_env_bool_default(self):
-        """환경변수 bool 변환 - 기본값"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_env_bool("NONEXISTENT", default=True) is True
-            assert get_env_bool("NONEXISTENT", default=False) is False
-
-    def test_get_env_bool_invalid(self):
-        """환경변수 bool 변환 - 유효하지 않은 값"""
-        with patch.dict(os.environ, {"TEST_BOOL": "invalid"}):
-            assert get_env_bool("TEST_BOOL", default=True) is True
-            assert get_env_bool("TEST_BOOL", default=False) is False
-
-    def test_get_env_int_valid(self):
-        """환경변수 int 변환 - 유효한 값"""
-        with patch.dict(os.environ, {"TEST_INT": "42"}):
-            assert get_env_int("TEST_INT", default=0) == 42
-
-    def test_get_env_int_invalid(self):
-        """환경변수 int 변환 - 유효하지 않은 값"""
-        with patch.dict(os.environ, {"TEST_INT": "not_a_number"}):
-            assert get_env_int("TEST_INT", default=10) == 10
-
-    def test_get_env_int_missing(self):
-        """환경변수 int 변환 - 누락된 값"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_env_int("NONEXISTENT", default=100) == 100
-
-
-class TestLogConfig:
-    """LogConfig 테스트"""
-
-    def test_default_values(self):
-        """기본값 확인"""
-        config = LogConfig()
-        assert config.level == "INFO"
-        assert "%(asctime)s" in config.format
-        assert config.date_format == "%Y-%m-%d %H:%M:%S"
-
-    def test_from_env(self):
-        """환경변수에서 로드"""
-        with patch.dict(
-            os.environ,
-            {"LOG_LEVEL": "DEBUG", "LOG_FORMAT": "%(message)s"},
-            clear=False,
-        ):
-            config = LogConfig.from_env()
-            assert config.level == "DEBUG"
-            assert config.format == "%(message)s"
 
 
 class TestValidateToolMetadata:

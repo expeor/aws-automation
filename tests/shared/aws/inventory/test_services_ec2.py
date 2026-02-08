@@ -7,12 +7,12 @@ EC2 및 Security Group 수집 함수를 직접 테스트합니다.
 from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 
-from shared.aws.inventory.services.ec2 import (
+from core.shared.aws.inventory.services.ec2 import (
     _populate_sg_attachments,
     collect_ec2_instances,
     collect_security_groups,
 )
-from shared.aws.inventory.types import SecurityGroup
+from core.shared.aws.inventory.types import SecurityGroup
 
 
 class TestCollectEC2Instances:
@@ -51,7 +51,7 @@ class TestCollectEC2Instances:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances) == 1
@@ -99,7 +99,7 @@ class TestCollectEC2Instances:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances[0].ebs_volume_ids) == 2
@@ -137,7 +137,7 @@ class TestCollectEC2Instances:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances[0].security_group_ids) == 2
@@ -172,7 +172,7 @@ class TestCollectEC2Instances:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert instances[0].iam_role == "WebServerRole"
@@ -216,7 +216,7 @@ class TestCollectEC2Instances:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances) == 2
@@ -235,7 +235,7 @@ class TestCollectEC2Instances:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             instances = collect_ec2_instances(mock_boto3_session, "123456789012", "test-account", "ap-northeast-2")
 
         assert len(instances) == 0
@@ -279,7 +279,7 @@ class TestCollectSecurityGroups:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             sgs = collect_security_groups(
                 mock_boto3_session, "123456789012", "test-account", "ap-northeast-2", populate_attachments=False
             )
@@ -338,7 +338,7 @@ class TestCollectSecurityGroups:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             sgs = collect_security_groups(
                 mock_boto3_session, "123456789012", "test-account", "ap-northeast-2", populate_attachments=False
             )
@@ -377,7 +377,7 @@ class TestCollectSecurityGroups:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             sgs = collect_security_groups(
                 mock_boto3_session, "123456789012", "test-account", "ap-northeast-2", populate_attachments=False
             )
@@ -435,7 +435,7 @@ class TestCollectSecurityGroups:
 
         mock_ec2.get_paginator.side_effect = get_paginator_side_effect
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             sgs = collect_security_groups(
                 mock_boto3_session, "123456789012", "test-account", "ap-northeast-2", populate_attachments=True
             )
@@ -476,7 +476,7 @@ class TestCollectSecurityGroups:
         mock_paginator.paginate.return_value = [mock_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
+        with patch("core.shared.aws.inventory.services.ec2.get_client", return_value=mock_ec2):
             sgs = collect_security_groups(
                 mock_boto3_session, "123456789012", "test-account", "ap-northeast-2", populate_attachments=False
             )
@@ -524,7 +524,7 @@ class TestPopulateSGAttachments:
         mock_paginator.paginate.return_value = [eni_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.parse_eni_description") as mock_parse:
+        with patch("core.shared.aws.inventory.services.ec2.parse_eni_description") as mock_parse:
             mock_parse.return_value = Mock(
                 resource_id="i-1234567890abcdef0",
                 resource_name="",
@@ -573,7 +573,7 @@ class TestPopulateSGAttachments:
         mock_paginator.paginate.return_value = [eni_response]
         mock_ec2.get_paginator.return_value = mock_paginator
 
-        with patch("shared.aws.inventory.services.ec2.parse_eni_description", return_value=None):
+        with patch("core.shared.aws.inventory.services.ec2.parse_eni_description", return_value=None):
             _populate_sg_attachments(mock_ec2, [sg])
 
         assert len(sg.attached_enis) == 2

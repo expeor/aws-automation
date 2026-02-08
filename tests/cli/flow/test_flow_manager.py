@@ -16,8 +16,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli.flow.context import ExecutionContext, ToolInfo
-from cli.flow.runner import FlowRunner
+from core.cli.flow.context import ExecutionContext, ToolInfo
+from core.cli.flow.runner import FlowRunner
 
 # =============================================================================
 # FlowRunner Creation Tests
@@ -29,7 +29,7 @@ class TestFlowRunnerCreation:
 
     def test_create_flow_runner(self):
         """create_flow_runner returns FlowRunner instance"""
-        from cli.flow import create_flow_runner
+        from core.cli.flow import create_flow_runner
 
         runner = create_flow_runner()
         assert isinstance(runner, FlowRunner)
@@ -524,8 +524,8 @@ class TestDirectToolExecution:
 
     @patch("core.tools.discovery.discover_categories")
     @patch("core.tools.discovery.load_tool")
-    @patch("cli.flow.steps.ProfileStep")
-    @patch("cli.flow.steps.RegionStep")
+    @patch("core.cli.flow.steps.ProfileStep")
+    @patch("core.cli.flow.steps.RegionStep")
     def test_run_tool_directly_success(
         self,
         mock_region_step,
@@ -610,9 +610,9 @@ class TestDirectToolExecution:
 class TestFlowLifecycle:
     """Test complete flow execution lifecycle"""
 
-    @patch("cli.flow.runner.CategoryStep")
-    @patch("cli.flow.runner.ProfileStep")
-    @patch("cli.flow.runner.RegionStep")
+    @patch("core.cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.ProfileStep")
+    @patch("core.cli.flow.runner.RegionStep")
     @patch("core.tools.discovery.load_tool")
     @patch("core.tools.discovery.discover_categories")
     @patch("core.tools.history.RecentHistory")
@@ -674,7 +674,7 @@ class TestFlowLifecycle:
         assert result.success is True
         assert result.context is not None
 
-    @patch("cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.CategoryStep")
     def test_run_once_keyboard_interrupt(self, mock_category_step):
         """Run once handles keyboard interrupt"""
         mock_instance = MagicMock()
@@ -686,7 +686,7 @@ class TestFlowLifecycle:
         with pytest.raises(KeyboardInterrupt):
             runner._run_once()
 
-    @patch("cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.CategoryStep")
     def test_run_once_generic_exception(self, mock_category_step):
         """Run once handles generic exceptions"""
         mock_instance = MagicMock()
@@ -707,9 +707,9 @@ class TestFlowLifecycle:
 class TestFlowIntegration:
     """Integration tests for flow execution"""
 
-    @patch("cli.flow.runner.CategoryStep")
-    @patch("cli.flow.runner.ProfileStep")
-    @patch("cli.flow.runner.RegionStep")
+    @patch("core.cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.ProfileStep")
+    @patch("core.cli.flow.runner.RegionStep")
     @patch("core.tools.discovery.load_tool")
     @patch("core.tools.discovery.discover_categories")
     def test_full_flow_with_session_selection(
@@ -768,7 +768,7 @@ class TestFlowIntegration:
         assert result.success is True
         mock_run.assert_called_once()
 
-    @patch("cli.flow.runner.CategoryStep")
+    @patch("core.cli.flow.runner.CategoryStep")
     @patch("core.tools.discovery.load_tool")
     @patch("core.tools.discovery.discover_categories")
     def test_full_flow_without_session(

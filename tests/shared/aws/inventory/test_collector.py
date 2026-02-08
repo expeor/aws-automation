@@ -6,8 +6,8 @@ InventoryCollector 클래스의 초기화, 리소스 수집, 캐싱, 에러 처�
 
 from unittest.mock import Mock, patch
 
-from shared.aws.inventory.collector import InventoryCollector
-from shared.aws.inventory.types import (
+from core.shared.aws.inventory.collector import InventoryCollector
+from core.shared.aws.inventory.types import (
     VPC,
     EBSVolume,
     EC2Instance,
@@ -39,8 +39,8 @@ class TestInventoryCollectorInit:
 class TestCollectVPCs:
     """VPC 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
-    @patch("shared.aws.inventory.services.vpc.collect_vpcs")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.services.vpc.collect_vpcs")
     def test_collect_vpcs_success(self, mock_collect, mock_parallel, mock_context):
         """VPC 수집 성공"""
         # Mock 데이터 준비
@@ -71,7 +71,7 @@ class TestCollectVPCs:
         assert vpcs[0].cidr_block == "10.0.0.0/16"
         mock_parallel.assert_called_once()
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_vpcs_empty_result(self, mock_parallel, mock_context):
         """VPC가 없는 경우"""
         mock_result = Mock()
@@ -83,7 +83,7 @@ class TestCollectVPCs:
 
         assert vpcs == []
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_vpcs_multiple_regions(self, mock_parallel, mock_context):
         """다중 리전 VPC 수집"""
         mock_vpcs = [
@@ -122,7 +122,7 @@ class TestCollectVPCs:
 class TestCollectEC2:
     """EC2 인스턴스 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_ec2_success(self, mock_parallel, mock_context):
         """EC2 인스턴스 수집 성공"""
         mock_instances = [
@@ -152,7 +152,7 @@ class TestCollectEC2:
         assert instances[0].instance_id == "i-1234567890abcdef0"
         assert instances[0].state == "running"
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_ec2_with_tags(self, mock_parallel, mock_context):
         """태그가 있는 EC2 인스턴스 수집"""
         mock_instances = [
@@ -185,7 +185,7 @@ class TestCollectEC2:
 class TestCollectEBSVolumes:
     """EBS Volume 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_ebs_volumes_success(self, mock_parallel, mock_context):
         """EBS Volume 수집 성공"""
         mock_volumes = [
@@ -219,7 +219,7 @@ class TestCollectEBSVolumes:
 class TestCollectSecurityGroups:
     """Security Group 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_security_groups_success(self, mock_parallel, mock_context):
         """Security Group 수집 성공"""
         mock_sgs = [
@@ -251,7 +251,7 @@ class TestCollectSecurityGroups:
 class TestCollectLambdaFunctions:
     """Lambda Function 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_lambda_functions_success(self, mock_parallel, mock_context):
         """Lambda Function 수집 성공"""
         mock_functions = [
@@ -284,7 +284,7 @@ class TestCollectLambdaFunctions:
 class TestCollectS3Buckets:
     """S3 Bucket 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_s3_buckets_success(self, mock_parallel, mock_context):
         """S3 Bucket 수집 성공"""
         mock_buckets = [
@@ -314,7 +314,7 @@ class TestCollectS3Buckets:
 class TestCollectRDSInstances:
     """RDS Instance 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_rds_instances_success(self, mock_parallel, mock_context):
         """RDS Instance 수집 성공"""
         mock_instances = [
@@ -347,7 +347,7 @@ class TestCollectRDSInstances:
 class TestCollectLoadBalancers:
     """Load Balancer 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_load_balancers_success(self, mock_parallel, mock_context):
         """Load Balancer 수집 성공"""
         mock_lbs = [
@@ -376,7 +376,7 @@ class TestCollectLoadBalancers:
         assert lbs[0].name == "test-alb"
         assert lbs[0].lb_type == "application"
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_load_balancers_include_classic(self, mock_parallel, mock_context):
         """Classic Load Balancer 포함 수집"""
         mock_lbs = [
@@ -408,7 +408,7 @@ class TestCollectLoadBalancers:
 class TestErrorHandling:
     """에러 처리 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_handles_access_denied(self, mock_parallel, mock_context):
         """AccessDenied 에러 처리"""
         # parallel_collect가 에러를 포함한 결과 반환
@@ -424,7 +424,7 @@ class TestErrorHandling:
         # 빈 리스트 반환 확인
         assert vpcs == []
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_handles_throttling(self, mock_parallel, mock_context):
         """Throttling 에러 처리"""
         mock_result = Mock()
@@ -437,7 +437,7 @@ class TestErrorHandling:
 
         assert instances == []
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_handles_partial_success(self, mock_parallel, mock_context):
         """일부 성공 시 처리"""
         # 일부 리전은 성공, 일부는 실패
@@ -470,7 +470,7 @@ class TestErrorHandling:
 class TestMultiAccountCollection:
     """멀티 계정 수집 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_from_multiple_accounts(self, mock_parallel, mock_context):
         """다중 계정에서 VPC 수집"""
         mock_vpcs = [
@@ -505,7 +505,7 @@ class TestMultiAccountCollection:
         assert vpcs[0].account_id == "111111111111"
         assert vpcs[1].account_id == "222222222222"
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_collect_from_multiple_accounts_and_regions(self, mock_parallel, mock_context):
         """다중 계정 및 리전에서 EC2 수집"""
         mock_instances = [
@@ -567,7 +567,7 @@ class TestMultiAccountCollection:
 class TestParallelCollectIntegration:
     """parallel_collect 통합 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_parallel_collect_called_with_correct_service(self, mock_parallel, mock_context):
         """parallel_collect이 올바른 서비스로 호출됨"""
         mock_result = Mock()
@@ -588,7 +588,7 @@ class TestParallelCollectIntegration:
         collector.collect_rds_instances()
         assert mock_parallel.call_args[1]["service"] == "rds"
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_parallel_collect_uses_context(self, mock_parallel, mock_context):
         """parallel_collect이 컨텍스트를 사용함"""
         mock_result = Mock()
@@ -605,7 +605,7 @@ class TestParallelCollectIntegration:
 class TestCollectorCompleteness:
     """모든 수집 메서드 테스트"""
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_all_network_collectors(self, mock_parallel, mock_context):
         """모든 네트워크 리소스 수집 메서드 존재 확인"""
         mock_result = Mock()
@@ -628,7 +628,7 @@ class TestCollectorCompleteness:
         collector.collect_vpcs()
         collector.collect_subnets()
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_all_compute_collectors(self, mock_parallel, mock_context):
         """모든 컴퓨팅 리소스 수집 메서드 존재 확인"""
         mock_result = Mock()
@@ -644,7 +644,7 @@ class TestCollectorCompleteness:
         assert hasattr(collector, "collect_ecs_clusters")
         assert hasattr(collector, "collect_ecs_services")
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_all_database_collectors(self, mock_parallel, mock_context):
         """모든 데이터베이스 리소스 수집 메서드 존재 확인"""
         mock_result = Mock()
@@ -659,7 +659,7 @@ class TestCollectorCompleteness:
         assert hasattr(collector, "collect_s3_buckets")
         assert hasattr(collector, "collect_dynamodb_tables")
 
-    @patch("shared.aws.inventory.collector.parallel_collect")
+    @patch("core.shared.aws.inventory.collector.parallel_collect")
     def test_all_security_collectors(self, mock_parallel, mock_context):
         """모든 보안 리소스 수집 메서드 존재 확인"""
         mock_result = Mock()

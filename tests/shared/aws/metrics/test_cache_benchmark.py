@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shared.aws.metrics import MetricQuery, MetricSessionCache, batch_get_metrics
+from core.shared.aws.metrics import MetricQuery, MetricSessionCache, batch_get_metrics
 
 
 class TestCacheBenchmark:

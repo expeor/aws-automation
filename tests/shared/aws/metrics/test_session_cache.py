@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from shared.aws.metrics.session_cache import (
+from core.shared.aws.metrics.session_cache import (
     CacheStats,
     FileBackedMetricCache,
     MetricSessionCache,

@@ -9,7 +9,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from cli.flow.context import ExecutionContext
+    from core.cli.flow.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 

@@ -620,7 +620,7 @@ class TestAdvancedDiscovery:
             mock_get.side_effect = [
                 {
                     "name": "collection",
-                    "module_path": "analyzers.collection",
+                    "module_path": "functions.analyzers.collection",
                     "tools": [
                         {
                             "name": "참조 도구",
@@ -630,7 +630,7 @@ class TestAdvancedDiscovery:
                 },
                 {
                     "name": "ec2",
-                    "module_path": "analyzers.ec2",
+                    "module_path": "functions.analyzers.ec2",
                     "tools": [
                         {
                             "name": "Original Tool",

@@ -34,7 +34,7 @@ from unittest.mock import Mock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from shared.aws.lambda_.collector import (
+from core.shared.aws.lambda_.collector import (
     LambdaFunctionInfo,
     LambdaMetrics,
     collect_all_function_metrics,
@@ -42,7 +42,7 @@ from shared.aws.lambda_.collector import (
     collect_functions,
     collect_functions_with_metrics,
 )
-from shared.aws.lambda_.runtime_eol import (
+from core.shared.aws.lambda_.runtime_eol import (
     EOLStatus,
     RuntimeInfo,
     get_deprecated_runtimes,
@@ -369,8 +369,8 @@ class TestLambdaFunctionInfo:
 class TestCollectFunctions:
     """collect_functions() tests"""
 
-    @patch("shared.aws.lambda_.collector.get_client")
-    @patch("shared.aws.lambda_.collector.try_or_default")
+    @patch("core.shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.try_or_default")
     def test_collect_functions_basic(self, mock_try_or_default, mock_get_client, mock_session, sample_function_data):
         """Test basic function collection"""
         mock_lambda_client = Mock()
@@ -402,8 +402,8 @@ class TestCollectFunctions:
         assert func.account_name == "test-account"
         assert func.region == "ap-northeast-2"
 
-    @patch("shared.aws.lambda_.collector.get_client")
-    @patch("shared.aws.lambda_.collector.try_or_default")
+    @patch("core.shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.try_or_default")
     def test_collect_functions_with_tags(
         self, mock_try_or_default, mock_get_client, mock_session, sample_function_data
     ):
@@ -428,8 +428,8 @@ class TestCollectFunctions:
         assert len(functions) == 1
         assert functions[0].tags == {"Environment": "prod", "Team": "backend"}
 
-    @patch("shared.aws.lambda_.collector.get_client")
-    @patch("shared.aws.lambda_.collector.try_or_default")
+    @patch("core.shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.try_or_default")
     def test_collect_functions_no_vpc(self, mock_try_or_default, mock_get_client, mock_session, sample_function_no_vpc):
         """Test function collection without VPC"""
         mock_lambda_client = Mock()
@@ -447,8 +447,8 @@ class TestCollectFunctions:
         assert functions[0].vpc_config is None
         assert functions[0].has_vpc is False
 
-    @patch("shared.aws.lambda_.collector.get_client")
-    @patch("shared.aws.lambda_.collector.try_or_default")
+    @patch("core.shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.try_or_default")
     def test_collect_functions_with_concurrency(
         self, mock_try_or_default, mock_get_client, mock_session, sample_function_data
     ):
@@ -479,7 +479,7 @@ class TestCollectFunctions:
         assert functions[0].provisioned_concurrency == 5
         assert functions[0].reserved_concurrency == 10
 
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_functions_api_error(self, mock_get_client, mock_session):
         """Test function collection with API error"""
         mock_lambda_client = Mock()
@@ -502,9 +502,9 @@ class TestCollectFunctions:
 class TestCollectFunctionMetrics:
     """collect_function_metrics() tests"""
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
-    @patch("shared.aws.lambda_.collector._get_last_invocation_time")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector._get_last_invocation_time")
     def test_collect_function_metrics_basic(
         self, mock_get_last_inv, mock_get_client, mock_batch_get_metrics, mock_session
     ):
@@ -537,8 +537,8 @@ class TestCollectFunctionMetrics:
         assert metrics.period_days == 30
         assert metrics.last_invocation_time == datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_function_metrics_no_invocations(self, mock_get_client, mock_batch_get_metrics, mock_session):
         """Test metrics collection for function with no invocations"""
         mock_cloudwatch_client = Mock()
@@ -554,9 +554,9 @@ class TestCollectFunctionMetrics:
         assert metrics.throttles == 0
         assert metrics.last_invocation_time is None
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
-    @patch("shared.aws.lambda_.collector._get_last_invocation_time")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector._get_last_invocation_time")
     def test_collect_function_metrics_custom_period(
         self, mock_get_last_inv, mock_get_client, mock_batch_get_metrics, mock_session
     ):
@@ -572,8 +572,8 @@ class TestCollectFunctionMetrics:
         assert metrics.period_days == 7
         assert metrics.invocations == 500
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_function_metrics_api_error(self, mock_get_client, mock_batch_get_metrics, mock_session):
         """Test metrics collection with API error"""
         mock_cloudwatch_client = Mock()
@@ -598,8 +598,8 @@ class TestCollectFunctionMetrics:
 class TestCollectAllFunctionMetrics:
     """collect_all_function_metrics() batch optimization tests"""
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_all_function_metrics_basic(self, mock_get_client, mock_batch_get_metrics, mock_session):
         """Test batch metrics collection for multiple functions"""
         mock_cloudwatch_client = Mock()
@@ -625,8 +625,8 @@ class TestCollectAllFunctionMetrics:
         assert results["func2"].invocations == 500
         assert results["func2"].errors == 5
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_all_function_metrics_empty_list(self, mock_get_client, mock_batch_get_metrics, mock_session):
         """Test batch metrics collection with empty function list"""
         results = collect_all_function_metrics(mock_session, "ap-northeast-2", [], days=30)
@@ -635,8 +635,8 @@ class TestCollectAllFunctionMetrics:
         mock_get_client.assert_not_called()
         mock_batch_get_metrics.assert_not_called()
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_all_function_metrics_no_data(self, mock_get_client, mock_batch_get_metrics, mock_session):
         """Test batch metrics collection when no metric data is available"""
         mock_cloudwatch_client = Mock()
@@ -650,8 +650,8 @@ class TestCollectAllFunctionMetrics:
         assert results["func1"].invocations == 0
         assert results["func2"].invocations == 0
 
-    @patch("shared.aws.lambda_.collector.batch_get_metrics")
-    @patch("shared.aws.lambda_.collector.get_client")
+    @patch("core.shared.aws.lambda_.collector.batch_get_metrics")
+    @patch("core.shared.aws.lambda_.collector.get_client")
     def test_collect_all_function_metrics_api_error(self, mock_get_client, mock_batch_get_metrics, mock_session):
         """Test batch metrics collection with API error"""
         mock_cloudwatch_client = Mock()
@@ -676,8 +676,8 @@ class TestCollectAllFunctionMetrics:
 class TestCollectFunctionsWithMetrics:
     """collect_functions_with_metrics() integration tests"""
 
-    @patch("shared.aws.lambda_.collector.collect_all_function_metrics")
-    @patch("shared.aws.lambda_.collector.collect_functions")
+    @patch("core.shared.aws.lambda_.collector.collect_all_function_metrics")
+    @patch("core.shared.aws.lambda_.collector.collect_functions")
     def test_collect_functions_with_metrics_basic(self, mock_collect_functions, mock_collect_metrics, mock_session):
         """Test combined function and metrics collection"""
         # Mock function collection
@@ -722,8 +722,8 @@ class TestCollectFunctionsWithMetrics:
         assert functions[1].function_name == "func2"
         assert functions[1].metrics.invocations == 0
 
-    @patch("shared.aws.lambda_.collector.collect_all_function_metrics")
-    @patch("shared.aws.lambda_.collector.collect_functions")
+    @patch("core.shared.aws.lambda_.collector.collect_all_function_metrics")
+    @patch("core.shared.aws.lambda_.collector.collect_functions")
     def test_collect_functions_with_metrics_empty(self, mock_collect_functions, mock_collect_metrics, mock_session):
         """Test combined collection with no functions"""
         mock_collect_functions.return_value = []
@@ -733,8 +733,8 @@ class TestCollectFunctionsWithMetrics:
         assert functions == []
         mock_collect_metrics.assert_not_called()
 
-    @patch("shared.aws.lambda_.collector.collect_all_function_metrics")
-    @patch("shared.aws.lambda_.collector.collect_functions")
+    @patch("core.shared.aws.lambda_.collector.collect_all_function_metrics")
+    @patch("core.shared.aws.lambda_.collector.collect_functions")
     def test_collect_functions_with_metrics_custom_period(
         self, mock_collect_functions, mock_collect_metrics, mock_session
     ):

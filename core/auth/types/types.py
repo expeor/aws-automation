@@ -10,9 +10,12 @@ AWS 인증 모듈의 핵심 타입 정의
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -77,9 +80,8 @@ class AccountInfo:
 
     def __post_init__(self):
         """데이터 유효성 검사"""
-        if not self.id or len(self.id) != 12:
-            # 12자리가 아닌 경우도 허용 (일부 테스트 환경)
-            pass
+        if not self.id or len(self.id) != 12 or not self.id.isdigit():
+            logger.warning("유효하지 않은 AWS 계정 ID: '%s' (12자리 숫자여야 함)", self.id)
         if not self.name:
             self.name = f"account-{self.id}"
 

@@ -201,7 +201,7 @@ enabled_opt_ins = checker.get_enabled_opt_in_regions()  # 활성화된 옵트인
 미사용 리소스 탐지 시 CloudWatch 메트릭을 효율적으로 조회:
 
 ```python
-from shared.aws.metrics import (
+from core.shared.aws.metrics import (
     batch_get_metrics,
     build_ec2_metric_queries,
     build_lambda_metric_queries,
@@ -239,7 +239,7 @@ metrics = batch_get_metrics(session, queries, region)
 서비스별 인벤토리 도구에서 공통 컬렉터 사용:
 
 ```python
-from shared.aws.inventory import InventoryCollector
+from core.shared.aws.inventory import InventoryCollector
 
 def run(ctx) -> None:
     collector = InventoryCollector(ctx)
