@@ -27,7 +27,7 @@ class TestGetVersion:
 
     def test_version_from_config(self):
         """Version is retrieved from core.config"""
-        from cli.app import get_version
+        from core.cli.app import get_version
 
         version = get_version()
         assert isinstance(version, str)
@@ -35,7 +35,7 @@ class TestGetVersion:
 
     def test_version_format(self):
         """Version follows semantic versioning format"""
-        from cli.app import get_version
+        from core.cli.app import get_version
 
         version = get_version()
         # Should be x.y.z format
@@ -46,7 +46,7 @@ class TestGetVersion:
 
     def test_version_constant_set(self):
         """VERSION constant is set in module"""
-        from cli.app import VERSION
+        from core.cli.app import VERSION
 
         assert isinstance(VERSION, str)
         assert len(VERSION) > 0
@@ -67,7 +67,7 @@ class TestCLI:
 
     def test_version_option(self, runner):
         """--version flag displays version"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
@@ -75,7 +75,7 @@ class TestCLI:
 
     def test_help_option(self, runner):
         """--help flag displays help text"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
@@ -83,33 +83,33 @@ class TestCLI:
 
     def test_lang_option_ko(self, runner):
         """--lang ko sets Korean language"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.i18n.set_lang") as mock_set_lang, patch("cli.ui.main_menu.show_main_menu"):
+        with patch("core.cli.i18n.set_lang") as mock_set_lang, patch("core.cli.ui.main_menu.show_main_menu"):
             runner.invoke(cli, ["--lang", "ko"])
             mock_set_lang.assert_called_once_with("ko")
 
     def test_lang_option_en(self, runner):
         """--lang en sets English language"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.i18n.set_lang") as mock_set_lang, patch("cli.ui.main_menu.show_main_menu"):
+        with patch("core.cli.i18n.set_lang") as mock_set_lang, patch("core.cli.ui.main_menu.show_main_menu"):
             runner.invoke(cli, ["--lang", "en"])
             mock_set_lang.assert_called_once_with("en")
 
-    @patch("cli.ui.main_menu.show_main_menu")
+    @patch("core.cli.ui.main_menu.show_main_menu")
     def test_invoke_without_command_shows_menu(self, mock_menu, runner):
         """Running without subcommand shows main menu"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         runner.invoke(cli, [])
         mock_menu.assert_called_once()
 
     def test_context_object_creation(self, runner):
         """Context object is created with lang"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.ui.main_menu.show_main_menu"):
+        with patch("core.cli.ui.main_menu.show_main_menu"):
             result = runner.invoke(cli, ["--lang", "en"], obj={})
             assert result.exit_code == 0
 
@@ -124,7 +124,7 @@ class TestBuildHelpText:
 
     def test_help_text_korean(self):
         """Korean help text contains expected content"""
-        from cli.app import _build_help_text
+        from core.cli.app import _build_help_text
 
         help_text = _build_help_text(lang="ko")
 
@@ -135,7 +135,7 @@ class TestBuildHelpText:
 
     def test_help_text_english(self):
         """English help text contains expected content"""
-        from cli.app import _build_help_text
+        from core.cli.app import _build_help_text
 
         help_text = _build_help_text(lang="en")
 
@@ -145,7 +145,7 @@ class TestBuildHelpText:
 
     def test_help_text_has_sections(self):
         """Help text has all required sections"""
-        from cli.app import _build_help_text
+        from core.cli.app import _build_help_text
 
         help_text = _build_help_text()
 
@@ -168,7 +168,7 @@ class TestPathBasedExecution:
 
     def test_path_execution_requires_auth_option(self, runner):
         """Path-based execution requires authentication option"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["ec2/unused"])
         assert result.exit_code != 0
@@ -176,37 +176,37 @@ class TestPathBasedExecution:
 
     def test_path_execution_with_profile_option(self, runner):
         """Path-based execution accepts profile option"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.headless.run_headless", return_value=0):
+        with patch("core.cli.headless.run_headless", return_value=0):
             result = runner.invoke(cli, ["ec2/unused", "-p", "my-profile"])
             assert result.exit_code == 0
 
     def test_path_execution_single_profile_only(self, runner):
         """Path-based execution -p accepts single profile only"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         # -p는 단일 프로파일만 지원, 다중 프로파일은 -g (profile group) 사용
-        with patch("cli.headless.run_headless", return_value=0):
+        with patch("core.cli.headless.run_headless", return_value=0):
             result = runner.invoke(cli, ["ec2/unused", "-p", "my-profile"])
             assert result.exit_code == 0
 
     def test_path_execution_with_profile_group(self, runner):
         """Path-based execution accepts profile group"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_group = MagicMock()
         mock_group.profiles = ["dev", "prod"]
 
         with patch("core.tools.history.ProfileGroupsManager") as mock_manager:
             mock_manager.return_value.get_by_name.return_value = mock_group
-            with patch("cli.headless.run_headless", return_value=0):
+            with patch("core.cli.headless.run_headless", return_value=0):
                 result = runner.invoke(cli, ["ec2/unused", "-g", "Dev Team"])
                 assert result.exit_code == 0
 
     def test_path_execution_with_nonexistent_group(self, runner):
         """Path-based execution fails with nonexistent group"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         with patch("core.tools.history.ProfileGroupsManager") as mock_manager:
             mock_manager.return_value.get_by_name.return_value = None
@@ -215,9 +215,9 @@ class TestPathBasedExecution:
 
     def test_path_execution_with_sso_session(self, runner):
         """Path-based execution accepts SSO session options"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.headless.run_headless", return_value=0):
+        with patch("core.cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
@@ -234,7 +234,7 @@ class TestPathBasedExecution:
 
     def test_path_execution_sso_requires_role(self, runner):
         """Path-based execution with SSO session requires role"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(
             cli,
@@ -250,7 +250,7 @@ class TestPathBasedExecution:
 
     def test_path_execution_sso_requires_account(self, runner):
         """Path-based execution with SSO session requires account"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(
             cli,
@@ -266,7 +266,7 @@ class TestPathBasedExecution:
 
     def test_path_execution_conflict_auth_options(self, runner):
         """Path-based execution rejects conflicting auth options"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(
             cli,
@@ -282,9 +282,9 @@ class TestPathBasedExecution:
 
     def test_path_execution_with_regions(self, runner):
         """Path-based execution accepts region options"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.headless.run_headless", return_value=0):
+        with patch("core.cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
@@ -301,9 +301,9 @@ class TestPathBasedExecution:
 
     def test_path_execution_with_output_format(self, runner):
         """Path-based execution accepts output format"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.headless.run_headless", return_value=0):
+        with patch("core.cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
@@ -318,9 +318,9 @@ class TestPathBasedExecution:
 
     def test_path_execution_with_quiet_flag(self, runner):
         """Path-based execution accepts quiet flag"""
-        from cli.app import cli
+        from core.cli.app import cli
 
-        with patch("cli.headless.run_headless", return_value=0):
+        with patch("core.cli.headless.run_headless", return_value=0):
             result = runner.invoke(
                 cli,
                 [
@@ -348,7 +348,7 @@ class TestListToolsCommand:
     @patch("core.tools.discovery.discover_categories")
     def test_list_tools_basic(self, mock_discover, runner):
         """List tools displays all tools"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_discover.return_value = [
             {
@@ -367,7 +367,7 @@ class TestListToolsCommand:
     @patch("core.tools.discovery.discover_categories")
     def test_list_tools_json_format(self, mock_discover, runner):
         """List tools with JSON output"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_discover.return_value = [
             {
@@ -386,7 +386,7 @@ class TestListToolsCommand:
     @patch("core.tools.discovery.discover_categories")
     def test_list_tools_by_category(self, mock_discover, runner):
         """List tools filtered by category"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_discover.return_value = [
             {
@@ -404,7 +404,7 @@ class TestListToolsCommand:
     @patch("core.tools.discovery.discover_categories")
     def test_list_tools_nonexistent_category(self, mock_discover, runner):
         """List tools fails with nonexistent category"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_discover.return_value = []
 
@@ -427,7 +427,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_list_empty(self, mock_manager, runner):
         """Group list with no groups"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_manager.return_value.get_all.return_value = []
 
@@ -437,7 +437,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_list_with_groups(self, mock_manager, runner):
         """Group list displays groups"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_group = MagicMock()
         mock_group.name = "Dev Team"
@@ -454,7 +454,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_list_json_format(self, mock_manager, runner):
         """Group list with JSON output"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_group = MagicMock()
         mock_group.name = "Dev Team"
@@ -471,7 +471,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_show(self, mock_manager, runner):
         """Group show displays group details"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_group = MagicMock()
         mock_group.name = "Dev Team"
@@ -487,7 +487,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_show_nonexistent(self, mock_manager, runner):
         """Group show fails for nonexistent group"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_manager.return_value.get_by_name.return_value = None
 
@@ -497,7 +497,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_delete_with_confirmation(self, mock_manager, runner):
         """Group delete with confirmation"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_group = MagicMock()
         mock_group.name = "Dev Team"
@@ -512,7 +512,7 @@ class TestGroupCommands:
     @patch("core.tools.history.ProfileGroupsManager")
     def test_group_delete_nonexistent(self, mock_manager, runner):
         """Group delete fails for nonexistent group"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         mock_manager.return_value.get_by_name.return_value = None
 
@@ -534,15 +534,15 @@ class TestCategoryCommands:
 
     def test_ec2_command_exists(self, runner):
         """EC2 category command is registered"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["ec2", "--help"])
         assert result.exit_code == 0
 
-    @patch("cli.flow.runner.FlowRunner.run")
+    @patch("core.cli.flow.runner.FlowRunner.run")
     def test_category_command_invokes_flow(self, mock_run, runner):
         """Category command invokes FlowRunner"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["ec2"])
         # FlowRunner.run should be called (even if it fails in test)
@@ -560,49 +560,49 @@ class TestParseSelection:
 
     def test_parse_single_number(self):
         """Parse single number"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("1", 10)
         assert result == [0]  # 0-indexed
 
     def test_parse_multiple_numbers(self):
         """Parse multiple numbers"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("1 2 3", 10)
         assert result == [0, 1, 2]
 
     def test_parse_comma_separated(self):
         """Parse comma-separated numbers"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("1,2,3", 10)
         assert result == [0, 1, 2]
 
     def test_parse_range(self):
         """Parse range (1-3)"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("1-3", 10)
         assert result == [0, 1, 2]
 
     def test_parse_mixed_format(self):
         """Parse mixed format (1,3-5,7)"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("1,3-5,7", 10)
         assert result == [0, 2, 3, 4, 6]
 
     def test_parse_out_of_range(self):
         """Out of range numbers are ignored"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("1 99", 10)
         assert result == [0]
 
     def test_parse_invalid_input(self):
         """Invalid input returns empty list"""
-        from cli.app import _parse_selection
+        from core.cli.app import _parse_selection
 
         result = _parse_selection("abc", 10)
         assert result == []
@@ -613,7 +613,7 @@ class TestGetProfilesByKind:
 
     def test_get_profiles_by_kind_basic(self):
         """Test basic profile filtering logic - simplified"""
-        from cli.app import _get_profiles_by_kind
+        from core.cli.app import _get_profiles_by_kind
 
         # This function relies on real AWS config
         # Just test that it returns a list
@@ -625,7 +625,7 @@ class TestGetProfilesByKind:
 
     def test_get_profiles_by_kind_invalid(self):
         """Test with invalid kind"""
-        from cli.app import _get_profiles_by_kind
+        from core.cli.app import _get_profiles_by_kind
 
         result = _get_profiles_by_kind("invalid_kind")
         assert isinstance(result, list)
@@ -642,13 +642,13 @@ class TestGroupedCommandsGroup:
 
     def test_format_commands_separates_utilities(self):
         """Commands are separated into utilities and services"""
-        from cli.app import GroupedCommandsGroup, cli
+        from core.cli.app import GroupedCommandsGroup, cli
 
         assert isinstance(cli, GroupedCommandsGroup)
 
     def test_utility_commands_defined(self):
         """UTILITY_COMMANDS set is defined"""
-        from cli.app import UTILITY_COMMANDS
+        from core.cli.app import UTILITY_COMMANDS
 
         assert isinstance(UTILITY_COMMANDS, set)
         assert "tools" in UTILITY_COMMANDS

@@ -19,6 +19,8 @@ from typing import TypeVar
 
 from botocore.exceptions import ClientError
 
+from .types import ErrorCategory
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -31,18 +33,6 @@ class ErrorSeverity(Enum):
     WARNING = "warning"  # 부분 실패 - 보고하되 계속 진행
     INFO = "info"  # 정보성 - 로그만 남김 (권한 없음 등)
     DEBUG = "debug"  # 디버그 - 개발 시에만 필요
-
-
-class ErrorCategory(Enum):
-    """에러 카테고리"""
-
-    ACCESS_DENIED = "access_denied"  # 권한 없음
-    NOT_FOUND = "not_found"  # 리소스 없음
-    THROTTLING = "throttling"  # API 제한
-    TIMEOUT = "timeout"  # 타임아웃
-    INVALID_REQUEST = "invalid_request"  # 잘못된 요청
-    SERVICE_ERROR = "service_error"  # AWS 서비스 오류
-    UNKNOWN = "unknown"  # 알 수 없음
 
 
 @dataclass

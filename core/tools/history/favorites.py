@@ -1,14 +1,20 @@
 """
-pkg/history/favorites.py - 즐겨찾기 관리
+core/tools/history/favorites.py - 즐겨찾기 관리
 
 사용자가 직접 등록한 즐겨찾기 도구 관리
 """
 
+from __future__ import annotations
+
 import json
-from dataclasses import asdict, dataclass
+import logging
+import tempfile
+import threading
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -34,20 +40,27 @@ class FavoriteItem:
     ref: str = ""  # 참조 (category/module 형식)
 
 
+# _load()에서 사용할 필드 이름 집합 (모듈 로드 시 1회 계산)
+_FAVORITE_FIELDS = {f.name for f in fields(FavoriteItem)}
+
+
 class FavoritesManager:
     """즐겨찾기 관리"""
 
     MAX_ITEMS = 20
-    _instance: Optional["FavoritesManager"] = None
+    _instance: FavoritesManager | None = None
+    _lock = threading.Lock()
 
-    def __new__(cls) -> "FavoritesManager":
-        """싱글톤 패턴"""
+    def __new__(cls) -> FavoritesManager:
+        """싱글톤 패턴 (double-check locking)"""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if self._initialized:
             return
         self._path = self._get_favorites_path()
@@ -140,13 +153,13 @@ class FavoritesManager:
         return False
 
     def remove(self, category: str, tool_module: str) -> bool:
-        """즐겨찾기 삭제
+        """도구 즐겨찾기 삭제
 
         Returns:
             삭제 성공 여부
         """
         for i, item in enumerate(self._items):
-            if item.category == category and item.tool_module == tool_module:
+            if item.item_type == "tool" and item.category == category and item.tool_module == tool_module:
                 self._items.pop(i)
                 self._save()
                 return True
@@ -171,8 +184,11 @@ class FavoritesManager:
             return True
 
     def is_favorite(self, category: str, tool_module: str) -> bool:
-        """즐겨찾기 여부 확인"""
-        return any(item.category == category and item.tool_module == tool_module for item in self._items)
+        """도구 즐겨찾기 여부 확인"""
+        return any(
+            item.item_type == "tool" and item.category == category and item.tool_module == tool_module
+            for item in self._items
+        )
 
     def get_all(self) -> list[FavoriteItem]:
         """전체 즐겨찾기 목록 (순서대로)"""
@@ -218,25 +234,53 @@ class FavoritesManager:
         self._save()
 
     def _load(self) -> None:
-        """파일에서 로드"""
+        """파일에서 로드
+
+        개별 항목 파싱 실패 시 해당 항목만 건너뛰고 나머지는 유지.
+        알 수 없는 필드는 무시하여 스키마 변경에 대한 하위 호환성 보장.
+        """
         if not self._path.exists():
             self._items = []
             return
 
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._items = [FavoriteItem(**item) for item in data]
-        except (json.JSONDecodeError, TypeError, KeyError):
+            if not isinstance(data, list):
+                self._items = []
+                return
+
+            items: list[FavoriteItem] = []
+            for raw in data:
+                if not isinstance(raw, dict):
+                    continue
+                try:
+                    filtered = {k: v for k, v in raw.items() if k in _FAVORITE_FIELDS}
+                    items.append(FavoriteItem(**filtered))
+                except (TypeError, KeyError):
+                    logger.debug("즐겨찾기 항목 로드 스킵: %s", raw)
+                    continue
+
+            self._items = items
+        except (json.JSONDecodeError, OSError):
             self._items = []
 
     def _save(self) -> None:
-        """파일에 저장"""
+        """파일에 원자적으로 저장 (write-to-temp-then-rename)"""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = [asdict(item) for item in self._items]
-        self._path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        content = json.dumps(data, ensure_ascii=False, indent=2)
+        try:
+            fd, tmp_path = tempfile.mkstemp(dir=self._path.parent, suffix=".tmp", prefix=".favorites_")
+            try:
+                with open(fd, "w", encoding="utf-8") as f:
+                    f.write(content)
+                Path(tmp_path).replace(self._path)
+            except BaseException:
+                Path(tmp_path).unlink(missing_ok=True)
+                raise
+        except OSError:
+            # Fallback: 원자적 쓰기 실패 시 직접 쓰기
+            self._path.write_text(content, encoding="utf-8")
 
     def reload(self) -> None:
         """파일에서 다시 로드"""

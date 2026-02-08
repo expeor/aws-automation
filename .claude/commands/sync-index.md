@@ -20,11 +20,11 @@ Claude Code의 토큰 사용량을 줄이고 프로젝트 탐색을 빠르게 �
 ### 1. 스크립트 실행
 
 ```bash
-python scripts/generate_index.py
+python core/scripts/generate_index.py
 ```
 
 스크립트가 수행하는 작업:
-1. `plugins/*/__init__.py` 스캔 → CATEGORY, TOOLS 추출
+1. `functions/analyzers/*/__init__.py` 스캔 → CATEGORY, TOOLS 추출
 2. `core/` 디렉토리 구조 수집
 3. `git status`로 최근 변경 확인
 4. `.claude/project-index.md` 갱신
@@ -86,7 +86,7 @@ head -50 .claude/project-index.md
 `.claude/hooks.json`에 설정된 훅:
 
 1. **플러그인 메타데이터 변경 시**:
-   - `plugins/**/__init__.py` 수정 시 알림
+   - `functions/analyzers/**/__init__.py` 수정 시 알림
    - `/sync-index` 실행 권장
 
 2. **새 플러그인 추가 시**:
@@ -94,7 +94,7 @@ head -50 .claude/project-index.md
 
 ## 참조 파일
 
-- `scripts/generate_index.py` - 인덱스 생성 스크립트
+- `core/scripts/generate_index.py` - 인덱스 생성 스크립트
 - `.claude/project-index.md` - 생성된 인덱스 (읽기 전용)
 - `CLAUDE.md` - 프로젝트 규칙 (Progressive Disclosure)
 

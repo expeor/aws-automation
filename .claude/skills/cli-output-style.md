@@ -5,7 +5,7 @@
 ## 표준 심볼 (이모지 사용 금지)
 
 ```python
-from cli.ui import (
+from core.cli.ui import (
     SYMBOL_SUCCESS,   # ✓ - 완료
     SYMBOL_ERROR,     # ✗ - 에러
     SYMBOL_WARNING,   # ! - 경고
@@ -19,7 +19,7 @@ from cli.ui import (
 ## 표준 출력 함수
 
 ```python
-from cli.ui import (
+from core.cli.ui import (
     print_success,      # [green]✓ 메시지[/green]
     print_error,        # [red]✗ 메시지[/red]
     print_warning,      # [yellow]! 메시지[/yellow]
@@ -35,7 +35,7 @@ from cli.ui import (
 ## Step 출력 패턴
 
 ```python
-from cli.ui import console, print_step_header
+from core.cli.ui import console, print_step_header
 
 # Step 헤더
 print_step_header(1, "데이터 수집 중...")

@@ -7,7 +7,7 @@
 ## 권장 패턴
 
 ```python
-from shared.aws.inventory import InventoryCollector
+from core.shared.aws.inventory import InventoryCollector
 ```
 
 ---
@@ -45,7 +45,7 @@ class InventoryCollector:
 ### 기본 사용법
 
 ```python
-from shared.aws.inventory import InventoryCollector
+from core.shared.aws.inventory import InventoryCollector
 
 def run(ctx) -> None:
     collector = InventoryCollector(ctx)
@@ -290,9 +290,9 @@ def run(ctx) -> None:
 ## 전체 예시 (네트워크 인벤토리)
 
 ```python
-from shared.aws.inventory import InventoryCollector
-from shared.io.compat import generate_reports
-from shared.io.output import OutputPath
+from core.shared.aws.inventory import InventoryCollector
+from core.shared.io.compat import generate_reports
+from core.shared.io.output import OutputPath
 
 def run(ctx) -> None:
     """VPC 네트워크 인벤토리 수집"""

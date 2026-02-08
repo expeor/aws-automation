@@ -409,8 +409,9 @@ class TestGetAwsConfig:
 
         assert aws_config["region_name"] == "ap-northeast-2"
         assert aws_config["credentials"]["access_key_id"] == "AKIAIOSFODNN7EXAMPLE"
-        assert aws_config["credentials"]["secret_access_key"] == "secret"
-        assert aws_config["credentials"]["session_token"] == "token"
+        # B9: secret_access_key와 session_token은 마스킹됨
+        assert aws_config["credentials"]["secret_access_key"] == "****"
+        assert aws_config["credentials"]["session_token"] == "****"
 
 
 # =============================================================================

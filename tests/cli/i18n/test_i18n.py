@@ -12,7 +12,7 @@ Tests cover:
 - Error handling
 """
 
-from cli.i18n import DEFAULT_LANG, SUPPORTED_LANGS, get_lang, get_text, set_lang, t
+from core.cli.i18n import DEFAULT_LANG, SUPPORTED_LANGS, get_lang, get_text, set_lang, t
 
 # =============================================================================
 # Language Context Tests
@@ -157,14 +157,14 @@ class TestMessageRegistry:
 
     def test_messages_imported(self):
         """Messages are imported and available"""
-        from cli.i18n.messages import MESSAGES
+        from core.cli.i18n.messages import MESSAGES
 
         assert isinstance(MESSAGES, dict)
         assert len(MESSAGES) > 0
 
     def test_common_messages_registered(self):
         """Common messages are registered"""
-        from cli.i18n.messages import MESSAGES
+        from core.cli.i18n.messages import MESSAGES
 
         assert "common.exit" in MESSAGES
         assert "common.error" in MESSAGES
@@ -172,7 +172,7 @@ class TestMessageRegistry:
 
     def test_message_structure(self):
         """Each message has ko and en translations"""
-        from cli.i18n.messages import MESSAGES
+        from core.cli.i18n.messages import MESSAGES
 
         for key, value in MESSAGES.items():
             assert isinstance(value, dict), f"Message {key} should be a dict"
@@ -181,7 +181,7 @@ class TestMessageRegistry:
 
     def test_register_messages_function(self):
         """register_messages function works"""
-        from cli.i18n.messages import register_messages
+        from core.cli.i18n.messages import register_messages
 
         test_messages = {
             "test_key": {"ko": "테스트", "en": "Test"},
@@ -328,7 +328,7 @@ class TestMessageCompleteness:
 
     def test_all_messages_have_korean(self):
         """All messages have Korean translation"""
-        from cli.i18n.messages import MESSAGES
+        from core.cli.i18n.messages import MESSAGES
 
         for key, value in MESSAGES.items():
             assert "ko" in value, f"Message {key} missing Korean translation"
@@ -337,9 +337,9 @@ class TestMessageCompleteness:
 
     def test_critical_messages_have_english(self):
         """Critical messages have English translation"""
-        from cli.i18n.messages import MESSAGES
+        from core.cli.i18n.messages import MESSAGES
 
-        critical_prefixes = ["common.", "error.", "cli.", "runner."]
+        critical_prefixes = ["common.", "error.", "core.cli.", "runner."]
 
         for key in MESSAGES:
             if any(key.startswith(prefix) for prefix in critical_prefixes):
@@ -368,7 +368,7 @@ class TestContextVariable:
     def test_context_var_default(self):
         """Context variable has correct default"""
         # Default should be Korean
-        from cli.i18n import _current_lang
+        from core.cli.i18n import _current_lang
 
         default = _current_lang.get()
         assert default in SUPPORTED_LANGS
@@ -465,7 +465,7 @@ class TestModuleExports:
 
     def test_all_exported_functions(self):
         """All expected functions are exported"""
-        from cli.i18n import __all__
+        from core.cli.i18n import __all__
 
         assert "t" in __all__
         assert "get_text" in __all__
@@ -474,14 +474,14 @@ class TestModuleExports:
 
     def test_constants_exported(self):
         """Constants are exported"""
-        from cli.i18n import __all__
+        from core.cli.i18n import __all__
 
         assert "SUPPORTED_LANGS" in __all__
         assert "DEFAULT_LANG" in __all__
 
     def test_direct_imports_work(self):
         """Direct imports work correctly"""
-        from cli.i18n import DEFAULT_LANG, SUPPORTED_LANGS, get_lang, get_text, set_lang, t
+        from core.cli.i18n import DEFAULT_LANG, SUPPORTED_LANGS, get_lang, get_text, set_lang, t
 
         assert callable(t)
         assert callable(get_text)

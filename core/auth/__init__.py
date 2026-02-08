@@ -39,6 +39,10 @@ from .config import (
     list_sso_sessions,
     load_config,
 )
+from .datadog_client import (
+    DatadogClientManager,
+    get_datadog_clients,
+)
 from .provider import (
     BaseProvider,
     SSOProfileConfig,
@@ -129,4 +133,7 @@ __all__: list[str] = [
     "get_account_alias",
     "get_account_info",
     "format_account_identifier",
+    # Datadog Client
+    "DatadogClientManager",
+    "get_datadog_clients",
 ]

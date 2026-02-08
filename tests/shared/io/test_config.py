@@ -1,6 +1,6 @@
 """core/tools/io/config.py 테스트"""
 
-from shared.io.config import OutputConfig, OutputFormat
+from core.shared.io.config import OutputConfig, OutputFormat
 
 
 class TestOutputFormat:

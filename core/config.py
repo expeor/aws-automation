@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 core/config.py - 중앙 집중식 설정 관리
 
@@ -7,7 +9,7 @@ core/config.py - 중앙 집중식 설정 관리
 주요 컴포넌트:
     - Settings: 불변 설정 클래스 (싱글톤 패턴)
     - 경로 헬퍼: get_project_root(), get_analyzers_path(), get_reports_path()
-    - 환경변수 헬퍼: get_default_profile(), get_default_region()
+    - 환경변수 헬퍼: get_default_region()
     - 버전 관리: get_version()
     - 메타데이터 검증: validate_tool_metadata()
 
@@ -16,13 +18,10 @@ Usage:
     from core.config import settings
 
     region = settings.DEFAULT_REGION        # "ap-northeast-2"
-    timeout = settings.API_TIMEOUT          # 30
-    retry = settings.API_RETRY_COUNT        # 3
 
     # 환경 변수 기반 값
-    from core.config import get_default_profile, get_default_region
+    from core.config import get_default_region
 
-    profile = get_default_profile()         # AWS_PROFILE 또는 None
     region = get_default_region()           # AWS_REGION 또는 기본값
 
     # 프로젝트 경로
@@ -38,12 +37,8 @@ Usage:
     # errors = ["필수 필드 누락: description"]
 
 환경 변수:
-    AWS_PROFILE: 기본 AWS 프로파일
-    AWS_DEFAULT_PROFILE: 기본 AWS 프로파일 (AWS_PROFILE 우선)
     AWS_REGION: 기본 AWS 리전
     AWS_DEFAULT_REGION: 기본 AWS 리전 (AWS_REGION 우선)
-    LOG_LEVEL: 로그 레벨 (DEBUG, INFO, WARNING, ERROR)
-    LOG_FORMAT: 로그 포맷 문자열
 """
 
 import os
@@ -66,18 +61,12 @@ def get_project_root() -> Path:
 
 def get_analyzers_path() -> Path:
     """분석기 폴더 경로 반환"""
-    return get_project_root() / "analyzers"
-
-
-# Backwards compatibility alias
-def get_plugins_path() -> Path:
-    """DEPRECATED: Use get_analyzers_path() instead"""
-    return get_analyzers_path()
+    return get_project_root() / "functions" / "analyzers"
 
 
 def get_reports_path() -> Path:
     """리포트 폴더 경로 반환"""
-    return get_project_root() / "reports"
+    return get_project_root() / "functions" / "reports"
 
 
 def get_version_file() -> Path:
@@ -99,24 +88,9 @@ class Settings:
 
     # AWS 기본 설정
     DEFAULT_REGION: str = "ap-northeast-2"
-    DEFAULT_REGIONS: tuple = ("ap-northeast-2", "us-east-1", "eu-west-1")
-
-    # API 호출 설정
-    API_TIMEOUT: int = 30  # 초
-    API_RETRY_COUNT: int = 3
-    API_RETRY_DELAY: float = 1.0  # 초
-
-    # 세션 설정
-    SESSION_DURATION_SECONDS: int = 3600  # 1시간
-    TOKEN_REFRESH_MARGIN: int = 300  # 만료 5분 전 갱신
 
     # 캐시 설정
-    CACHE_TTL_SECONDS: int = 300  # 5분
     DISCOVERY_CACHE_TTL: int = 600  # 10분
-
-    # 출력 설정
-    MAX_DISPLAY_ERRORS: int = 5
-    MAX_LOG_LINE_LENGTH: int = 2000
 
     # 플러그인 설정
     PLUGIN_EXCLUDE_DIRS: frozenset[str] = frozenset({"__pycache__", "_templates", "_legacy", ".git"})
@@ -164,12 +138,6 @@ class Settings:
     SECURITY_CERT_EXPIRY_HIGH: int = 30  # 30일 이내 = HIGH
     SECURITY_CERT_EXPIRY_MEDIUM: int = 90  # 90일 이내 = MEDIUM
 
-    # WAF 필수 여부 (internet-facing ALB)
-    SECURITY_WAF_REQUIRED_FOR_PUBLIC: bool = True
-
-    # 액세스 로그 필수 여부
-    SECURITY_ACCESS_LOG_REQUIRED: bool = True
-
     # 삭제 보호 필수 패턴 (정규식)
     # - 이 패턴에 매칭되는 이름의 리소스는 삭제 보호 필수
     SECURITY_DELETION_PROTECTION_PATTERNS: tuple = (
@@ -191,20 +159,6 @@ settings = Settings()
 # =============================================================================
 
 
-def get_default_profile() -> str | None:
-    """기본 AWS 프로파일 반환
-
-    우선순위:
-    1. AWS_PROFILE 환경변수
-    2. AWS_DEFAULT_PROFILE 환경변수
-    3. None (boto3가 default 프로파일 사용)
-
-    Returns:
-        프로파일 이름 또는 None
-    """
-    return os.environ.get("AWS_PROFILE") or os.environ.get("AWS_DEFAULT_PROFILE")
-
-
 def get_default_region() -> str:
     """기본 AWS 리전 반환
 
@@ -217,43 +171,6 @@ def get_default_region() -> str:
         리전 이름
     """
     return os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or settings.DEFAULT_REGION
-
-
-def get_env_bool(key: str, default: bool = False) -> bool:
-    """환경변수를 bool로 변환
-
-    Args:
-        key: 환경변수 키
-        default: 기본값
-
-    Returns:
-        True/False
-    """
-    value = os.environ.get(key, "").lower()
-    if value in ("true", "1", "yes", "on"):
-        return True
-    if value in ("false", "0", "no", "off"):
-        return False
-    return default
-
-
-def get_env_int(key: str, default: int) -> int:
-    """환경변수를 int로 변환
-
-    Args:
-        key: 환경변수 키
-        default: 기본값
-
-    Returns:
-        정수값
-    """
-    value = os.environ.get(key)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError:
-        return default
 
 
 # =============================================================================
@@ -286,29 +203,6 @@ def get_version() -> str:
         return pkg_version("aa")
     except Exception:
         return "0.0.1"
-
-
-# =============================================================================
-# 로깅 설정
-# =============================================================================
-
-
-@dataclass
-class LogConfig:
-    """로깅 설정"""
-
-    level: str = "INFO"
-    format: str = "%(asctime)s - %(levelname)s - %(message)s"
-    date_format: str = "%Y-%m-%d %H:%M:%S"
-
-    @classmethod
-    def from_env(cls) -> "LogConfig":
-        """환경변수에서 로깅 설정 로드"""
-        return cls(
-            level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-            format=os.environ.get("LOG_FORMAT", cls.format),
-            date_format=os.environ.get("LOG_DATE_FORMAT", cls.date_format),
-        )
 
 
 # =============================================================================

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cli.flow.context import (
+from core.cli.flow.context import (
     BackToMenu,
     ExecutionContext,
     FallbackStrategy,
@@ -437,7 +437,7 @@ class TestAuthContext:
 
     def test_default_values(self):
         """기본값 확인"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext()
 
@@ -451,28 +451,28 @@ class TestAuthContext:
 
     def test_is_sso_with_sso_session(self):
         """SSO Session일 때 True"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.SSO_SESSION)
         assert auth.is_sso() is True
 
     def test_is_sso_with_sso_profile(self):
         """SSO Profile일 때 True"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.SSO_PROFILE)
         assert auth.is_sso() is True
 
     def test_is_sso_with_static(self):
         """Static Credentials일 때 False"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.STATIC_CREDENTIALS)
         assert auth.is_sso() is False
 
     def test_is_sso_session(self):
         """SSO Session 체크"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.SSO_SESSION)
         assert auth.is_sso_session() is True
@@ -482,7 +482,7 @@ class TestAuthContext:
 
     def test_is_sso_profile(self):
         """SSO Profile 체크"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.SSO_PROFILE)
         assert auth.is_sso_profile() is True
@@ -492,7 +492,7 @@ class TestAuthContext:
 
     def test_is_multi_profile(self):
         """다중 프로파일 체크"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(profiles=["dev", "prod"])
         assert auth.is_multi_profile() is True
@@ -505,7 +505,7 @@ class TestAuthContext:
 
     def test_is_multi_account(self):
         """멀티 계정 체크"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.SSO_SESSION)
         assert auth.is_multi_account() is True
@@ -515,7 +515,7 @@ class TestAuthContext:
 
     def test_needs_role_selection(self):
         """역할 선택 필요 여부 체크"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(provider_kind=ProviderKind.SSO_SESSION)
         assert auth.needs_role_selection() is True
@@ -525,7 +525,7 @@ class TestAuthContext:
 
     def test_get_effective_role_primary(self):
         """Primary Role 반환"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(
             role_selection=RoleSelection(
@@ -540,7 +540,7 @@ class TestAuthContext:
 
     def test_get_effective_role_fallback(self):
         """Fallback Role 반환"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(
             role_selection=RoleSelection(
@@ -557,7 +557,7 @@ class TestAuthContext:
 
     def test_get_effective_role_skip_strategy(self):
         """SKIP 전략일 때 None 반환"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         auth = AuthContext(
             role_selection=RoleSelection(
@@ -573,7 +573,7 @@ class TestAuthContext:
 
     def test_get_target_accounts(self):
         """실제 실행 대상 계정 목록 반환"""
-        from cli.flow.context import AuthContext
+        from core.cli.flow.context import AuthContext
 
         mock_acc1 = MagicMock()
         mock_acc1.id = "111111111111"
@@ -603,7 +603,7 @@ class TestToolContext:
 
     def test_default_values(self):
         """기본값 확인"""
-        from cli.flow.context import ToolContext
+        from core.cli.flow.context import ToolContext
 
         tool_ctx = ToolContext()
 
@@ -613,7 +613,7 @@ class TestToolContext:
 
     def test_with_values(self):
         """값 설정 확인"""
-        from cli.flow.context import ToolContext
+        from core.cli.flow.context import ToolContext
 
         tool = ToolInfo(
             name="테스트 도구",
@@ -648,7 +648,7 @@ class TestExecutionContextInventory:
         # Lazy import 확인
         inventory = ctx.get_inventory()
 
-        from shared.aws.inventory import InventoryCollector
+        from core.shared.aws.inventory import InventoryCollector
 
         assert isinstance(inventory, InventoryCollector)
 
@@ -676,7 +676,7 @@ class TestExecutionContextOutputConfig:
         ctx = ExecutionContext()
         config = ctx.get_output_config()
 
-        from shared.io.config import OutputConfig
+        from core.shared.io.config import OutputConfig
 
         assert isinstance(config, OutputConfig)
 

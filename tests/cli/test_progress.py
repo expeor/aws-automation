@@ -19,7 +19,7 @@ class TestParallelTracker:
         """초기 상태 확인"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=None)
@@ -34,7 +34,7 @@ class TestParallelTracker:
         """set_total 동작 확인"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=None)
@@ -47,7 +47,7 @@ class TestParallelTracker:
         """성공 완료 처리"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -65,7 +65,7 @@ class TestParallelTracker:
         """실패 완료 처리"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -82,7 +82,7 @@ class TestParallelTracker:
         """성공/실패 혼합 카운트"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -108,7 +108,7 @@ class TestParallelTrackerThreadSafety:
         """동시 on_complete() 호출 시 race condition 검증"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=1000)
@@ -134,7 +134,7 @@ class TestParallelTrackerThreadSafety:
         """높은 동시성 스트레스 테스트"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         num_tasks = 10000
         num_workers = 100
@@ -172,7 +172,7 @@ class TestStepTracker:
         from rich.console import Console
         from rich.progress import Progress
 
-        from cli.ui.progress import StepTracker
+        from core.cli.ui.progress import StepTracker
 
         console = Console()
         with Progress() as progress:
@@ -191,7 +191,7 @@ class TestStepTracker:
         from rich.console import Console
         from rich.progress import Progress
 
-        from cli.ui.progress import StepTracker
+        from core.cli.ui.progress import StepTracker
 
         console = Console()
         with Progress() as progress:
@@ -214,7 +214,7 @@ class TestDownloadTracker:
         """advance() 호출로 진행"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=100)
@@ -231,7 +231,7 @@ class TestDownloadTracker:
         """update_description() 호출"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=100)
@@ -248,7 +248,7 @@ class TestDownloadTrackerThreadSafety:
         """동시 advance() 호출"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=1000)
@@ -278,7 +278,7 @@ class TestStatusTracker:
         """update() 호출"""
         from rich.progress import Progress
 
-        from cli.ui.progress import StatusTracker
+        from core.cli.ui.progress import StatusTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=None)
@@ -291,7 +291,7 @@ class TestStatusTracker:
         """complete() 호출"""
         from rich.progress import Progress
 
-        from cli.ui.progress import StatusTracker
+        from core.cli.ui.progress import StatusTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=None)
@@ -313,7 +313,7 @@ class TestBaseTracker:
         """progress 프로퍼티 접근"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -325,7 +325,7 @@ class TestBaseTracker:
         """task_id 프로퍼티 접근"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -337,7 +337,7 @@ class TestBaseTracker:
         """as_callback() 간단한 콜백 반환"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -354,7 +354,7 @@ class TestBaseTracker:
         """as_callback(include_status=True) 상태 포함 콜백"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -378,7 +378,7 @@ class TestParallelProgressContextManager:
 
     def test_basic_usage(self):
         """기본 사용법"""
-        from cli.ui.progress import parallel_progress
+        from core.cli.ui.progress import parallel_progress
 
         with parallel_progress("테스트") as tracker:
             tracker.set_total(10)
@@ -392,7 +392,7 @@ class TestParallelProgressContextManager:
 
     def test_mixed_results(self):
         """성공/실패 혼합"""
-        from cli.ui.progress import parallel_progress
+        from core.cli.ui.progress import parallel_progress
 
         with parallel_progress("테스트") as tracker:
             tracker.set_total(5)
@@ -412,7 +412,7 @@ class TestStepProgressContextManager:
 
     def test_basic_usage(self):
         """기본 사용법"""
-        from cli.ui.progress import step_progress
+        from core.cli.ui.progress import step_progress
 
         with step_progress("테스트", total_steps=3) as steps:
             steps.step("Step 1")
@@ -428,7 +428,7 @@ class TestDownloadProgressContextManager:
 
     def test_basic_usage(self):
         """기본 사용법"""
-        from cli.ui.progress import download_progress
+        from core.cli.ui.progress import download_progress
 
         with download_progress("테스트", total=5) as tracker:
             for _ in range(5):
@@ -442,7 +442,7 @@ class TestIndeterminateProgressContextManager:
 
     def test_basic_usage(self):
         """기본 사용법"""
-        from cli.ui.progress import indeterminate_progress
+        from core.cli.ui.progress import indeterminate_progress
 
         with indeterminate_progress("테스트") as status:
             status.update("처리 중...")
@@ -461,7 +461,7 @@ class TestSuccessFailColumn:
         """render() 호출"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker, SuccessFailColumn
+        from core.cli.ui.progress import ParallelTracker, SuccessFailColumn
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -487,7 +487,7 @@ class TestIntegration:
 
     def test_parallel_progress_with_threading(self):
         """병렬 progress와 스레딩 통합"""
-        from cli.ui.progress import parallel_progress
+        from core.cli.ui.progress import parallel_progress
 
         with parallel_progress("통합 테스트") as tracker:
             tracker.set_total(100)
@@ -507,7 +507,7 @@ class TestIntegration:
 
     def test_step_with_sub_parallel(self):
         """step progress 내 nested parallel"""
-        from cli.ui.progress import step_progress
+        from core.cli.ui.progress import step_progress
 
         with step_progress("분석", total_steps=2) as steps:
             steps.step("Phase 1")
@@ -532,8 +532,8 @@ class TestModuleExports:
     """모듈 export 테스트"""
 
     def test_import_from_cli_ui(self):
-        """cli.ui에서 progress 컴포넌트 import 가능"""
-        from cli.ui import (
+        """core.cli.ui에서 progress 컴포넌트 import 가능"""
+        from core.cli.ui import (
             BaseTracker,
             DownloadTracker,
             ParallelTracker,
@@ -556,8 +556,8 @@ class TestModuleExports:
         assert callable(indeterminate_progress)
 
     def test_import_from_progress_module(self):
-        """cli.ui.progress에서 직접 import 가능"""
-        from cli.ui.progress import (
+        """core.cli.ui.progress에서 직접 import 가능"""
+        from core.cli.ui.progress import (
             BaseTracker,
             SuccessFailColumn,
         )
@@ -578,7 +578,7 @@ class TestParallelTrackerProperties:
         """success_count 프로퍼티"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -593,7 +593,7 @@ class TestParallelTrackerProperties:
         """failed_count 프로퍼티"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -609,7 +609,7 @@ class TestParallelTrackerProperties:
         """total_count 프로퍼티"""
         from rich.progress import Progress
 
-        from cli.ui.progress import ParallelTracker
+        from core.cli.ui.progress import ParallelTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=None)
@@ -630,7 +630,7 @@ class TestStepTrackerSubParallel:
 
     def test_sub_parallel_stats_tracking(self):
         """nested parallel의 통계 추적"""
-        from cli.ui.progress import step_progress
+        from core.cli.ui.progress import step_progress
 
         with step_progress("테스트", total_steps=1) as steps:
             steps.step("Step 1")
@@ -660,7 +660,7 @@ class TestDownloadTrackerProperties:
         """total 프로퍼티"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=100)
@@ -672,7 +672,7 @@ class TestDownloadTrackerProperties:
         """completed 프로퍼티"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=100)
@@ -694,7 +694,7 @@ class TestContextManagerExceptions:
 
     def test_parallel_progress_with_exception(self):
         """예외 발생 시에도 정상 종료"""
-        from cli.ui.progress import parallel_progress
+        from core.cli.ui.progress import parallel_progress
 
         with parallel_progress("테스트") as tracker:
             tracker.set_total(5)
@@ -704,7 +704,7 @@ class TestContextManagerExceptions:
 
     def test_step_progress_with_exception(self):
         """예외 발생 시에도 정상 종료"""
-        from cli.ui.progress import step_progress
+        from core.cli.ui.progress import step_progress
 
         with step_progress("테스트", total_steps=3) as steps:
             steps.step("Step 1")
@@ -713,7 +713,7 @@ class TestContextManagerExceptions:
 
     def test_download_progress_with_exception(self):
         """예외 발생 시에도 정상 종료"""
-        from cli.ui.progress import download_progress
+        from core.cli.ui.progress import download_progress
 
         with download_progress("테스트", total=10) as tracker:
             tracker.advance(3)
@@ -733,7 +733,7 @@ class TestAsCallbackAdvanced:
         """임의의 args/kwargs를 받는 콜백"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -749,7 +749,7 @@ class TestAsCallbackAdvanced:
         """done=False인 상태 콜백"""
         from rich.progress import Progress
 
-        from cli.ui.progress import DownloadTracker
+        from core.cli.ui.progress import DownloadTracker
 
         with Progress() as progress:
             task_id = progress.add_task("test", total=10)
@@ -778,7 +778,7 @@ class TestCustomConsole:
         """커스텀 console 사용"""
         from rich.console import Console
 
-        from cli.ui.progress import parallel_progress
+        from core.cli.ui.progress import parallel_progress
 
         custom_console = Console()
 
@@ -794,7 +794,7 @@ class TestCustomConsole:
         """커스텀 console 사용"""
         from rich.console import Console
 
-        from cli.ui.progress import step_progress
+        from core.cli.ui.progress import step_progress
 
         custom_console = Console()
 
@@ -808,7 +808,7 @@ class TestCustomConsole:
         """커스텀 console 사용"""
         from rich.console import Console
 
-        from cli.ui.progress import download_progress
+        from core.cli.ui.progress import download_progress
 
         custom_console = Console()
 
@@ -822,7 +822,7 @@ class TestCustomConsole:
         """커스텀 console 사용"""
         from rich.console import Console
 
-        from cli.ui.progress import indeterminate_progress
+        from core.cli.ui.progress import indeterminate_progress
 
         custom_console = Console()
 

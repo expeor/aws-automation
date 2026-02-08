@@ -4,11 +4,17 @@ core/tools/history/profile_groups.py - 프로파일 그룹 관리
 자주 사용하는 프로파일 조합을 그룹으로 저장하여 빠르게 선택
 """
 
+from __future__ import annotations
+
 import json
-from dataclasses import asdict, dataclass, field
+import logging
+import tempfile
+import threading
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,9 +27,13 @@ class ProfileGroup:
     added_at: str = ""  # ISO format
     order: int = 0  # 정렬 순서 (낮을수록 상위)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.added_at:
             self.added_at = datetime.now().isoformat()
+
+
+# _load()에서 사용할 필드 이름 집합 (모듈 로드 시 1회 계산)
+_PROFILE_GROUP_FIELDS = {f.name for f in fields(ProfileGroup)}
 
 
 class ProfileGroupsManager:
@@ -35,16 +45,19 @@ class ProfileGroupsManager:
 
     MAX_GROUPS = 20
     MAX_PROFILES_PER_GROUP = 20
-    _instance: Optional["ProfileGroupsManager"] = None
+    _instance: ProfileGroupsManager | None = None
+    _lock = threading.Lock()
 
-    def __new__(cls) -> "ProfileGroupsManager":
-        """싱글톤 패턴"""
+    def __new__(cls) -> ProfileGroupsManager:
+        """싱글톤 패턴 (double-check locking)"""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if self._initialized:
             return
         self._path = self._get_path()
@@ -204,25 +217,53 @@ class ProfileGroupsManager:
         self._save()
 
     def _load(self) -> None:
-        """파일에서 로드"""
+        """파일에서 로드
+
+        개별 항목 파싱 실패 시 해당 항목만 건너뛰고 나머지는 유지.
+        알 수 없는 필드는 무시하여 스키마 변경에 대한 하위 호환성 보장.
+        """
         if not self._path.exists():
             self._groups = []
             return
 
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._groups = [ProfileGroup(**item) for item in data]
-        except (json.JSONDecodeError, TypeError, KeyError):
+            if not isinstance(data, list):
+                self._groups = []
+                return
+
+            groups: list[ProfileGroup] = []
+            for raw in data:
+                if not isinstance(raw, dict):
+                    continue
+                try:
+                    filtered = {k: v for k, v in raw.items() if k in _PROFILE_GROUP_FIELDS}
+                    groups.append(ProfileGroup(**filtered))
+                except (TypeError, KeyError):
+                    logger.debug("프로파일 그룹 항목 로드 스킵: %s", raw)
+                    continue
+
+            self._groups = groups
+        except (json.JSONDecodeError, OSError):
             self._groups = []
 
     def _save(self) -> None:
-        """파일에 저장"""
+        """파일에 원자적으로 저장 (write-to-temp-then-rename)"""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = [asdict(group) for group in self._groups]
-        self._path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        content = json.dumps(data, ensure_ascii=False, indent=2)
+        try:
+            fd, tmp_path = tempfile.mkstemp(dir=self._path.parent, suffix=".tmp", prefix=".profile_groups_")
+            try:
+                with open(fd, "w", encoding="utf-8") as f:
+                    f.write(content)
+                Path(tmp_path).replace(self._path)
+            except BaseException:
+                Path(tmp_path).unlink(missing_ok=True)
+                raise
+        except OSError:
+            # Fallback: 원자적 쓰기 실패 시 직접 쓰기
+            self._path.write_text(content, encoding="utf-8")
 
     def reload(self) -> None:
         """파일에서 다시 로드"""

@@ -26,7 +26,7 @@ Total: 56 tests achieving 100% code coverage.
 
 import pytest
 
-from shared.aws.tags import (
+from core.shared.aws.tags import (
     TagPolicy,
     TagPolicyValidator,
     TagRule,

@@ -5,7 +5,7 @@ tests/shared/io/excel/test_workbook.py - Excel Workbook 테스트
 from pathlib import Path
 from unittest.mock import patch
 
-from shared.io.excel.workbook import ColumnDef, Sheet, SummaryItem, Workbook
+from core.shared.io.excel.workbook import ColumnDef, Sheet, SummaryItem, Workbook
 
 
 class TestColumnDef:
@@ -462,7 +462,7 @@ class TestWorkbookUtilityFunctions:
 
     def test_save_to_csv_dict_list(self, tmp_path):
         """딕셔너리 리스트를 CSV로 저장"""
-        from shared.io.excel.workbook import save_to_csv
+        from core.shared.io.excel.workbook import save_to_csv
 
         data = [
             {"Name": "John", "Age": "30"},
@@ -479,7 +479,7 @@ class TestWorkbookUtilityFunctions:
 
     def test_save_to_csv_list_list(self, tmp_path):
         """리스트 리스트를 CSV로 저장"""
-        from shared.io.excel.workbook import save_to_csv
+        from core.shared.io.excel.workbook import save_to_csv
 
         data = [["John", "30"], ["Jane", "25"]]
         headers = ["Name", "Age"]
@@ -493,7 +493,7 @@ class TestWorkbookUtilityFunctions:
 
     def test_save_to_csv_empty_data(self, tmp_path):
         """빈 데이터 저장"""
-        from shared.io.excel.workbook import save_to_csv
+        from core.shared.io.excel.workbook import save_to_csv
 
         output_file = str(tmp_path / "empty.csv")
         save_to_csv([], output_file)
@@ -502,7 +502,7 @@ class TestWorkbookUtilityFunctions:
 
     def test_save_dict_list_to_excel(self, tmp_path):
         """딕셔너리 리스트를 Excel로 저장"""
-        from shared.io.excel.workbook import save_dict_list_to_excel
+        from core.shared.io.excel.workbook import save_dict_list_to_excel
 
         data = [
             {"Name": "John", "Age": 30, "City": "Seoul"},
@@ -517,7 +517,7 @@ class TestWorkbookUtilityFunctions:
 
     def test_save_dict_list_to_excel_with_columns(self, tmp_path):
         """컬럼 순서 지정하여 저장"""
-        from shared.io.excel.workbook import save_dict_list_to_excel
+        from core.shared.io.excel.workbook import save_dict_list_to_excel
 
         data = [
             {"Name": "John", "Age": 30, "City": "Seoul"},
@@ -531,7 +531,7 @@ class TestWorkbookUtilityFunctions:
 
     def test_save_dict_list_to_excel_empty(self, tmp_path):
         """빈 데이터 저장"""
-        from shared.io.excel.workbook import save_dict_list_to_excel
+        from core.shared.io.excel.workbook import save_dict_list_to_excel
 
         output_file = str(tmp_path / "empty.xlsx")
         save_dict_list_to_excel([], output_file)
@@ -542,7 +542,7 @@ class TestWorkbookUtilityFunctions:
         """기존 Workbook에 시트 추가"""
         from openpyxl import Workbook as OpenpyxlWorkbook
 
-        from shared.io.excel.workbook import add_sheet_from_dict_list
+        from core.shared.io.excel.workbook import add_sheet_from_dict_list
 
         wb = OpenpyxlWorkbook()
         data = [
@@ -560,7 +560,7 @@ class TestWorkbookUtilityFunctions:
         """컬럼 순서 지정하여 시트 추가"""
         from openpyxl import Workbook as OpenpyxlWorkbook
 
-        from shared.io.excel.workbook import add_sheet_from_dict_list
+        from core.shared.io.excel.workbook import add_sheet_from_dict_list
 
         wb = OpenpyxlWorkbook()
         data = [
@@ -577,7 +577,7 @@ class TestWorkbookUtilityFunctions:
         """빈 데이터로 시트 추가"""
         from openpyxl import Workbook as OpenpyxlWorkbook
 
-        from shared.io.excel.workbook import add_sheet_from_dict_list
+        from core.shared.io.excel.workbook import add_sheet_from_dict_list
 
         wb = OpenpyxlWorkbook()
         ws = add_sheet_from_dict_list(wb, [], "EmptySheet")
@@ -591,7 +591,7 @@ class TestWorksheetFormatting:
 
     def test_calculate_optimal_column_width(self):
         """최적 컬럼 너비 계산"""
-        from shared.io.excel.workbook import calculate_optimal_column_width
+        from core.shared.io.excel.workbook import calculate_optimal_column_width
 
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
@@ -605,7 +605,7 @@ class TestWorksheetFormatting:
 
     def test_calculate_optimal_column_width_multiline(self):
         """멀티라인 컬럼 너비 계산"""
-        from shared.io.excel.workbook import calculate_optimal_column_width
+        from core.shared.io.excel.workbook import calculate_optimal_column_width
 
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
@@ -618,7 +618,7 @@ class TestWorksheetFormatting:
 
     def test_calculate_optimal_column_width_max_limit(self):
         """최대 너비 제한"""
-        from shared.io.excel.workbook import calculate_optimal_column_width
+        from core.shared.io.excel.workbook import calculate_optimal_column_width
 
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
@@ -631,7 +631,7 @@ class TestWorksheetFormatting:
 
     def test_calculate_optimal_row_height(self):
         """최적 행 높이 계산"""
-        from shared.io.excel.workbook import calculate_optimal_row_height
+        from core.shared.io.excel.workbook import calculate_optimal_row_height
 
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
@@ -644,7 +644,7 @@ class TestWorksheetFormatting:
 
     def test_apply_detail_sheet_formatting(self):
         """상세 시트 포맷팅 적용"""
-        from shared.io.excel.workbook import apply_detail_sheet_formatting
+        from core.shared.io.excel.workbook import apply_detail_sheet_formatting
 
         wb = Workbook()
         columns = [ColumnDef(header="A"), ColumnDef(header="B")]
@@ -658,7 +658,7 @@ class TestWorksheetFormatting:
 
     def test_apply_detail_sheet_formatting_no_header(self):
         """헤더 없이 포맷팅"""
-        from shared.io.excel.workbook import apply_detail_sheet_formatting
+        from core.shared.io.excel.workbook import apply_detail_sheet_formatting
 
         wb = Workbook()
         columns = [ColumnDef(header="A")]
@@ -670,7 +670,7 @@ class TestWorksheetFormatting:
 
     def test_apply_summary_formatting(self):
         """요약 시트 포맷팅"""
-        from shared.io.excel.workbook import apply_summary_formatting
+        from core.shared.io.excel.workbook import apply_summary_formatting
 
         wb = Workbook()
         summary = wb.new_summary_sheet("요약")
@@ -682,7 +682,7 @@ class TestWorksheetFormatting:
 
     def test_apply_worksheet_settings(self):
         """워크시트 기본 설정"""
-        from shared.io.excel.workbook import apply_worksheet_settings
+        from core.shared.io.excel.workbook import apply_worksheet_settings
 
         wb = Workbook()
         columns = [ColumnDef(header="Test")]
@@ -802,7 +802,7 @@ class TestWorkbookEdgeCases:
         assert Path(filepath).exists()
         assert "final" in str(filepath)
 
-    @patch("shared.io.output.open_in_explorer")
+    @patch("core.shared.io.output.open_in_explorer")
     def test_workbook_save_with_one_sheet(self, mock_open, tmp_path):
         """하나의 빈 시트만 있는 Workbook 저장"""
         wb = Workbook()

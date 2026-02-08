@@ -11,7 +11,7 @@ from io import StringIO
 
 from rich.console import Console
 
-from cli.ui.timeline import (
+from core.cli.ui.timeline import (
     PhaseContext,
     PhaseInfo,
     PhaseState,
@@ -553,8 +553,8 @@ class TestModuleExports:
     """모듈 export 테스트"""
 
     def test_import_from_cli_ui(self):
-        """cli.ui에서 timeline 컴포넌트 import 가능"""
-        from cli.ui import TimelineParallelTracker, TimelineTracker, timeline_progress
+        """core.cli.ui에서 timeline 컴포넌트 import 가능"""
+        from core.cli.ui import TimelineParallelTracker, TimelineTracker, timeline_progress
 
         assert TimelineTracker is not None
         assert TimelineParallelTracker is not None
@@ -562,7 +562,7 @@ class TestModuleExports:
 
     def test_import_all_classes(self):
         """모든 클래스/함수 import 가능"""
-        from cli.ui.timeline import (
+        from core.cli.ui.timeline import (
             PhaseContext,
             PhaseInfo,
             PhaseState,

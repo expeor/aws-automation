@@ -12,10 +12,10 @@ description: 리포트 출력 패턴. Excel, HTML 보고서, 콘솔 출력 스�
 **새 플러그인 작성 시 권장하는 통합 출력 API**
 
 ```python
-from shared.io.compat import generate_dual_report
-from shared.io.output.helpers import create_output_path
-from shared.io.output import print_report_complete, open_in_explorer
-from shared.io.excel import Workbook, ColumnDef, Styles
+from core.shared.io.compat import generate_dual_report
+from core.shared.io.output.helpers import create_output_path
+from core.shared.io.output import print_report_complete, open_in_explorer
+from core.shared.io.excel import Workbook, ColumnDef, Styles
 
 def _build_excel(results: list, data: list) -> Workbook:
     """Excel Workbook 빌더 (저장하지 않고 반환)"""
@@ -76,7 +76,7 @@ def run(ctx) -> None:
 ```python
 def _build_html(output_dir: str) -> str:
     """커스텀 HTML 빌더 (output_dir -> filepath)"""
-    from shared.io.html import HTMLReport
+    from core.shared.io.html import HTMLReport
     report = HTMLReport(title="Custom Report")
     report.add_summary({"total": 100, "found": 10})
     report.add_pie_chart("Distribution", labels, values)
@@ -100,7 +100,7 @@ report_paths = generate_dual_report(
 기존 플러그인의 Excel 생성 함수를 래핑하는 경우:
 
 ```python
-from shared.io.compat import generate_reports
+from core.shared.io.compat import generate_reports
 
 report_paths = generate_reports(
     ctx,
@@ -118,7 +118,7 @@ report_paths = generate_reports(
 ## 출력 경로 헬퍼
 
 ```python
-from shared.io.output.helpers import create_output_path, get_context_identifier
+from core.shared.io.output.helpers import create_output_path, get_context_identifier
 
 # 6줄 → 1줄
 output_path = create_output_path(ctx, "ec2", "unused")
@@ -133,7 +133,7 @@ identifier = get_context_identifier(ctx)
 ### 기본 사용법
 
 ```python
-from shared.io.excel import Workbook, ColumnDef, Styles
+from core.shared.io.excel import Workbook, ColumnDef, Styles
 
 # Workbook 생성
 wb = Workbook()  # 한국어 (기본)
@@ -198,7 +198,7 @@ summary.add_item("월간 예상 비용", "$1,234.56", highlight="warning")
 ### HTMLReport (커스텀 차트)
 
 ```python
-from shared.io.html import HTMLReport
+from core.shared.io.html import HTMLReport
 
 report = HTMLReport(title="EC2 미사용 리소스 분석")
 report.add_summary({"total": 150, "found": 23, "savings": 1234.56})
@@ -211,7 +211,7 @@ report.save("output.html")
 ### AWSReport (자동 시각화)
 
 ```python
-from shared.io.html import create_aws_report
+from core.shared.io.html import create_aws_report
 
 report = create_aws_report(
     title="EC2 미사용",
@@ -240,7 +240,7 @@ AWSReport 사용 시 자동 생성:
 ### 표준 심볼 (이모지 사용 금지)
 
 ```python
-from cli.ui import (
+from core.cli.ui import (
     SYMBOL_SUCCESS,   # ✓ - 완료
     SYMBOL_ERROR,     # ✗ - 에러
     SYMBOL_WARNING,   # ! - 경고
@@ -252,7 +252,7 @@ from cli.ui import (
 ### 표준 출력 함수
 
 ```python
-from cli.ui import (
+from core.cli.ui import (
     print_success,      # [green]✓ 메시지[/green]
     print_error,        # [red]✗ 메시지[/red]
     print_warning,      # [yellow]! 메시지[/yellow]
@@ -264,7 +264,7 @@ from cli.ui import (
 ### 완료 메시지
 
 ```python
-from shared.io.output import print_report_complete
+from core.shared.io.output import print_report_complete
 
 # 단일 경로
 print_report_complete("/output/path/report.xlsx")

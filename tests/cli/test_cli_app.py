@@ -20,7 +20,7 @@ class TestGetVersion:
 
     def test_version_from_file(self, tmp_path):
         """version.txt에서 버전 읽기"""
-        from cli.app import get_version
+        from core.cli.app import get_version
 
         version = get_version()
         # 버전이 문자열인지 확인
@@ -29,7 +29,7 @@ class TestGetVersion:
 
     def test_version_format(self):
         """버전 형식 확인 (semantic versioning)"""
-        from cli.app import get_version
+        from core.cli.app import get_version
 
         version = get_version()
         # x.y.z 형식 확인
@@ -54,7 +54,7 @@ class TestCLI:
 
     def test_version_option(self, runner):
         """--version 옵션 테스트"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
@@ -62,16 +62,16 @@ class TestCLI:
 
     def test_help_option(self, runner):
         """--help 옵션 테스트"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
         assert "AWS Automation" in result.output or "aa" in result.output.lower()
 
-    @patch("cli.ui.main_menu.show_main_menu")
+    @patch("core.cli.ui.main_menu.show_main_menu")
     def test_invoke_without_command(self, mock_menu, runner):
         """서브명령어 없이 실행 시 메인 메뉴 호출"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         runner.invoke(cli, [])
         # 메인 메뉴가 호출되었는지 확인
@@ -88,7 +88,7 @@ class TestBuildHelpText:
 
     def test_help_text_content(self):
         """help 텍스트 내용 확인"""
-        from cli.app import _build_help_text
+        from core.cli.app import _build_help_text
 
         help_text = _build_help_text()
 
@@ -123,7 +123,7 @@ class TestCategoryCommands:
             }
         ]
 
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["--help"])
         # help 출력에 cost가 있는지 확인 (등록된 명령어)
@@ -131,7 +131,7 @@ class TestCategoryCommands:
 
     def test_ec2_command_exists(self, runner):
         """ec2 명령어가 존재하는지 테스트"""
-        from cli.app import cli
+        from core.cli.app import cli
 
         result = runner.invoke(cli, ["ec2", "--help"])
         # ec2 명령어가 등록되어 있으면 help가 표시됨

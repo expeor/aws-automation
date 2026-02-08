@@ -27,7 +27,7 @@ Example (권장 - parallel_collect):
 
 Example (Progress tracking 사용):
     from core.parallel import parallel_collect, quiet_mode
-    from cli.ui import parallel_progress
+    from core.cli.ui import parallel_progress
 
     with parallel_progress("리소스 수집") as tracker:
         with quiet_mode():

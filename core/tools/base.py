@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from cli.flow.context import ExecutionContext
+    from core.cli.flow.context import ExecutionContext
 
 
 def _get_console() -> "Console":

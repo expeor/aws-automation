@@ -2,7 +2,7 @@
 tests/shared/aws/inventory/test_helpers.py - Inventory 헬퍼 함수 테스트
 """
 
-from shared.aws.inventory.services.helpers import (
+from core.shared.aws.inventory.services.helpers import (
     count_rules,
     get_name_from_tags,
     get_tag_value,

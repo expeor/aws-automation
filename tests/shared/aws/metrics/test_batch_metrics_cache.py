@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
-from shared.aws.metrics import MetricQuery, MetricSessionCache, batch_get_metrics
+from core.shared.aws.metrics import MetricQuery, MetricSessionCache, batch_get_metrics
 
 
 class TestBatchGetMetricsWithCache:

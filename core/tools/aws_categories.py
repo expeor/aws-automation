@@ -7,7 +7,7 @@ AWS 공식 문서 기반 서비스 그룹 분류
 
 # AWS 서비스 카테고리 정의 (AWS 공식 분류 기준)
 # services 리스트는 각 서비스 폴더의 CATEGORY["name"] 값과 매칭
-# 폴더 구조: plugins/{service}/ (예: plugins/rds/, plugins/ec2/)
+# 폴더 구조: analyzers/{service}/ (예: analyzers/rds/, analyzers/ec2/)
 AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     # =========================================================================
     # Compute
@@ -17,8 +17,17 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "name_ko": "컴퓨팅",
         "services": [
             "ec2",
-            "lambda",
+            "fn",
+            "lightsail",
+            "batch",
+            "app_runner",
+            "outposts",
             "elasticbeanstalk",
+            "ec2_image_builder",
+            "evs",
+            "wavelength",
+            "serverless_repo",
+            "local_zones",
         ],
     },
     # =========================================================================
@@ -31,6 +40,7 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
             "ecr",
             "ecs",
             "eks",
+            "fargate",
         ],
     },
     # =========================================================================
@@ -41,10 +51,12 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "name_ko": "스토리지",
         "services": [
             "s3",
-            "ebs",
+            "backup",
             "efs",
             "fsx",
-            "aws_backup",
+            "elastic_disaster_recovery",
+            "storage_gateway",
+            "file_cache",
         ],
     },
     # =========================================================================
@@ -58,7 +70,14 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
             "dynamodb",
             "docdb",
             "elasticache",
+            "aurora",
+            "keyspaces",
+            "memorydb",
+            "neptune",
             "opensearch",
+            "timestream",
+            "redshift",
+            "oracle_db_aws",
         ],
     },
     # =========================================================================
@@ -73,6 +92,19 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
             "route53",
             "cloudfront",
             "apigateway",
+            "direct_connect",
+            "global_accelerator",
+            "privatelink",
+            "transit_gateway",
+            "vpc_lattice",
+            "verified_access",
+            "cloud_map",
+            "cloud_wan",
+            "client_vpn",
+            "site_to_site_vpn",
+            "nat_gateway",
+            "app_mesh",
+            "network_manager",
         ],
     },
     # =========================================================================
@@ -90,6 +122,23 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
             "acm",
             "cognito",
             "sso",
+            "detective",
+            "inspector",
+            "macie",
+            "security_lake",
+            "verified_permissions",
+            "audit_manager",
+            "cloudhsm",
+            "directory_service",
+            "firewall_manager",
+            "network_firewall",
+            "ram",
+            "security_hub",
+            "shield",
+            "signer",
+            "payment_cryptography",
+            "private_ca",
+            "wickr",
         ],
     },
     # =========================================================================
@@ -105,7 +154,22 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
             "ssm",
             "servicecatalog",
             "organizations",
-            "tag",
+            "tag_editor",
+            "health",
+            "auto_scaling",
+            "appconfig",
+            "compute_optimizer",
+            "control_tower",
+            "launch_wizard",
+            "license_manager",
+            "managed_grafana",
+            "managed_prometheus",
+            "resilience_hub",
+            "resource_groups",
+            "service_quotas",
+            "trusted_advisor",
+            "well_architected",
+            "opsworks",
         ],
     },
     # =========================================================================
@@ -115,12 +179,23 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "name": "Analytics",
         "name_ko": "분석",
         "services": [
-            "kinesis",
-            "glue",
             "athena",
-            "redshift",
             "emr",
-            "log",
+            "kinesis",
+            "kinesis_video",
+            "firehose",
+            "glue",
+            "lakeformation",
+            "msk",
+            "managed_flink",
+            "datazone",
+            "quicksight",
+            "cleanrooms",
+            "dataexchange",
+            "datapipeline",
+            "entity_resolution",
+            "cloudsearch",
+            "finspace",
         ],
     },
     # =========================================================================
@@ -130,10 +205,15 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "name": "Application Integration",
         "name_ko": "애플리케이션 통합",
         "services": [
+            "stepfunctions",
+            "appflow",
+            "b2b_data_interchange",
+            "eventbridge",
+            "mwaa",
+            "mq",
             "sns",
             "sqs",
-            "eventbridge",
-            "stepfunctions",
+            "swf",
         ],
     },
     # =========================================================================
@@ -143,10 +223,19 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "name": "Developer Tools",
         "name_ko": "개발자 도구",
         "services": [
+            "cloudformation",
             "codecommit",
             "codebuild",
             "codepipeline",
-            "cfn",
+            "codedeploy",
+            "codeartifact",
+            "codecatalyst",
+            "cloud9",
+            "cloudshell",
+            "infrastructure_composer",
+            "corretto",
+            "fis",
+            "xray",
         ],
     },
     # =========================================================================
@@ -158,6 +247,32 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "services": [
             "bedrock",
             "sagemaker",
+            "comprehend",
+            "kendra",
+            "lex",
+            "personalize",
+            "rekognition",
+            "textract",
+            "transcribe",
+            "translate",
+            "q_developer",
+            "q_business",
+            "augmented_ai",
+            "codeguru",
+            "devops_guru",
+            "forecast",
+            "fraud_detector",
+            "comprehend_medical",
+            "lookout_equipment",
+            "lookout_metrics",
+            "lookout_vision",
+            "monitron",
+            "partyrock",
+            "polly",
+            "deepcomposer",
+            "deepracer",
+            "healthlake",
+            "panorama",
         ],
     },
     # =========================================================================
@@ -167,8 +282,12 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
         "name": "Cloud Financial Management",
         "name_ko": "클라우드 비용 관리",
         "services": [
-            "ce",
             "cost",
+            "ce",
+            "billing_conductor",
+            "budgets",
+            "cur",
+            "savings_plans",
         ],
     },
     # =========================================================================
@@ -177,7 +296,15 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "migration": {
         "name": "Migration & Transfer",
         "name_ko": "마이그레이션 및 전송",
-        "services": [],
+        "services": [
+            "transfer",
+            "dms",
+            "application_migration",
+            "migration_hub",
+            "datasync",
+            "mainframe_modernization",
+            "snow_family",
+        ],
     },
     # =========================================================================
     # Media Services
@@ -185,7 +312,16 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "media": {
         "name": "Media Services",
         "name_ko": "미디어 서비스",
-        "services": [],
+        "services": [
+            "mediaconnect",
+            "mediaconvert",
+            "medialive",
+            "mediapackage",
+            "mediatailor",
+            "elastic_transcoder",
+            "ivs",
+            "deadline_cloud",
+        ],
     },
     # =========================================================================
     # Internet of Things
@@ -193,7 +329,15 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "iot": {
         "name": "Internet of Things",
         "name_ko": "사물 인터넷",
-        "services": [],
+        "services": [
+            "iot_core",
+            "iot_device_defender",
+            "iot_device_management",
+            "iot_greengrass",
+            "iot_sitewise",
+            "iot_fleetwise",
+            "iot_twinmaker",
+        ],
     },
     # =========================================================================
     # Game Tech
@@ -201,7 +345,9 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "game_tech": {
         "name": "Game Tech",
         "name_ko": "게임 기술",
-        "services": [],
+        "services": [
+            "gamelift",
+        ],
     },
     # =========================================================================
     # Satellite
@@ -209,7 +355,9 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "satellite": {
         "name": "Satellite",
         "name_ko": "위성",
-        "services": [],
+        "services": [
+            "ground_station",
+        ],
     },
     # =========================================================================
     # Quantum Technologies
@@ -217,7 +365,9 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "quantum": {
         "name": "Quantum Technologies",
         "name_ko": "양자 기술",
-        "services": [],
+        "services": [
+            "braket",
+        ],
     },
     # =========================================================================
     # End User Computing
@@ -225,7 +375,11 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "end_user_computing": {
         "name": "End User Computing",
         "name_ko": "최종 사용자 컴퓨팅",
-        "services": [],
+        "services": [
+            "workspaces",
+            "workspaces_web",
+            "appstream",
+        ],
     },
     # =========================================================================
     # Business Applications
@@ -233,7 +387,14 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "business_apps": {
         "name": "Business Applications",
         "name_ko": "비즈니스 애플리케이션",
-        "services": [],
+        "services": [
+            "connect",
+            "chime_sdk",
+            "ses",
+            "pinpoint",
+            "end_user_messaging",
+            "workmail",
+        ],
     },
     # =========================================================================
     # Frontend Web & Mobile
@@ -241,7 +402,12 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "frontend_mobile": {
         "name": "Frontend Web & Mobile",
         "name_ko": "프론트엔드 웹 및 모바일",
-        "services": [],
+        "services": [
+            "amplify",
+            "appsync",
+            "device_farm",
+            "location",
+        ],
     },
     # =========================================================================
     # Customer Enablement
@@ -249,7 +415,10 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "customer_enablement": {
         "name": "Customer Enablement",
         "name_ko": "고객 지원",
-        "services": [],
+        "services": [
+            "managed_services",
+            "repost",
+        ],
     },
     # =========================================================================
     # Blockchain
@@ -257,7 +426,9 @@ AWS_SERVICE_CATEGORIES: dict[str, dict] = {
     "blockchain": {
         "name": "Blockchain",
         "name_ko": "블록체인",
-        "services": [],
+        "services": [
+            "managed_blockchain",
+        ],
     },
 }
 
@@ -267,6 +438,21 @@ for cat_key, cat_info in AWS_SERVICE_CATEGORIES.items():
     for service in cat_info["services"]:
         if service not in SERVICE_TO_CATEGORY:
             SERVICE_TO_CATEGORY[service] = cat_key
+
+# AWS 글로벌 서비스 목록 (리전 선택이 불필요한 서비스)
+# 참조: https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/global-services.html
+GLOBAL_SERVICES: set[str] = {
+    "iam",
+    "organizations",
+    "route53",
+    "cloudfront",
+    "waf",
+    "acm",
+    "global_accelerator",
+    "shield",
+    "sso",
+    "sts",
+}
 
 
 def get_aws_categories() -> list[dict]:
@@ -278,7 +464,7 @@ def get_aws_categories() -> list[dict]:
                 "key": "compute",
                 "name": "Compute",
                 "name_ko": "컴퓨팅",
-                "services": ["ec2", "lambda", ...]
+                "services": ["ec2", "fn", ...]
             },
             ...
         ]

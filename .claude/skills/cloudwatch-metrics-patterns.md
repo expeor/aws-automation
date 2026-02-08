@@ -10,7 +10,7 @@ GetMetricData API를 사용하여 최대 500개 메트릭을 1회 호출로 조�
 ## 권장 패턴
 
 ```python
-from shared.aws.metrics import (
+from core.shared.aws.metrics import (
     MetricQuery,
     batch_get_metrics,
     sanitize_metric_id,
@@ -110,7 +110,7 @@ def batch_get_metrics(
 ```python
 from datetime import datetime, timedelta
 from core.parallel import get_client
-from shared.aws.metrics import MetricQuery, batch_get_metrics
+from core.shared.aws.metrics import MetricQuery, batch_get_metrics
 
 def _collect_with_metrics(session, account_id: str, account_name: str, region: str):
     cw = get_client(session, "cloudwatch", region_name=region)
@@ -153,7 +153,7 @@ def _collect_with_metrics(session, account_id: str, account_name: str, region: s
 동일 메트릭에 대해 여러 통계를 조회할 때 사용:
 
 ```python
-from shared.aws.metrics import batch_get_metrics_with_stats
+from core.shared.aws.metrics import batch_get_metrics_with_stats
 
 queries = [
     MetricQuery(id="func1_duration_avg", ..., stat="Average"),
@@ -174,7 +174,7 @@ max_duration = result.get("func1_duration", {}).get("max", 0)
 AWS MetricDataQuery ID 규칙에 맞게 변환:
 
 ```python
-from shared.aws.metrics import sanitize_metric_id
+from core.shared.aws.metrics import sanitize_metric_id
 
 sanitize_metric_id("my-lambda-func.prod")  # → "my_lambda_func_prod"
 sanitize_metric_id("123-func")              # → "m_123_func" (숫자 시작 방지)
@@ -196,7 +196,7 @@ sanitize_metric_id("func/with/slashes")     # → "func_with_slashes"
 ### Lambda
 
 ```python
-from shared.aws.metrics import build_lambda_metric_queries
+from core.shared.aws.metrics import build_lambda_metric_queries
 
 queries = build_lambda_metric_queries(
     function_names=["func1", "func2", "func3"],
@@ -214,7 +214,7 @@ queries = build_lambda_metric_queries(
 ### EC2
 
 ```python
-from shared.aws.metrics import build_ec2_metric_queries
+from core.shared.aws.metrics import build_ec2_metric_queries
 
 queries = build_ec2_metric_queries(
     instance_ids=["i-1234567890abcdef0"],
@@ -230,7 +230,7 @@ queries = build_ec2_metric_queries(
 ### RDS
 
 ```python
-from shared.aws.metrics import build_rds_metric_queries
+from core.shared.aws.metrics import build_rds_metric_queries
 
 queries = build_rds_metric_queries(
     instance_ids=["mydb-instance"],
@@ -241,7 +241,7 @@ queries = build_rds_metric_queries(
 ### ElastiCache
 
 ```python
-from shared.aws.metrics import build_elasticache_metric_queries
+from core.shared.aws.metrics import build_elasticache_metric_queries
 
 # Redis Replication Group
 queries = build_elasticache_metric_queries(
@@ -254,7 +254,7 @@ queries = build_elasticache_metric_queries(
 ### NAT Gateway
 
 ```python
-from shared.aws.metrics import build_nat_metric_queries
+from core.shared.aws.metrics import build_nat_metric_queries
 
 queries = build_nat_metric_queries(
     nat_gateway_ids=["nat-0123456789abcdef0"],
@@ -266,7 +266,7 @@ queries = build_nat_metric_queries(
 ### SageMaker Endpoint
 
 ```python
-from shared.aws.metrics import build_sagemaker_endpoint_metric_queries
+from core.shared.aws.metrics import build_sagemaker_endpoint_metric_queries
 
 queries = build_sagemaker_endpoint_metric_queries(
     endpoint_names=["my-endpoint"],
@@ -281,7 +281,7 @@ queries = build_sagemaker_endpoint_metric_queries(
 ```python
 from datetime import datetime, timedelta
 from core.parallel import get_client, parallel_collect
-from shared.aws.metrics import build_lambda_metric_queries, batch_get_metrics
+from core.shared.aws.metrics import build_lambda_metric_queries, batch_get_metrics
 
 def _collect_lambda_with_metrics(session, account_id: str, account_name: str, region: str):
     """Lambda 함수 수집 + CloudWatch 메트릭 조회"""

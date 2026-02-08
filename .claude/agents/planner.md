@@ -72,23 +72,23 @@ mcp__aws-documentation__search("EFS describe API")
 # 좋음: 구체적이고 독립적
 1. [ ] __init__.py 작성: CATEGORY(name="efs", display_name="EFS"), TOOLS 1개 정의
    - 완료 조건: ruff check 통과, CATEGORY/TOOLS import 가능
-   - 파일: analyzers/efs/__init__.py
-   - 참조: analyzers/ec2/__init__.py (패턴 참고)
+   - 파일: functions/analyzers/efs/__init__.py
+   - 참조: functions/analyzers/ec2/__init__.py (패턴 참고)
 
 2. [ ] _collect_and_analyze 콜백 구현: EFS describe → CloudWatch 메트릭 조회 → 미사용 판정
    - 완료 조건: 함수가 list[dict] 반환, 필수 키 포함
-   - 파일: analyzers/efs/unused.py
-   - 참조: analyzers/ec2/unused.py (패턴 참고)
+   - 파일: functions/analyzers/efs/unused.py
+   - 참조: functions/analyzers/ec2/unused.py (패턴 참고)
 
 3. [ ] run(ctx) 함수 구현: parallel_collect → 콘솔 출력 → 보고서 생성
    - 완료 조건: 함수 실행 시 Excel/HTML 보고서 경로 반환
-   - 파일: analyzers/efs/unused.py
+   - 파일: functions/analyzers/efs/unused.py
    - 의존: 태스크 2 완료 필요
 
 4. [ ] 테스트 작성: moto 모킹으로 정상/빈 결과/에러 케이스
    - 완료 조건: pytest 통과, 3개 이상 테스트 함수
-   - 파일: tests/analyzers/efs/test_unused.py
-   - 참조: tests/analyzers/ec2/test_ec2_tools.py
+   - 파일: tests/functions/analyzers/efs/test_unused.py
+   - 참조: tests/functions/analyzers/ec2/test_ec2_tools.py
 ```
 
 **태스크 간 의존성이 있으면 명시적으로 표기:**
@@ -114,10 +114,10 @@ mcp__aws-documentation__search("EFS describe API")
 
 | 파일 | 의존 대상 | 의존 유형 |
 |------|----------|----------|
-| `analyzers/{service}/{type}.py` | `core/parallel` | import |
-| `analyzers/{service}/{type}.py` | `shared/aws/metrics` | import (메트릭 조회 시) |
-| `analyzers/{service}/{type}.py` | `shared/aws/inventory` | import (인벤토리 사용 시) |
-| `tests/.../test_{type}.py` | `analyzers/{service}/{type}.py` | 테스트 대상 |
+| `functions/analyzers/{service}/{type}.py` | `core/parallel` | import |
+| `functions/analyzers/{service}/{type}.py` | `shared/aws/metrics` | import (메트릭 조회 시) |
+| `functions/analyzers/{service}/{type}.py` | `shared/aws/inventory` | import (인벤토리 사용 시) |
+| `tests/.../test_{type}.py` | `functions/analyzers/{service}/{type}.py` | 테스트 대상 |
 
 ### 서브태스크 (Subagent-Ready)
 
@@ -125,32 +125,32 @@ mcp__aws-documentation__search("EFS describe API")
 
 | # | 태스크 | 파일 | 의존 | 병렬 가능 |
 |---|--------|------|------|----------|
-| 1 | __init__.py 작성 | `analyzers/{service}/__init__.py` | 없음 | ✅ |
-| 2 | 콜백 함수 구현 | `analyzers/{service}/{type}.py` | 없음 | ✅ |
-| 3 | run(ctx) 구현 | `analyzers/{service}/{type}.py` | #2 | ❌ |
-| 4 | 테스트 작성 | `tests/analyzers/{service}/test_{type}.py` | #2, #3 | ❌ |
+| 1 | __init__.py 작성 | `functions/analyzers/{service}/__init__.py` | 없음 | ✅ |
+| 2 | 콜백 함수 구현 | `functions/analyzers/{service}/{type}.py` | 없음 | ✅ |
+| 3 | run(ctx) 구현 | `functions/analyzers/{service}/{type}.py` | #2 | ❌ |
+| 4 | 테스트 작성 | `tests/functions/analyzers/{service}/test_{type}.py` | #2, #3 | ❌ |
 | 5 | 린트/타입 확인 | 전체 | #1~#4 | ❌ |
 
 #### 태스크 1: __init__.py 작성
-- **파일:** `analyzers/{service}/__init__.py`
+- **파일:** `functions/analyzers/{service}/__init__.py`
 - **내용:** CATEGORY, TOOLS 메타데이터 정의
-- **참조:** `analyzers/ec2/__init__.py` (패턴 참고)
+- **참조:** `functions/analyzers/ec2/__init__.py` (패턴 참고)
 - **완료 조건:** ruff check 통과, import 가능
 
 #### 태스크 2: 콜백 함수 구현
-- **파일:** `analyzers/{service}/{type}.py`
+- **파일:** `functions/analyzers/{service}/{type}.py`
 - **내용:** `_collect_and_analyze(session, account_id, account_name, region)` 구현
-- **참조:** `analyzers/ec2/unused.py` (패턴 참고)
+- **참조:** `functions/analyzers/ec2/unused.py` (패턴 참고)
 - **완료 조건:** 함수가 `list[dict]` 반환
 
 #### 태스크 3: run(ctx) 구현
-- **파일:** `analyzers/{service}/{type}.py`
+- **파일:** `functions/analyzers/{service}/{type}.py`
 - **내용:** parallel_collect → 콘솔 출력 → generate_reports
 - **의존:** 태스크 2 완료 필요
 - **완료 조건:** 함수 실행 시 보고서 경로 반환
 
 #### 태스크 4: 테스트 작성
-- **파일:** `tests/analyzers/{service}/test_{type}.py`
+- **파일:** `tests/functions/analyzers/{service}/test_{type}.py`
 - **내용:** moto 모킹, 정상/빈 결과/에러 케이스
 - **의존:** 태스크 2, 3 완료 필요
 - **완료 조건:** pytest 통과, 3개+ 테스트 함수

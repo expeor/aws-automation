@@ -29,6 +29,16 @@ from contextlib import contextmanager
 _quiet_state = threading.local()
 
 
+class _QuietFilter(logging.Filter):
+    """스레드별 quiet 상태에 따라 WARNING 이하 로그를 필터링"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not (is_quiet() and record.levelno < logging.ERROR)
+
+
+_quiet_filter = _QuietFilter()
+
+
 def is_quiet() -> bool:
     """현재 스레드가 quiet 모드인지 확인
 
@@ -50,29 +60,25 @@ def quiet_mode() -> Generator[None, None, None]:
     이 컨텍스트 안에서 실행되는 코드는 is_quiet() == True가 됩니다.
     개별 함수에서 is_quiet()를 확인하여 출력을 조건부로 수행할 수 있습니다.
 
-    또한 logging WARNING 레벨 이하의 로그도 억제됩니다.
-    (루트 로거의 레벨을 ERROR로 변경하여 모든 자식 로거에 적용)
+    WARNING 이하의 로그는 스레드별 Filter로 억제됩니다.
+    (글로벌 로거 레벨 변경 대신 Filter를 사용하여 스레드 안전성 확보)
 
     Example:
         with quiet_mode():
             # 이 블록 안에서 is_quiet() == True
             parallel_collect(ctx, collector_func)
     """
-    # quiet 모드 설정
     old_value = getattr(_quiet_state, "quiet", False)
     _quiet_state.quiet = True
 
-    # 루트 로거의 레벨을 ERROR로 변경 (WARNING 이하 억제)
     root_logger = logging.getLogger()
-    old_level = root_logger.level
-    root_logger.setLevel(logging.ERROR)
+    root_logger.addFilter(_quiet_filter)
 
     try:
         yield
     finally:
-        # 원래 상태로 복원
         _quiet_state.quiet = old_value
-        root_logger.setLevel(old_level)
+        root_logger.removeFilter(_quiet_filter)
 
 
 # 모든 스레드에서 상태를 상속받도록 하는 헬퍼

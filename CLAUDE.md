@@ -20,21 +20,27 @@ AWS 운영 자동화 CLI 도구. 미사용 리소스 탐지, 보안 점검, 비�
 
 ```
 aws-automation/
-├── cli/            # Click 기반 CLI, 대화형 메뉴, i18n
-├── core/           # 인증, 병렬처리, 도구 관리
-├── shared/         # 공유 유틸리티 (AWS, I/O)
-├── analyzers/        # AWS 서비스별 분석 도구 (30개 카테고리)
-├── reports/        # 종합 리포트 (cost_dashboard, inventory, ip_search, log_analyzer)
-└── tests/          # pytest 테스트
+├── core/               # CLI 인프라 전체 (통합)
+│   ├── auth/           # 인증
+│   ├── parallel/       # 병렬 처리
+│   ├── tools/          # 도구 관리
+│   ├── region/         # 리전
+│   ├── cli/            # Click CLI, 플로우, UI, i18n
+│   ├── shared/         # 공유 유틸리티 (AWS, I/O)
+│   └── scripts/        # 개발 도구
+├── functions/          # 기능 모듈
+│   ├── analyzers/      # AWS 서비스별 분석 도구 (30개 카테고리)
+│   └── reports/        # 종합 리포트 (cost_dashboard, inventory, ip_search, log_analyzer)
+└── tests/              # pytest 테스트
 ```
 
 ### 주요 디렉토리
 
-- **cli/**: 메인 앱 진입점 (`app.py`), 플로우 관리, 프롬프트, 국제화(i18n)
-- **core/**: 인증 프로바이더, 병렬 처리, 도구 레지스트리
-- **shared/**: 공유 유틸리티 (AWS: metrics, pricing, inventory, ip_ranges / I/O: excel, html, csv)
-- **analyzers/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam, cost 등)
-- **reports/**: 종합 리포트 (비용 대시보드, 인벤토리, IP 검색, 로그 분석)
+- **core/**: CLI 인프라 전체 (인증, 병렬 처리, 도구 관리, CLI, 공유 유틸리티)
+  - **core/cli/**: 메인 앱 진입점 (`app.py`), 플로우 관리, 프롬프트, 국제화(i18n)
+  - **core/shared/**: 공유 유틸리티 (AWS: metrics, pricing, inventory, ip_ranges / I/O: excel, html, csv)
+- **functions/analyzers/**: 서비스별 분석 도구 (ec2, vpc, lambda, iam, cost 등)
+- **functions/reports/**: 종합 리포트 (비용 대시보드, 인벤토리, IP 검색, 로그 분석)
 
 ### Core 모듈 구조
 
@@ -52,39 +58,26 @@ core/
 ├── region/         # 리전 데이터 및 가용성 확인
 │   ├── data.py           # ALL_REGIONS, REGION_NAMES
 │   └── availability.py   # 리전 가용성 확인
+├── cli/            # Click 기반 CLI
+│   ├── app.py            # 메인 엔트리포인트
+│   ├── headless.py       # 비대화형 모드
+│   ├── flow/             # 플로우 관리
+│   ├── ui/               # 터미널 UI
+│   └── i18n/             # 국제화
+├── shared/         # 공유 유틸리티
+│   ├── aws/              # AWS (metrics, pricing, inventory, ip_ranges, health)
+│   └── io/               # I/O (excel, html, csv, output)
+├── scripts/        # 개발 도구
+│   └── generate_index.py # 프로젝트 인덱스 생성
 └── filter.py       # 리전 필터링
-```
-
-### Shared 모듈 구조
-
-공유 유틸리티는 `shared/`에 위치:
-
-```
-shared/
-├── aws/                        # AWS 관련 공유 유틸리티
-│   ├── metrics/                # CloudWatch 메트릭 배치 수집
-│   │   └── batch_metrics.py    # GetMetricData 배치 API (500개/호출)
-│   ├── inventory/              # 리소스 인벤토리 수집/캐싱
-│   │   ├── collector.py        # InventoryCollector
-│   │   ├── types.py            # 리소스 타입 정의
-│   │   └── services/           # 서비스별 수집기
-│   ├── ip_ranges/              # IP 대역 검색 (AWS, GCP, Azure, Oracle)
-│   ├── pricing/                # AWS 가격 정보
-│   └── health/                 # Health 이벤트 분석
-│
-└── io/                         # I/O 유틸리티
-    ├── excel/                  # Excel 출력 (openpyxl)
-    ├── html/                   # HTML 리포트 (ECharts)
-    ├── csv/                    # CSV 처리
-    └── output/                 # 출력 경로 관리
 ```
 
 ### Reports 모듈 구조
 
-종합 리포트는 `reports/`에 위치:
+종합 리포트는 `functions/reports/`에 위치:
 
 ```
-reports/
+functions/reports/
 ├── cost_dashboard/             # 미사용 리소스 종합 대시보드
 ├── inventory/                  # AWS 리소스 인벤토리
 ├── ip_search/                  # IP 검색 (Public/Private)
@@ -134,10 +127,10 @@ no_implicit_optional = true
 
 ### 기본 구조
 
-플러그인은 `analyzers/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:
+플러그인은 `functions/analyzers/{service}/` 디렉토리에 위치하며, `__init__.py`와 도구 모듈로 구성:
 
 ```python
-# analyzers/{service}/__init__.py
+# functions/analyzers/{service}/__init__.py
 CATEGORY = {
     "name": "{service}",
     "display_name": "{Service}",
@@ -175,7 +168,7 @@ TOOLS = [
 ### 도구 모듈 패턴
 
 ```python
-# analyzers/{service}/{module}.py
+# functions/analyzers/{service}/{module}.py
 from core.parallel import parallel_collect, get_client
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str):
@@ -194,7 +187,7 @@ def run(ctx) -> None:
         print(result.get_error_summary())
 
     # 보고서 생성
-    from shared.io.compat import generate_reports
+    from core.shared.io.compat import generate_reports
     generate_reports(ctx, data, columns=[...])
 ```
 
@@ -216,7 +209,7 @@ from core.parallel import (
 result = parallel_collect(ctx, callback_func, service="ec2", max_workers=20)
 
 # Progress tracking
-from cli.ui import parallel_progress
+from core.cli.ui import parallel_progress
 with parallel_progress("수집 중") as tracker:
     with quiet_mode():
         result = parallel_collect(ctx, callback_func, progress_tracker=tracker)
@@ -274,11 +267,11 @@ if not result.is_valid:
     print(result.get_summary())  # 누락된 필수 태그: Owner
 ```
 
-### 파일 출력 (shared.io)
+### 파일 출력 (core.shared.io)
 
 ```python
 # Excel 출력
-from shared.io.excel import Workbook, ColumnDef
+from core.shared.io.excel import Workbook, ColumnDef
 
 wb = Workbook()
 columns = [
@@ -292,7 +285,7 @@ for row in data:
 wb.save("output.xlsx")
 
 # HTML 보고서 (ECharts 시각화)
-from shared.io.html import AWSReport, create_aws_report
+from core.shared.io.html import AWSReport, create_aws_report
 
 report = create_aws_report(
     title="EC2 미사용",
@@ -304,7 +297,7 @@ report = create_aws_report(
 report.save("output.html")
 
 # 듀얼 출력 (Excel + HTML)
-from shared.io.compat import generate_reports
+from core.shared.io.compat import generate_reports
 
 generate_reports(ctx, data, columns=[...], charts=[...])
 ```
@@ -337,10 +330,10 @@ pytest tests/ -v
 
 # 특정 모듈
 pytest tests/core/ -v
-pytest tests/analyzers/ec2/ -v
+pytest tests/functions/analyzers/ec2/ -v
 
 # 커버리지
-pytest tests/ --cov=core --cov=cli --cov=plugins
+pytest tests/ --cov=core --cov=functions
 ```
 
 ### 테스트 구조
@@ -351,8 +344,9 @@ tests/
 │   ├── auth/       # 인증 테스트
 │   ├── parallel/   # 병렬 처리 테스트
 │   └── tools/      # 도구 테스트
-└── analyzers/        # 플러그인 테스트
-    └── cloudwatch/ # CloudWatch batch_metrics 테스트
+└── functions/
+    ├── analyzers/  # 플러그인 테스트
+    └── reports/    # 리포트 테스트
 ```
 
 ### Mocking
@@ -364,19 +358,19 @@ tests/
 
 ```bash
 # 린트 체크
-ruff check cli core plugins
+ruff check core functions
 
 # 자동 수정
-ruff check --fix cli core plugins
+ruff check --fix core functions
 
 # 포맷팅
-ruff format cli core plugins
+ruff format core functions
 
 # 타입 체크
-mypy cli core plugins
+mypy core functions
 
 # 보안 스캔
-bandit -r cli core plugins -c pyproject.toml
+bandit -r core functions -c pyproject.toml
 ```
 
 ## 실행 명령
@@ -524,7 +518,7 @@ skips = ["B101", "B311", "B608"]
 
 ```toml
 [tool.coverage.run]
-source = ["cli", "core", "plugins"]
+source = ["core", "functions"]
 omit = ["*/tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]

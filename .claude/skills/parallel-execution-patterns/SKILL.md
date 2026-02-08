@@ -108,7 +108,7 @@ def _collect(session, account_id: str, account_name: str, region: str):
 
 ```python
 from core.parallel import parallel_collect, quiet_mode
-from cli.ui import parallel_progress
+from core.cli.ui import parallel_progress
 
 def run(ctx):
     with parallel_progress("리소스 수집") as tracker:
@@ -127,7 +127,7 @@ def run(ctx):
 ### progress_tracker 상세 사용
 
 ```python
-from cli.ui import parallel_progress, console
+from core.cli.ui import parallel_progress, console
 
 def run(ctx):
     # 진행 바 컨텍스트 매니저
@@ -311,7 +311,7 @@ def run(ctx):
 
 ```python
 from core.parallel import parallel_collect, get_client
-from shared.io.output import OutputPath, open_in_explorer
+from core.shared.io.output import OutputPath, open_in_explorer
 from rich.console import Console
 
 console = Console()
