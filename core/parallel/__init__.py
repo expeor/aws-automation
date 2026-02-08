@@ -6,8 +6,6 @@ core/parallel - 병렬 처리 모듈
 주요 구성 요소:
 - ParallelSessionExecutor: Map-Reduce 패턴 병렬 실행기
 - parallel_collect: 간편한 병렬 수집 함수
-- @safe_aws_call: 재시도 + Rate limiting 데코레이터
-- @with_retry: 간단한 재시도 데코레이터
 - TokenBucketRateLimiter: API 쓰로틀링 방지
 
 Example (권장 - parallel_collect):
@@ -46,22 +44,10 @@ Example (상세 제어 - Executor):
     config = ParallelConfig(max_workers=30)
     executor = ParallelSessionExecutor(ctx, config)
     result = executor.execute(collect_func, service="ec2")
-
-Example (데코레이터 - 개별 함수):
-    from core.parallel import safe_aws_call, TaskError
-
-    @safe_aws_call(service="ec2", operation="describe_instances")
-    def get_instances(session, region):
-        ec2 = session.client("ec2", region_name=region)
-        return ec2.describe_instances()["Reservations"]
-
-    result = get_instances(session, region)
-    if isinstance(result, TaskError):
-        print(f"Error: {result.message}")
 """
 
-from .client import get_client, get_resource
-from .decorators import RetryConfig, safe_aws_call, with_retry
+from .client import get_client
+from .decorators import RetryConfig
 from .errors import (
     CollectedError,
     ErrorCollector,
@@ -71,18 +57,9 @@ from .errors import (
 )
 from .executor import ParallelConfig, ParallelSessionExecutor, parallel_collect
 from .quiet import is_quiet, quiet_mode, set_quiet
-from .quotas import (
-    COMMON_QUOTAS,
-    QuotaStatus,
-    ServiceQuotaChecker,
-    ServiceQuotaInfo,
-    get_quota_checker,
-    reset_quota_checkers,
-)
 from .rate_limiter import (
     RateLimiterConfig,
     TokenBucketRateLimiter,
-    create_rate_limiter,
     get_rate_limiter,
     reset_rate_limiters,
 )
@@ -95,10 +72,7 @@ __all__: list[str] = [
     "parallel_collect",
     # Client (retry 적용)
     "get_client",
-    "get_resource",
     # Decorators
-    "safe_aws_call",
-    "with_retry",
     "RetryConfig",
     # Error handling
     "ErrorCollector",
@@ -114,18 +88,10 @@ __all__: list[str] = [
     "TokenBucketRateLimiter",
     "RateLimiterConfig",
     "get_rate_limiter",
-    "create_rate_limiter",
     "reset_rate_limiters",
     # Types
     "ErrorCategory",
     "TaskError",
     "TaskResult",
     "ParallelExecutionResult",
-    # Quotas
-    "ServiceQuotaChecker",
-    "ServiceQuotaInfo",
-    "QuotaStatus",
-    "COMMON_QUOTAS",
-    "get_quota_checker",
-    "reset_quota_checkers",
 ]

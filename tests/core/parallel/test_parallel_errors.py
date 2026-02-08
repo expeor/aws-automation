@@ -12,7 +12,7 @@ from core.parallel.errors import (
     ErrorCategory,
     ErrorCollector,
     ErrorSeverity,
-    categorize_error,
+    categorize_error_code,
     safe_collect,
     try_or_default,
 )
@@ -128,47 +128,47 @@ class TestCollectedError:
         assert result["resource_id"] == "bucket-name"
 
 
-class TestCategorizeError:
-    """categorize_error 함수 테스트"""
+class TestCategorizeErrorCode:
+    """categorize_error_code 함수 테스트"""
 
     def test_access_denied(self):
         """AccessDenied 분류"""
-        assert categorize_error("AccessDenied") == ErrorCategory.ACCESS_DENIED
-        assert categorize_error("UnauthorizedAccess") == ErrorCategory.ACCESS_DENIED
-        assert categorize_error("Forbidden") == ErrorCategory.ACCESS_DENIED
+        assert categorize_error_code("AccessDenied") == ErrorCategory.ACCESS_DENIED
+        assert categorize_error_code("UnauthorizedAccess") == ErrorCategory.ACCESS_DENIED
+        assert categorize_error_code("Forbidden") == ErrorCategory.ACCESS_DENIED
 
     def test_not_found(self):
         """NotFound 분류"""
-        assert categorize_error("ResourceNotFound") == ErrorCategory.NOT_FOUND
-        assert categorize_error("NoSuchBucket") == ErrorCategory.NOT_FOUND
-        assert categorize_error("FunctionDoesNotExist") == ErrorCategory.NOT_FOUND
+        assert categorize_error_code("ResourceNotFound") == ErrorCategory.NOT_FOUND
+        assert categorize_error_code("NoSuchBucket") == ErrorCategory.NOT_FOUND
+        assert categorize_error_code("FunctionDoesNotExist") == ErrorCategory.NOT_FOUND
 
     def test_throttling(self):
         """Throttling 분류"""
-        assert categorize_error("Throttling") == ErrorCategory.THROTTLING
-        assert categorize_error("RateLimitExceeded") == ErrorCategory.THROTTLING
-        assert categorize_error("TooManyRequests") == ErrorCategory.THROTTLING
+        assert categorize_error_code("Throttling") == ErrorCategory.THROTTLING
+        assert categorize_error_code("RateLimitExceeded") == ErrorCategory.THROTTLING
+        assert categorize_error_code("TooManyRequests") == ErrorCategory.THROTTLING
 
     def test_timeout(self):
         """Timeout 분류"""
-        assert categorize_error("RequestTimeout") == ErrorCategory.TIMEOUT
-        assert categorize_error("TimedOut") == ErrorCategory.TIMEOUT
+        assert categorize_error_code("RequestTimeout") == ErrorCategory.TIMEOUT
+        assert categorize_error_code("TimedOut") == ErrorCategory.TIMEOUT
 
     def test_invalid_request(self):
         """Invalid request 분류"""
-        assert categorize_error("InvalidParameterValue") == ErrorCategory.INVALID_REQUEST
-        assert categorize_error("ValidationError") == ErrorCategory.INVALID_REQUEST
-        assert categorize_error("MalformedRequest") == ErrorCategory.INVALID_REQUEST
+        assert categorize_error_code("InvalidParameterValue") == ErrorCategory.INVALID_REQUEST
+        assert categorize_error_code("ValidationError") == ErrorCategory.INVALID_REQUEST
+        assert categorize_error_code("MalformedRequest") == ErrorCategory.INVALID_REQUEST
 
     def test_service_error(self):
         """Service error 분류"""
-        assert categorize_error("InternalError") == ErrorCategory.SERVICE_ERROR
-        assert categorize_error("ServiceUnavailable") == ErrorCategory.SERVICE_ERROR
+        assert categorize_error_code("InternalError") == ErrorCategory.SERVICE_ERROR
+        assert categorize_error_code("ServiceUnavailable") == ErrorCategory.SERVICE_ERROR
 
     def test_unknown(self):
         """Unknown 분류"""
-        assert categorize_error("SomeRandomError") == ErrorCategory.UNKNOWN
-        assert categorize_error("") == ErrorCategory.UNKNOWN
+        assert categorize_error_code("SomeRandomError") == ErrorCategory.UNKNOWN
+        assert categorize_error_code("") == ErrorCategory.UNKNOWN
 
 
 class TestErrorCollector:

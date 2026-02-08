@@ -45,12 +45,21 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+def _clear_exception_chain(e: BaseException) -> None:
+    """traceback + chained exception 메모리 누수 방지"""
+    e.__traceback__ = None
+    if e.__context__ is not None:
+        e.__context__.__traceback__ = None
+    if e.__cause__ is not None:
+        e.__cause__.__traceback__ = None
+
+
 @dataclass
 class ParallelConfig:
     """병렬 실행 설정
 
     Attributes:
-        max_workers: 최대 동시 스레드 수
+        max_workers: 최대 동시 스레드 수 (1~100)
         retry_config: 재시도 설정
         rate_limiter_config: Rate limiter 설정
     """
@@ -58,6 +67,12 @@ class ParallelConfig:
     max_workers: int = 20
     retry_config: RetryConfig | None = None
     rate_limiter_config: RateLimiterConfig | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_workers < 1:
+            raise ValueError(f"max_workers must be >= 1, got {self.max_workers}")
+        if self.max_workers > 100:
+            self.max_workers = 100
 
 
 @dataclass
@@ -191,7 +206,7 @@ class ParallelSessionExecutor:
                 except Exception as e:
                     # 예상치 못한 executor 에러
                     logger.error(f"작업 실행 중 예외 [{task.account_id}/{task.region}]: {e}")
-                    e.__traceback__ = None  # prevent traceback memory leak
+                    _clear_exception_chain(e)
                     results.append(
                         TaskResult(
                             identifier=task.account_id,
@@ -213,7 +228,7 @@ class ParallelSessionExecutor:
                         progress_tracker.on_complete(success=False)
 
         total_time = (time.monotonic() - start_time) * 1000
-        exec_result = ParallelExecutionResult(results=results)
+        exec_result = ParallelExecutionResult(results=tuple(results))
 
         logger.info(
             f"병렬 실행 완료: 성공 {exec_result.success_count}, 실패 {exec_result.error_count}, 총 {total_time:.0f}ms"
@@ -389,7 +404,7 @@ class ParallelSessionExecutor:
 
         except Exception as e:
             # 세션 획득 실패 등
-            e.__traceback__ = None  # prevent traceback memory leak
+            _clear_exception_chain(e)
             return TaskResult(
                 identifier=task.account_id,
                 region=task.region,
@@ -446,7 +461,7 @@ class ParallelSessionExecutor:
 
                 # 재시도 가능 여부 확인
                 if not is_retryable(e) or attempt >= self._retry_config.max_retries:
-                    e.__traceback__ = None  # prevent traceback memory leak
+                    _clear_exception_chain(e)
                     return TaskResult(
                         identifier=task.account_id,
                         region=task.region,
@@ -470,7 +485,7 @@ class ParallelSessionExecutor:
 
         # 재시도 소진 (도달하면 안 됨)
         if last_error is not None:
-            last_error.__traceback__ = None  # prevent traceback memory leak
+            _clear_exception_chain(last_error)
         return TaskResult(
             identifier=task.account_id,
             region=task.region,

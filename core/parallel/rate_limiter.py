@@ -30,7 +30,7 @@ class RateLimiterConfig:
     """Rate Limiter 설정
 
     Attributes:
-        requests_per_second: 초당 허용 요청 수 (토큰 생성 속도)
+        requests_per_second: 초당 허용 요청 수 (토큰 생성 속도, > 0 필수)
         burst_size: 버스트 허용량 (최대 토큰 수)
         wait_timeout: 토큰 대기 최대 시간 (초)
     """
@@ -38,6 +38,10 @@ class RateLimiterConfig:
     requests_per_second: float = 10.0
     burst_size: int = 20
     wait_timeout: float = 30.0
+
+    def __post_init__(self) -> None:
+        if self.requests_per_second <= 0:
+            raise ValueError(f"requests_per_second must be > 0, got {self.requests_per_second}")
 
 
 class TokenBucketRateLimiter:
@@ -77,6 +81,7 @@ class TokenBucketRateLimiter:
         self._tokens = float(self.config.burst_size)  # 초기에는 버스트 허용
         self._last_refill = time.monotonic()
         self._lock = threading.Lock()
+        self._condition = threading.Condition(self._lock)
 
     def acquire(self, tokens: int = 1) -> bool:
         """토큰 획득 (없으면 대기)
@@ -92,26 +97,24 @@ class TokenBucketRateLimiter:
         """
         deadline = time.monotonic() + self.config.wait_timeout
 
-        while True:
-            with self._lock:
+        with self._condition:
+            while True:
                 self._refill()
 
                 if self._tokens >= tokens:
                     self._tokens -= tokens
                     return True
 
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+
                 # 다음 토큰까지 필요한 대기 시간 계산
-                tokens_needed = tokens - self._tokens
-                wait_time = tokens_needed / self.config.requests_per_second
-
-            # 타임아웃 체크
-            if time.monotonic() >= deadline:
-                return False
-
-            # 대기 (락 해제 상태에서)
-            actual_wait = min(wait_time, 0.1, deadline - time.monotonic())
-            if actual_wait > 0:
-                time.sleep(actual_wait)
+                wait_time = min(
+                    (tokens - self._tokens) / self.config.requests_per_second,
+                    remaining,
+                )
+                self._condition.wait(timeout=wait_time)
 
     def try_acquire(self, tokens: int = 1) -> bool:
         """토큰 획득 시도 (대기 없이)
@@ -225,32 +228,6 @@ def get_rate_limiter(service: str = "default") -> TokenBucketRateLimiter:
             config = SERVICE_RATE_LIMITS[config_key]
             _rate_limiters[service] = TokenBucketRateLimiter(config)
         return _rate_limiters[service]
-
-
-def create_rate_limiter(
-    requests_per_second: float = 10.0,
-    burst_size: int = 20,
-    wait_timeout: float = 30.0,
-) -> TokenBucketRateLimiter:
-    """커스텀 Rate Limiter 생성
-
-    싱글톤이 아닌 새로운 Rate Limiter를 생성합니다.
-    특별한 Rate 제어가 필요한 경우 사용합니다.
-
-    Args:
-        requests_per_second: 초당 허용 요청 수
-        burst_size: 버스트 허용량
-        wait_timeout: 최대 대기 시간 (초)
-
-    Returns:
-        새 Rate Limiter 인스턴스
-    """
-    config = RateLimiterConfig(
-        requests_per_second=requests_per_second,
-        burst_size=burst_size,
-        wait_timeout=wait_timeout,
-    )
-    return TokenBucketRateLimiter(config)
 
 
 def reset_rate_limiters() -> None:

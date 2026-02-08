@@ -128,7 +128,7 @@ class ParallelExecutionResult(Generic[T]):
             print(result.get_error_summary())
     """
 
-    results: list[TaskResult[T]] = field(default_factory=list)
+    results: tuple[TaskResult[T], ...] = ()
 
     @cached_property
     def successful(self) -> list[TaskResult[T]]:

@@ -106,7 +106,7 @@ class CollectedError:
         }
 
 
-def categorize_error(error_code: str) -> ErrorCategory:
+def categorize_error_code(error_code: str) -> ErrorCategory:
     """에러 코드 문자열을 기반으로 ErrorCategory 분류
 
     에러 코드에 포함된 키워드를 분석하여 적절한 카테고리를 반환합니다.
@@ -194,7 +194,7 @@ class ErrorCollector:
         error_info = error.response.get("Error", {})
         error_code = error_info.get("Code", "Unknown")
         error_message = error_info.get("Message", str(error))
-        category = categorize_error(error_code)
+        category = categorize_error_code(error_code)
 
         # 권한 없음은 INFO로 다운그레이드
         if category == ErrorCategory.ACCESS_DENIED:
@@ -251,7 +251,7 @@ class ErrorCollector:
             severity: 에러 심각도 (기본: WARNING)
             resource_id: 관련 리소스 ID (선택사항)
         """
-        category = categorize_error(error_code)
+        category = categorize_error_code(error_code)
 
         collected = CollectedError(
             timestamp=datetime.now(),
