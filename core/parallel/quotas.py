@@ -32,7 +32,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import boto3
 
-    Boto3Session = boto3.Session
+    from typing import TypeAlias
+
+    Boto3Session: TypeAlias = boto3.Session
 
 logger = logging.getLogger(__name__)
 

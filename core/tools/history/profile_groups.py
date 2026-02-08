@@ -47,6 +47,7 @@ class ProfileGroupsManager:
     MAX_PROFILES_PER_GROUP = 20
     _instance: ProfileGroupsManager | None = None
     _lock = threading.Lock()
+    _initialized: bool
 
     def __new__(cls) -> ProfileGroupsManager:
         """싱글톤 패턴 (double-check locking)"""

@@ -50,6 +50,7 @@ class FavoritesManager:
     MAX_ITEMS = 20
     _instance: FavoritesManager | None = None
     _lock = threading.Lock()
+    _initialized: bool
 
     def __new__(cls) -> FavoritesManager:
         """싱글톤 패턴 (double-check locking)"""

@@ -208,7 +208,7 @@ class StaticCredentialsProvider(BaseProvider):
         """AWS 설정 정보 반환 (민감 정보 마스킹)"""
         session = self.get_session(region=region)
         secret = self._config.secret_access_key
-        masked_secret = f"{secret[:4]}****{secret[-4:]}" if len(secret) > 8 else "****"
+        masked_secret = f"{secret[:4]}****{secret[-4:]}" if secret and len(secret) > 8 else "****"
         return {
             "region_name": session.region_name,
             "credentials": {
