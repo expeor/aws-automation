@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/kms.py - KMS 가격 조회
+functions/analyzers/cost/pricing/kms.py - KMS 가격 조회
 
 KMS 비용 계산:
 - Customer Managed Key: ~$1.00/월 (리전별 상이)

@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/route53.py - Route53 가격 조회
+functions/analyzers/cost/pricing/route53.py - Route53 가격 조회
 
 Route53 비용 계산 (글로벌 서비스):
 - Hosted Zone: $0.50/월 (첫 25개), $0.10/월 (추가)

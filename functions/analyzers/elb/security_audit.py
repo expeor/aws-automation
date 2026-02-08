@@ -1,5 +1,5 @@
 """
-plugins/elb/security_audit.py - ELB 보안 감사
+functions/analyzers/elb/security_audit.py - ELB 보안 감사
 
 ELB의 보안 설정을 종합 분석하여 취약점을 탐지합니다.
 
@@ -85,6 +85,11 @@ class SSLPolicyAnalyzer:
 
     AWS API를 통해 실제 정책 정보를 조회하여 분석합니다.
     하드코딩 대신 동적으로 프로토콜/암호 스위트를 검사합니다.
+
+    Attributes:
+        client: ELBv2 boto3 클라이언트
+        min_tls_version: 최소 허용 TLS 버전 (예: "TLSv1.2")
+        _policy_cache: 정책 이름별 상세 정보 캐시
     """
 
     def __init__(self, elbv2_client, min_tls_version: str = DEFAULT_MIN_TLS_VERSION):
@@ -93,7 +98,17 @@ class SSLPolicyAnalyzer:
         self._policy_cache: dict[str, dict] = {}
 
     def get_policy_details(self, policy_name: str) -> dict | None:
-        """AWS API로 정책 상세 정보 조회"""
+        """AWS API로 SSL 정책 상세 정보 조회
+
+        정책 이름으로 AWS API를 호출하여 프로토콜, 암호 스위트 등
+        상세 정보를 가져옵니다. 결과는 내부 캐시에 저장됩니다.
+
+        Args:
+            policy_name: SSL 정책 이름 (예: "ELBSecurityPolicy-TLS13-1-2-2021-06")
+
+        Returns:
+            정책 상세 정보 딕셔너리. 조회 실패 시 None.
+        """
         from botocore.exceptions import ClientError
 
         if policy_name in self._policy_cache:
@@ -111,17 +126,18 @@ class SSLPolicyAnalyzer:
         return None
 
     def analyze_policy(self, policy_name: str) -> dict[str, Any]:
-        """정책 보안 분석
+        """SSL 정책 보안 취약점 분석
+
+        AWS API로 정책 상세 정보를 조회하여 취약 프로토콜(TLS 1.0/1.1),
+        약한 암호 스위트(RC4, DES 등)를 탐지합니다. API 조회 실패 시
+        정책 이름 기반 휴리스틱 분석으로 fallback합니다.
+
+        Args:
+            policy_name: SSL 정책 이름
 
         Returns:
-            {
-                "is_vulnerable": bool,
-                "risk_level": str,
-                "issues": List[str],
-                "protocols": List[str],
-                "weak_ciphers": List[str],
-                "recommendation": str
-            }
+            분석 결과 딕셔너리. is_vulnerable, risk_level, issues,
+            protocols, weak_ciphers, recommendation 키 포함.
         """
         issues: list[str] = []
         protocols: list[str] = []
@@ -178,7 +194,17 @@ class SSLPolicyAnalyzer:
         return result
 
     def _analyze_by_name(self, policy_name: str) -> dict[str, Any]:
-        """정책 이름 기반 휴리스틱 분석 (API 실패 시 fallback)"""
+        """정책 이름 기반 휴리스틱 분석 (API 실패 시 fallback)
+
+        정책 이름에 포함된 TLS 버전 및 연도 정보를 기반으로
+        취약 여부를 판단합니다.
+
+        Args:
+            policy_name: SSL 정책 이름
+
+        Returns:
+            분석 결과 딕셔너리. analyze_policy()와 동일한 구조.
+        """
         issues: list[str] = []
         protocols: list[str] = []
         weak_ciphers: list[str] = []
@@ -215,7 +241,14 @@ class SSLPolicyAnalyzer:
         return result
 
     def _get_recommendation(self, current_protocols: list[str]) -> str:
-        """상황에 맞는 권장 정책 반환"""
+        """현재 프로토콜 구성에 기반한 권장 정책 반환
+
+        Args:
+            current_protocols: 현재 지원 중인 TLS 프로토콜 목록
+
+        Returns:
+            권장 SSL 정책 이름 및 설명 문자열
+        """
         if "TLSv1.3" in current_protocols:
             return "현재 TLS 1.3 지원 중. 취약 프로토콜만 제거 권장"
         elif "TLSv1.2" in current_protocols:
@@ -225,7 +258,11 @@ class SSLPolicyAnalyzer:
 
 
 class RiskLevel(Enum):
-    """위험 수준"""
+    """보안 발견 항목의 위험 수준 분류
+
+    CRITICAL부터 INFO까지 5단계로 구분하며,
+    보안 감사 보고서의 우선순위 결정에 사용됩니다.
+    """
 
     CRITICAL = "critical"  # 즉시 조치 필요
     HIGH = "high"  # 높은 위험
@@ -235,7 +272,11 @@ class RiskLevel(Enum):
 
 
 class FindingCategory(Enum):
-    """발견 항목 카테고리"""
+    """보안 발견 항목의 카테고리 분류
+
+    SSL/TLS, WAF, 액세스 로그, 삭제 보호, 리스너, 인증서 등
+    보안 검사 영역별 분류에 사용됩니다.
+    """
 
     SSL_TLS = "ssl_tls"
     WAF = "waf"
@@ -247,7 +288,16 @@ class FindingCategory(Enum):
 
 @dataclass
 class SecurityFinding:
-    """보안 발견 항목"""
+    """보안 발견 항목
+
+    Attributes:
+        category: 발견 항목 카테고리 (SSL_TLS, WAF, ACCESS_LOG 등)
+        risk_level: 위험 수준 (CRITICAL, HIGH, MEDIUM, LOW, INFO)
+        title: 발견 항목 제목 (간략 설명)
+        description: 상세 설명
+        recommendation: 권장 조치 사항
+        details: 추가 상세 정보 딕셔너리
+    """
 
     category: FindingCategory
     risk_level: RiskLevel
@@ -259,7 +309,16 @@ class SecurityFinding:
 
 @dataclass
 class ListenerInfo:
-    """리스너 정보"""
+    """리스너 정보
+
+    Attributes:
+        arn: 리스너 ARN (CLB의 경우 빈 문자열)
+        protocol: 리스너 프로토콜 (HTTP, HTTPS, TCP, TLS 등)
+        port: 리스너 포트 번호
+        ssl_policy: SSL 정책 이름. HTTPS/TLS 리스너만 해당.
+        certificates: 연결된 인증서 ARN 목록
+        default_actions: 기본 액션 설정 목록
+    """
 
     arn: str
     protocol: str
@@ -271,7 +330,27 @@ class ListenerInfo:
 
 @dataclass
 class LBSecurityInfo:
-    """LB 보안 정보"""
+    """LB 보안 정보
+
+    Attributes:
+        arn: 로드밸런서 ARN
+        name: 로드밸런서 이름
+        lb_type: LB 유형 (application, network, gateway, classic)
+        scheme: 스킴 (internet-facing, internal)
+        dns_name: DNS 이름
+        vpc_id: VPC ID
+        state: 현재 상태
+        created_time: 생성 시각
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        access_logs_enabled: 액세스 로그 활성화 여부
+        access_logs_bucket: 액세스 로그 S3 버킷 이름
+        deletion_protection: 삭제 보호 활성화 여부
+        waf_web_acl_arn: WAF WebACL ARN. 미연결 시 None.
+        listeners: 리스너 정보 목록
+        findings: 보안 발견 항목 목록
+    """
 
     # 기본 정보
     arn: str
@@ -302,15 +381,32 @@ class LBSecurityInfo:
 
     @property
     def is_internet_facing(self) -> bool:
+        """인터넷 페이싱 여부 확인
+
+        Returns:
+            scheme이 "internet-facing"이면 True
+        """
         return self.scheme == "internet-facing"
 
     @property
     def has_https_listener(self) -> bool:
+        """HTTPS/TLS 리스너 보유 여부 확인
+
+        Returns:
+            HTTPS 또는 TLS 프로토콜 리스너가 하나 이상 있으면 True
+        """
         return any(listener.protocol in ("HTTPS", "TLS") for listener in self.listeners)
 
     @property
     def risk_score(self) -> int:
-        """위험 점수 계산 (높을수록 위험)"""
+        """위험 점수 계산 (높을수록 위험)
+
+        발견 항목의 위험 수준별 가중치를 합산합니다.
+        CRITICAL=100, HIGH=50, MEDIUM=20, LOW=5.
+
+        Returns:
+            합산된 위험 점수
+        """
         score = 0
         for f in self.findings:
             if f.risk_level == RiskLevel.CRITICAL:
@@ -326,7 +422,19 @@ class LBSecurityInfo:
 
 @dataclass
 class SecurityAuditResult:
-    """보안 감사 결과"""
+    """보안 감사 결과
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        load_balancers: 분석된 LB 보안 정보 목록
+        total_count: 전체 LB 수
+        critical_count: CRITICAL 위험 발견 수
+        high_count: HIGH 위험 발견 수
+        medium_count: MEDIUM 위험 발견 수
+        low_count: LOW 위험 발견 수
+    """
 
     account_id: str
     account_name: str
@@ -347,7 +455,20 @@ class SecurityAuditResult:
 
 
 def collect_v2_lb_security(session, account_id: str, account_name: str, region: str) -> list[LBSecurityInfo]:
-    """ALB/NLB/GWLB 보안 정보 수집"""
+    """ALB/NLB/GWLB 보안 정보 수집
+
+    ELBv2 API로 로드밸런서, 속성(액세스 로그, 삭제 보호),
+    WAF WebACL(ALB만), 리스너 정보를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        LB 보안 정보 목록
+    """
     from botocore.exceptions import ClientError
 
     load_balancers = []
@@ -415,7 +536,15 @@ def collect_v2_lb_security(session, account_id: str, account_name: str, region: 
 
 
 def _get_listeners(elbv2, lb_arn: str) -> list[ListenerInfo]:
-    """리스너 정보 조회"""
+    """지정 LB의 리스너 정보 조회
+
+    Args:
+        elbv2: ELBv2 boto3 클라이언트
+        lb_arn: 로드밸런서 ARN
+
+    Returns:
+        리스너 정보 목록. 조회 실패 시 빈 리스트.
+    """
     from botocore.exceptions import ClientError
 
     listeners = []
@@ -441,7 +570,20 @@ def _get_listeners(elbv2, lb_arn: str) -> list[ListenerInfo]:
 
 
 def collect_classic_lb_security(session, account_id: str, account_name: str, region: str) -> list[LBSecurityInfo]:
-    """CLB 보안 정보 수집"""
+    """Classic Load Balancer 보안 정보 수집
+
+    ELB API로 CLB의 속성(액세스 로그), 리스너 정보를 수집합니다.
+    CLB는 WAF 및 삭제 보호를 지원하지 않습니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        CLB 보안 정보 목록
+    """
     from botocore.exceptions import ClientError
 
     load_balancers = []
@@ -505,7 +647,16 @@ def collect_classic_lb_security(session, account_id: str, account_name: str, reg
 
 
 def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
-    """개별 LB 보안 분석"""
+    """개별 LB 보안 종합 분석
+
+    SSL/TLS 정책, 인증서, WAF, 액세스 로그, 삭제 보호, 리스너 보안을
+    순차적으로 분석하고 발견된 취약점을 lb.findings에 추가합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+        session: boto3 Session 객체
+        region: AWS 리전
+    """
     from botocore.exceptions import ClientError
 
     # SSL 정책 분석기 생성 (ALB/NLB만, CLB는 None)
@@ -537,7 +688,15 @@ def analyze_security(lb: LBSecurityInfo, session, region: str) -> None:
 
 
 def _analyze_ssl_policy(lb: LBSecurityInfo, ssl_analyzer: SSLPolicyAnalyzer | None) -> None:
-    """SSL/TLS 정책 분석 (AWS API 기반 동적 분석)"""
+    """SSL/TLS 정책 분석 (AWS API 기반 동적 분석)
+
+    HTTPS/TLS 리스너의 SSL 정책을 분석하여 취약 프로토콜 및
+    약한 암호 스위트를 탐지합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+        ssl_analyzer: SSL 정책 분석기. None이면 fallback 휴리스틱 사용.
+    """
     for listener in lb.listeners:
         if listener.protocol not in ("HTTPS", "TLS"):
             continue
@@ -580,7 +739,17 @@ def _analyze_ssl_policy(lb: LBSecurityInfo, ssl_analyzer: SSLPolicyAnalyzer | No
 
 
 def _fallback_policy_analysis(policy_name: str) -> dict[str, Any]:
-    """API 없이 정책 이름 기반 휴리스틱 분석"""
+    """API 없이 정책 이름 기반 휴리스틱 분석
+
+    SSLPolicyAnalyzer를 사용할 수 없을 때 정책 이름에서
+    TLS 버전 및 연도 정보를 파싱하여 취약 여부를 판단합니다.
+
+    Args:
+        policy_name: SSL 정책 이름
+
+    Returns:
+        분석 결과 딕셔너리. analyze_policy()와 동일한 구조.
+    """
     issues: list[str] = []
     protocols: list[str] = []
     weak_ciphers: list[str] = []
@@ -613,7 +782,16 @@ def _fallback_policy_analysis(policy_name: str) -> dict[str, Any]:
 
 
 def _analyze_certificates(lb: LBSecurityInfo, session, region: str) -> None:
-    """인증서 분석"""
+    """ACM 인증서 만료 분석
+
+    리스너에 연결된 인증서의 만료일을 확인하고,
+    중앙 설정의 임계값에 따라 위험 수준을 분류합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+        session: boto3 Session 객체
+        region: AWS 리전
+    """
     from botocore.exceptions import ClientError
 
     cert_arns: set[str] = set()
@@ -705,7 +883,14 @@ def _analyze_certificates(lb: LBSecurityInfo, session, region: str) -> None:
 
 
 def _analyze_waf(lb: LBSecurityInfo) -> None:
-    """WAF 분석"""
+    """WAF WebACL 연결 상태 분석
+
+    ALB에 WAF WebACL이 연결되어 있는지 확인합니다.
+    인터넷 페이싱 ALB는 HIGH, 내부 ALB는 INFO 수준으로 분류합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+    """
     if lb.lb_type != "application":
         return
 
@@ -737,7 +922,14 @@ def _analyze_waf(lb: LBSecurityInfo) -> None:
 
 
 def _analyze_access_logs(lb: LBSecurityInfo) -> None:
-    """액세스 로그 분석"""
+    """액세스 로그 활성화 여부 분석
+
+    액세스 로그가 비활성화된 LB를 탐지합니다.
+    인터넷 페이싱 LB는 HIGH, 내부 LB는 MEDIUM 수준으로 분류합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+    """
     if not lb.access_logs_enabled:
         risk = RiskLevel.HIGH if lb.is_internet_facing else RiskLevel.MEDIUM
         lb.findings.append(
@@ -755,7 +947,15 @@ def _analyze_access_logs(lb: LBSecurityInfo) -> None:
 
 
 def _analyze_deletion_protection(lb: LBSecurityInfo) -> None:
-    """삭제 보호 분석"""
+    """삭제 보호 설정 분석
+
+    ALB/NLB/GWLB의 삭제 보호 활성화 여부를 확인합니다.
+    프로덕션 패턴과 일치하는 LB는 HIGH, 그 외는 LOW 수준으로 분류합니다.
+    CLB는 삭제 보호를 지원하지 않으므로 스킵합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+    """
     if lb.lb_type == "classic":
         return  # CLB는 삭제 보호 없음
 
@@ -780,7 +980,14 @@ def _analyze_deletion_protection(lb: LBSecurityInfo) -> None:
 
 
 def _analyze_listener_security(lb: LBSecurityInfo) -> None:
-    """리스너 보안 분석"""
+    """리스너 보안 구성 분석
+
+    인터넷 페이싱 LB에 HTTPS 리스너가 없는 경우(CRITICAL)와
+    HTTP->HTTPS 리다이렉트가 미설정된 경우(MEDIUM)를 탐지합니다.
+
+    Args:
+        lb: 분석 대상 LB 보안 정보 (findings가 in-place 업데이트됨)
+    """
     if not lb.listeners:
         return
 
@@ -832,7 +1039,21 @@ def analyze_all(
     account_id: str,
     account_name: str,
 ) -> SecurityAuditResult:
-    """전체 LB 보안 분석"""
+    """전체 LB 보안 분석
+
+    수집된 모든 LB에 대해 보안 분석을 수행하고
+    위험 수준별 카운트를 집계합니다.
+
+    Args:
+        load_balancers: 분석 대상 LB 보안 정보 목록
+        session: boto3 Session 객체
+        region: AWS 리전
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+
+    Returns:
+        위험 수준별 카운트가 포함된 보안 감사 결과
+    """
     result = SecurityAuditResult(
         account_id=account_id,
         account_name=account_name,
@@ -864,7 +1085,18 @@ def analyze_all(
 
 
 def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보안 감사 보고서 생성
+
+    Summary(계정/리전별 위험 수준 카운트), Findings(위험도순 발견 항목),
+    Load Balancers(LB별 보안 속성 현황) 3개 시트로 구성된 보고서를 생성합니다.
+
+    Args:
+        results: 계정/리전별 보안 감사 결과 목록
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        저장된 Excel 파일 경로
+    """
     from openpyxl.styles import Font, PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -1027,7 +1259,19 @@ def generate_report(results: list[SecurityAuditResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SecurityAuditResult | None:
-    """단일 계정/리전의 ELB 보안 정보 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 ELB 보안 정보 수집 및 분석 (parallel_collect 콜백)
+
+    ALB/NLB/GWLB와 CLB를 모두 수집하고 보안 분석을 수행합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        보안 감사 결과. LB가 없으면 None.
+    """
     v2_lbs = collect_v2_lb_security(session, account_id, account_name, region)
     classic_lbs = collect_classic_lb_security(session, account_id, account_name, region)
     all_lbs = v2_lbs + classic_lbs
@@ -1037,7 +1281,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """ELB 보안 감사 실행"""
+    """ELB 보안 감사 실행
+
+    멀티 계정/리전에서 모든 유형의 ELB를 병렬 수집하고,
+    SSL/TLS, WAF, 액세스 로그, 삭제 보호, 인증서 만료 등
+    보안 취약점을 분석하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]ELB Security Audit 시작...[/bold]")
     console.print("[dim]SSL/TLS, WAF, 액세스 로그, 삭제 보호, 인증서 만료 분석[/dim]\n")
 

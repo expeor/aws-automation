@@ -1,15 +1,18 @@
 """
-plugins/cost/pricing/kinesis.py - Amazon Kinesis Data Streams 가격 조회
+core/shared/aws/pricing/kinesis.py - Amazon Kinesis Data Streams 가격 조회
 
-Kinesis 비용 계산:
-- Provisioned: Shard-hour당 $0.015
-- On-Demand: 스트림당 시간 + 데이터 비용
-- Extended Retention: 추가 비용
+Kinesis Data Streams의 Provisioned/On-Demand 모드별 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격으로 fallback한다.
+
+비용 구조 (ap-northeast-2 기준):
+    - Provisioned: Shard-hour $0.015
+    - On-Demand: Stream-hour $0.04 + 데이터 수집/조회 비용
+    - Extended Retention: Shard-hour $0.020 (24시간 초과분)
 
 사용법:
-    from functions.analyzers.cost.pricing.kinesis import get_kinesis_monthly_cost
+    from core.shared.aws.pricing.kinesis import get_kinesis_monthly_cost
 
-    # Provisioned 모드 월간 비용
+    # Provisioned 4 Shard 월간 비용
     monthly = get_kinesis_monthly_cost("ap-northeast-2", shard_count=4)
 
     # On-Demand 모드 월간 비용
@@ -74,7 +77,16 @@ DEFAULT_PRICES = {
 
 
 def get_kinesis_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 Kinesis 가격 조회"""
+    """AWS Pricing API를 통해 Kinesis Data Streams 가격을 조회한다.
+
+    Args:
+        session: boto3 세션
+        region: 대상 AWS 리전 코드
+
+    Returns:
+        Shard-hour/Payload/Extended retention 가격 딕셔너리.
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -116,7 +128,18 @@ def get_kinesis_prices_from_api(session: boto3.Session, region: str) -> dict[str
 
 
 def get_kinesis_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
-    """Kinesis 가격 조회"""
+    """Kinesis Data Streams 가격을 조회한다.
+
+    ``session`` 이 제공되면 Pricing API를 우선 호출하고,
+    실패 시 하드코딩된 ``KINESIS_PRICES`` 에서 fallback한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        ``{"shard_hour": float, "put_payload_unit": float, ...}`` 형식의 가격 딕셔너리
+    """
     if session:
         api_prices = get_kinesis_prices_from_api(session, region)
         if api_prices:
@@ -129,7 +152,15 @@ def get_kinesis_shard_hour_price(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> float:
-    """Kinesis Shard-hour 가격 (Provisioned)"""
+    """Provisioned 모드 Shard-hour 가격을 반환한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        Shard-hour당 USD (기본값: ``0.015``)
+    """
     prices = get_kinesis_prices(region, session)
     return prices.get("shard_hour", 0.015)
 
@@ -141,17 +172,20 @@ def get_kinesis_monthly_cost(
     extended_retention_hours: int = 0,
     session: boto3.Session | None = None,
 ) -> float:
-    """Kinesis 월간 비용 계산
+    """Kinesis Data Streams의 월간 비용을 계산한다.
+
+    Provisioned 모드: ``shard_hour * 730h * shard_count + extended_retention``
+    On-Demand 모드: ``stream_hour * 730h`` (데이터 비용은 사용량에 따라 별도)
 
     Args:
-        region: AWS 리전
-        shard_count: Shard 수 (Provisioned 모드)
-        mode: PROVISIONED 또는 ON_DEMAND
-        extended_retention_hours: 기본 24시간 초과 보존 시간
-        session: boto3 세션
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        shard_count: Shard 수 (Provisioned 모드, 기본: ``1``)
+        mode: ``"PROVISIONED"`` 또는 ``"ON_DEMAND"`` (기본: ``"PROVISIONED"``)
+        extended_retention_hours: 24시간 초과 보존 시간 (기본: ``0``)
+        session: boto3 세션 (API 조회용, 선택 사항)
 
     Returns:
-        월간 USD 비용
+        월간 USD 비용 (소수점 2자리 반올림)
     """
     prices = get_kinesis_prices(region, session)
 

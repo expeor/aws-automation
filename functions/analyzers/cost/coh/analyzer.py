@@ -1,5 +1,5 @@
 """
-plugins/cost/coh/analyzer.py - Cost Optimization Hub 분석기
+functions/analyzers/cost/coh/analyzer.py - Cost Optimization Hub 분석기
 
 AWS Cost Optimization Hub에서 모든 비용 최적화 권장사항을 조회합니다.
 - Rightsizing, Stop, Delete, ScaleIn, Upgrade
@@ -38,7 +38,20 @@ HOURS_PER_MONTH = 730
 
 @dataclass
 class RecommendationFilter:
-    """Cost Optimization Hub 권장사항 필터"""
+    """Cost Optimization Hub 권장사항 필터
+
+    list_recommendations API 호출 시 사용되는 필터 조건을 정의합니다.
+
+    Attributes:
+        action_types: 액션 유형 필터 (Rightsize, Stop, Delete 등)
+        resource_types: 리소스 유형 필터 (Ec2Instance, RdsDbInstance 등)
+        regions: 리전 필터
+        account_ids: 계정 ID 필터
+        implementation_efforts: 구현 난이도 필터 (VeryLow~VeryHigh)
+        restart_needed: 재시작 필요 여부 필터 (None이면 미적용)
+        rollback_possible: 롤백 가능 여부 필터 (None이면 미적용)
+        lookback_periods: lookback 기간 필터 (일 단위, 클라이언트측 필터링)
+    """
 
     action_types: list[str] = field(default_factory=list)
     resource_types: list[str] = field(default_factory=list)
@@ -113,7 +126,13 @@ class RecommendationFilter:
     ]
 
     def to_api_filter(self) -> dict[str, Any]:
-        """AWS API 필터 형식으로 변환"""
+        """AWS API 필터 형식으로 변환
+
+        빈 필드는 필터에 포함하지 않습니다.
+
+        Returns:
+            list_recommendations API의 filter 파라미터에 전달할 딕셔너리
+        """
         api_filter: dict[str, Any] = {}
 
         if self.action_types:
@@ -136,7 +155,32 @@ class RecommendationFilter:
 
 @dataclass
 class Recommendation:
-    """Cost Optimization Hub 권장사항"""
+    """Cost Optimization Hub 권장사항
+
+    단일 비용 최적화 권장사항의 모든 정보를 담는 데이터클래스.
+
+    Attributes:
+        recommendation_id: 권장사항 고유 ID
+        account_id: 대상 AWS 계정 ID
+        region: 대상 리전
+        resource_id: 리소스 식별자
+        resource_arn: 리소스 ARN
+        current_resource_type: 현재 리소스 타입 (예: Ec2Instance)
+        recommended_resource_type: 권장 리소스 타입
+        current_resource_summary: 현재 리소스 요약 (예: m5.xlarge)
+        recommended_resource_summary: 권장 리소스 요약 (예: m5.large)
+        action_type: 권장 액션 (Rightsize, Stop, Delete 등)
+        estimated_monthly_cost: 현재 월간 비용 (USD)
+        estimated_monthly_savings: 예상 월간 절감액 (USD)
+        estimated_savings_percentage: 예상 절감 비율 (0~100)
+        implementation_effort: 구현 난이도 (VeryLow~VeryHigh)
+        restart_needed: 리소스 재시작 필요 여부
+        rollback_possible: 롤백 가능 여부
+        lookback_period_days: 분석 기간 (일 단위)
+        tags: 리소스 태그 딕셔너리
+        source: 권장사항 소스
+        last_refresh_timestamp: 마지막 갱신 시각 (ISO 8601, optional)
+    """
 
     recommendation_id: str
     account_id: str
@@ -161,7 +205,14 @@ class Recommendation:
 
     @classmethod
     def from_api_response(cls, item: dict[str, Any]) -> Recommendation:
-        """API 응답에서 Recommendation 객체 생성"""
+        """API 응답에서 Recommendation 객체 생성
+
+        Args:
+            item: list_recommendations API 응답의 개별 항목 딕셔너리
+
+        Returns:
+            변환된 Recommendation 인스턴스
+        """
         tags_list = item.get("tags", [])
         tags_dict = {tag["key"]: tag["value"] for tag in tags_list}
 
@@ -189,7 +240,11 @@ class Recommendation:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """딕셔너리로 변환 (리포트용)"""
+        """딕셔너리로 변환 (리포트용)
+
+        Returns:
+            모든 필드를 포함하는 딕셔너리 (last_refresh_timestamp 제외)
+        """
         return {
             "recommendation_id": self.recommendation_id,
             "account_id": self.account_id,
@@ -305,7 +360,21 @@ class CostOptimizationAnalyzer:
         include_all: bool,
         page_size: int,
     ) -> Iterator[dict[str, Any]]:
-        """권장사항 페이지네이션 처리"""
+        """권장사항 페이지네이션 처리
+
+        boto3 paginator를 사용하여 모든 페이지의 권장사항을 순회합니다.
+
+        Args:
+            rec_filter: 권장사항 필터
+            include_all: 모든 권장사항 포함 여부
+            page_size: 페이지당 항목 수
+
+        Yields:
+            개별 권장사항 딕셔너리 (API 응답 원본)
+
+        Raises:
+            Exception: API 호출 실패 시
+        """
         try:
             paginator = self.client.get_paginator("list_recommendations")
 

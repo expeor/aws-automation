@@ -33,7 +33,16 @@ def _format_port_range(port_range: str) -> int | str:
 
 
 class SGExcelReporter:
-    """Security Group Audit Excel 보고서 생성기"""
+    """Security Group Audit Excel 보고서 생성기.
+
+    7개 시트(Summary, HIGH Risk Rules, Security Warnings, Action Required - SG,
+    Action Required - Rules, Security Groups, Rules)를 생성한다.
+
+    Args:
+        sg_results: SG 분석 결과 목록.
+        rule_results: Rule 분석 결과 목록.
+        summary: 계정/리전별 요약 통계.
+    """
 
     def __init__(
         self,
@@ -46,7 +55,14 @@ class SGExcelReporter:
         self.summary = summary
 
     def generate(self, output_dir: str) -> str:
-        """Excel 보고서 생성"""
+        """Excel 보고서를 생성하고 파일로 저장한다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+
+        Returns:
+            저장된 Excel 파일의 절대 경로.
+        """
 
         wb = Workbook()
 
@@ -80,7 +96,7 @@ class SGExcelReporter:
         return filepath
 
     def _add_summary_sheet(self, wb: Workbook) -> None:
-        """Summary 시트 추가"""
+        """Summary 시트를 추가한다. 계정/리전별 SG 현황 통계를 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),
@@ -133,7 +149,7 @@ class SGExcelReporter:
             )
 
     def _add_high_risk_rules_sheet(self, wb: Workbook) -> None:
-        """HIGH Risk Rules 시트 (최우선 검토 대상 - 위험 포트 노출)"""
+        """HIGH Risk Rules 시트를 추가한다. 위험 포트가 노출된 규칙만 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),
@@ -196,7 +212,7 @@ class SGExcelReporter:
             )
 
     def _add_security_warnings_sheet(self, wb: Workbook) -> None:
-        """Security Warnings 시트 (Egress ALL, Self ALL, Cross-account 등)"""
+        """Security Warnings 시트를 추가한다. Egress ALL, Self ALL, Cross-account 등 경고 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),
@@ -253,7 +269,7 @@ class SGExcelReporter:
             )
 
     def _add_action_sg_sheet(self, wb: Workbook) -> None:
-        """Action Required - SG 시트 (미사용 SG만)"""
+        """Action Required - SG 시트를 추가한다. 미사용 SG만 필터링하여 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),
@@ -304,7 +320,7 @@ class SGExcelReporter:
             )
 
     def _add_action_rules_sheet(self, wb: Workbook) -> None:
-        """Action Required - Rules 시트 (확인 필요 규칙만)"""
+        """Action Required - Rules 시트를 추가한다. Stale, 위험, 경고 규칙만 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),
@@ -381,7 +397,7 @@ class SGExcelReporter:
             )
 
     def _add_sg_sheet(self, wb: Workbook) -> None:
-        """Security Groups 시트 추가"""
+        """Security Groups 시트를 추가한다. 전체 SG 목록과 미사용 판단 근거를 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),
@@ -441,7 +457,7 @@ class SGExcelReporter:
             )
 
     def _add_rules_sheet(self, wb: Workbook) -> None:
-        """Rules 시트 추가"""
+        """Rules 시트를 추가한다. 전체 규칙과 Issue, 경고, 노출 포트를 표시."""
         columns = [
             # 식별 정보
             ColumnDef(header="Account ID", width=15, style="text"),

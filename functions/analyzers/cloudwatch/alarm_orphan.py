@@ -1,5 +1,5 @@
 """
-plugins/cloudwatch/alarm_orphan.py - CloudWatch 고아 알람 분석
+functions/analyzers/cloudwatch/alarm_orphan.py - CloudWatch 고아 알람 분석
 
 모니터링 대상 리소스가 없는 알람 탐지
 - 지표 데이터 존재 여부로 판단 (모든 namespace 지원)
@@ -39,7 +39,15 @@ METRIC_CHECK_DAYS = 7
 
 
 class AlarmStatus(Enum):
-    """알람 상태"""
+    """CloudWatch 알람 분석 상태.
+
+    알람의 정상/고아/무액션 상태를 분류한다.
+
+    Attributes:
+        NORMAL: 정상 동작 중인 알람.
+        ORPHAN: 모니터링 대상 리소스가 삭제되어 지표 데이터가 없는 고아 알람.
+        NO_ACTIONS: 알람 트리거 시 실행할 액션이 설정되지 않은 알람.
+    """
 
     NORMAL = "normal"
     ORPHAN = "orphan"  # 지표 데이터 없음 (리소스 삭제됨)
@@ -48,7 +56,26 @@ class AlarmStatus(Enum):
 
 @dataclass
 class AlarmInfo:
-    """CloudWatch 알람 정보"""
+    """CloudWatch 알람 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        alarm_name: 알람 이름.
+        alarm_arn: 알람 ARN.
+        namespace: CloudWatch 네임스페이스 (AWS/EC2, AWS/RDS 등).
+        metric_name: 지표 이름.
+        dimensions: Dimension 문자열 (표시용, "Name=Value" 형식).
+        dimensions_list: Dimension 딕셔너리 목록 (API 호출용).
+        state: 알람 상태 (OK, ALARM, INSUFFICIENT_DATA).
+        state_reason: 상태 사유 (최대 100자).
+        actions_enabled: 알람 액션 활성화 여부.
+        alarm_actions: ALARM 상태 시 실행할 액션 ARN 목록.
+        ok_actions: OK 상태 시 실행할 액션 ARN 목록.
+        insufficient_data_actions: INSUFFICIENT_DATA 상태 시 실행할 액션 ARN 목록.
+        has_metric_data: 최근 7일간 지표 데이터 존재 여부.
+    """
 
     account_id: str
     account_name: str
@@ -70,7 +97,13 @@ class AlarmInfo:
 
 @dataclass
 class AlarmFinding:
-    """알람 분석 결과"""
+    """개별 알람에 대한 분석 결과.
+
+    Attributes:
+        alarm: 분석 대상 알람 정보.
+        status: 분석된 알람 상태 (NORMAL, ORPHAN, NO_ACTIONS).
+        recommendation: 권장 조치 메시지.
+    """
 
     alarm: AlarmInfo
     status: AlarmStatus
@@ -79,7 +112,18 @@ class AlarmFinding:
 
 @dataclass
 class AlarmAnalysisResult:
-    """알람 분석 결과 집계"""
+    """계정/리전별 알람 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_alarms: 전체 알람 수.
+        orphan_alarms: 고아 알람 수 (지표 데이터 없음).
+        no_actions: 액션 미설정 알람 수.
+        normal_alarms: 정상 알람 수.
+        findings: 개별 알람 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -92,7 +136,20 @@ class AlarmAnalysisResult:
 
 
 def check_metric_has_data(cloudwatch, namespace: str, metric_name: str, dimensions: list[dict]) -> bool:
-    """지표에 데이터가 있는지 확인 (모든 namespace 지원)"""
+    """지표에 최근 데이터가 있는지 확인한다.
+
+    get_metric_statistics로 최근 METRIC_CHECK_DAYS일간 데이터포인트를 조회하여
+    리소스 존재 여부를 판단한다. 모든 CloudWatch 네임스페이스를 지원한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        namespace: CloudWatch 네임스페이스 (AWS/EC2 등).
+        metric_name: 지표 이름.
+        dimensions: Dimension 딕셔너리 목록.
+
+    Returns:
+        데이터포인트가 하나라도 있으면 True.
+    """
     from botocore.exceptions import ClientError
 
     now = datetime.now(timezone.utc)
@@ -116,7 +173,20 @@ def check_metric_has_data(cloudwatch, namespace: str, metric_name: str, dimensio
 
 
 def collect_alarms(session, account_id: str, account_name: str, region: str) -> list[AlarmInfo]:
-    """CloudWatch 알람 수집 및 지표 데이터 확인"""
+    """CloudWatch MetricAlarm을 수집하고 지표 데이터 존재 여부를 확인한다.
+
+    INSUFFICIENT_DATA 상태의 알람은 즉시 고아로 판단하고, 그 외 알람은
+    get_metric_statistics로 실제 데이터 존재를 확인한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 AlarmInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     cloudwatch = get_client(session, "cloudwatch", region_name=region)
@@ -168,7 +238,20 @@ def collect_alarms(session, account_id: str, account_name: str, region: str) -> 
 
 
 def analyze_alarms(alarms: list[AlarmInfo], account_id: str, account_name: str, region: str) -> AlarmAnalysisResult:
-    """CloudWatch 알람 분석"""
+    """수집된 CloudWatch 알람을 분석한다.
+
+    고아 알람(지표 데이터 없음), 액션 미설정 알람, 정상 알람으로 분류하고
+    각 알람에 대한 권장 조치를 생성한다.
+
+    Args:
+        alarms: 수집된 AlarmInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        분석 결과를 담은 AlarmAnalysisResult 객체.
+    """
     result = AlarmAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -217,7 +300,17 @@ def analyze_alarms(alarms: list[AlarmInfo], account_id: str, account_name: str, 
 
 
 def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """고아 알람 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계)와 Alarms(비정상 알람 상세) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 알람 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -293,7 +386,17 @@ def generate_report(results: list[AlarmAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> AlarmAnalysisResult | None:
-    """단일 계정/리전의 알람 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 알람을 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        알람 분석 결과. 알람이 없으면 None.
+    """
     alarms = collect_alarms(session, account_id, account_name, region)
     if not alarms:
         return None
@@ -301,7 +404,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """CloudWatch 고아 알람 분석"""
+    """CloudWatch 고아 알람 분석 도구의 메인 실행 함수.
+
+    모니터링 대상 리소스가 없는 고아 알람과 액션 미설정 알람을 탐지한다.
+    최근 7일간 지표 데이터 존재 여부로 고아 여부를 판단한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]CloudWatch 알람 분석 시작...[/bold]\n")
     console.print(f"[dim]* 고아 알람 기준: {METRIC_CHECK_DAYS}일간 지표 데이터 없음[/dim]\n")
 

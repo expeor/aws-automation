@@ -1,5 +1,5 @@
 """
-plugins/opensearch/unused.py - OpenSearch 미사용 도메인 분석
+functions/analyzers/opensearch/unused.py - OpenSearch 미사용 도메인 분석
 
 유휴/저사용 OpenSearch 도메인 탐지 (CloudWatch 지표 기반)
 
@@ -53,7 +53,11 @@ REQUIRED_PERMISSIONS = {
 
 
 class DomainStatus(Enum):
-    """도메인 상태"""
+    """OpenSearch 도메인 사용 상태 분류.
+
+    CloudWatch 지표(CPUUtilization, SearchableDocuments, IndexingRate)를
+    기반으로 유휴/저사용/정상 상태를 분류한다.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -62,7 +66,25 @@ class DomainStatus(Enum):
 
 @dataclass
 class OpenSearchDomainInfo:
-    """OpenSearch 도메인 정보"""
+    """OpenSearch 도메인 메타데이터 및 CloudWatch 지표 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        domain_name: 도메인 이름.
+        domain_id: 도메인 ID.
+        instance_type: 인스턴스 타입 (예: r6g.large.search).
+        instance_count: 인스턴스 수.
+        storage_type: 스토리지 유형 (ebs 또는 instance).
+        storage_gb: EBS 볼륨 크기 (GB).
+        engine_version: OpenSearch 엔진 버전.
+        created_at: 도메인 생성 시각.
+        avg_cpu: 7일 평균 CPU 사용률 (%).
+        searchable_docs: 검색 가능 문서 수.
+        indexing_rate: 7일 평균 인덱싱 레이트 (/min).
+        jvm_memory_pressure: 7일 평균 JVM 메모리 압력 (%).
+    """
 
     account_id: str
     account_name: str
@@ -82,7 +104,14 @@ class OpenSearchDomainInfo:
     jvm_memory_pressure: float = 0.0
 
     def get_estimated_monthly_cost(self, session=None) -> float:
-        """월간 비용 추정 (Pricing API 사용)"""
+        """Pricing API를 사용하여 월간 예상 비용을 계산한다.
+
+        Args:
+            session: boto3 Session. None이면 기본 세션 사용.
+
+        Returns:
+            월간 예상 비용 (USD).
+        """
         from functions.analyzers.cost.pricing.opensearch import get_opensearch_monthly_cost
 
         return get_opensearch_monthly_cost(
@@ -95,13 +124,23 @@ class OpenSearchDomainInfo:
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (후방 호환용)"""
+        """월간 예상 비용 (후방 호환용 property).
+
+        Returns:
+            월간 예상 비용 (USD).
+        """
         return self.get_estimated_monthly_cost()
 
 
 @dataclass
 class OpenSearchDomainFinding:
-    """도메인 분석 결과"""
+    """개별 OpenSearch 도메인의 분석 결과.
+
+    Attributes:
+        domain: 분석 대상 도메인 정보.
+        status: 분석된 사용 상태.
+        recommendation: 권장 조치 사항 문자열.
+    """
 
     domain: OpenSearchDomainInfo
     status: DomainStatus
@@ -110,7 +149,20 @@ class OpenSearchDomainFinding:
 
 @dataclass
 class OpenSearchAnalysisResult:
-    """OpenSearch 분석 결과 집계"""
+    """단일 계정/리전의 OpenSearch 미사용 도메인 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_domains: 전체 도메인 수.
+        unused_domains: 미사용 도메인 수.
+        low_usage_domains: 저사용 도메인 수.
+        normal_domains: 정상 도메인 수.
+        unused_monthly_cost: 미사용 도메인 월간 비용 합계 (USD).
+        low_usage_monthly_cost: 저사용 도메인 월간 비용 합계 (USD).
+        findings: 개별 도메인별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -125,7 +177,20 @@ class OpenSearchAnalysisResult:
 
 
 def collect_opensearch_domains(session, account_id: str, account_name: str, region: str) -> list[OpenSearchDomainInfo]:
-    """OpenSearch 도메인 수집 (배치 메트릭 최적화)"""
+    """OpenSearch 도메인 목록 수집 및 CloudWatch 메트릭 배치 조회.
+
+    ListDomainNames + DescribeDomains로 도메인 메타데이터를 수집한 후,
+    GetMetricData API로 CloudWatch 지표를 배치 조회한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        OpenSearchDomainInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     opensearch = get_client(session, "opensearch", region_name=region)
@@ -186,7 +251,18 @@ def _collect_opensearch_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """OpenSearch 도메인 메트릭 배치 수집 (내부 함수)"""
+    """OpenSearch 도메인의 CloudWatch 메트릭을 배치로 수집한다.
+
+    CPUUtilization, SearchableDocuments, IndexingRate, JVMMemoryPressure
+    메트릭을 GetMetricData API로 한 번에 조회하여 각 도메인에 매핑한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 client.
+        account_id: AWS 계정 ID (ClientId dimension용).
+        domains: 메트릭을 수집할 도메인 목록.
+        start_time: 조회 시작 시각 (UTC).
+        end_time: 조회 종료 시각 (UTC).
+    """
     from botocore.exceptions import ClientError
 
     metrics_to_fetch = [
@@ -239,7 +315,20 @@ def _collect_opensearch_metrics_batch(
 def analyze_domains(
     domains: list[OpenSearchDomainInfo], account_id: str, account_name: str, region: str
 ) -> OpenSearchAnalysisResult:
-    """OpenSearch 도메인 분석"""
+    """OpenSearch 도메인을 CloudWatch 지표 기준으로 분석하여 유휴/저사용을 판별한다.
+
+    미사용: CPU < 2% AND 검색 가능 문서 수 = 0.
+    저사용: CPU < 5% AND 인덱싱 레이트 < 1/min.
+
+    Args:
+        domains: 분석할 OpenSearch 도메인 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과 집계 (OpenSearchAnalysisResult).
+    """
     result = OpenSearchAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -287,7 +376,17 @@ def analyze_domains(
 
 
 def generate_report(results: list[OpenSearchAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """OpenSearch 미사용 도메인 분석 Excel 보고서를 생성한다.
+
+    Summary 시트(계정/리전별 집계)와 Domains 시트(미사용/저사용 도메인 상세)를 포함.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        저장된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -376,7 +475,19 @@ def generate_report(results: list[OpenSearchAnalysisResult], output_dir: str) ->
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> OpenSearchAnalysisResult | None:
-    """단일 계정/리전의 OpenSearch 도메인 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 OpenSearch 도메인을 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 병렬로 실행된다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과. 도메인이 없으면 None.
+    """
     domains = collect_opensearch_domains(session, account_id, account_name, region)
     if not domains:
         return None
@@ -384,7 +495,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """OpenSearch 미사용 도메인 분석"""
+    """OpenSearch 미사용 도메인 분석 도구의 진입점.
+
+    멀티 계정/리전 병렬 수집 후 콘솔 요약 출력, Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 리전, 출력 설정 포함).
+    """
     console.print("[bold]OpenSearch 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="opensearch")

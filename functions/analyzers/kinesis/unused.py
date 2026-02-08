@@ -1,5 +1,5 @@
 """
-plugins/kinesis/unused.py - Kinesis 미사용 스트림 분석
+functions/analyzers/kinesis/unused.py - Kinesis 미사용 스트림 분석
 
 유휴/저사용 Kinesis Data Streams 탐지 (CloudWatch 지표 기반)
 
@@ -53,7 +53,15 @@ REQUIRED_PERMISSIONS = {
 
 
 class StreamStatus(Enum):
-    """스트림 상태"""
+    """Kinesis 스트림 사용 상태 분류.
+
+    CloudWatch 지표 기반으로 스트림의 활용도를 분류한다.
+
+    Attributes:
+        NORMAL: 정상적으로 데이터가 유입/소비되는 스트림.
+        UNUSED: 7일간 IncomingRecords가 0인 미사용 스트림.
+        LOW_USAGE: 일평균 레코드 < 100이고 소비(GetRecords)가 없는 저사용 스트림.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -62,7 +70,24 @@ class StreamStatus(Enum):
 
 @dataclass
 class KinesisStreamInfo:
-    """Kinesis 스트림 정보"""
+    """Kinesis Data Stream 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        stream_name: 스트림 이름.
+        stream_arn: 스트림 ARN.
+        stream_mode: 용량 모드 (PROVISIONED 또는 ON_DEMAND).
+        shard_count: 오픈 샤드 수.
+        retention_hours: 데이터 보존 기간 (시간).
+        stream_status: 스트림 상태 (CREATING, DELETING, ACTIVE, UPDATING).
+        created_at: 스트림 생성 시각.
+        incoming_records: 일평균 수신 레코드 수 (CloudWatch 지표).
+        incoming_bytes: 일평균 수신 바이트 수 (CloudWatch 지표).
+        get_records: 일평균 소비 레코드 수 (CloudWatch GetRecords.Records 지표).
+        consumer_count: Enhanced Fan-Out 소비자 수.
+    """
 
     account_id: str
     account_name: str
@@ -81,7 +106,17 @@ class KinesisStreamInfo:
     consumer_count: int = 0
 
     def get_estimated_monthly_cost(self, session=None) -> float:
-        """월간 비용 추정 (Pricing API 사용)"""
+        """Pricing API를 사용하여 월간 비용을 추정한다.
+
+        Provisioned 모드는 샤드당 비용, On-Demand 모드는 스트림당 비용 +
+        데이터 입력량 기반으로 계산한다.
+
+        Args:
+            session: boto3 Session 객체. None이면 기본 세션 사용.
+
+        Returns:
+            추정 월간 비용 (USD).
+        """
         from functions.analyzers.cost.pricing.kinesis import get_kinesis_monthly_cost
 
         return get_kinesis_monthly_cost(
@@ -90,13 +125,23 @@ class KinesisStreamInfo:
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (후방 호환용)"""
+        """Pricing API 기반 추정 월간 비용 (USD, 후방 호환용).
+
+        Returns:
+            추정 월간 비용 (USD).
+        """
         return self.get_estimated_monthly_cost()
 
 
 @dataclass
 class KinesisStreamFinding:
-    """스트림 분석 결과"""
+    """개별 Kinesis 스트림에 대한 분석 결과.
+
+    Attributes:
+        stream: 분석 대상 스트림 정보.
+        status: 분석된 스트림 상태 (NORMAL, UNUSED, LOW_USAGE).
+        recommendation: 권장 조치 메시지.
+    """
 
     stream: KinesisStreamInfo
     status: StreamStatus
@@ -105,7 +150,20 @@ class KinesisStreamFinding:
 
 @dataclass
 class KinesisAnalysisResult:
-    """Kinesis 분석 결과 집계"""
+    """계정/리전별 Kinesis 스트림 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_streams: 전체 스트림 수.
+        unused_streams: 미사용 스트림 수 (IncomingRecords = 0).
+        low_usage_streams: 저사용 스트림 수 (레코드 < 100/일, 소비 없음).
+        normal_streams: 정상 스트림 수.
+        unused_monthly_cost: 미사용 스트림 합산 월간 추정 비용 (USD).
+        low_usage_monthly_cost: 저사용 스트림 합산 월간 추정 비용 (USD).
+        findings: 개별 스트림 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -120,7 +178,20 @@ class KinesisAnalysisResult:
 
 
 def collect_kinesis_streams(session, account_id: str, account_name: str, region: str) -> list[KinesisStreamInfo]:
-    """Kinesis 스트림 수집 (배치 메트릭 최적화)"""
+    """Kinesis Data Streams를 수집하고 CloudWatch 지표를 배치 조회한다.
+
+    스트림 목록 조회 후 describe_stream_summary로 상세 정보를 수집하고,
+    Enhanced Fan-Out 소비자 수를 확인한 뒤 배치 메트릭으로 지표를 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 KinesisStreamInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     kinesis = get_client(session, "kinesis", region_name=region)
@@ -187,7 +258,17 @@ def _collect_kinesis_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """Kinesis 스트림 메트릭 배치 수집 (내부 함수)"""
+    """CloudWatch GetMetricData API로 Kinesis 지표를 배치 수집한다.
+
+    IncomingRecords, IncomingBytes, GetRecords.Records 세 가지 지표를
+    한 번의 API 호출로 수집하여 각 스트림의 일평균 값을 설정한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        streams: 지표를 수집할 KinesisStreamInfo 목록.
+        start_time: 지표 조회 시작 시각.
+        end_time: 지표 조회 종료 시각.
+    """
     from botocore.exceptions import ClientError
 
     metrics_to_fetch = [
@@ -233,7 +314,20 @@ def _collect_kinesis_metrics_batch(
 def analyze_streams(
     streams: list[KinesisStreamInfo], account_id: str, account_name: str, region: str
 ) -> KinesisAnalysisResult:
-    """Kinesis 스트림 분석"""
+    """수집된 Kinesis 스트림을 분석하여 미사용/저사용을 판별한다.
+
+    미사용(IncomingRecords = 0), 저사용(레코드 < 100/일 AND 소비 없음),
+    정상으로 분류하고 비용을 합산한다.
+
+    Args:
+        streams: 수집된 KinesisStreamInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        분석 결과를 담은 KinesisAnalysisResult 객체.
+    """
     result = KinesisAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -281,7 +375,17 @@ def analyze_streams(
 
 
 def generate_report(results: list[KinesisAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Kinesis 미사용 스트림 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계)와 Streams(비정상 스트림 상세) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 Kinesis 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -370,7 +474,17 @@ def generate_report(results: list[KinesisAnalysisResult], output_dir: str) -> st
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> KinesisAnalysisResult | None:
-    """단일 계정/리전의 Kinesis 스트림 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 Kinesis 스트림을 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        Kinesis 분석 결과. 스트림이 없으면 None.
+    """
     streams = collect_kinesis_streams(session, account_id, account_name, region)
     if not streams:
         return None
@@ -378,7 +492,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Kinesis 미사용 스트림 분석"""
+    """Kinesis 미사용 스트림 분석 도구의 메인 실행 함수.
+
+    CloudWatch 지표 기반으로 7일간 미사용/저사용 Kinesis Data Streams를
+    탐지하고 비용 절감 기회를 보고서로 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]Kinesis 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="kinesis")

@@ -19,7 +19,23 @@ if TYPE_CHECKING:
 
 @dataclass
 class ResourceItem:
-    """리소스 데이터 표준 구조"""
+    """리소스 데이터 표준 구조
+
+    HTML 리포트의 테이블에 표시할 리소스 정보를 표준화된 형태로 저장합니다.
+    AWSReport.add_resource()에 전달하여 리포트에 추가합니다.
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        resource_id: 리소스 식별자 (인스턴스 ID, ARN 등)
+        resource_name: 리소스 이름 (Name 태그 등)
+        resource_type: 리소스 유형 (예: "t3.micro", "gp3")
+        status: 리소스 상태 (예: "unused", "running")
+        reason: 감지 사유 또는 설명
+        cost: 월간 비용 (USD)
+        extra: 추가 메타데이터 딕셔너리 (커스텀 컬럼에 매핑)
+    """
 
     account_id: str
     account_name: str
@@ -33,7 +49,14 @@ class ResourceItem:
     extra: dict[str, Any] | None = None
 
     def to_row(self, columns: list[str]) -> list[Any]:
-        """지정된 컬럼 순서로 행 데이터 반환"""
+        """지정된 컬럼 순서로 행 데이터 반환
+
+        Args:
+            columns: 출력할 컬럼 키 목록 (예: ["account", "region", "resource_id"])
+
+        Returns:
+            컬럼 순서에 맞는 값 리스트. extra 딕셔너리 키도 매핑됨.
+        """
         mapping = {
             "account_id": self.account_id,
             "account_name": self.account_name,
@@ -124,7 +147,14 @@ class AWSReport:
         self.execution_info = self._extract_execution_info(ctx)
 
     def _extract_execution_info(self, ctx: Any | None) -> dict[str, Any]:
-        """컨텍스트에서 실행 정보 추출"""
+        """컨텍스트에서 실행 정보 추출
+
+        Args:
+            ctx: 실행 컨텍스트 (None 허용)
+
+        Returns:
+            실행 정보 딕셔너리 (timestamp, accounts, regions, profile)
+        """
         info: dict[str, Any] = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "accounts": [],
@@ -173,12 +203,26 @@ class AWSReport:
         return self
 
     def add_resource(self, item: ResourceItem) -> AWSReport:
-        """리소스 추가"""
+        """리소스 추가
+
+        Args:
+            item: 추가할 ResourceItem
+
+        Returns:
+            self (메서드 체이닝)
+        """
         self.resources.append(item)
         return self
 
     def add_resources(self, items: list[ResourceItem]) -> AWSReport:
-        """리소스 일괄 추가"""
+        """리소스 일괄 추가
+
+        Args:
+            items: 추가할 ResourceItem 리스트
+
+        Returns:
+            self (메서드 체이닝)
+        """
         self.resources.extend(items)
         return self
 
@@ -237,7 +281,17 @@ class AWSReport:
         return report.save(filepath, auto_open=auto_open)
 
     def _build_report(self, table_columns: list[tuple[str, str]] | None = None) -> HTMLReport:
-        """HTMLReport 객체 생성"""
+        """HTMLReport 객체 생성
+
+        요약 카드, 분포 차트, 커스텀 차트, 리소스 테이블, 커스텀 섹션을
+        순서대로 조합하여 HTMLReport 인스턴스를 구성합니다.
+
+        Args:
+            table_columns: 테이블 컬럼 정의 [(key, header), ...]. None이면 자동 생성.
+
+        Returns:
+            완성된 HTMLReport 인스턴스
+        """
         subtitle = self.subtitle or self._generate_subtitle()
         report = HTMLReport(self.title, subtitle)
 
@@ -259,7 +313,13 @@ class AWSReport:
         return report
 
     def _generate_subtitle(self) -> str:
-        """부제목 자동 생성"""
+        """부제목 자동 생성
+
+        서비스명, 프로파일, 계정 수, 리전 수를 조합하여 부제목을 생성합니다.
+
+        Returns:
+            "EC2 / unused | Profile: my-profile | 3개 계정 | 5개 리전" 형식 문자열
+        """
         parts = [f"{self.service} / {self.tool_name}"]
 
         if self.execution_info["profile"]:

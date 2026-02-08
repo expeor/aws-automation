@@ -1,13 +1,12 @@
-"""
-reports/inventory - AWS Resource Explorer
+"""functions/reports/inventory/__init__.py - AWS 리소스 인벤토리 패키지.
 
-리소스 인벤토리 수집 및 종합 보고서 제공.
+EC2, VPC, ELB 등 주요 AWS 리소스의 종합 인벤토리를 수집하고
+Excel 보고서로 생성합니다. 60개 이상의 리소스 타입을 카테고리별로 수집합니다.
 
-Usage:
-    from core.shared.aws.inventory import InventoryCollector
-
-    collector = InventoryCollector(ctx)
-    instances = collector.collect_ec2()
+Example:
+    >>> from core.shared.aws.inventory import InventoryCollector
+    >>> collector = InventoryCollector(ctx)
+    >>> instances = collector.collect_ec2()
 """
 
 CATEGORY = {

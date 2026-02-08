@@ -1,5 +1,5 @@
 """
-plugins/fn/provisioned.py - Provisioned Concurrency 분석
+functions/analyzers/fn/provisioned.py - Provisioned Concurrency 분석
 
 Lambda Provisioned Concurrency 최적화 분석:
 - 실제 동시 실행 대비 PC 과다 설정 탐지
@@ -40,7 +40,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class PCStatus(Enum):
-    """PC 상태"""
+    """Provisioned Concurrency 최적화 상태 분류.
+
+    활용률과 Throttle 발생 여부를 기준으로 PC 설정의 적정성을 분류한다.
+    """
 
     UNUSED = "unused"  # PC 설정됐으나 미사용
     OVERSIZED = "oversized"  # 과다 설정
@@ -51,7 +54,14 @@ class PCStatus(Enum):
 
 @dataclass
 class PCConfig:
-    """Provisioned Concurrency 설정"""
+    """Provisioned Concurrency 개별 설정 정보.
+
+    Attributes:
+        qualifier: PC가 적용된 대상 (버전 번호, Alias 이름, 또는 $LATEST).
+        allocated: 할당된 PC 수.
+        available: 사용 가능한 PC 수.
+        status: PC 프로비저닝 상태 (InProgress, Ready, Failed).
+    """
 
     qualifier: str  # $LATEST, version, alias
     allocated: int
@@ -61,7 +71,25 @@ class PCConfig:
 
 @dataclass
 class LambdaPCInfo:
-    """Lambda PC 정보"""
+    """Lambda 함수의 Provisioned Concurrency 상세 정보.
+
+    Attributes:
+        function_name: Lambda 함수 이름.
+        function_arn: Lambda 함수 ARN.
+        runtime: 런타임 식별자.
+        memory_mb: 메모리 크기 (MB).
+        pc_configs: PC 개별 설정 목록 (버전/Alias별).
+        total_provisioned: 총 할당 PC 수.
+        reserved_concurrency: Reserved Concurrency 설정값. None이면 미설정.
+        invocations_30d: 30일간 총 호출 수.
+        max_concurrent: 30일간 최대 동시 실행 수.
+        avg_concurrent: 30일간 평균 동시 실행 수.
+        throttles_30d: 30일간 Throttle 발생 수.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        monthly_cost: PC 월간 비용 (USD).
+    """
 
     function_name: str
     function_arn: str
@@ -89,11 +117,22 @@ class LambdaPCInfo:
 
     @property
     def has_pc(self) -> bool:
+        """Provisioned Concurrency 설정 여부.
+
+        Returns:
+            PC가 1개 이상 설정되어 있으면 True.
+        """
         return self.total_provisioned > 0
 
     @property
     def utilization_pct(self) -> float:
-        """PC 활용률"""
+        """PC 활용률 (%).
+
+        최대 동시 실행 수를 할당된 PC 수로 나누어 계산한다.
+
+        Returns:
+            활용률 (0~100%). PC 미설정 시 0.0.
+        """
         if self.total_provisioned == 0:
             return 0.0
         return min(100.0, self.max_concurrent / self.total_provisioned * 100)
@@ -101,7 +140,16 @@ class LambdaPCInfo:
 
 @dataclass
 class PCFinding:
-    """PC 분석 결과"""
+    """개별 함수의 PC 분석 결과.
+
+    Attributes:
+        function: Lambda PC 정보.
+        status: PC 최적화 상태.
+        recommendation: 권장 조치 설명 (한글).
+        recommended_pc: 권장 PC 수. None이면 변경 불필요.
+        monthly_waste: 완전 낭비 비용 (미사용 PC, USD).
+        monthly_savings: 축소 시 절감 가능 비용 (과다 설정, USD).
+    """
 
     function: LambdaPCInfo
     status: PCStatus
@@ -113,7 +161,23 @@ class PCFinding:
 
 @dataclass
 class PCAnalysisResult:
-    """PC 분석 결과 집계"""
+    """PC 분석 결과 집계.
+
+    단일 계정/리전의 Provisioned Concurrency 분석 통계를 집계한다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_functions: 분석된 전체 함수 수.
+        functions_with_pc: PC가 설정된 함수 수.
+        unused_pc_count: 미사용 PC 함수 수.
+        oversized_pc_count: PC 과다 설정 함수 수.
+        undersized_pc_count: PC 부족 (Throttle 발생) 함수 수.
+        total_pc_cost: 전체 PC 월간 비용 (USD).
+        potential_savings: 절감 가능한 총 비용 (USD).
+        findings: 개별 함수별 PC 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -139,7 +203,20 @@ def collect_pc_info(
     account_name: str,
     region: str,
 ) -> list[LambdaPCInfo]:
-    """Lambda PC 정보 수집"""
+    """Lambda 함수별 Provisioned Concurrency 정보와 CloudWatch 메트릭을 수집한다.
+
+    ListFunctions -> ListProvisionedConcurrencyConfigs -> GetFunctionConcurrency ->
+    CloudWatch 메트릭 순서로 AWS API를 호출한다.
+
+    Args:
+        session: boto3 세션 (Rate limiting 적용).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        함수별 PC 상세 정보 목록 (메트릭 포함).
+    """
     from botocore.exceptions import ClientError
 
     functions = []
@@ -274,7 +351,20 @@ def analyze_pc(
     account_name: str,
     region: str,
 ) -> PCAnalysisResult:
-    """PC 분석"""
+    """Lambda Provisioned Concurrency 최적화 상태를 분석한다.
+
+    활용률, Throttle 발생 여부, 호출 유무를 기반으로 각 함수의
+    PC 설정 적정성을 평가하고 권장 조치를 제시한다.
+
+    Args:
+        functions: Lambda PC 정보 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        PC 분석 결과 (통계 + 개별 함수 분석).
+    """
     result = PCAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -303,7 +393,15 @@ def analyze_pc(
 
 
 def _analyze_single_pc(func: LambdaPCInfo, region: str) -> PCFinding:
-    """개별 함수 PC 분석"""
+    """개별 Lambda 함수의 PC 설정을 분석한다.
+
+    Args:
+        func: Lambda PC 정보.
+        region: AWS 리전 코드 (비용 계산용).
+
+    Returns:
+        함수의 PC 분석 결과 (상태, 권장 조치, 절감액).
+    """
 
     # PC 미설정
     if not func.has_pc:
@@ -377,7 +475,18 @@ def _analyze_single_pc(func: LambdaPCInfo, region: str) -> PCFinding:
 
 
 def generate_report(results: list[PCAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """PC 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary Data, PC Functions 시트를 포함하며, 상태별로
+    셀 색상을 다르게 적용한다 (빨강=미사용, 노랑=부족, 초록=적정).
+
+    Args:
+        results: 계정/리전별 PC 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일의 절대 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -484,7 +593,19 @@ def generate_report(results: list[PCAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> PCAnalysisResult | None:
-    """단일 계정/리전의 PC 정보 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 Lambda PC 정보를 수집하고 최적화 분석을 수행한다.
+
+    parallel_collect 콜백 함수로, 멀티 계정/리전 병렬 실행에 사용된다.
+
+    Args:
+        session: boto3 세션 (Rate limiting 적용).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        해당 계정/리전의 PC 분석 결과. 함수가 없으면 None.
+    """
     functions = collect_pc_info(session, account_id, account_name, region)
     if not functions:
         return None
@@ -492,7 +613,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """PC 분석 실행"""
+    """Lambda Provisioned Concurrency 분석 도구를 실행한다.
+
+    모든 Lambda 함수의 PC 설정을 수집하고, 활용률/Throttle 기반으로
+    미사용, 과다 설정, 부족 상태를 분류한다. PC 비용과 절감 가능액을
+    계산하여 콘솔에 출력하고 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 리전, 출력 설정 포함).
+    """
     console.print("[bold]Lambda Provisioned Concurrency 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="lambda")

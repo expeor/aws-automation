@@ -1,4 +1,8 @@
-"""Style caching for high-performance Excel generation."""
+"""functions/reports/log_analyzer/reporter/styles.py - Excel 스타일 캐시.
+
+openpyxl Font, Fill, Alignment, Border 객체를 싱글톤 패턴으로 캐시하여
+Excel 보고서 생성 시 스타일 객체 중복 생성을 방지합니다.
+"""
 
 from __future__ import annotations
 

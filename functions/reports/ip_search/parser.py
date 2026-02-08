@@ -1,8 +1,11 @@
-"""
-reports/ip_search/parser.py - ENI Description Parser
+"""functions/reports/ip_search/parser.py - ENI Description Parser.
 
-Single source of truth for ENI description -> resource mapping.
-Consolidates parsing logic from private.py and detail.py.
+ENI Description 문자열을 파싱하여 연결된 리소스 정보를 추출하는 단일 소스입니다.
+private_ip 및 detail 모듈에서 공통으로 사용하는 파싱 로직을 통합 관리합니다.
+
+지원 리소스 타입:
+    EC2, Lambda, ELB, RDS, EFS, NAT Gateway, Transit Gateway, VPC Endpoint,
+    ElastiCache, EKS, Redshift, Global Accelerator 등.
 """
 
 from __future__ import annotations
@@ -15,7 +18,14 @@ from typing import Any
 
 @dataclass
 class ParsedResource:
-    """Parsed resource information from ENI description"""
+    """ENI Description에서 파싱된 리소스 정보.
+
+    Attributes:
+        resource_type: 리소스 유형 ("EC2", "Lambda", "ELB", "RDS", "EFS" 등).
+        resource_id: 리소스 식별자 (instance-id, function-name, fs-id 등).
+        resource_name: UI 표시용 리소스 이름.
+        additional_info: 추가 메타데이터 (리소스 유형별 부가 정보).
+    """
 
     resource_type: str  # "EC2", "Lambda", "ELB", "RDS", "EFS", etc.
     resource_id: str  # instance-id, function-name, fs-id, etc.

@@ -1,19 +1,26 @@
-"""캐시 TTL(Time To Live) 관리
+"""캐시 TTL(Time To Live) 관리.
 
-카테고리별 캐시 유효기간을 관리하고, 만료 여부를 확인합니다.
+카테고리별 캐시 유효기간을 관리하고, 파일 mtime 기반으로 만료 여부를 확인합니다.
+``get_or_fetch``를 통해 캐시 우선 데이터 조회를 간편하게 수행할 수 있습니다.
 
-Usage:
-    from core.tools.cache.ttl import is_cache_valid, get_or_fetch
+Attributes:
+    CACHE_TTL: 카테고리별 캐시 TTL 설정 딕셔너리.
+    DEFAULT_TTL: 설정되지 않은 카테고리의 기본 TTL (12시간).
 
-    # 캐시 유효성 확인
-    if is_cache_valid("pricing", filepath):
-        data = load_from_cache(filepath)
-    else:
-        data = fetch_from_api()
-        save_to_cache(filepath, data)
+Example:
+    ::
 
-    # 또는 한 줄로:
-    data = get_or_fetch("pricing", "ec2_prices.json", fetch_fn=fetch_ec2_prices)
+        from core.tools.cache.ttl import is_cache_valid, get_or_fetch
+
+        # 캐시 유효성 확인
+        if is_cache_valid("pricing", filepath):
+            data = load_from_cache(filepath)
+        else:
+            data = fetch_from_api()
+            save_to_cache(filepath, data)
+
+        # 또는 한 줄로:
+        data = get_or_fetch("pricing", "ec2_prices.json", fetch_fn=fetch_ec2_prices)
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-plugins/fn/common/runtime_eol.py - Lambda 런타임 EOL 정보
+functions/analyzers/fn/common/runtime_eol.py - Lambda 런타임 EOL 정보
 
 AWS Lambda 런타임 지원 종료 일정 관리
 https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
@@ -18,7 +18,10 @@ OS_AL2023 = "AL2023"
 
 
 class EOLStatus(Enum):
-    """EOL 상태"""
+    """Lambda 런타임 EOL(End of Life) 상태 분류.
+
+    deprecation_date까지 남은 일수를 기준으로 긴급도를 분류한다.
+    """
 
     DEPRECATED = "deprecated"  # 이미 지원 종료
     CRITICAL = "critical"  # 30일 이내 종료
@@ -30,7 +33,20 @@ class EOLStatus(Enum):
 
 @dataclass
 class RuntimeInfo:
-    """런타임 정보"""
+    """Lambda 런타임 EOL 정보.
+
+    AWS Lambda 런타임의 지원 종료 일정과 권장 업그레이드 경로를 포함한다.
+    Phase 1(생성 차단) -> Phase 2(업데이트 차단) -> EOL(완전 종료) 순으로 진행된다.
+
+    Attributes:
+        runtime_id: 런타임 식별자 (예: python3.12, nodejs22.x).
+        name: 사람이 읽을 수 있는 런타임 이름 (예: Python 3.12).
+        deprecation_date: Phase 1 시작일 (함수 생성 차단). None이면 미정.
+        block_update_date: Phase 2 시작일 (함수 업데이트 차단). None이면 미정.
+        eol_date: 완전 종료일. None이면 미정.
+        os_version: Amazon Linux 버전 (AL1, AL2, AL2023).
+        recommended_upgrade: 권장 업그레이드 런타임 식별자 (예: python3.13).
+    """
 
     runtime_id: str
     name: str
@@ -42,14 +58,22 @@ class RuntimeInfo:
 
     @property
     def is_deprecated(self) -> bool:
-        """지원 종료 여부"""
+        """지원 종료 여부.
+
+        Returns:
+            오늘 날짜가 deprecation_date 이후이면 True.
+        """
         if not self.deprecation_date:
             return False
         return date.today() >= self.deprecation_date
 
     @property
     def days_until_deprecation(self) -> int | None:
-        """지원 종료까지 남은 일수"""
+        """지원 종료까지 남은 일수.
+
+        Returns:
+            남은 일수 (음수이면 이미 종료). deprecation_date 미정 시 None.
+        """
         if not self.deprecation_date:
             return None
         delta = self.deprecation_date - date.today()
@@ -57,7 +81,11 @@ class RuntimeInfo:
 
     @property
     def status(self) -> EOLStatus:
-        """EOL 상태"""
+        """남은 일수 기반 EOL 상태를 반환한다.
+
+        Returns:
+            DEPRECATED / CRITICAL(30일) / HIGH(90일) / MEDIUM(180일) / LOW / SUPPORTED.
+        """
         if self.is_deprecated:
             return EOLStatus.DEPRECATED
 
@@ -161,12 +189,26 @@ RUNTIME_EOL_DATA: dict[str, RuntimeInfo] = {
 
 
 def get_runtime_info(runtime_id: str) -> RuntimeInfo | None:
-    """런타임 정보 조회"""
+    """런타임 ID로 EOL 정보를 조회한다.
+
+    Args:
+        runtime_id: Lambda 런타임 식별자 (예: python3.12).
+
+    Returns:
+        런타임 정보. 알 수 없는 런타임이면 None.
+    """
     return RUNTIME_EOL_DATA.get(runtime_id)
 
 
 def get_runtime_status(runtime_id: str) -> EOLStatus:
-    """런타임 EOL 상태 조회"""
+    """런타임 ID로 EOL 상태를 조회한다.
+
+    Args:
+        runtime_id: Lambda 런타임 식별자.
+
+    Returns:
+        EOL 상태. 알 수 없는 런타임이면 SUPPORTED.
+    """
     info = get_runtime_info(runtime_id)
     if info:
         return info.status
@@ -175,12 +217,23 @@ def get_runtime_status(runtime_id: str) -> EOLStatus:
 
 
 def get_deprecated_runtimes() -> dict[str, RuntimeInfo]:
-    """지원 종료된 런타임 목록"""
+    """현재 지원 종료된 모든 런타임 목록을 반환한다.
+
+    Returns:
+        {runtime_id: RuntimeInfo} 딕셔너리 (is_deprecated=True인 항목만).
+    """
     return {k: v for k, v in RUNTIME_EOL_DATA.items() if v.is_deprecated}
 
 
 def get_expiring_runtimes(days: int = 180) -> dict[str, RuntimeInfo]:
-    """곧 지원 종료될 런타임 목록"""
+    """지정 기간 내 지원 종료 예정인 런타임 목록을 반환한다.
+
+    Args:
+        days: 조회 기간 (일). 기본 180일.
+
+    Returns:
+        {runtime_id: RuntimeInfo} 딕셔너리 (0 < days_until_deprecation <= days).
+    """
     result = {}
     for k, v in RUNTIME_EOL_DATA.items():
         remaining = v.days_until_deprecation
@@ -190,7 +243,14 @@ def get_expiring_runtimes(days: int = 180) -> dict[str, RuntimeInfo]:
 
 
 def get_recommended_upgrade(runtime_id: str) -> str | None:
-    """권장 업그레이드 런타임"""
+    """런타임의 권장 업그레이드 대상을 반환한다.
+
+    Args:
+        runtime_id: Lambda 런타임 식별자.
+
+    Returns:
+        권장 업그레이드 런타임 ID (예: python3.13). 없으면 None.
+    """
     info = RUNTIME_EOL_DATA.get(runtime_id)
     if info and info.recommended_upgrade:
         return info.recommended_upgrade
@@ -198,5 +258,12 @@ def get_recommended_upgrade(runtime_id: str) -> str | None:
 
 
 def get_os_runtimes(os_version: str) -> dict[str, RuntimeInfo]:
-    """특정 OS 버전의 런타임 목록"""
+    """특정 Amazon Linux OS 버전의 런타임 목록을 반환한다.
+
+    Args:
+        os_version: OS 버전 (AL1, AL2, AL2023).
+
+    Returns:
+        {runtime_id: RuntimeInfo} 딕셔너리.
+    """
     return {k: v for k, v in RUNTIME_EOL_DATA.items() if v.os_version == os_version}

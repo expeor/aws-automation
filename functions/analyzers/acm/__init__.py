@@ -1,5 +1,11 @@
 """
-plugins/acm - ACM Certificate Management Tools
+functions/analyzers/acm - ACM 인증서 관리 도구
+
+AWS Certificate Manager(ACM) 인증서의 사용 현황을 분석하고
+미사용 또는 만료 임박 인증서를 탐지합니다.
+
+도구 목록:
+    - unused: 미사용/만료 임박 인증서 탐지
 """
 
 CATEGORY = {

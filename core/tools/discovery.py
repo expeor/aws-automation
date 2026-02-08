@@ -1,10 +1,10 @@
-"""
-core/tools/discovery.py - 분석기/리포트 자동 발견 시스템
+"""분석기/리포트 자동 발견 시스템.
 
-카테고리/도구를 자동으로 발견하여 menu.py 수동 관리 제거.
-새 도구 추가: 폴더 생성 + __init__.py 작성만 하면 자동 등록.
+카테고리/도구를 자동으로 발견하여 menu.py 수동 관리를 제거합니다.
+새 도구 추가 시 폴더 생성 + ``__init__.py`` 작성만 하면 자동 등록됩니다.
 
-폴더 구조:
+폴더 구조::
+
     analyzers/           # AWS 서비스별 분석 도구
     ├── ec2/             # EC2 분석 (unused, ebs_audit 등)
     ├── rds/             # RDS 분석
@@ -15,15 +15,17 @@ core/tools/discovery.py - 분석기/리포트 자동 발견 시스템
     ├── inventory/       # 리소스 인벤토리
     └── ...
 
-Usage:
-    from core.tools.discovery import discover_categories, load_tool
+Example:
+    ::
 
-    # 모든 카테고리/도구 발견
-    categories = discover_categories()
+        from core.tools.discovery import discover_categories, load_tool
 
-    # 도구 동적 로드
-    tool = load_tool("cost", "미사용 EBS 볼륨")
-    tool["run"](ctx)
+        # 모든 카테고리/도구 발견
+        categories = discover_categories()
+
+        # 도구 동적 로드
+        tool = load_tool("cost", "미사용 EBS 볼륨")
+        tool["run"](ctx)
 """
 
 import importlib
@@ -74,12 +76,27 @@ _cache_lock = threading.RLock()
 
 
 def _get_cache_key(include_aws_services: bool, only_analysis: bool) -> str:
-    """캐시 키 생성"""
+    """디스커버리 캐시 키를 생성합니다.
+
+    Args:
+        include_aws_services: AWS 서비스 카테고리 포함 여부.
+        only_analysis: 분석 플랫폼 카테고리만 포함 여부.
+
+    Returns:
+        캐시 키 문자열 (예: "categories_True_False").
+    """
     return f"categories_{include_aws_services}_{only_analysis}"
 
 
 def _is_cache_valid(cache_time: float) -> bool:
-    """캐시 유효성 검사"""
+    """캐시 타임스탬프 기반 유효성을 검사합니다.
+
+    Args:
+        cache_time: 캐시 저장 시각 (Unix timestamp).
+
+    Returns:
+        캐시가 TTL 이내이면 True, 만료되었으면 False.
+    """
     return (time.time() - cache_time) < settings.DISCOVERY_CACHE_TTL
 
 
@@ -545,12 +562,23 @@ def _load_referenced_tool(tool_meta: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def list_categories() -> list[str]:
-    """카테고리 이름 목록 반환"""
+    """발견된 모든 카테고리의 이름 목록을 반환합니다.
+
+    Returns:
+        카테고리 이름 문자열 리스트 (예: ["ec2", "vpc", "rds", ...]).
+    """
     return [cat["name"] for cat in discover_categories()]
 
 
 def list_tools(category_name: str) -> list[str]:
-    """카테고리 내 도구 이름 목록 반환"""
+    """특정 카테고리 내 도구 이름 목록을 반환합니다.
+
+    Args:
+        category_name: 카테고리 이름 (예: "ec2", "rds").
+
+    Returns:
+        도구 이름 문자열 리스트. 카테고리가 없으면 빈 리스트.
+    """
     category = get_category(category_name)
     if not category:
         return []

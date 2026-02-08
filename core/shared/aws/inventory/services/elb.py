@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/elb.py - ELB 리소스 수집
+core/shared/aws/inventory/services/elb.py - ELB 리소스 수집
 """
 
 from __future__ import annotations
@@ -17,7 +17,21 @@ logger = logging.getLogger(__name__)
 def collect_load_balancers(
     session, account_id: str, account_name: str, region: str, include_classic: bool = False
 ) -> list[LoadBalancer]:
-    """Load Balancer 수집 (ALB/NLB/GWLB, 선택적 CLB) - 상세 정보 포함"""
+    """Load Balancer 리소스를 수집합니다 (ALB/NLB/GWLB, 선택적 CLB).
+
+    ELBv2 API로 ALB/NLB/GWLB를 수집하고, include_classic이 True이면 Classic ELB도
+    함께 수집합니다. 수집 후 태그와 Access Logs 속성을 일괄 조회하여 API 호출을 최소화합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+        include_classic: True면 Classic Load Balancer도 함께 수집합니다.
+
+    Returns:
+        LoadBalancer 데이터 클래스 목록
+    """
     load_balancers = []
 
     # ALB/NLB/GWLB (elbv2)
@@ -95,10 +109,14 @@ def collect_load_balancers(
 
 
 def _populate_lb_details(elbv2, load_balancers: list[LoadBalancer]) -> None:
-    """
-    Load Balancer 태그 및 속성 일괄 조회.
+    """Load Balancer의 태그 및 속성을 일괄 조회하여 in-place로 업데이트합니다.
 
-    API 호출 최적화를 위해 배치로 처리.
+    API 호출 최소화를 위해 태그는 최대 20개씩 배치로 조회하고,
+    Access Logs 속성은 개별 조회합니다.
+
+    Args:
+        elbv2: Rate limiting이 적용된 ELBv2 클라이언트
+        load_balancers: 태그/속성을 채울 LoadBalancer 목록
     """
     # ARN -> LoadBalancer 매핑
     lb_map: dict[str, LoadBalancer] = {lb.arn: lb for lb in load_balancers if lb.arn}
@@ -136,7 +154,20 @@ def _populate_lb_details(elbv2, load_balancers: list[LoadBalancer]) -> None:
 
 
 def collect_target_groups(session, account_id: str, account_name: str, region: str) -> list[TargetGroup]:
-    """Target Group 수집 (상세 정보 포함)"""
+    """Target Group 리소스를 수집합니다.
+
+    Target Group 목록 조회 후 각 그룹의 Target Health(정상/비정상 타겟 수),
+    Health Check 설정, Deregistration Delay 속성 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        TargetGroup 데이터 클래스 목록
+    """
     elbv2 = get_client(session, "elbv2", region_name=region)
     target_groups = []
 
@@ -199,8 +230,14 @@ def collect_target_groups(session, account_id: str, account_name: str, region: s
 
 
 def _populate_tg_details(elbv2, target_groups: list[TargetGroup]) -> None:
-    """
-    Target Group 태그 및 속성 일괄 조회.
+    """Target Group의 태그 및 속성을 일괄 조회하여 in-place로 업데이트합니다.
+
+    태그는 최대 20개씩 배치로 조회하고, Deregistration Delay 속성은
+    개별 조회합니다.
+
+    Args:
+        elbv2: Rate limiting이 적용된 ELBv2 클라이언트
+        target_groups: 태그/속성을 채울 TargetGroup 목록
     """
     # ARN -> TargetGroup 매핑
     tg_map: dict[str, TargetGroup] = {tg.arn: tg for tg in target_groups if tg.arn}

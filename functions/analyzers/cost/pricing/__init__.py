@@ -1,10 +1,14 @@
 """
-plugins/cost/pricing - Backwards Compatibility Shim
+functions/analyzers/cost/pricing - 가격 정보 하위 호환 shim (DEPRECATED)
 
-DEPRECATED: 이 모듈은 shared.aws.pricing으로 이동되었습니다.
-새 코드에서는 shared.aws.pricing을 직접 import하세요.
+DEPRECATED: 이 모듈의 모든 기능은 core.shared.aws.pricing으로 이전되었습니다.
+새 코드에서는 core.shared.aws.pricing을 직접 import하세요.
 
-Usage (NEW):
+이 모듈을 import하면 DeprecationWarning이 발생합니다.
+기존 코드의 import 경로를 깨뜨리지 않기 위해 모든 public 심볼을
+core.shared.aws.pricing에서 re-export합니다.
+
+사용 예시 (신규 코드):
     from core.shared.aws.pricing import get_ec2_monthly_cost, get_ebs_monthly_cost
     from core.shared.aws.pricing import pricing_service
 """

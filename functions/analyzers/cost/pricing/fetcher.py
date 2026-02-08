@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/fetcher.py - AWS 가격 정보 가져오기
+functions/analyzers/cost/pricing/fetcher.py - AWS 가격 정보 가져오기
 
 AWS Pricing API (get_products)를 사용하여 리전별 가격을 조회합니다.
 """

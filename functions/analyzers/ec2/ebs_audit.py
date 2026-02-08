@@ -1,5 +1,5 @@
 """
-plugins/ec2/ebs_audit.py - EBS 미사용 분석
+functions/analyzers/ec2/ebs_audit.py - EBS 미사용 분석
 
 미사용 EBS 볼륨 탐지 및 비용 절감 기회 식별
 
@@ -49,7 +49,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """EBS 볼륨의 사용 상태 분류
+
+    볼륨 연결 상태 및 CloudWatch I/O 지표 기반으로 판별됩니다.
+    """
 
     UNUSED = "unused"  # 미사용 (available 상태)
     IDLE = "idle"  # 유휴 (연결됨 but I/O 없음)
@@ -58,7 +61,10 @@ class UsageStatus(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도 수준
+
+    볼륨 용량 기반으로 결정되며, 비용 영향도를 반영합니다.
+    """
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -68,7 +74,30 @@ class Severity(Enum):
 
 @dataclass
 class EBSInfo:
-    """EBS 볼륨 정보"""
+    """EBS 볼륨 정보 및 CloudWatch I/O 지표 데이터
+
+    Attributes:
+        id: EBS 볼륨 ID
+        name: Name 태그 값
+        state: 볼륨 상태 (available, in-use, creating 등)
+        volume_type: 볼륨 타입 (gp3, gp2, io1, st1, sc1 등)
+        size_gb: 볼륨 크기 (GB)
+        iops: 프로비저닝된 IOPS
+        throughput: 프로비저닝된 처리량 (MiB/s)
+        encrypted: 암호화 여부
+        kms_key_id: KMS 키 ID
+        availability_zone: 가용 영역
+        create_time: 볼륨 생성 시간
+        snapshot_id: 원본 스냅샷 ID
+        attachments: 연결 정보 리스트
+        tags: 사용자 태그 딕셔너리 (aws: 접두사 제외)
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        monthly_cost: 추정 월간 비용 (USD)
+        read_ops: 분석 기간 총 VolumeReadOps
+        write_ops: 분석 기간 총 VolumeWriteOps
+    """
 
     id: str
     name: str
@@ -99,22 +128,38 @@ class EBSInfo:
 
     @property
     def total_ops(self) -> float:
-        """총 I/O 작업 수"""
+        """분석 기간 총 I/O 작업 수 (읽기 + 쓰기)
+
+        Returns:
+            read_ops + write_ops 합계
+        """
         return self.read_ops + self.write_ops
 
     @property
     def avg_daily_ops(self) -> float:
-        """일평균 I/O 작업 수"""
+        """일평균 I/O 작업 수
+
+        Returns:
+            분석 기간 일평균 총 I/O 작업 수
+        """
         return self.total_ops / ANALYSIS_DAYS if ANALYSIS_DAYS > 0 else 0
 
     @property
     def is_attached(self) -> bool:
-        """연결 여부"""
+        """EC2 인스턴스 연결 여부
+
+        Returns:
+            in-use 상태이고 attachment가 존재하면 True
+        """
         return self.state == "in-use" and len(self.attachments) > 0
 
     @property
     def attached_instance_id(self) -> str:
-        """연결된 인스턴스 ID"""
+        """연결된 EC2 인스턴스 ID
+
+        Returns:
+            첫 번째 attachment의 InstanceId. 연결 없으면 빈 문자열.
+        """
         if self.attachments:
             return str(self.attachments[0].get("InstanceId", ""))
         return ""
@@ -122,7 +167,15 @@ class EBSInfo:
 
 @dataclass
 class EBSFinding:
-    """EBS 분석 결과"""
+    """개별 EBS 볼륨 분석 결과
+
+    Attributes:
+        volume: 분석 대상 EBS 볼륨 정보
+        usage_status: 분석으로 판별된 사용 상태
+        severity: 심각도 수준
+        description: 상태 설명
+        recommendation: 권장 조치 사항
+    """
 
     volume: EBSInfo
     usage_status: UsageStatus
@@ -133,7 +186,24 @@ class EBSFinding:
 
 @dataclass
 class EBSAnalysisResult:
-    """분석 결과"""
+    """EBS 볼륨 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        findings: 개별 볼륨 분석 결과 리스트
+        total_count: 전체 볼륨 수
+        unused_count: 미사용 볼륨 수 (available 상태)
+        idle_count: 유휴 볼륨 수 (연결됨, I/O 없음)
+        normal_count: 정상 사용 볼륨 수
+        pending_count: 확인 필요 볼륨 수
+        total_size_gb: 전체 볼륨 용량 (GB)
+        unused_size_gb: 미사용 볼륨 용량 (GB)
+        idle_size_gb: 유휴 볼륨 용량 (GB)
+        unused_monthly_cost: 미사용 볼륨 추정 월간 비용 (USD)
+        idle_monthly_cost: 유휴 볼륨 추정 월간 비용 (USD)
+    """
 
     account_id: str
     account_name: str
@@ -161,7 +231,20 @@ class EBSAnalysisResult:
 
 
 def collect_ebs(session, account_id: str, account_name: str, region: str) -> list[EBSInfo]:
-    """EBS 볼륨 목록 수집"""
+    """EBS 볼륨 목록 수집 및 CloudWatch I/O 메트릭 조회
+
+    모든 EBS 볼륨을 페이지네이션으로 수집하고, in-use 볼륨에 대해
+    CloudWatch GetMetricStatistics로 VolumeReadOps/VolumeWriteOps를 조회합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        EBS 볼륨 정보 리스트 (I/O 메트릭 포함)
+    """
     from datetime import timedelta, timezone
 
     from botocore.exceptions import ClientError
@@ -257,7 +340,20 @@ def collect_ebs(session, account_id: str, account_name: str, region: str) -> lis
 
 
 def analyze_ebs(volumes: list[EBSInfo], account_id: str, account_name: str, region: str) -> EBSAnalysisResult:
-    """EBS 미사용 분석"""
+    """EBS 볼륨 사용 상태 분석
+
+    각 볼륨을 연결 상태 및 I/O 지표 기반으로 미사용/유휴/정상/확인필요로
+    분류하고, 상태별 용량과 비용을 집계합니다.
+
+    Args:
+        volumes: 수집된 EBS 볼륨 정보 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 볼륨 수, 용량, 비용 포함)
+    """
     result = EBSAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -287,7 +383,16 @@ def analyze_ebs(volumes: list[EBSInfo], account_id: str, account_name: str, regi
 
 
 def _analyze_single_volume(volume: EBSInfo) -> EBSFinding:
-    """개별 볼륨 분석"""
+    """개별 EBS 볼륨 사용 상태 분석
+
+    연결 상태, I/O 활동, 용량을 기반으로 사용 상태와 심각도를 결정합니다.
+
+    Args:
+        volume: 분석 대상 EBS 볼륨 정보
+
+    Returns:
+        개별 볼륨 분석 결과 (사용 상태, 심각도, 권장 조치 포함)
+    """
 
     # 1. 연결됨
     if volume.is_attached:
@@ -354,7 +459,18 @@ def _analyze_single_volume(volume: EBSInfo) -> EBSFinding:
 
 
 def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """EBS 미사용 분석 Excel 보고서 생성
+
+    Summary 시트(통계 요약)와 Findings 시트(개별 볼륨 상세)를 포함하는
+    Excel 파일을 생성합니다.
+
+    Args:
+        results: 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -475,13 +591,31 @@ def generate_report(results: list[EBSAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EBSAnalysisResult:
-    """단일 계정/리전의 EBS 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 EBS 볼륨 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 EBS 분석 결과
+    """
     volumes = collect_ebs(session, account_id, account_name, region)
     return analyze_ebs(volumes, account_id, account_name, region)
 
 
 def run(ctx: ExecutionContext) -> None:
-    """EBS 미사용 분석 실행 (병렬 처리)"""
+    """EBS 미사용 분석 실행
+
+    멀티 계정/리전에서 EBS 볼륨을 병렬 수집하고,
+    미사용(available)/유휴(I/O 없음) 상태를 분석하여
+    Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]EBS 미사용 분석 시작...[/bold]")
 
     # 병렬 수집

@@ -1,5 +1,5 @@
 """
-plugins/health/html_reporter.py - AWS Health 대시보드 HTML 리포터
+core/shared/aws/health/html_reporter.py - AWS Health 대시보드 HTML 리포터
 
 AWS Health 이벤트를 CloudScape UI 스타일의 HTML 대시보드로 생성합니다.
 - 요약 카드: 긴급도별 현황
@@ -47,7 +47,15 @@ COLORS = {
 
 
 class HealthDashboard:
-    """AWS Health 대시보드 HTML 생성기"""
+    """AWS Health 대시보드 HTML 생성기
+
+    CollectionResult를 CloudScape UI 스타일의 인터랙티브 HTML 대시보드로 변환합니다.
+    ECharts 차트, 캘린더 뷰, 검색/필터 기능이 포함된 단일 HTML 파일을 생성합니다.
+
+    Attributes:
+        result: CollectionResult 수집 결과 객체
+        generated_at: 대시보드 생성 일시 문자열
+    """
 
     def __init__(self, result: CollectionResult):
         """초기화

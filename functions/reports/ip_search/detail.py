@@ -1,8 +1,11 @@
-"""
-reports/ip_search/detail.py - ENI 상세 조회
+"""functions/reports/ip_search/detail.py - ENI 상세 조회.
 
 AWS API를 호출하여 ENI에 연결된 리소스의 상세 정보를 조회합니다.
-캐시 기반 빠른 검색과 달리, 정확한 실시간 정보를 제공합니다.
+캐시 기반 빠른 검색과 달리, 실시간 API 호출로 정확한 리소스 정보를 제공합니다.
+
+주요 함수:
+    - get_detailed_resource_info: 단일 ENI의 리소스 상세 정보 조회.
+    - enrich_resources_parallel: 다수 ENI의 리소스 정보를 병렬 조회.
 """
 
 from __future__ import annotations

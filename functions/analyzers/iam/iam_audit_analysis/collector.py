@@ -25,7 +25,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class IAMAccessKey:
-    """IAM Access Key 정보"""
+    """IAM Access Key 상세 정보.
+
+    Attributes:
+        user_name: 소유 IAM 사용자 이름.
+        access_key_id: Access Key ID.
+        status: 키 상태 (Active, Inactive).
+        create_date: 키 생성 일시.
+        last_used_date: 마지막 사용 일시.
+        last_used_service: 마지막 사용 AWS 서비스.
+        last_used_region: 마지막 사용 리전.
+        age_days: 키 생성 후 경과일.
+        days_since_last_use: 마지막 사용 후 경과일 (-1이면 사용 기록 없음).
+    """
 
     user_name: str
     access_key_id: str
@@ -41,7 +53,16 @@ class IAMAccessKey:
 
 @dataclass
 class GitCredential:
-    """CodeCommit Git Credential 정보"""
+    """CodeCommit Git Credential 정보.
+
+    Attributes:
+        user_name: 소유 IAM 사용자 이름.
+        service_user_name: Git 서비스 사용자 이름.
+        service_specific_credential_id: Credential ID.
+        status: 상태 (Active, Inactive).
+        create_date: 생성 일시.
+        age_days: 생성 후 경과일.
+    """
 
     user_name: str
     service_user_name: str
@@ -54,7 +75,15 @@ class GitCredential:
 
 @dataclass
 class IAMUserChangeHistory:
-    """IAM User 변경 이력 (AWS Config History)"""
+    """IAM User 변경 이력 (AWS Config History에서 추출).
+
+    Attributes:
+        capture_time: 캡처 시간.
+        status: 리소스 상태 (OK, ResourceDeleted, ResourceDiscovered).
+        change_type: 변경 유형 (CREATE, UPDATE, DELETE).
+        related_events: 관련 CloudTrail Event ID 목록.
+        configuration_diff: 변경 전후 상태 요약.
+    """
 
     capture_time: datetime | None = None
     status: str = ""  # OK, ResourceDeleted, ResourceDiscovered
@@ -66,7 +95,13 @@ class IAMUserChangeHistory:
 
 @dataclass
 class RoleResourceRelation:
-    """Role-Resource 연결 정보 (AWS Config)"""
+    """Role과 연결된 AWS 리소스 정보 (AWS Config에서 추출).
+
+    Attributes:
+        resource_type: AWS 리소스 타입 (EC2 Instance, Lambda Function 등).
+        resource_name: 리소스 이름 또는 식별자.
+        resource_id: 리소스 ID.
+    """
 
     resource_type: str
     resource_name: str
@@ -75,7 +110,11 @@ class RoleResourceRelation:
 
 @dataclass
 class IAMUser:
-    """IAM User 정보"""
+    """IAM User 종합 정보.
+
+    MFA, Access Key, Password, Git Credential, 그룹/정책, 위험 권한,
+    권한 상승 경로 등 보안 감사에 필요한 모든 정보를 포함한다.
+    """
 
     user_name: str
     user_id: str
@@ -113,7 +152,11 @@ class IAMUser:
 
 @dataclass
 class IAMRole:
-    """IAM Role 정보"""
+    """IAM Role 종합 정보.
+
+    Trust Policy, 연결 리소스(AWS Config), 위험 권한, 권한 상승 경로 등
+    보안 감사에 필요한 모든 정보를 포함한다.
+    """
 
     role_name: str
     role_id: str
@@ -153,7 +196,10 @@ class IAMRole:
 
 @dataclass
 class IAMGroup:
-    """IAM Group 정보"""
+    """IAM Group 종합 정보.
+
+    멤버 사용자 목록, 연결 정책, Admin 권한 보유 여부 등을 포함한다.
+    """
 
     group_name: str
     group_id: str
@@ -175,7 +221,10 @@ class IAMGroup:
 
 @dataclass
 class PasswordPolicy:
-    """비밀번호 정책"""
+    """IAM 비밀번호 정책 설정.
+
+    exists가 False이면 비밀번호 정책이 설정되지 않은 것이다.
+    """
 
     exists: bool = False
     minimum_length: int = 0
@@ -192,7 +241,10 @@ class PasswordPolicy:
 
 @dataclass
 class AccountSummary:
-    """계정 요약 정보"""
+    """AWS 계정 수준 IAM 요약 정보.
+
+    Root 계정의 Access Key 존재 여부, MFA 활성화 여부, 리소스 수 등을 포함한다.
+    """
 
     account_id: str
     account_name: str
@@ -210,7 +262,19 @@ class AccountSummary:
 
 @dataclass
 class IAMData:
-    """수집된 IAM 데이터"""
+    """단일 계정에서 수집된 IAM 전체 데이터.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        users: IAM User 목록.
+        groups: IAM Group 목록.
+        roles: IAM Role 목록.
+        password_policy: 비밀번호 정책.
+        account_summary: 계정 요약 정보.
+        config_enabled: AWS Config 활성화 여부.
+        config_error: AWS Config 조회 시 에러 메시지.
+    """
 
     account_id: str
     account_name: str
@@ -225,7 +289,12 @@ class IAMData:
 
 
 class IAMCollector:
-    """IAM 데이터 수집기"""
+    """IAM 데이터 수집기.
+
+    IAM User, Role, Group, Password Policy, Account Summary를 수집하고,
+    AWS Config에서 Role-Resource 관계도 조회한다.
+    위험 권한(PassRole 등)과 Admin 정책 보유 여부도 분석한다.
+    """
 
     # 관리자 수준 권한 정책 (경고 대상)
     # Tier 1: 직접 권한 상승 가능

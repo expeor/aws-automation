@@ -1,23 +1,36 @@
 """
-plugins/resource_explorer/common/collector.py - 인벤토리 수집기
+core/shared/aws/inventory/collector.py - 인벤토리 수집기
 
 병렬로 AWS 리소스를 수집하는 통합 클래스.
 
+``InventoryCollector``는 ``parallel_collect``를 사용하여 멀티 계정/리전에서
+60종의 AWS 리소스를 병렬로 수집합니다. 각 수집 메서드는 해당 리소스 타입의
+데이터 클래스 목록을 반환합니다.
+
 카테고리:
-- Network: VPC, Subnet, RouteTable, InternetGateway, ElasticIP, ENI, NATGateway, VPCEndpoint
-          TransitGateway, TransitGatewayAttachment, VPNGateway, VPNConnection, NetworkACL, VPCPeering
-- Compute: EC2, EBSVolume, LambdaFunction, ECSCluster, ECSService
-           AutoScalingGroup, LaunchTemplate, EKSCluster, EKSNodeGroup, AMI, Snapshot
-- Database/Storage: RDSInstance, RDSCluster, S3Bucket, DynamoDBTable, ElastiCacheCluster
-                    RedshiftCluster, EFSFileSystem, FSxFileSystem
-- Security: SecurityGroup, KMSKey, Secret, IAMRole, IAMUser, IAMPolicy, ACMCertificate, WAFWebACL
-- CDN/DNS: CloudFrontDistribution, Route53HostedZone
-- Load Balancing: LoadBalancer, TargetGroup
-- Integration/Messaging: SNSTopic, SQSQueue, EventBridgeRule, StepFunction, APIGatewayAPI
-- Monitoring: CloudWatchAlarm, CloudWatchLogGroup
-- Analytics: KinesisStream, KinesisFirehose, GlueDatabase
-- DevOps: CloudFormationStack, CodePipeline, CodeBuildProject
-- Backup: BackupVault, BackupPlan
+    - Network (14): VPC, Subnet, RouteTable, InternetGateway, ElasticIP, ENI, NATGateway,
+      VPCEndpoint, TransitGateway, TransitGatewayAttachment, VPNGateway, VPNConnection,
+      NetworkACL, VPCPeeringConnection
+    - Compute (11): EC2Instance, EBSVolume, LambdaFunction, ECSCluster, ECSService,
+      AutoScalingGroup, LaunchTemplate, EKSCluster, EKSNodeGroup, AMI, Snapshot
+    - Database/Storage (8): RDSInstance, RDSCluster, S3Bucket, DynamoDBTable,
+      ElastiCacheCluster, RedshiftCluster, EFSFileSystem, FSxFileSystem
+    - Security (8): SecurityGroup, KMSKey, Secret, IAMRole, IAMUser, IAMPolicy,
+      ACMCertificate, WAFWebACL
+    - CDN/DNS (2): CloudFrontDistribution, Route53HostedZone
+    - Load Balancing (2): LoadBalancer, TargetGroup
+    - Integration/Messaging (5): SNSTopic, SQSQueue, EventBridgeRule, StepFunction,
+      APIGatewayAPI
+    - Monitoring (2): CloudWatchAlarm, CloudWatchLogGroup
+    - Analytics (3): KinesisStream, KinesisFirehose, GlueDatabase
+    - DevOps (3): CloudFormationStack, CodePipeline, CodeBuildProject
+    - Backup (2): BackupVault, BackupPlan
+
+Example:
+    >>> from core.shared.aws.inventory import InventoryCollector
+    >>> collector = InventoryCollector(ctx)
+    >>> vpcs = collector.collect_vpcs()
+    >>> instances = collector.collect_ec2()
 """
 
 from __future__ import annotations
@@ -168,29 +181,27 @@ from .types import (
 
 
 class InventoryCollector:
-    """AWS 리소스 인벤토리 수집기
+    """AWS 리소스 인벤토리 수집기.
 
-    병렬 처리를 통해 multi-account/region에서 리소스를 수집합니다.
+    ``parallel_collect``를 사용하여 멀티 계정/리전에서 AWS 리소스를 병렬로 수집합니다.
+    11개 카테고리, 60종의 리소스 타입을 지원하며 각 수집 메서드는 해당 타입의
+    데이터 클래스 목록을 반환합니다.
 
-    Usage:
-        collector = InventoryCollector(ctx)
+    글로벌 리소스(IAM, S3, CloudFront, Route53)는 us-east-1에서만 수집되며,
+    리전 리소스는 ExecutionContext에 지정된 모든 리전에서 병렬 수집됩니다.
 
-        # Network
-        vpcs = collector.collect_vpcs()
-        subnets = collector.collect_subnets()
-
-        # Compute
-        instances = collector.collect_ec2()
-        volumes = collector.collect_ebs_volumes()
-
-        # Database
-        rds_instances = collector.collect_rds_instances()
+    Example:
+        >>> collector = InventoryCollector(ctx)
+        >>> vpcs = collector.collect_vpcs()
+        >>> instances = collector.collect_ec2()
+        >>> rds_instances = collector.collect_rds_instances()
     """
 
     def __init__(self, ctx):
-        """
+        """InventoryCollector를 초기화합니다.
+
         Args:
-            ctx: ExecutionContext (provider, regions, accounts 포함)
+            ctx: ExecutionContext 객체. provider, regions, accounts 정보를 포함합니다.
         """
         self._ctx = ctx
 
@@ -199,7 +210,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_vpcs(self) -> list[VPC]:
-        """VPC 수집"""
+        """모든 계정/리전에서 VPC 리소스를 병렬 수집합니다.
+
+        Returns:
+            VPC 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_vpcs(session, account_id, account_name, region)
@@ -208,7 +223,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_subnets(self) -> list[Subnet]:
-        """Subnet 수집"""
+        """모든 계정/리전에서 Subnet 리소스를 병렬 수집합니다.
+
+        Returns:
+            Subnet 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_subnets(session, account_id, account_name, region)
@@ -217,7 +236,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_route_tables(self) -> list[RouteTable]:
-        """Route Table 수집"""
+        """모든 계정/리전에서 Route Table 리소스를 병렬 수집합니다.
+
+        Returns:
+            RouteTable 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_route_tables(session, account_id, account_name, region)
@@ -226,7 +249,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_internet_gateways(self) -> list[InternetGateway]:
-        """Internet Gateway 수집"""
+        """모든 계정/리전에서 Internet Gateway 리소스를 병렬 수집합니다.
+
+        Returns:
+            InternetGateway 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_internet_gateways(session, account_id, account_name, region)
@@ -235,7 +262,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_elastic_ips(self) -> list[ElasticIP]:
-        """Elastic IP 수집"""
+        """모든 계정/리전에서 Elastic IP 리소스를 병렬 수집합니다.
+
+        Returns:
+            ElasticIP 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_elastic_ips(session, account_id, account_name, region)
@@ -244,7 +275,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_enis(self) -> list[ENI]:
-        """ENI 수집"""
+        """모든 계정/리전에서 Elastic Network Interface를 병렬 수집합니다.
+
+        Returns:
+            ENI 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_enis(session, account_id, account_name, region)
@@ -253,7 +288,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_nat_gateways(self) -> list[NATGateway]:
-        """NAT Gateway 수집"""
+        """모든 계정/리전에서 NAT Gateway 리소스를 병렬 수집합니다.
+
+        Returns:
+            NATGateway 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_nat_gateways(session, account_id, account_name, region)
@@ -262,7 +301,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_vpc_endpoints(self) -> list[VPCEndpoint]:
-        """VPC Endpoint 수집"""
+        """모든 계정/리전에서 VPC Endpoint 리소스를 병렬 수집합니다.
+
+        Returns:
+            VPCEndpoint 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_vpc_endpoints(session, account_id, account_name, region)
@@ -275,7 +318,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_transit_gateways(self) -> list[TransitGateway]:
-        """Transit Gateway 수집"""
+        """모든 계정/리전에서 Transit Gateway 리소스를 병렬 수집합니다.
+
+        Returns:
+            TransitGateway 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_transit_gateways(session, account_id, account_name, region)
@@ -284,7 +331,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_transit_gateway_attachments(self) -> list[TransitGatewayAttachment]:
-        """Transit Gateway Attachment 수집"""
+        """모든 계정/리전에서 Transit Gateway Attachment를 병렬 수집합니다.
+
+        Returns:
+            TransitGatewayAttachment 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_transit_gateway_attachments(session, account_id, account_name, region)
@@ -293,7 +344,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_vpn_gateways(self) -> list[VPNGateway]:
-        """VPN Gateway 수집"""
+        """모든 계정/리전에서 VPN Gateway 리소스를 병렬 수집합니다.
+
+        Returns:
+            VPNGateway 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_vpn_gateways(session, account_id, account_name, region)
@@ -302,7 +357,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_vpn_connections(self) -> list[VPNConnection]:
-        """VPN Connection 수집"""
+        """모든 계정/리전에서 VPN Connection 리소스를 병렬 수집합니다.
+
+        Returns:
+            VPNConnection 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_vpn_connections(session, account_id, account_name, region)
@@ -311,7 +370,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_network_acls(self) -> list[NetworkACL]:
-        """Network ACL 수집"""
+        """모든 계정/리전에서 Network ACL 리소스를 병렬 수집합니다.
+
+        Returns:
+            NetworkACL 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_network_acls(session, account_id, account_name, region)
@@ -320,7 +383,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_vpc_peering_connections(self) -> list[VPCPeeringConnection]:
-        """VPC Peering Connection 수집"""
+        """모든 계정/리전에서 VPC Peering Connection을 병렬 수집합니다.
+
+        Returns:
+            VPCPeeringConnection 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_vpc_peering_connections(session, account_id, account_name, region)
@@ -333,7 +400,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_ec2(self) -> list[EC2Instance]:
-        """EC2 인스턴스 수집"""
+        """모든 계정/리전에서 EC2 인스턴스를 병렬 수집합니다.
+
+        Returns:
+            EC2Instance 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_ec2_instances(session, account_id, account_name, region)
@@ -342,7 +413,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_ebs_volumes(self) -> list[EBSVolume]:
-        """EBS Volume 수집"""
+        """모든 계정/리전에서 EBS Volume 리소스를 병렬 수집합니다.
+
+        Returns:
+            EBSVolume 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_ebs_volumes(session, account_id, account_name, region)
@@ -351,7 +426,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_lambda_functions(self) -> list[LambdaFunction]:
-        """Lambda Function 수집"""
+        """모든 계정/리전에서 Lambda Function을 병렬 수집합니다.
+
+        Returns:
+            LambdaFunction 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_lambda_functions(session, account_id, account_name, region)
@@ -360,7 +439,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_ecs_clusters(self) -> list[ECSCluster]:
-        """ECS Cluster 수집"""
+        """모든 계정/리전에서 ECS Cluster 리소스를 병렬 수집합니다.
+
+        Returns:
+            ECSCluster 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_ecs_clusters(session, account_id, account_name, region)
@@ -369,7 +452,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_ecs_services(self) -> list[ECSService]:
-        """ECS Service 수집"""
+        """모든 계정/리전에서 ECS Service를 병렬 수집합니다.
+
+        Returns:
+            ECSService 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_ecs_services(session, account_id, account_name, region)
@@ -378,7 +465,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_auto_scaling_groups(self) -> list[AutoScalingGroup]:
-        """Auto Scaling Group 수집"""
+        """모든 계정/리전에서 Auto Scaling Group을 병렬 수집합니다.
+
+        Returns:
+            AutoScalingGroup 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_auto_scaling_groups(session, account_id, account_name, region)
@@ -387,7 +478,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_launch_templates(self) -> list[LaunchTemplate]:
-        """Launch Template 수집"""
+        """모든 계정/리전에서 Launch Template 리소스를 병렬 수집합니다.
+
+        Returns:
+            LaunchTemplate 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_launch_templates(session, account_id, account_name, region)
@@ -396,7 +491,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_eks_clusters(self) -> list[EKSCluster]:
-        """EKS Cluster 수집"""
+        """모든 계정/리전에서 EKS Cluster 리소스를 병렬 수집합니다.
+
+        Returns:
+            EKSCluster 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_eks_clusters(session, account_id, account_name, region)
@@ -405,7 +504,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_eks_node_groups(self) -> list[EKSNodeGroup]:
-        """EKS Node Group 수집"""
+        """모든 계정/리전에서 EKS Node Group을 병렬 수집합니다.
+
+        Returns:
+            EKSNodeGroup 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_eks_node_groups(session, account_id, account_name, region)
@@ -414,7 +517,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_amis(self) -> list[AMI]:
-        """EC2 AMI (자체 소유) 수집"""
+        """모든 계정/리전에서 자체 소유 EC2 AMI를 병렬 수집합니다.
+
+        Returns:
+            AMI 데이터 클래스 목록 (자체 소유 이미지만 포함)
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_amis(session, account_id, account_name, region)
@@ -423,7 +530,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_snapshots(self) -> list[Snapshot]:
-        """EC2 Snapshot (자체 소유) 수집"""
+        """모든 계정/리전에서 자체 소유 EC2 Snapshot을 병렬 수집합니다.
+
+        Returns:
+            Snapshot 데이터 클래스 목록 (자체 소유 스냅샷만 포함)
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_snapshots(session, account_id, account_name, region)
@@ -436,7 +547,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_rds_instances(self) -> list[RDSInstance]:
-        """RDS Instance 수집"""
+        """모든 계정/리전에서 RDS Instance를 병렬 수집합니다.
+
+        Returns:
+            RDSInstance 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_rds_instances(session, account_id, account_name, region)
@@ -445,7 +560,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_rds_clusters(self) -> list[RDSCluster]:
-        """RDS Cluster (Aurora) 수집"""
+        """모든 계정/리전에서 RDS Cluster (Aurora)를 병렬 수집합니다.
+
+        Returns:
+            RDSCluster 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_rds_clusters(session, account_id, account_name, region)
@@ -454,7 +573,13 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_s3_buckets(self) -> list[S3Bucket]:
-        """S3 Bucket 수집 (글로벌 - us-east-1에서만)"""
+        """모든 계정에서 S3 Bucket을 병렬 수집합니다.
+
+        S3는 글로벌 서비스이므로 us-east-1에서만 수집됩니다.
+
+        Returns:
+            S3Bucket 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_s3_buckets(session, account_id, account_name, region)
@@ -463,7 +588,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_dynamodb_tables(self) -> list[DynamoDBTable]:
-        """DynamoDB Table 수집"""
+        """모든 계정/리전에서 DynamoDB Table을 병렬 수집합니다.
+
+        Returns:
+            DynamoDBTable 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_dynamodb_tables(session, account_id, account_name, region)
@@ -472,7 +601,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_elasticache_clusters(self) -> list[ElastiCacheCluster]:
-        """ElastiCache Cluster 수집"""
+        """모든 계정/리전에서 ElastiCache Cluster를 병렬 수집합니다.
+
+        Returns:
+            ElastiCacheCluster 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_elasticache_clusters(session, account_id, account_name, region)
@@ -481,7 +614,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_redshift_clusters(self) -> list[RedshiftCluster]:
-        """Redshift Cluster 수집"""
+        """모든 계정/리전에서 Redshift Cluster를 병렬 수집합니다.
+
+        Returns:
+            RedshiftCluster 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_redshift_clusters(session, account_id, account_name, region)
@@ -490,7 +627,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_efs_file_systems(self) -> list[EFSFileSystem]:
-        """EFS File System 수집"""
+        """모든 계정/리전에서 EFS File System을 병렬 수집합니다.
+
+        Returns:
+            EFSFileSystem 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_efs_file_systems(session, account_id, account_name, region)
@@ -499,7 +640,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_fsx_file_systems(self) -> list[FSxFileSystem]:
-        """FSx File System 수집"""
+        """모든 계정/리전에서 FSx File System을 병렬 수집합니다.
+
+        Returns:
+            FSxFileSystem 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_fsx_file_systems(session, account_id, account_name, region)
@@ -512,7 +657,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_security_groups(self) -> list[SecurityGroup]:
-        """Security Group 수집"""
+        """모든 계정/리전에서 Security Group을 병렬 수집합니다.
+
+        Returns:
+            SecurityGroup 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_security_groups(session, account_id, account_name, region)
@@ -521,7 +670,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_kms_keys(self) -> list[KMSKey]:
-        """KMS Key 수집"""
+        """모든 계정/리전에서 KMS Key를 병렬 수집합니다.
+
+        Returns:
+            KMSKey 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_kms_keys(session, account_id, account_name, region)
@@ -530,7 +683,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_secrets(self) -> list[Secret]:
-        """Secrets Manager Secret 수집"""
+        """모든 계정/리전에서 Secrets Manager Secret을 병렬 수집합니다.
+
+        Returns:
+            Secret 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_secrets(session, account_id, account_name, region)
@@ -539,7 +696,13 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_iam_roles(self) -> list[IAMRole]:
-        """IAM Role 수집 (글로벌)"""
+        """모든 계정에서 IAM Role을 병렬 수집합니다.
+
+        IAM은 글로벌 서비스이므로 us-east-1에서만 수집됩니다.
+
+        Returns:
+            IAMRole 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_iam_roles(session, account_id, account_name, region)
@@ -548,7 +711,13 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_iam_users(self) -> list[IAMUser]:
-        """IAM User 수집 (글로벌)"""
+        """모든 계정에서 IAM User를 병렬 수집합니다.
+
+        IAM은 글로벌 서비스이므로 us-east-1에서만 수집됩니다.
+
+        Returns:
+            IAMUser 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_iam_users(session, account_id, account_name, region)
@@ -557,7 +726,14 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_iam_policies(self) -> list[IAMPolicy]:
-        """IAM Policy (Customer Managed) 수집 (글로벌)"""
+        """모든 계정에서 Customer Managed IAM Policy를 병렬 수집합니다.
+
+        IAM은 글로벌 서비스이므로 us-east-1에서만 수집됩니다.
+        AWS Managed Policy는 제외되고 Customer Managed Policy만 포함됩니다.
+
+        Returns:
+            IAMPolicy 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_iam_policies(session, account_id, account_name, region)
@@ -566,7 +742,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_acm_certificates(self) -> list[ACMCertificate]:
-        """ACM Certificate 수집"""
+        """모든 계정/리전에서 ACM Certificate를 병렬 수집합니다.
+
+        Returns:
+            ACMCertificate 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_acm_certificates(session, account_id, account_name, region)
@@ -575,7 +755,13 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_waf_web_acls(self) -> list[WAFWebACL]:
-        """WAF WebACL 수집"""
+        """모든 계정/리전에서 WAF WebACL을 병렬 수집합니다.
+
+        Regional WebACL과 CloudFront WebACL(us-east-1에서만)을 모두 수집합니다.
+
+        Returns:
+            WAFWebACL 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_waf_web_acls(session, account_id, account_name, region)
@@ -588,7 +774,13 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_cloudfront_distributions(self) -> list[CloudFrontDistribution]:
-        """CloudFront Distribution 수집 (글로벌 - us-east-1에서만)"""
+        """모든 계정에서 CloudFront Distribution을 병렬 수집합니다.
+
+        CloudFront는 글로벌 서비스이므로 us-east-1에서만 수집됩니다.
+
+        Returns:
+            CloudFrontDistribution 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_cloudfront_distributions(session, account_id, account_name, region)
@@ -597,7 +789,13 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_route53_hosted_zones(self) -> list[Route53HostedZone]:
-        """Route 53 Hosted Zone 수집 (글로벌 - us-east-1에서만)"""
+        """모든 계정에서 Route 53 Hosted Zone을 병렬 수집합니다.
+
+        Route 53는 글로벌 서비스이므로 us-east-1에서만 수집됩니다.
+
+        Returns:
+            Route53HostedZone 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_route53_hosted_zones(session, account_id, account_name, region)
@@ -610,10 +808,15 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_load_balancers(self, include_classic: bool = False) -> list[LoadBalancer]:
-        """Load Balancer 수집
+        """모든 계정/리전에서 Load Balancer를 병렬 수집합니다.
+
+        기본적으로 ALB/NLB/GWLB만 수집하며, include_classic=True 시 Classic LB도 포함합니다.
 
         Args:
-            include_classic: True면 Classic LB도 포함
+            include_classic: True면 Classic LB도 포함합니다.
+
+        Returns:
+            LoadBalancer 데이터 클래스 목록
         """
 
         def _collect(session, account_id: str, account_name: str, region: str):
@@ -623,7 +826,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_target_groups(self) -> list[TargetGroup]:
-        """Target Group 수집"""
+        """모든 계정/리전에서 Target Group을 병렬 수집합니다.
+
+        Returns:
+            TargetGroup 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_target_groups(session, account_id, account_name, region)
@@ -636,7 +843,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_sns_topics(self) -> list[SNSTopic]:
-        """SNS Topic 수집"""
+        """모든 계정/리전에서 SNS Topic을 병렬 수집합니다.
+
+        Returns:
+            SNSTopic 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_sns_topics(session, account_id, account_name, region)
@@ -645,7 +856,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_sqs_queues(self) -> list[SQSQueue]:
-        """SQS Queue 수집"""
+        """모든 계정/리전에서 SQS Queue를 병렬 수집합니다.
+
+        Returns:
+            SQSQueue 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_sqs_queues(session, account_id, account_name, region)
@@ -654,7 +869,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_eventbridge_rules(self) -> list[EventBridgeRule]:
-        """EventBridge Rule 수집"""
+        """모든 계정/리전에서 EventBridge Rule을 병렬 수집합니다.
+
+        Returns:
+            EventBridgeRule 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_eventbridge_rules(session, account_id, account_name, region)
@@ -663,7 +882,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_step_functions(self) -> list[StepFunction]:
-        """Step Functions State Machine 수집"""
+        """모든 계정/리전에서 Step Functions State Machine을 병렬 수집합니다.
+
+        Returns:
+            StepFunction 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_step_functions(session, account_id, account_name, region)
@@ -672,7 +895,13 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_api_gateway_apis(self) -> list[APIGatewayAPI]:
-        """API Gateway REST/HTTP API 수집"""
+        """모든 계정/리전에서 API Gateway REST/HTTP API를 병렬 수집합니다.
+
+        REST API (v1)와 HTTP/WebSocket API (v2)를 모두 수집합니다.
+
+        Returns:
+            APIGatewayAPI 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_api_gateway_apis(session, account_id, account_name, region)
@@ -685,7 +914,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_cloudwatch_alarms(self) -> list[CloudWatchAlarm]:
-        """CloudWatch Alarm 수집"""
+        """모든 계정/리전에서 CloudWatch Alarm을 병렬 수집합니다.
+
+        Returns:
+            CloudWatchAlarm 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_cloudwatch_alarms(session, account_id, account_name, region)
@@ -694,7 +927,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_cloudwatch_log_groups(self) -> list[CloudWatchLogGroup]:
-        """CloudWatch Log Group 수집"""
+        """모든 계정/리전에서 CloudWatch Log Group을 병렬 수집합니다.
+
+        Returns:
+            CloudWatchLogGroup 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_cloudwatch_log_groups(session, account_id, account_name, region)
@@ -707,7 +944,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_kinesis_streams(self) -> list[KinesisStream]:
-        """Kinesis Data Stream 수집"""
+        """모든 계정/리전에서 Kinesis Data Stream을 병렬 수집합니다.
+
+        Returns:
+            KinesisStream 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_kinesis_streams(session, account_id, account_name, region)
@@ -716,7 +957,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_kinesis_firehoses(self) -> list[KinesisFirehose]:
-        """Kinesis Firehose Delivery Stream 수집"""
+        """모든 계정/리전에서 Kinesis Firehose Delivery Stream을 병렬 수집합니다.
+
+        Returns:
+            KinesisFirehose 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_kinesis_firehoses(session, account_id, account_name, region)
@@ -725,7 +970,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_glue_databases(self) -> list[GlueDatabase]:
-        """Glue Database 수집"""
+        """모든 계정/리전에서 Glue Database를 병렬 수집합니다.
+
+        Returns:
+            GlueDatabase 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_glue_databases(session, account_id, account_name, region)
@@ -738,7 +987,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_cloudformation_stacks(self) -> list[CloudFormationStack]:
-        """CloudFormation Stack 수집"""
+        """모든 계정/리전에서 CloudFormation Stack을 병렬 수집합니다.
+
+        Returns:
+            CloudFormationStack 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_cloudformation_stacks(session, account_id, account_name, region)
@@ -747,7 +1000,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_codepipelines(self) -> list[CodePipeline]:
-        """CodePipeline 수집"""
+        """모든 계정/리전에서 CodePipeline을 병렬 수집합니다.
+
+        Returns:
+            CodePipeline 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_codepipelines(session, account_id, account_name, region)
@@ -756,7 +1013,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_codebuild_projects(self) -> list[CodeBuildProject]:
-        """CodeBuild Project 수집"""
+        """모든 계정/리전에서 CodeBuild Project를 병렬 수집합니다.
+
+        Returns:
+            CodeBuildProject 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_codebuild_projects(session, account_id, account_name, region)
@@ -769,7 +1030,11 @@ class InventoryCollector:
     # =========================================================================
 
     def collect_backup_vaults(self) -> list[BackupVault]:
-        """Backup Vault 수집"""
+        """모든 계정/리전에서 Backup Vault를 병렬 수집합니다.
+
+        Returns:
+            BackupVault 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_backup_vaults(session, account_id, account_name, region)
@@ -778,7 +1043,11 @@ class InventoryCollector:
         return result.get_flat_data()
 
     def collect_backup_plans(self) -> list[BackupPlan]:
-        """Backup Plan 수집"""
+        """모든 계정/리전에서 Backup Plan을 병렬 수집합니다.
+
+        Returns:
+            BackupPlan 데이터 클래스 목록
+        """
 
         def _collect(session, account_id: str, account_name: str, region: str):
             return collect_backup_plans(session, account_id, account_name, region)

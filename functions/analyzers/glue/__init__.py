@@ -1,7 +1,11 @@
 """
-plugins/glue - AWS Glue Analysis Tools
+functions/analyzers/glue - AWS Glue ETL 작업 관리 및 최적화 도구
 
-AWS Glue ETL job management and optimization
+Glue ETL 작업의 실행 기록을 분석하고
+미사용/실패 Glue 작업을 탐지합니다.
+
+도구 목록:
+    - unused: 미사용/실패 Glue 작업 탐지 (실행 기록 기반)
 """
 
 CATEGORY = {

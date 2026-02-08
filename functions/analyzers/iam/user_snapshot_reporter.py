@@ -26,7 +26,20 @@ OLD_KEY_THRESHOLD_DAYS = 90
 
 @dataclass
 class AccountStats:
-    """계정별 통계"""
+    """계정별 IAM 사용자 통계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        total_users: 전체 IAM 사용자 수.
+        users_with_console: 콘솔 접근 가능한 사용자 수.
+        users_with_mfa: MFA 활성화 사용자 수.
+        total_access_keys: 전체 Access Key 수.
+        active_access_keys: Active 상태 Access Key 수.
+        old_access_keys: 90일 이상 된 Active Access Key 수.
+        inactive_users: 비활성 사용자 수 (자격 증명 없음).
+        users_with_git_credentials: Git Credential 보유 사용자 수.
+    """
 
     account_id: str
     account_name: str
@@ -42,7 +55,19 @@ class AccountStats:
 
 @dataclass
 class OldAccessKey:
-    """오래된 Access Key 정보"""
+    """90일 이상 경과한 Active Access Key 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        user_name: IAM 사용자 이름.
+        access_key_id: Access Key ID.
+        age_days: 키 생성 후 경과일.
+        last_used_days: 마지막 사용 후 경과일.
+        last_used_service: 마지막 사용 서비스.
+        last_used_region: 마지막 사용 리전.
+        create_date: 키 생성일 문자열.
+    """
 
     account_id: str
     account_name: str
@@ -57,7 +82,16 @@ class OldAccessKey:
 
 @dataclass
 class InactiveUser:
-    """비활성 사용자 정보"""
+    """비활성 IAM 사용자 정보 (콘솔/키/Git Credential 모두 없음).
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        user_name: IAM 사용자 이름.
+        create_date: 사용자 생성일 문자열.
+        groups: 소속 그룹 (쉼표 구분).
+        attached_policies: 연결된 정책 이름 (쉼표 구분).
+    """
 
     account_id: str
     account_name: str
@@ -69,7 +103,22 @@ class InactiveUser:
 
 @dataclass
 class UserSnapshot:
-    """사용자 스냅샷 정보"""
+    """IAM 사용자의 종합 현황 스냅샷.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        user_name: IAM 사용자 이름.
+        create_date: 사용자 생성일 문자열.
+        has_console_access: 콘솔 접근 가능 여부.
+        has_mfa: MFA 활성화 여부.
+        active_key_count: Active 상태 Access Key 수.
+        active_git_credential_count: Active 상태 Git Credential 수.
+        groups: 소속 그룹 (쉼표 구분).
+        attached_policies: 연결된 정책 이름 (쉼표 구분).
+        days_since_last_login: 마지막 콘솔 로그인 후 경과일.
+        oldest_key_age_days: 가장 오래된 Access Key 경과일.
+    """
 
     account_id: str
     account_name: str
@@ -87,7 +136,14 @@ class UserSnapshot:
 
 @dataclass
 class UserSnapshotAnalysis:
-    """분석 결과"""
+    """사용자 현황 분석 결과.
+
+    Attributes:
+        account_stats: 계정별 통계 목록.
+        old_access_keys: 오래된 Access Key 목록.
+        inactive_users: 비활성 사용자 목록.
+        user_snapshots: 전체 사용자 스냅샷 목록.
+    """
 
     account_stats: list[AccountStats] = field(default_factory=list)
     old_access_keys: list[OldAccessKey] = field(default_factory=list)
@@ -96,14 +152,25 @@ class UserSnapshotAnalysis:
 
 
 class UserSnapshotReporter:
-    """IAM 사용자 현황 보고서 생성기"""
+    """IAM 사용자 현황 Excel 보고서 생성기.
+
+    IAM 데이터를 분석하여 Summary, Old Access Keys, Inactive Users,
+    User Snapshot 시트가 포함된 Excel 보고서를 생성한다.
+
+    Args:
+        iam_data_list: 계정별 IAM 데이터 목록.
+    """
 
     def __init__(self, iam_data_list: list[IAMData]):
         self.iam_data_list = iam_data_list
         self.analysis = self._analyze()
 
     def _analyze(self) -> UserSnapshotAnalysis:
-        """IAM 데이터 분석"""
+        """IAM 데이터를 분석하여 통계, 오래된 키, 비활성 사용자, 스냅샷을 생성한다.
+
+        Returns:
+            사용자 현황 분석 결과.
+        """
         analysis = UserSnapshotAnalysis()
 
         for iam_data in self.iam_data_list:
@@ -187,7 +254,16 @@ class UserSnapshotReporter:
         return analysis
 
     def generate(self, output_dir: str) -> str:
-        """Excel 보고서 생성"""
+        """Excel 보고서를 생성한다.
+
+        Summary, Old Access Keys, Inactive Users, User Snapshot 4개 시트로 구성된다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+
+        Returns:
+            생성된 Excel 파일 경로.
+        """
         wb = Workbook()
 
         # 1. Summary 시트

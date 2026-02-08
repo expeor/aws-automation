@@ -1,10 +1,7 @@
-"""
-reports/scheduled/types.py - 정기 작업 데이터 타입
+"""functions/reports/scheduled/types.py - 정기 작업 데이터 타입.
 
-작업 유형:
-- 점검 (read): 현황 파악, 보고서 생성
-- 적용 (write): 설정 변경, 태그 적용
-- 정리 (delete): 리소스 삭제, 정리
+TaskCycle(주기 Enum), ScheduledTask(작업 항목), ScheduleGroup(주기별 그룹)
+데이터 클래스와 권한별 색상 매핑을 정의합니다.
 """
 
 from dataclasses import dataclass, field
@@ -13,7 +10,16 @@ from typing import Literal
 
 
 class TaskCycle(Enum):
-    """작업 주기"""
+    """작업 실행 주기.
+
+    Attributes:
+        DAILY: 일간 ("D").
+        WEEKLY: 주간 ("W").
+        MONTHLY: 월간 ("1M").
+        QUARTERLY: 분기 ("3M").
+        BIANNUAL: 반기 ("6M").
+        ANNUAL: 연간 ("12M").
+    """
 
     DAILY = "D"  # 일간
     WEEKLY = "W"  # 주간
@@ -36,7 +42,22 @@ PERMISSION_COLORS = {
 
 @dataclass
 class ScheduledTask:
-    """정기 작업 항목"""
+    """정기 작업 항목.
+
+    Attributes:
+        id: 고유 ID (예: "D-001", "3M-004").
+        name: 한글 이름.
+        name_en: 영문 이름.
+        description: 한글 설명.
+        description_en: 영문 설명.
+        cycle: 작업 실행 주기 (TaskCycle).
+        tool_ref: 참조 도구 경로 (예: "ec2/ebs_audit").
+        permission: 권한 타입 ("read", "write", "delete").
+        supports_regions: 멀티 리전 지원 여부.
+        requires_input: 추가 입력이 필요한 경우의 입력 설정.
+        requires_confirm: delete 작업 시 확인 필요 여부.
+        enabled: 작업 활성화 여부.
+    """
 
     id: str  # 고유 ID (예: "D-001", "3M-004")
     name: str  # 한글 이름
@@ -54,7 +75,16 @@ class ScheduledTask:
 
 @dataclass
 class ScheduleGroup:
-    """주기별 그룹"""
+    """주기별 작업 그룹.
+
+    Attributes:
+        cycle: 이 그룹의 실행 주기 (TaskCycle).
+        display_name: 한글 표시 이름 (예: "일간 작업").
+        display_name_en: 영문 표시 이름 (예: "Daily Operations").
+        color: Rich 콘솔 출력 색상.
+        icon: 아이콘 문자열.
+        tasks: 이 그룹에 속한 ScheduledTask 리스트.
+    """
 
     cycle: TaskCycle
     display_name: str  # "일간 작업"

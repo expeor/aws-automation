@@ -26,7 +26,12 @@ from .analyzer import Severity, SSOAnalysisResult
 
 
 class SSOExcelReporter:
-    """SSO Excel 보고서 생성기"""
+    """IAM Identity Center 감사 Excel 보고서 생성기.
+
+    Summary, Permission Sets, Users, Groups, Admin Summary, Issues
+    6개 시트로 구성된 보고서를 생성한다.
+    openpyxl 스타일은 Lazy Initialization 패턴으로 초기화된다.
+    """
 
     # 스타일 캐시 (lazy initialization)
     _styles_initialized: bool = False

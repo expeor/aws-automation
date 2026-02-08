@@ -1,8 +1,9 @@
-"""
-reports/ip_search/private_ip/tool.py - Private IP Search Tool
+"""functions/reports/ip_search/private_ip/tool.py - Private IP Search Tool.
 
-Search AWS ENI cache for private IP addresses.
-Supports multi-profile/multi-account cache management.
+AWS ENI 캐시를 기반으로 내부(Private) IP 주소가 할당된 리소스를 검색합니다.
+멀티 프로파일/멀티 계정 캐시 관리를 지원하며, IP, CIDR, VPC ID, ENI ID,
+텍스트 검색 등 다양한 검색 방식을 제공합니다. Detail Mode를 통해
+API 호출로 리소스 상세 정보를 조회할 수 있습니다.
 """
 
 from __future__ import annotations

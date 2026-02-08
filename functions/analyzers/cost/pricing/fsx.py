@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/fsx.py - Amazon FSx 가격 조회
+functions/analyzers/cost/pricing/fsx.py - Amazon FSx 가격 조회
 
 FSx 비용 계산:
 - Windows File Server: GB당 월 $0.013 (SSD)

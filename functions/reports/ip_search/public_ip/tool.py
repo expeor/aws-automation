@@ -1,8 +1,9 @@
-"""
-reports/ip_search/public_ip/tool.py - Public IP Search Tool
+"""functions/reports/ip_search/public_ip/tool.py - Public IP Search Tool.
 
-Search cloud provider IP ranges (AWS, GCP, Azure, Oracle).
-No AWS authentication required.
+클라우드 프로바이더(AWS, GCP, Azure, Oracle, Cloudflare, Fastly)의 IP 대역에서
+특정 IP 주소 또는 CIDR 범위의 소유자 정보를 검색합니다.
+AWS 인증이 불필요하며, 공개된 IP 대역 데이터를 로컬 캐시로 관리합니다.
+인라인 필터(-p, -r, -s)와 대화형 필터를 지원합니다.
 """
 
 from __future__ import annotations

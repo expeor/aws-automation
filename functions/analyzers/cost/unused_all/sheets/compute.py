@@ -6,6 +6,7 @@ from core.shared.io.excel import ColumnDef, Styles, Workbook
 
 
 def _create_ami_sheet(wb: Workbook, results) -> None:
+    """미사용 AMI 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -37,6 +38,7 @@ def _create_ami_sheet(wb: Workbook, results) -> None:
 
 
 def _create_ebs_sheet(wb: Workbook, results) -> None:
+    """미사용 EBS 볼륨 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -68,6 +70,7 @@ def _create_ebs_sheet(wb: Workbook, results) -> None:
 
 
 def _create_snap_sheet(wb: Workbook, results) -> None:
+    """미사용 EBS Snapshot 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -101,6 +104,7 @@ def _create_snap_sheet(wb: Workbook, results) -> None:
 
 
 def _create_eip_sheet(wb: Workbook, results) -> None:
+    """미사용 Elastic IP 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -177,6 +181,7 @@ def _create_ec2_instance_sheet(wb: Workbook, results) -> None:
 
 
 def _create_elb_sheet(wb: Workbook, results) -> None:
+    """미사용/비정상 ELB 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -210,6 +215,7 @@ def _create_elb_sheet(wb: Workbook, results) -> None:
 
 
 def _create_tg_sheet(wb: Workbook, results) -> None:
+    """미사용 Target Group 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -248,6 +254,7 @@ def _create_tg_sheet(wb: Workbook, results) -> None:
 
 
 def _create_lambda_sheet(wb: Workbook, results) -> None:
+    """미사용/비정상 Lambda 함수 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),

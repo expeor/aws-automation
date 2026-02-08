@@ -1,19 +1,22 @@
 """
-plugins/cost/pricing/utils.py - 가격 조회 통합 서비스
+core/shared/aws/pricing/utils.py - 가격 조회 통합 서비스 (PricingService)
 
-PricingService: 캐시 + API + fallback을 통합 관리하는 싱글톤 서비스
-- Thread Lock: 동일 프로세스 내 동시성 보호
-- Lazy Loading: 필요할 때만 가격 조회
-- Exponential Backoff: API 실패 시 재시도
-- Metrics: 캐시 히트율, API 호출 수 추적
+``PricingService`` 싱글톤이 캐시(PriceCache) + API(PricingFetcher) + fallback(constants)을
+통합 관리하여 thread-safe한 가격 조회를 제공한다.
+
+주요 기능:
+    - Double-checked locking: 동일 서비스/리전의 동시 API 호출 방지
+    - Exponential backoff: Throttling 시 1/2/4초 간격으로 최대 3회 재시도
+    - Metrics: 캐시 히트율, API 호출 수, 에러 수, 재시도 수 추적
+    - Lazy init: PricingFetcher(boto3 클라이언트)를 첫 호출 시 생성
 
 사용법:
-    from functions.analyzers.cost.pricing.utils import pricing_service
+    from core.shared.aws.pricing.utils import pricing_service
 
-    # 가격 조회
+    # 가격 조회 (캐시 -> API -> fallback 순서)
     prices = pricing_service.get_prices("ec2", "ap-northeast-2")
 
-    # 캐시 무효화
+    # 캐시 무효화 후 재조회
     pricing_service.invalidate("ec2", "ap-northeast-2")
 
     # 메트릭 조회
@@ -43,7 +46,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PricingMetrics:
-    """가격 조회 메트릭"""
+    """가격 조회 성능/상태 메트릭을 thread-safe하게 수집하는 데이터 클래스.
+
+    Attributes:
+        api_calls: Pricing API 호출 횟수
+        cache_hits: 캐시 히트 횟수
+        cache_misses: 캐시 미스 횟수
+        errors: API 호출 에러 횟수
+        retries: API 재시도 횟수
+    """
 
     api_calls: int = 0
     cache_hits: int = 0
@@ -54,7 +65,11 @@ class PricingMetrics:
 
     @property
     def hit_rate(self) -> float:
-        """캐시 히트율"""
+        """캐시 히트율을 반환한다 (0.0 ~ 1.0).
+
+        Returns:
+            ``cache_hits / (cache_hits + cache_misses)``. 조회가 없으면 ``0.0``
+        """
         total = self.cache_hits + self.cache_misses
         return self.cache_hits / total if total > 0 else 0.0
 
@@ -79,7 +94,12 @@ class PricingMetrics:
             self.retries += 1
 
     def to_dict(self) -> dict[str, float | int]:
-        """메트릭을 딕셔너리로 변환"""
+        """메트릭 값을 딕셔너리로 변환하여 반환한다.
+
+        Returns:
+            ``{"api_calls": int, "cache_hits": int, "cache_misses": int,
+            "hit_rate": float, "errors": int, "retries": int}``
+        """
         return {
             "api_calls": self.api_calls,
             "cache_hits": self.cache_hits,
@@ -90,7 +110,7 @@ class PricingMetrics:
         }
 
     def reset(self) -> None:
-        """메트릭 초기화"""
+        """모든 메트릭 카운터를 0으로 초기화한다."""
         with self._lock:
             self.api_calls = 0
             self.cache_hits = 0
@@ -120,12 +140,16 @@ _FETCHER_METHODS: dict[str, str] = {
 
 
 class PricingService:
-    """가격 조회 통합 서비스 (Singleton)
+    """가격 조회 통합 서비스 (Singleton).
 
-    Thread-safe한 가격 조회를 제공합니다.
-    - Double-checked locking으로 동시성 보호
-    - Exponential backoff으로 API 재시도
-    - 메트릭 수집으로 모니터링 지원
+    Thread-safe한 가격 조회를 제공하며, 프로세스 내에서 단일 인스턴스로 동작한다.
+    캐시(PriceCache) -> API(PricingFetcher) -> fallback(constants) 순서로
+    가격을 조회하고, per-region 락으로 동일 서비스/리전의 동시 API 호출을 방지한다.
+
+    Attributes:
+        _cache: PriceCache 인스턴스 (파일 기반 캐시)
+        _fetcher: PricingFetcher 인스턴스 (lazy init)
+        _metrics: PricingMetrics 인스턴스 (성능 추적)
     """
 
     _instance: PricingService | None = None
@@ -157,13 +181,24 @@ class PricingService:
 
     @property
     def fetcher(self) -> PricingFetcher:
-        """Fetcher lazy initialization"""
+        """PricingFetcher를 지연 생성(lazy init)하여 반환한다.
+
+        Returns:
+            PricingFetcher 인스턴스
+        """
         if self._fetcher is None:
             self._fetcher = PricingFetcher()
         return self._fetcher
 
     def _get_lock(self, key: str) -> threading.Lock:
-        """Per-region 락 획득 (double-checked locking)"""
+        """서비스/리전 조합별 락을 반환한다 (double-checked locking).
+
+        Args:
+            key: 락 키 (``"{service}_{region}"`` 형식)
+
+        Returns:
+            해당 키에 대한 ``threading.Lock`` 인스턴스
+        """
         if key not in self._lock_registry:
             with self._registry_mutex:
                 if key not in self._lock_registry:
@@ -177,16 +212,21 @@ class PricingService:
         refresh: bool = False,
         defaults: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        """통합 가격 조회 (캐시 + API + fallback)
+        """통합 가격 조회 (캐시 -> API -> fallback 순서).
+
+        1차(fast path): 락 없이 캐시 확인
+        2차(slow path): 락 획득 후 double-check -> API 호출 -> fallback 병합 -> 캐시 저장
+
+        API 결과의 ``0.0`` 이 아닌 값만 기본값을 덮어쓰며, 결과를 캐시에 저장한다.
 
         Args:
-            service: 서비스 코드 (ec2, ebs, sagemaker 등)
-            region: AWS 리전
-            refresh: 캐시 무시하고 새로 조회
-            defaults: 커스텀 기본값 (None이면 constants.py 사용)
+            service: AWS 서비스 코드 (``"ec2"``, ``"ebs"``, ``"sagemaker"`` 등)
+            region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+            refresh: ``True`` 이면 캐시를 무시하고 API에서 새로 조회
+            defaults: 커스텀 기본값 딕셔너리 (``None`` 이면 ``constants.DEFAULT_PRICES`` 사용)
 
         Returns:
-            가격 딕셔너리 {key: price}
+            ``{key: price}`` 형식의 가격 딕셔너리 (예: ``{"t3.medium": 0.0416}``)
         """
         lock_key = f"{service}_{region}"
 
@@ -237,15 +277,18 @@ class PricingService:
         region: str,
         max_retries: int = 3,
     ) -> dict[str, float]:
-        """Exponential backoff으로 API 호출
+        """Exponential backoff으로 PricingFetcher의 서비스별 메서드를 호출한다.
+
+        Throttling/RequestLimitExceeded/ServiceUnavailable 에러 시
+        1, 2, 4초 간격으로 최대 ``max_retries`` 회 재시도한다.
 
         Args:
-            service: 서비스 코드
-            region: AWS 리전
-            max_retries: 최대 재시도 횟수
+            service: AWS 서비스 코드 (``_FETCHER_METHODS`` 에 등록된 키)
+            region: AWS 리전 코드
+            max_retries: 최대 재시도 횟수 (기본: ``3``)
 
         Returns:
-            가격 딕셔너리 (실패 시 빈 딕셔너리)
+            가격 딕셔너리 (API 실패 시 빈 딕셔너리)
         """
         method_name = _FETCHER_METHODS.get(service)
         if not method_name:
@@ -291,14 +334,14 @@ class PricingService:
         return {}
 
     def invalidate(self, service: str | None = None, region: str | None = None) -> int:
-        """캐시 무효화
+        """캐시를 무효화(삭제)한다.
 
         Args:
-            service: 서비스 코드 (None이면 전체)
-            region: AWS 리전 (None이면 전체)
+            service: AWS 서비스 코드 (``None`` 이면 전체 서비스)
+            region: AWS 리전 코드 (``None`` 이면 전체 리전)
 
         Returns:
-            삭제된 캐시 항목 수
+            삭제된 캐시 파일 수
         """
         from .cache import clear_cache
 
@@ -307,24 +350,28 @@ class PricingService:
         return count
 
     def refresh(self, service: str, region: str = "ap-northeast-2") -> dict[str, float]:
-        """강제 새로고침
+        """캐시를 무효화하고 API에서 강제로 새로 조회한다.
 
         Args:
-            service: 서비스 코드
-            region: AWS 리전
+            service: AWS 서비스 코드
+            region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
 
         Returns:
-            가격 딕셔너리
+            새로 조회된 가격 딕셔너리
         """
         self._cache.invalidate(service, region)
         return self.get_prices(service, region, refresh=True)
 
     def get_metrics(self) -> dict[str, float | int]:
-        """메트릭 조회"""
+        """현재 메트릭 값을 딕셔너리로 반환한다.
+
+        Returns:
+            ``PricingMetrics.to_dict()`` 와 동일한 형식
+        """
         return self._metrics.to_dict()
 
     def reset_metrics(self) -> None:
-        """메트릭 초기화"""
+        """모든 메트릭 카운터를 0으로 초기화한다."""
         self._metrics.reset()
 
 

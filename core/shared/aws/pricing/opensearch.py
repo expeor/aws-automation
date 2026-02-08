@@ -1,20 +1,23 @@
 """
-plugins/cost/pricing/opensearch.py - Amazon OpenSearch Service 가격 조회
+core/shared/aws/pricing/opensearch.py - Amazon OpenSearch Service 가격 조회
 
-OpenSearch 비용 계산:
-- 인스턴스 시간당 비용 (타입별)
-- EBS 스토리지 비용 (GB당)
-- UltraWarm/Cold 스토리지
+OpenSearch Service 인스턴스 타입별/EBS 스토리지 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격으로 fallback한다.
+
+비용 구조:
+    - 인스턴스: 타입별 시간당 비용 (예: r6g.large.search $0.167/h)
+    - EBS 스토리지: ~$0.115/GB/월 (리전별 상이)
+    - UltraWarm/Cold 스토리지: 별도 (이 모듈에서 미포함)
 
 사용법:
-    from functions.analyzers.cost.pricing.opensearch import get_opensearch_monthly_cost
+    from core.shared.aws.pricing.opensearch import get_opensearch_monthly_cost
 
-    # 월간 비용
+    # r6g.large.search 2노드 + 100GB 스토리지 월간 비용
     monthly = get_opensearch_monthly_cost(
         "ap-northeast-2",
         instance_type="r6g.large.search",
         instance_count=2,
-        storage_gb=100
+        storage_gb=100,
     )
 """
 
@@ -78,7 +81,19 @@ DEFAULT_STORAGE_PRICE = 0.115
 
 
 def get_opensearch_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 OpenSearch 가격 조회"""
+    """AWS Pricing API를 통해 OpenSearch 인스턴스/스토리지 가격을 조회한다.
+
+    서비스 코드는 ``AmazonES`` (레거시 Elasticsearch)를 사용한다.
+    ``.search`` 접미사가 없는 인스턴스 타입에는 자동으로 추가한다.
+
+    Args:
+        session: boto3 세션
+        region: 대상 AWS 리전 코드
+
+    Returns:
+        ``{instance_type: hourly_price, "storage_gb": float}`` 딕셔너리.
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -125,7 +140,18 @@ def get_opensearch_prices(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> dict[str, float]:
-    """OpenSearch 가격 조회"""
+    """OpenSearch 인스턴스 타입별 가격을 조회한다.
+
+    ``session`` 이 제공되면 Pricing API를 우선 호출하고,
+    실패 시 하드코딩된 ``OPENSEARCH_INSTANCE_PRICES`` 에서 fallback한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        ``{instance_type: hourly_price}`` 딕셔너리
+    """
     if session:
         api_prices = get_opensearch_prices_from_api(session, region)
         if api_prices:
@@ -139,7 +165,16 @@ def get_opensearch_instance_price(
     instance_type: str = "m6g.large.search",
     session: boto3.Session | None = None,
 ) -> float:
-    """OpenSearch 인스턴스 시간당 가격"""
+    """OpenSearch 인스턴스의 시간당 가격을 반환한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        instance_type: 인스턴스 타입 (예: ``"m6g.large.search"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        시간당 USD (알 수 없는 타입이면 기본값 ``0.20``)
+    """
     prices = get_opensearch_prices(region, session)
     return prices.get(instance_type, DEFAULT_INSTANCE_PRICE)
 
@@ -148,7 +183,15 @@ def get_opensearch_storage_price(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> float:
-    """OpenSearch 스토리지 GB당 월 가격"""
+    """OpenSearch EBS 스토리지 GB당 월간 가격을 반환한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        GB당 월간 USD (기본값: ``0.115``)
+    """
     if session:
         api_prices = get_opensearch_prices_from_api(session, region)
         if api_prices and "storage_gb" in api_prices:
@@ -164,7 +207,20 @@ def get_opensearch_monthly_cost(
     storage_gb: int = 0,
     session: boto3.Session | None = None,
 ) -> float:
-    """OpenSearch 월간 비용 계산"""
+    """OpenSearch 도메인의 월간 총 비용(인스턴스 + 스토리지)을 계산한다.
+
+    스토리지 비용은 노드별로 발생하므로 ``storage_gb * storage_price * instance_count``.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        instance_type: 인스턴스 타입 (예: ``"m6g.large.search"``)
+        instance_count: 노드(인스턴스) 수 (기본: ``1``)
+        storage_gb: 노드당 EBS 스토리지 크기 (GB, 기본: ``0``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        월간 USD 비용 (소수점 2자리 반올림)
+    """
     instance_hourly = get_opensearch_instance_price(region, instance_type, session)
     storage_monthly = get_opensearch_storage_price(region, session)
 

@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/eip.py - Elastic IP 가격 조회
+functions/analyzers/cost/pricing/eip.py - Elastic IP 가격 조회
 
 Elastic IP 비용 계산:
 - 미연결 EIP: ~$0.005/시간 = ~$3.60/월 (리전별 상이)

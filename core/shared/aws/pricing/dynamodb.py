@@ -1,36 +1,34 @@
 """
-plugins/cost/pricing/dynamodb.py - DynamoDB 가격 조회
+core/shared/aws/pricing/dynamodb.py - Amazon DynamoDB 가격 조회
 
-DynamoDB 비용 구성:
-- On-Demand (PAY_PER_REQUEST):
-  - 쓰기: $1.25 per million WRU (ap-northeast-2 기준)
-  - 읽기: $0.25 per million RRU
-- Provisioned:
-  - WCU: $0.00065 per hour (~$0.47/월)
-  - RCU: $0.00013 per hour (~$0.095/월)
-- Storage: $0.25 per GB per month
+DynamoDB의 Provisioned/On-Demand 모드별 비용과 스토리지 비용을 조회한다.
+``PricingService`` 를 통해 캐시/API/fallback을 자동 관리한다.
 
-PricingService를 사용하여 캐시와 API를 통합 관리합니다.
+비용 구조 (ap-northeast-2 기준):
+    - On-Demand (PAY_PER_REQUEST):
+      - 쓰기: $1.25 / 100만 WRU
+      - 읽기: $0.25 / 100만 RRU
+    - Provisioned:
+      - WCU: $0.00065/시간 (~$0.47/월)
+      - RCU: $0.00013/시간 (~$0.095/월)
+    - Storage: $0.25 / GB / 월
 
 사용법:
-    from functions.analyzers.cost.pricing import get_dynamodb_monthly_cost
+    from core.shared.aws.pricing.dynamodb import get_dynamodb_monthly_cost
 
     # Provisioned 테이블 월간 비용
     cost = get_dynamodb_monthly_cost(
         region="ap-northeast-2",
         billing_mode="PROVISIONED",
-        rcu=10,
-        wcu=5,
-        storage_gb=1.5
+        rcu=10, wcu=5, storage_gb=1.5,
     )
 
     # On-Demand 테이블 월간 비용
     cost = get_dynamodb_monthly_cost(
         region="ap-northeast-2",
         billing_mode="PAY_PER_REQUEST",
-        read_requests=1000000,
-        write_requests=500000,
-        storage_gb=10
+        read_requests=1_000_000, write_requests=500_000,
+        storage_gb=10,
     )
 """
 
@@ -48,20 +46,24 @@ def get_dynamodb_prices(
     region: str = "ap-northeast-2",
     refresh: bool = False,
 ) -> dict[str, float]:
-    """DynamoDB 가격 조회
+    """DynamoDB Provisioned/On-Demand/Storage 가격을 조회한다.
+
+    ``PricingService`` 를 통해 캐시 우선 조회하며, 캐시 미스 시 API를 호출한다.
 
     Args:
-        region: AWS 리전
-        refresh: 캐시 무시
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        refresh: ``True`` 이면 캐시를 무시하고 API에서 새로 조회
 
     Returns:
-        {
-            "rcu_per_hour": float,
-            "wcu_per_hour": float,
-            "read_per_million": float,
-            "write_per_million": float,
-            "storage_per_gb": float,
-        }
+        가격 딕셔너리::
+
+            {
+                "rcu_per_hour": float,        # Provisioned RCU 시간당 가격
+                "wcu_per_hour": float,        # Provisioned WCU 시간당 가격
+                "read_per_million": float,    # On-Demand 읽기 100만건당 가격
+                "write_per_million": float,   # On-Demand 쓰기 100만건당 가격
+                "storage_per_gb": float,      # 스토리지 GB당 월간 가격
+            }
     """
     return pricing_service.get_prices("dynamodb", region, refresh)
 
@@ -70,14 +72,14 @@ def get_dynamodb_provisioned_price(
     region: str = "ap-northeast-2",
     capacity_type: str = "read",
 ) -> float:
-    """Provisioned Capacity 시간당 가격
+    """Provisioned Capacity 유닛의 시간당 가격을 반환한다.
 
     Args:
-        region: AWS 리전
-        capacity_type: "read" (RCU) 또는 "write" (WCU)
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        capacity_type: ``"read"`` (RCU) 또는 ``"write"`` (WCU)
 
     Returns:
-        시간당 USD
+        시간당 USD (RCU 기본: ``0.00013``, WCU 기본: ``0.00065``)
     """
     prices = get_dynamodb_prices(region)
     if capacity_type.lower() == "write":
@@ -89,14 +91,14 @@ def get_dynamodb_ondemand_price(
     region: str = "ap-northeast-2",
     request_type: str = "read",
 ) -> float:
-    """On-Demand 100만 요청당 가격
+    """On-Demand 모드의 100만 요청당 가격을 반환한다.
 
     Args:
-        region: AWS 리전
-        request_type: "read" 또는 "write"
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        request_type: ``"read"`` (RRU) 또는 ``"write"`` (WRU)
 
     Returns:
-        100만 요청당 USD
+        100만 요청당 USD (읽기 기본: ``0.25``, 쓰기 기본: ``1.25``)
     """
     prices = get_dynamodb_prices(region)
     if request_type.lower() == "write":
@@ -105,13 +107,13 @@ def get_dynamodb_ondemand_price(
 
 
 def get_dynamodb_storage_price(region: str = "ap-northeast-2") -> float:
-    """Storage GB당 월간 가격
+    """DynamoDB 스토리지 GB당 월간 가격을 반환한다.
 
     Args:
-        region: AWS 리전
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
 
     Returns:
-        GB당 월간 USD
+        GB당 월간 USD (기본: ``0.25``)
     """
     prices = get_dynamodb_prices(region)
     return prices.get("storage_per_gb", 0.25)
@@ -126,19 +128,22 @@ def get_dynamodb_monthly_cost(
     write_requests: int = 0,
     storage_gb: float = 0.0,
 ) -> float:
-    """DynamoDB 월간 비용 계산
+    """DynamoDB 테이블의 월간 총 비용을 계산한다.
+
+    ``billing_mode`` 에 따라 Provisioned(RCU/WCU 시간당) 또는
+    On-Demand(요청당) 비용을 산출하고, 스토리지 비용을 합산한다.
 
     Args:
-        region: AWS 리전
-        billing_mode: "PROVISIONED" 또는 "PAY_PER_REQUEST"
-        rcu: Read Capacity Units (Provisioned)
-        wcu: Write Capacity Units (Provisioned)
-        read_requests: 읽기 요청 수 (On-Demand)
-        write_requests: 쓰기 요청 수 (On-Demand)
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        billing_mode: ``"PROVISIONED"`` 또는 ``"PAY_PER_REQUEST"``
+        rcu: Provisioned Read Capacity Units (Provisioned 모드)
+        wcu: Provisioned Write Capacity Units (Provisioned 모드)
+        read_requests: 월간 읽기 요청 수 (On-Demand 모드)
+        write_requests: 월간 쓰기 요청 수 (On-Demand 모드)
         storage_gb: 스토리지 용량 (GB)
 
     Returns:
-        월간 USD 비용
+        월간 USD 비용 (소수점 2자리 반올림)
     """
     prices = get_dynamodb_prices(region)
     total = 0.0
@@ -168,16 +173,18 @@ def estimate_provisioned_cost(
     avg_consumed_wcu: float,
     storage_gb: float,
 ) -> float:
-    """현재 사용량 기준 Provisioned 예상 비용
+    """현재 소비량 기준으로 Provisioned 모드 전환 시 예상 비용을 계산한다.
+
+    평균 소비 RCU/WCU에 10% 여유분을 더한 권장 용량으로 비용을 산출한다.
 
     Args:
-        region: AWS 리전
-        avg_consumed_rcu: 평균 소비 RCU
-        avg_consumed_wcu: 평균 소비 WCU
-        storage_gb: 스토리지 용량
+        region: AWS 리전 코드
+        avg_consumed_rcu: CloudWatch 기준 평균 소비 RCU (초당)
+        avg_consumed_wcu: CloudWatch 기준 평균 소비 WCU (초당)
+        storage_gb: 테이블 스토리지 용량 (GB)
 
     Returns:
-        예상 월간 비용 (10% 여유분 포함)
+        예상 월간 USD 비용 (10% 여유분 포함, 소수점 2자리 반올림)
     """
     # 10% 여유분을 더해 권장 용량 계산
     recommended_rcu = int(avg_consumed_rcu * 1.1) + 1
@@ -198,18 +205,18 @@ def estimate_ondemand_cost(
     avg_consumed_wcu: float,
     storage_gb: float,
 ) -> float:
-    """현재 사용량 기준 On-Demand 예상 비용
+    """현재 소비량 기준으로 On-Demand 모드 전환 시 예상 비용을 계산한다.
 
-    RCU/WCU를 요청 수로 환산 (초당 → 월간)
+    초당 RCU/WCU를 월간 요청 수로 환산(30일 * 24h * 3600s)하여 비용을 산출한다.
 
     Args:
-        region: AWS 리전
-        avg_consumed_rcu: 평균 소비 RCU (초당)
-        avg_consumed_wcu: 평균 소비 WCU (초당)
-        storage_gb: 스토리지 용량
+        region: AWS 리전 코드
+        avg_consumed_rcu: CloudWatch 기준 평균 소비 RCU (초당)
+        avg_consumed_wcu: CloudWatch 기준 평균 소비 WCU (초당)
+        storage_gb: 테이블 스토리지 용량 (GB)
 
     Returns:
-        예상 월간 비용
+        예상 월간 USD 비용 (소수점 2자리 반올림)
     """
     # 초당 용량 → 월간 요청 수 변환 (30일 * 24시간 * 3600초)
     seconds_per_month = 30 * 24 * 3600

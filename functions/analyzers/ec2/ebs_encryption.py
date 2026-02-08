@@ -43,7 +43,23 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class UnencryptedEBSInfo:
-    """암호화되지 않은 EBS 볼륨 정보"""
+    """암호화되지 않은 개별 EBS 볼륨의 상세 정보.
+
+    Attributes:
+        volume_id: EBS 볼륨 ID.
+        volume_name: Name 태그 값.
+        state: 볼륨 상태 (available, in-use).
+        volume_type: 볼륨 타입 (gp3, io1 등).
+        size_gb: 볼륨 크기 (GB).
+        iops: 프로비저닝된 IOPS.
+        availability_zone: 가용 영역.
+        create_time: 볼륨 생성 일시.
+        attachments: 연결 정보 목록 (InstanceId, Device 등).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        tags: 사용자 태그 딕셔너리 (aws: 접두사 제외).
+    """
 
     volume_id: str
     volume_name: str
@@ -61,19 +77,31 @@ class UnencryptedEBSInfo:
 
     @property
     def is_attached(self) -> bool:
-        """연결 여부"""
+        """인스턴스에 연결(in-use)되어 있는지 확인한다.
+
+        Returns:
+            state가 in-use이고 attachments가 있으면 True.
+        """
         return self.state == "in-use" and len(self.attachments) > 0
 
     @property
     def attached_instances(self) -> str:
-        """연결된 인스턴스 ID 목록 (쉼표 구분)"""
+        """연결된 인스턴스 ID를 쉼표로 구분한 문자열로 반환한다.
+
+        Returns:
+            인스턴스 ID 목록 문자열. 연결이 없으면 빈 문자열.
+        """
         if not self.attachments:
             return ""
         return ", ".join(a.get("InstanceId", "") for a in self.attachments if a.get("InstanceId"))
 
     @property
     def device_paths(self) -> str:
-        """디바이스 경로 목록 (쉼표 구분)"""
+        """디바이스 경로를 쉼표로 구분한 문자열로 반환한다.
+
+        Returns:
+            디바이스 경로 목록 문자열. 연결이 없으면 빈 문자열.
+        """
         if not self.attachments:
             return ""
         return ", ".join(a.get("Device", "") for a in self.attachments if a.get("Device"))
@@ -81,7 +109,19 @@ class UnencryptedEBSInfo:
 
 @dataclass
 class UnencryptedEBSResult:
-    """암호화되지 않은 EBS 분석 결과"""
+    """단일 계정/리전의 암호화되지 않은 EBS 분석 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        volumes: 암호화되지 않은 볼륨 목록.
+        total_volumes_checked: 전체 검사 볼륨 수.
+        unencrypted_count: 암호화되지 않은 볼륨 수.
+        unencrypted_size_gb: 암호화되지 않은 볼륨 총 용량 (GB).
+        attached_count: 인스턴스에 연결된 비암호화 볼륨 수.
+        available_count: 미연결 비암호화 볼륨 수.
+    """
 
     account_id: str
     account_name: str
@@ -102,10 +142,19 @@ class UnencryptedEBSResult:
 def collect_unencrypted_volumes(
     session, account_id: str, account_name: str, region: str
 ) -> tuple[list[UnencryptedEBSInfo], int]:
-    """암호화되지 않은 EBS 볼륨 수집
+    """암호화되지 않은 EBS 볼륨을 수집한다.
+
+    모든 EBS 볼륨을 Paginator로 조회하고 암호화된 볼륨은 제외하여
+    비암호화 볼륨만 반환한다. aws: 접두사 태그는 제외한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
 
     Returns:
-        tuple: (암호화되지 않은 볼륨 목록, 전체 볼륨 수)
+        (암호화되지 않은 볼륨 목록, 전체 볼륨 수) 튜플.
     """
     from botocore.exceptions import ClientError
 
@@ -162,7 +211,18 @@ def collect_unencrypted_volumes(
 
 
 def generate_report(results: list[UnencryptedEBSResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보고서를 생성한다.
+
+    Summary 시트(전체 통계)와 Unencrypted Volumes 시트(비암호화 볼륨 상세)로 구성된다.
+    볼륨은 용량 내림차순으로 정렬된다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from core.shared.io.excel import ColumnDef, Workbook
 
     wb = Workbook()
@@ -244,7 +304,17 @@ def generate_report(results: list[UnencryptedEBSResult], output_dir: str) -> str
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> UnencryptedEBSResult:
-    """단일 계정/리전의 암호화되지 않은 EBS 수집 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 암호화되지 않은 EBS 볼륨을 수집한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        암호화되지 않은 EBS 분석 결과.
+    """
     volumes, total_count = collect_unencrypted_volumes(session, account_id, account_name, region)
 
     attached_count = sum(1 for v in volumes if v.is_attached)
@@ -264,7 +334,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """암호화되지 않은 EBS 볼륨 탐지 실행 (병렬 처리)"""
+    """도구의 메인 실행 함수.
+
+    모든 계정/리전에서 암호화되지 않은 EBS 볼륨을 병렬 수집하고,
+    연결 상태별(in-use, available) 통계를 콘솔에 출력한다.
+    비암호화 볼륨이 있으면 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. 계정/리전 정보와 옵션을 포함한다.
+    """
     console.print("[bold]암호화되지 않은 EBS 볼륨 탐지 시작...[/bold]")
 
     # 병렬 수집

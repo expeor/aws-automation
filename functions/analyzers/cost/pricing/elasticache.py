@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/elasticache.py - Amazon ElastiCache 가격 조회
+functions/analyzers/cost/pricing/elasticache.py - Amazon ElastiCache 가격 조회
 
 ElastiCache 비용 계산:
 - 노드 시간당 비용 (인스턴스 타입별)
@@ -65,7 +65,18 @@ DEFAULT_NODE_PRICE = 0.20  # 알 수 없는 노드 타입용 기본값
 
 
 def get_elasticache_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 ElastiCache 가격 조회"""
+    """AWS Pricing API를 통해 ElastiCache 노드 타입별 시간당 가격 조회
+
+    Cache Instance productFamily에 해당하는 OnDemand 가격만 조회합니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: 가격을 조회할 AWS 리전 코드
+
+    Returns:
+        노드 타입별 시간당 가격 딕셔너리 (USD).
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -110,7 +121,18 @@ def get_elasticache_prices_from_api(session: boto3.Session, region: str) -> dict
 
 
 def get_elasticache_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
-    """ElastiCache 가격 조회"""
+    """ElastiCache 노드 타입별 시간당 가격 조회
+
+    API 조회 실패 시 하드코딩된 기본값을 반환합니다.
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        노드 타입별 시간당 가격 (USD) 딕셔너리.
+        예: ``{"cache.t3.medium": 0.068}``
+    """
     if session:
         api_prices = get_elasticache_prices_from_api(session, region)
         if api_prices:
@@ -124,7 +146,16 @@ def get_elasticache_hourly_price(
     node_type: str = "cache.t3.medium",
     session: boto3.Session | None = None,
 ) -> float:
-    """ElastiCache 노드 시간당 가격"""
+    """ElastiCache 특정 노드 타입의 시간당 가격 조회
+
+    Args:
+        region: AWS 리전 코드
+        node_type: ElastiCache 노드 타입 (예: cache.t3.medium, cache.r6g.large)
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        시간당 가격 (USD). 알 수 없는 노드 타입이면 DEFAULT_NODE_PRICE 반환.
+    """
     prices = get_elasticache_prices(region, session)
     return prices.get(node_type, DEFAULT_NODE_PRICE)
 
@@ -135,6 +166,18 @@ def get_elasticache_monthly_cost(
     num_nodes: int = 1,
     session: boto3.Session | None = None,
 ) -> float:
-    """ElastiCache 월간 비용 계산"""
+    """ElastiCache 월간 비용 계산
+
+    시간당 가격 x 730시간 x 노드 수로 계산합니다.
+
+    Args:
+        region: AWS 리전 코드
+        node_type: ElastiCache 노드 타입
+        num_nodes: 노드 수
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        월간 비용 (USD), 소수점 2자리 반올림
+    """
     hourly_price = get_elasticache_hourly_price(region, node_type, session)
     return round(hourly_price * HOURS_PER_MONTH * num_nodes, 2)

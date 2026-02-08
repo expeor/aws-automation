@@ -1,5 +1,5 @@
 """
-plugins/health/analyzer.py - AWS Personal Health Dashboard 분석기
+core/shared/aws/health/analyzer.py - AWS Personal Health Dashboard 분석기
 
 AWS Health API를 호출하여 계정별 Health 이벤트를 조회합니다.
 - scheduledChange: 예정된 유지보수, 패치
@@ -45,7 +45,23 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class EventFilter:
-    """AWS Health 이벤트 필터"""
+    """AWS Health 이벤트 필터
+
+    AWS Health API의 DescribeEvents 호출에 사용되는 필터 조건을 정의합니다.
+    여러 조건을 조합하여 원하는 이벤트만 조회할 수 있습니다.
+
+    Attributes:
+        event_type_categories: 이벤트 카테고리 (scheduledChange, accountNotification, issue, investigation)
+        services: AWS 서비스 이름 (EC2, RDS 등)
+        regions: AWS 리전 (ap-northeast-2 등)
+        availability_zones: 가용 영역 (ap-northeast-2a 등)
+        event_type_codes: 이벤트 타입 코드 (AWS_EC2_SYSTEM_MAINTENANCE_EVENT 등)
+        event_status_codes: 이벤트 상태 (open, upcoming, closed)
+        start_time_from: 시작 시간 범위 하한
+        start_time_to: 시작 시간 범위 상한
+        end_time_from: 종료 시간 범위 하한
+        end_time_to: 종료 시간 범위 상한
+    """
 
     event_type_categories: list[str] = field(default_factory=list)
     services: list[str] = field(default_factory=list)
@@ -74,7 +90,13 @@ class EventFilter:
     ]
 
     def to_api_filter(self) -> dict[str, Any]:
-        """AWS API 필터 형식으로 변환"""
+        """AWS API 필터 형식으로 변환
+
+        설정된 필터 조건을 AWS Health API의 filter 파라미터 형식으로 변환합니다.
+
+        Returns:
+            AWS Health API filter 딕셔너리. 설정된 조건만 포함됩니다.
+        """
         api_filter: dict[str, Any] = {}
 
         if self.event_type_categories:
@@ -116,7 +138,18 @@ class EventFilter:
 
 @dataclass
 class AffectedEntity:
-    """영향받는 리소스 정보"""
+    """영향받는 리소스 정보
+
+    Health 이벤트에 의해 영향을 받는 AWS 리소스를 나타냅니다.
+
+    Attributes:
+        entity_value: 리소스 ID (예: i-1234567890abcdef0)
+        aws_account_id: 리소스가 속한 AWS 계정 ID
+        entity_url: 리소스 콘솔 URL
+        status_code: 엔티티 상태 (PENDING, RESOLVED 등)
+        last_updated_time: 마지막 업데이트 시간
+        tags: 리소스에 부착된 태그 딕셔너리
+    """
 
     entity_value: str  # 리소스 ID (예: i-1234567890abcdef0)
     aws_account_id: str
@@ -127,7 +160,14 @@ class AffectedEntity:
 
     @classmethod
     def from_api_response(cls, item: dict[str, Any]) -> AffectedEntity:
-        """API 응답에서 AffectedEntity 객체 생성"""
+        """API 응답에서 AffectedEntity 객체 생성
+
+        Args:
+            item: DescribeAffectedEntities API 응답의 단일 엔티티 딕셔너리
+
+        Returns:
+            AffectedEntity 인스턴스
+        """
         tags_list = item.get("tags", {})
         tags_dict = tags_list if isinstance(tags_list, dict) else {}
 
@@ -143,7 +183,26 @@ class AffectedEntity:
 
 @dataclass
 class HealthEvent:
-    """AWS Health 이벤트"""
+    """AWS Health 이벤트
+
+    AWS Personal Health Dashboard에서 조회되는 개별 이벤트를 나타냅니다.
+    예정된 유지보수, 서비스 장애, 계정 알림 등 다양한 유형을 포함합니다.
+
+    Attributes:
+        arn: 이벤트 ARN
+        service: 관련 AWS 서비스 (EC2, RDS 등)
+        event_type_code: 이벤트 타입 코드 (AWS_EC2_SYSTEM_MAINTENANCE_EVENT 등)
+        event_type_category: 이벤트 카테고리 (scheduledChange, issue, accountNotification)
+        region: 영향받는 리전
+        availability_zone: 영향받는 가용 영역
+        start_time: 이벤트 시작 시간
+        end_time: 이벤트 종료 시간
+        last_updated_time: 마지막 업데이트 시간
+        status_code: 이벤트 상태 (open, upcoming, closed)
+        event_scope_code: 이벤트 범위 (ACCOUNT_SPECIFIC, PUBLIC 등)
+        description: 이벤트 상세 설명
+        affected_entities: 영향받는 리소스 목록
+    """
 
     arn: str
     service: str
@@ -190,7 +249,14 @@ class HealthEvent:
 
     @property
     def urgency(self) -> str:
-        """긴급도 판단 (critical, high, medium, low)"""
+        """긴급도 판단
+
+        시작일까지 남은 일수에 따라 긴급도를 결정합니다:
+        3일 이내 critical, 7일 이내 high, 14일 이내 medium, 그 외 low.
+
+        Returns:
+            긴급도 문자열 ("critical", "high", "medium", "low")
+        """
         days = self.days_until_start
 
         if days is None:
@@ -209,7 +275,15 @@ class HealthEvent:
         event_item: dict[str, Any],
         detail_item: dict[str, Any] | None = None,
     ) -> HealthEvent:
-        """API 응답에서 HealthEvent 객체 생성"""
+        """API 응답에서 HealthEvent 객체 생성
+
+        Args:
+            event_item: DescribeEvents API 응답의 단일 이벤트 딕셔너리
+            detail_item: DescribeEventDetails API 응답 (상세 설명 포함, 선택)
+
+        Returns:
+            HealthEvent 인스턴스
+        """
         description = ""
         if detail_item:
             desc_list = detail_item.get("eventDescription", {}).get("latestDescription", "")
@@ -231,7 +305,14 @@ class HealthEvent:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """딕셔너리로 변환 (리포트용)"""
+        """딕셔너리로 변환 (리포트용)
+
+        datetime 필드는 ISO 형식 문자열로, urgency/days_until_start 등
+        계산된 속성도 포함됩니다.
+
+        Returns:
+            이벤트 정보를 담은 딕셔너리
+        """
         return {
             "arn": self.arn,
             "service": self.service,
@@ -354,7 +435,20 @@ class HealthAnalyzer:
         event_filter: EventFilter,
         page_size: int,
     ) -> Iterator[dict[str, Any]]:
-        """이벤트 페이지네이션 처리"""
+        """이벤트 페이지네이션 처리
+
+        DescribeEvents API를 paginator로 호출하여 전체 이벤트를 순회합니다.
+
+        Args:
+            event_filter: 이벤트 필터 조건
+            page_size: 페이지당 항목 수
+
+        Yields:
+            API 응답의 개별 이벤트 딕셔너리
+
+        Raises:
+            Exception: API 호출 실패 시 (페이지네이션 토큰 만료 제외)
+        """
         try:
             paginator = self.client.get_paginator("describe_events")
 
@@ -382,7 +476,17 @@ class HealthAnalyzer:
             raise
 
     def _get_event_details(self, event_arns: list[str]) -> dict[str, str]:
-        """이벤트 상세 설명 조회"""
+        """이벤트 상세 설명 조회
+
+        DescribeEventDetails API로 이벤트의 latestDescription을 조회합니다.
+        API 제한으로 한 번에 최대 10개씩 배치 처리합니다.
+
+        Args:
+            event_arns: 조회할 이벤트 ARN 목록
+
+        Returns:
+            ARN을 키로, 설명 텍스트를 값으로 하는 딕셔너리
+        """
         details = {}
 
         # API는 한 번에 최대 10개까지 조회 가능
@@ -401,7 +505,16 @@ class HealthAnalyzer:
         return details
 
     def _get_affected_entities(self, event_arns: list[str]) -> dict[str, list[AffectedEntity]]:
-        """영향받는 리소스 조회"""
+        """영향받는 리소스 조회
+
+        DescribeAffectedEntities API로 각 이벤트에 영향받는 리소스를 조회합니다.
+
+        Args:
+            event_arns: 조회할 이벤트 ARN 목록
+
+        Returns:
+            ARN을 키로, AffectedEntity 리스트를 값으로 하는 딕셔너리
+        """
         affected = {}
 
         for arn in event_arns:

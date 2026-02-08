@@ -1,13 +1,13 @@
-"""
-IP Intelligence 통합 모듈
+"""functions/reports/log_analyzer/ip_intelligence.py - IP 인텔리전스 통합 모듈.
 
 IPDeny (국가별 IP 블록) + AbuseIPDB (악성 IP) 데이터를 통합 관리합니다.
+GeoIP 국가 매핑과 악성 IP 탐지 기능을 제공하며, 로컬 JSON 캐시를 사용합니다.
 
 클래스:
-    IPDataCache        - 캐시 공통 로직
-    IPDenyProvider     - IPDeny 데이터 제공자
-    AbuseIPDBProvider  - AbuseIPDB 데이터 제공자
-    IPIntelligence     - 통합 IP 인텔리전스 (국가 매핑 + 악성 IP 체크)
+    IPDataCache        - 캐시 공통 로직 (JSON 파일 기반, 만료 시간 관리).
+    IPDenyProvider     - IPDeny 데이터 제공자 (국가별 CIDR 블록 다운로드).
+    AbuseIPDBProvider  - AbuseIPDB 데이터 제공자 (API 키 기반 악성 IP 조회).
+    IPIntelligence     - 통합 IP 인텔리전스 (국가 매핑 + 악성 IP 체크).
 """
 
 from __future__ import annotations

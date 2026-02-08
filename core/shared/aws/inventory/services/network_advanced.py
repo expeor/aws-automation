@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/network_advanced.py - 고급 네트워크 리소스 수집
+core/shared/aws/inventory/services/network_advanced.py - 고급 네트워크 리소스 수집
 
 Transit Gateway, VPN, Network ACL, VPC Peering 수집.
 """
@@ -24,7 +24,20 @@ logger = logging.getLogger(__name__)
 
 
 def collect_transit_gateways(session, account_id: str, account_name: str, region: str) -> list[TransitGateway]:
-    """Transit Gateway 수집"""
+    """Transit Gateway 리소스를 수집합니다.
+
+    Transit Gateway 목록 조회 후 각 게이트웨이의 옵션(ASN, 기본 라우팅 테이블,
+    Auto Accept, DNS/VPN ECMP 지원 등) 상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        TransitGateway 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     tgws = []
 
@@ -64,7 +77,20 @@ def collect_transit_gateways(session, account_id: str, account_name: str, region
 def collect_transit_gateway_attachments(
     session, account_id: str, account_name: str, region: str
 ) -> list[TransitGatewayAttachment]:
-    """Transit Gateway Attachment 수집"""
+    """Transit Gateway Attachment 리소스를 수집합니다.
+
+    Attachment 목록 조회 후 각 Attachment의 리소스 타입(VPC, VPN, Peering 등),
+    리소스 ID, 상태, Association 상태 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        TransitGatewayAttachment 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     attachments = []
 
@@ -97,7 +123,20 @@ def collect_transit_gateway_attachments(
 
 
 def collect_vpn_gateways(session, account_id: str, account_name: str, region: str) -> list[VPNGateway]:
-    """VPN Gateway 수집"""
+    """VPN Gateway (Virtual Private Gateway) 리소스를 수집합니다.
+
+    VPN Gateway 목록 조회 후 각 게이트웨이의 상태, VPN 타입, ASN,
+    연결된 VPC 목록 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        VPNGateway 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     gateways = []
 
@@ -133,7 +172,20 @@ def collect_vpn_gateways(session, account_id: str, account_name: str, region: st
 
 
 def collect_vpn_connections(session, account_id: str, account_name: str, region: str) -> list[VPNConnection]:
-    """VPN Connection 수집"""
+    """VPN Connection 리소스를 수집합니다.
+
+    VPN Connection 목록 조회 후 각 연결의 상태, Customer Gateway, VPN Gateway,
+    Transit Gateway, Static Routes 설정 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        VPNConnection 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     connections = []
 
@@ -166,7 +218,20 @@ def collect_vpn_connections(session, account_id: str, account_name: str, region:
 
 
 def collect_network_acls(session, account_id: str, account_name: str, region: str) -> list[NetworkACL]:
-    """Network ACL 수집"""
+    """Network ACL 리소스를 수집합니다.
+
+    Network ACL 목록 조회 후 각 ACL의 인바운드/아웃바운드 규칙 수,
+    연결된 Subnet 목록, Default 여부 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        NetworkACL 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     nacls = []
 
@@ -205,7 +270,20 @@ def collect_network_acls(session, account_id: str, account_name: str, region: st
 def collect_vpc_peering_connections(
     session, account_id: str, account_name: str, region: str
 ) -> list[VPCPeeringConnection]:
-    """VPC Peering Connection 수집"""
+    """VPC Peering Connection 리소스를 수집합니다.
+
+    Peering Connection 목록 조회 후 각 연결의 Requester/Accepter VPC 정보
+    (VPC ID, 소유자 계정 ID, CIDR Block), 상태 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        VPCPeeringConnection 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     peerings = []
 

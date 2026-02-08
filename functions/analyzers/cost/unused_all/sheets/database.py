@@ -209,6 +209,7 @@ def _create_rds_instance_sheet(wb: Workbook, results) -> None:
 
 
 def _create_rds_snap_sheet(wb: Workbook, results) -> None:
+    """오래된 RDS Snapshot 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),

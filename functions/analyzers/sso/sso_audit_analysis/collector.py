@@ -43,7 +43,11 @@ ADMIN_PERMISSION_PATTERNS = [
 
 @dataclass
 class SSOUser:
-    """Identity Center 사용자"""
+    """IAM Identity Center 사용자 정보.
+
+    Identity Store에서 수집한 사용자 기본 정보와 할당된 Permission Set,
+    Admin 접근 권한 보유 여부를 포함한다.
+    """
 
     user_id: str
     user_name: str  # email 형식
@@ -64,7 +68,10 @@ class SSOUser:
 
 @dataclass
 class SSOGroup:
-    """Identity Center 그룹"""
+    """IAM Identity Center 그룹 정보.
+
+    그룹 멤버, 할당된 Permission Set, Admin 접근 권한 보유 여부를 포함한다.
+    """
 
     group_id: str
     group_name: str
@@ -80,7 +87,10 @@ class SSOGroup:
 
 @dataclass
 class SSOPermissionSet:
-    """Permission Set 정보"""
+    """SSO Permission Set 상세 정보.
+
+    관리형 정책, 인라인 정책, 위험 분석 결과, 계정 할당 현황을 포함한다.
+    """
 
     permission_set_arn: str
     name: str
@@ -103,7 +113,10 @@ class SSOPermissionSet:
 
 @dataclass
 class SSOAccountAssignment:
-    """계정별 권한 할당 정보"""
+    """계정별 SSO 권한 할당 정보.
+
+    어떤 사용자/그룹이 어떤 Permission Set으로 어떤 계정에 접근하는지를 나타낸다.
+    """
 
     account_id: str
     account_name: str
@@ -116,7 +129,10 @@ class SSOAccountAssignment:
 
 @dataclass
 class SSOData:
-    """SSO 전체 데이터"""
+    """IAM Identity Center에서 수집된 전체 데이터.
+
+    사용자, 그룹, Permission Set, 계정 할당 정보를 집계한다.
+    """
 
     instance_arn: str
     identity_store_id: str
@@ -130,7 +146,11 @@ class SSOData:
 
 
 class SSOCollector:
-    """IAM Identity Center 데이터 수집기"""
+    """IAM Identity Center 데이터 수집기.
+
+    Identity Store, SSO Admin API를 통해 사용자, 그룹, Permission Set,
+    계정 할당 정보를 수집하고 위험 분석을 수행한다.
+    """
 
     def __init__(self):
         self.errors: list[str] = []

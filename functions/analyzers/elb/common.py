@@ -1,5 +1,5 @@
 """
-plugins/elb/common.py - ELB 공통 유틸리티
+functions/analyzers/elb/common.py - ELB 공통 유틸리티
 
 ALB, NLB, CLB, GWLB에서 공유하는 데이터 구조와 헬퍼 함수.
 
@@ -18,7 +18,10 @@ from core.shared.aws.pricing import get_elb_monthly_cost
 
 
 class LBType(Enum):
-    """Load Balancer 타입"""
+    """Load Balancer 타입 열거형
+
+    AWS ELB의 4가지 유형을 나타냅니다.
+    """
 
     ALB = "application"
     NLB = "network"
@@ -27,7 +30,14 @@ class LBType(Enum):
 
     @classmethod
     def from_string(cls, value: str) -> LBType:
-        """문자열에서 LBType 변환"""
+        """문자열에서 LBType 변환
+
+        Args:
+            value: LB 타입 문자열 (application, network, gateway, classic)
+
+        Returns:
+            대응하는 LBType. 매칭 실패 시 ALB 반환.
+        """
         mapping = {
             "application": cls.ALB,
             "network": cls.NLB,
@@ -38,7 +48,11 @@ class LBType(Enum):
 
     @property
     def display_name(self) -> str:
-        """표시용 이름"""
+        """표시용 이름
+
+        Returns:
+            ALB, NLB, GWLB, CLB 중 하나
+        """
         return {
             LBType.ALB: "ALB",
             LBType.NLB: "NLB",
@@ -48,7 +62,10 @@ class LBType(Enum):
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """Load Balancer의 사용 상태 분류
+
+    타겟 등록 여부와 헬스체크 상태로 판별됩니다.
+    """
 
     UNUSED = "unused"  # 미사용 (타겟 없음)
     UNHEALTHY = "unhealthy"  # 모든 타겟 비정상
@@ -56,7 +73,7 @@ class UsageStatus(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도 수준"""
 
     CRITICAL = "critical"
     HIGH = "high"
@@ -67,7 +84,16 @@ class Severity(Enum):
 
 @dataclass
 class TargetGroupInfo:
-    """타겟 그룹 정보"""
+    """타겟 그룹 정보
+
+    Attributes:
+        arn: Target Group ARN
+        name: Target Group 이름
+        target_type: 타겟 유형 (instance, ip, lambda, alb)
+        total_targets: 전체 타겟 수
+        healthy_targets: 정상 타겟 수
+        unhealthy_targets: 비정상 타겟 수
+    """
 
     arn: str
     name: str
@@ -79,7 +105,27 @@ class TargetGroupInfo:
 
 @dataclass
 class LoadBalancerInfo:
-    """Load Balancer 정보"""
+    """Load Balancer 정보
+
+    Attributes:
+        arn: Load Balancer ARN
+        name: Load Balancer 이름
+        dns_name: DNS 이름
+        lb_type: LB 유형 (application, network, gateway, classic)
+        scheme: 스킴 (internet-facing, internal)
+        state: LB 상태
+        vpc_id: VPC ID
+        availability_zones: 가용 영역 리스트
+        created_time: 생성 시간
+        tags: 사용자 태그 딕셔너리
+        target_groups: 연결된 타겟 그룹 리스트 (ALB/NLB/GWLB)
+        registered_instances: 등록된 인스턴스 수 (CLB 전용)
+        healthy_instances: 정상 인스턴스 수 (CLB 전용)
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        monthly_cost: 추정 월간 고정 비용 (USD)
+    """
 
     arn: str
     name: str
@@ -109,19 +155,31 @@ class LoadBalancerInfo:
 
     @property
     def lb_type_enum(self) -> LBType:
-        """LBType enum으로 변환"""
+        """LBType enum으로 변환
+
+        Returns:
+            lb_type 문자열에 대응하는 LBType enum 값
+        """
         return LBType.from_string(self.lb_type)
 
     @property
     def total_targets(self) -> int:
-        """전체 타겟 수"""
+        """전체 타겟 수
+
+        Returns:
+            CLB는 등록 인스턴스 수, ALB/NLB/GWLB는 타겟 그룹별 합계
+        """
         if self.lb_type == "classic":
             return self.registered_instances
         return sum(tg.total_targets for tg in self.target_groups)
 
     @property
     def healthy_targets(self) -> int:
-        """정상 타겟 수"""
+        """정상 타겟 수
+
+        Returns:
+            CLB는 InService 인스턴스 수, ALB/NLB/GWLB는 healthy 타겟 합계
+        """
         if self.lb_type == "classic":
             return self.healthy_instances
         return sum(tg.healthy_targets for tg in self.target_groups)
@@ -129,7 +187,15 @@ class LoadBalancerInfo:
 
 @dataclass
 class LBFinding:
-    """LB 분석 결과"""
+    """개별 Load Balancer 분석 결과
+
+    Attributes:
+        lb: 분석 대상 Load Balancer 정보
+        usage_status: 분석으로 판별된 사용 상태
+        severity: 심각도 수준
+        description: 상태 설명
+        recommendation: 권장 조치 사항
+    """
 
     lb: LoadBalancerInfo
     usage_status: UsageStatus
@@ -140,7 +206,20 @@ class LBFinding:
 
 @dataclass
 class LBAnalysisResult:
-    """분석 결과"""
+    """Load Balancer 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        lb_type_filter: 필터링된 LB 타입 (None이면 전체)
+        findings: 개별 LB 분석 결과 리스트
+        total_count: 전체 LB 수
+        unused_count: 미사용 LB 수
+        unhealthy_count: 전체 타겟 비정상 LB 수
+        normal_count: 정상 LB 수
+        unused_monthly_cost: 미사용/unhealthy LB 추정 월간 비용 (USD)
+    """
 
     account_id: str
     account_name: str
@@ -173,11 +252,14 @@ def collect_v2_load_balancers(
     """ALB/NLB/GWLB 목록 수집
 
     Args:
-        session: boto3 session
+        session: boto3 Session 객체
         account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전
+        account_name: AWS 계정 이름
+        region: AWS 리전
         lb_type_filter: 필터링할 LB 타입 (application, network, gateway)
+
+    Returns:
+        Load Balancer 정보 리스트 (타겟 그룹 헬스 포함)
     """
     from botocore.exceptions import ClientError
 
@@ -240,7 +322,15 @@ def collect_v2_load_balancers(
 
 
 def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
-    """LB에 연결된 타겟 그룹 조회"""
+    """LB에 연결된 타겟 그룹 및 헬스 상태 조회
+
+    Args:
+        elbv2: ELBv2 클라이언트
+        lb_arn: Load Balancer ARN
+
+    Returns:
+        타겟 그룹 정보 리스트
+    """
     from botocore.exceptions import ClientError
 
     target_groups = []
@@ -296,7 +386,17 @@ def collect_classic_load_balancers(
     account_name: str,
     region: str,
 ) -> list[LoadBalancerInfo]:
-    """Classic Load Balancer 목록 수집"""
+    """Classic Load Balancer 목록 수집
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        CLB 정보 리스트 (인스턴스 헬스 포함)
+    """
     from botocore.exceptions import ClientError
 
     from core.parallel import get_client
@@ -367,7 +467,14 @@ def collect_classic_load_balancers(
 
 
 def analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
-    """개별 LB 분석"""
+    """개별 Load Balancer 사용 상태 분석
+
+    Args:
+        lb: 분석 대상 Load Balancer 정보
+
+    Returns:
+        LB 분석 결과 (상태, 심각도, 권장 조치 포함)
+    """
 
     # 비활성 상태
     if lb.state not in ("active", ""):
@@ -440,7 +547,18 @@ def analyze_load_balancers(
     region: str,
     lb_type_filter: str | None = None,
 ) -> LBAnalysisResult:
-    """Load Balancer 미사용 분석"""
+    """Load Balancer 미사용 분석
+
+    Args:
+        load_balancers: 수집된 LB 정보 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        lb_type_filter: 필터링된 LB 타입 (None이면 전체)
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 LB 수, 비용 포함)
+    """
     result = LBAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -477,10 +595,15 @@ def generate_unused_report(
 ) -> str:
     """미사용 분석 Excel 보고서 생성
 
+    Summary 시트와 미사용/unhealthy LB Findings 시트를 포함합니다.
+
     Args:
         results: 분석 결과 리스트
-        output_dir: 출력 디렉토리
+        output_dir: 출력 디렉토리 경로
         lb_type_name: 보고서 제목에 사용할 LB 타입 이름 (ELB, ALB, NLB, CLB)
+
+    Returns:
+        생성된 Excel 파일 경로
     """
     from openpyxl.styles import PatternFill
 

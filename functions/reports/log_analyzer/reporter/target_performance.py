@@ -1,4 +1,7 @@
-"""Target performance analysis sheet writer."""
+"""functions/reports/log_analyzer/reporter/target_performance.py - 타겟 성능 분석 시트 Writer.
+
+백엔드 타겟(IP:Port)별 요청 수, 평균 응답 시간, 에러율 등 성능 지표를 분석합니다.
+"""
 
 from __future__ import annotations
 

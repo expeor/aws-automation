@@ -1,5 +1,5 @@
 """
-plugins/ec2/ami_audit.py - AMI 미사용 분석
+functions/analyzers/ec2/ami_audit.py - AMI 미사용 분석
 
 사용되지 않는 AMI 탐지
 
@@ -57,14 +57,20 @@ REQUIRED_PERMISSIONS = {
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """AMI의 사용 상태 분류
+
+    EC2 인스턴스 사용 여부로 판별됩니다.
+    """
 
     UNUSED = "unused"  # 미사용
     NORMAL = "normal"  # 사용 중
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도 수준
+
+    백업 스냅샷 용량 기반으로 결정됩니다.
+    """
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -74,7 +80,28 @@ class Severity(Enum):
 
 @dataclass
 class AMIInfo:
-    """AMI 정보"""
+    """AMI 정보
+
+    Attributes:
+        id: AMI ID
+        name: AMI 이름
+        description: AMI 설명
+        state: AMI 상태 (available, pending 등)
+        architecture: CPU 아키텍처 (x86_64, arm64)
+        platform: 플랫폼 상세 (Linux/UNIX, Windows 등)
+        root_device_type: 루트 디바이스 유형 (ebs, instance-store)
+        creation_date: AMI 생성 시간
+        owner_id: 소유자 계정 ID
+        public: 공개 여부
+        tags: 사용자 태그 딕셔너리 (aws: 접두사 제외)
+        snapshot_ids: 백업 스냅샷 ID 리스트
+        total_size_gb: 백업 스냅샷 총 용량 (GB)
+        used_by_instances: 이 AMI를 사용하는 인스턴스 ID 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        monthly_cost: 추정 월간 스냅샷 비용 (USD)
+    """
 
     id: str
     name: str
@@ -105,7 +132,11 @@ class AMIInfo:
 
     @property
     def age_days(self) -> int:
-        """AMI 나이 (일)"""
+        """AMI 생성 후 경과 일수
+
+        Returns:
+            creation_date 기준 경과 일수. creation_date가 없으면 0.
+        """
         if not self.creation_date:
             return 0
         now = datetime.now(timezone.utc)
@@ -114,18 +145,34 @@ class AMIInfo:
 
     @property
     def is_used(self) -> bool:
-        """사용 여부"""
+        """EC2 인스턴스에서 사용 여부
+
+        Returns:
+            used_by_instances가 하나 이상 존재하면 True
+        """
         return len(self.used_by_instances) > 0
 
     @property
     def is_recent(self) -> bool:
-        """최근 생성 여부"""
+        """최근 생성 여부
+
+        Returns:
+            경과 일수가 RECENT_DAYS 미만이면 True
+        """
         return self.age_days < RECENT_DAYS
 
 
 @dataclass
 class AMIFinding:
-    """AMI 분석 결과"""
+    """개별 AMI 분석 결과
+
+    Attributes:
+        ami: 분석 대상 AMI 정보
+        usage_status: 분석으로 판별된 사용 상태
+        severity: 심각도 수준
+        description: 상태 설명
+        recommendation: 권장 조치 사항
+    """
 
     ami: AMIInfo
     usage_status: UsageStatus
@@ -136,7 +183,20 @@ class AMIFinding:
 
 @dataclass
 class AMIAnalysisResult:
-    """분석 결과"""
+    """AMI 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        findings: 개별 AMI 분석 결과 리스트
+        total_count: 전체 AMI 수
+        unused_count: 미사용 AMI 수
+        normal_count: 사용 중 AMI 수
+        total_size_gb: 전체 스냅샷 용량 (GB)
+        unused_size_gb: 미사용 AMI 스냅샷 용량 (GB)
+        unused_monthly_cost: 미사용 AMI 추정 월간 비용 (USD)
+    """
 
     account_id: str
     account_name: str
@@ -160,7 +220,20 @@ class AMIAnalysisResult:
 
 
 def collect_amis(session, account_id: str, account_name: str, region: str) -> list[AMIInfo]:
-    """AMI 목록 수집 (자체 소유만)"""
+    """AMI 목록 수집 (자체 소유만)
+
+    DescribeImages API로 자체 소유 available 상태 AMI를 수집하고,
+    BlockDeviceMappings에서 스냅샷 정보와 비용을 계산합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        AMI 정보 리스트
+    """
     from botocore.exceptions import ClientError
 
     amis = []
@@ -230,7 +303,17 @@ def collect_amis(session, account_id: str, account_name: str, region: str) -> li
 
 
 def get_used_ami_ids(session, region: str) -> set[str]:
-    """EC2 인스턴스에서 사용 중인 AMI ID 목록"""
+    """EC2 인스턴스에서 사용 중인 AMI ID 목록 조회
+
+    모든 EC2 인스턴스의 ImageId를 수집하여 현재 사용 중인 AMI를 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: AWS 리전
+
+    Returns:
+        사용 중인 AMI ID 집합
+    """
     from botocore.exceptions import ClientError
 
     used_ids = set()
@@ -264,7 +347,21 @@ def analyze_amis(
     account_name: str,
     region: str,
 ) -> AMIAnalysisResult:
-    """AMI 미사용 분석"""
+    """AMI 사용 상태 분석
+
+    각 AMI의 EC2 인스턴스 사용 여부 및 경과 일수를 기반으로
+    미사용/정상으로 분류하고, 스냅샷 용량과 비용을 집계합니다.
+
+    Args:
+        amis: 수집된 AMI 정보 리스트
+        used_ami_ids: 인스턴스에서 사용 중인 AMI ID 집합
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 AMI 수, 용량, 비용 포함)
+    """
     result = AMIAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -292,7 +389,17 @@ def analyze_amis(
 
 
 def _analyze_single_ami(ami: AMIInfo) -> AMIFinding:
-    """개별 AMI 분석"""
+    """개별 AMI 사용 상태 분석
+
+    인스턴스 사용 여부, 경과 일수, 스냅샷 용량을 기반으로
+    사용 상태와 심각도를 결정합니다.
+
+    Args:
+        ami: 분석 대상 AMI 정보
+
+    Returns:
+        개별 AMI 분석 결과 (사용 상태, 심각도, 권장 조치 포함)
+    """
 
     # 사용 중
     if ami.is_used:
@@ -337,7 +444,18 @@ def _analyze_single_ami(ami: AMIInfo) -> AMIFinding:
 
 
 def generate_report(results: list[AMIAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """AMI 미사용 분석 Excel 보고서 생성
+
+    Summary 시트(통계 요약)와 Findings 시트(개별 AMI 상세)를 포함하는
+    Excel 파일을 생성합니다.
+
+    Args:
+        results: 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -436,7 +554,19 @@ def generate_report(results: list[AMIAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> AMIAnalysisResult | None:
-    """단일 계정/리전의 AMI 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 AMI 수집 및 분석 (parallel_collect 콜백)
+
+    AMI 목록과 사용 중인 AMI ID를 수집하여 사용 상태를 분석합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        분석 결과. AMI가 없으면 None.
+    """
     # 수집
     amis = collect_amis(session, account_id, account_name, region)
 
@@ -451,7 +581,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """AMI 미사용 분석 실행"""
+    """AMI 미사용 분석 실행
+
+    멀티 계정/리전에서 AMI를 병렬 수집하고,
+    EC2 인스턴스 미사용 AMI를 식별하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]AMI 미사용 분석 시작...[/bold]")
     console.print(f"  [dim]기준: {RECENT_DAYS}일 이내 생성은 제외[/dim]")
 

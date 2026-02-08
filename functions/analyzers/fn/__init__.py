@@ -1,7 +1,19 @@
 """
-plugins/fn - Lambda Analysis Tools
+functions/analyzers/fn - Lambda 함수 관리 및 분석 도구
 
-Folder name 'fn': 'lambda' is a Python reserved word
+Lambda 함수의 사용 현황, 런타임 EOL, 메모리/비용/에러율을 분석합니다.
+미사용 함수 및 버전 탐지, 런타임 지원 종료 분석, Provisioned Concurrency
+비용 최적화 기능을 제공합니다.
+
+Note:
+    폴더명 'fn': 'lambda'는 Python 예약어이므로 'fn'을 사용합니다.
+
+도구 목록:
+    - unused: 미사용 Lambda 함수 탐지 (30일 이상 미호출)
+    - versions: 오래된 버전 및 미사용 Alias 탐지
+    - comprehensive: 런타임 EOL, 메모리, 비용, 에러율 현황
+    - runtime_deprecated: Lambda 런타임 지원 종료 현황 분석 (종료됨/곧 종료/안전, OS 버전, 업그레이드 경로)
+    - provisioned: Provisioned Concurrency 비용 최적화 (과다/부족 설정 탐지)
 """
 
 CATEGORY = {

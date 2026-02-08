@@ -44,7 +44,15 @@ except ImportError:
 
 @dataclass
 class IPPrefixData:
-    """IP prefix with associated metadata"""
+    """IP prefix with associated metadata
+
+    Attributes:
+        prefix: CIDR 표기법 (예: "10.0.0.0/8", "2600::/32")
+        provider: 클라우드 제공자 이름 (AWS, GCP, Azure 등)
+        service: 서비스 이름 (EC2, S3, CLOUDFRONT 등)
+        region: 리전 이름 (ap-northeast-2 등)
+        extra: 추가 메타데이터 (network_border_group 등)
+    """
 
     prefix: str
     provider: str
@@ -357,7 +365,11 @@ _global_index: MultiProviderIndex | None = None
 
 
 def get_global_index() -> MultiProviderIndex:
-    """Get or create the global multi-provider index"""
+    """글로벌 멀티 프로바이더 인덱스 싱글톤 반환
+
+    Returns:
+        MultiProviderIndex 싱글톤 인스턴스
+    """
     global _global_index
     if _global_index is None:
         _global_index = MultiProviderIndex()
@@ -365,6 +377,6 @@ def get_global_index() -> MultiProviderIndex:
 
 
 def reset_global_index() -> None:
-    """Reset the global index (for cache refresh)"""
+    """글로벌 인덱스 초기화 (캐시 갱신용)"""
     global _global_index
     _global_index = None

@@ -1,5 +1,5 @@
 """
-plugins/vpc/endpoint_audit.py - VPC Endpoint 미사용 분석
+functions/analyzers/vpc/endpoint_audit.py - VPC Endpoint 미사용 분석
 
 미사용 VPC Endpoint 탐지 (Interface Endpoint)
 
@@ -35,7 +35,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class EndpointStatus(Enum):
-    """VPC Endpoint 상태"""
+    """VPC Endpoint의 사용 상태 분류
+
+    CloudWatch 트래픽 지표 및 state 기반으로 판별됩니다.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"  # 트래픽 없음
@@ -44,7 +47,20 @@ class EndpointStatus(Enum):
 
 @dataclass
 class VPCEndpointInfo:
-    """VPC Endpoint 정보"""
+    """VPC Endpoint 정보
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        endpoint_id: VPC Endpoint ID
+        endpoint_type: Endpoint 유형 (Interface, Gateway, GatewayLoadBalancer)
+        service_name: 연결된 AWS 서비스 이름
+        vpc_id: VPC ID
+        state: Endpoint 상태 (available, pending 등)
+        creation_time: 생성 시간
+        name: Name 태그 값
+    """
 
     account_id: str
     account_name: str
@@ -59,10 +75,20 @@ class VPCEndpointInfo:
 
     @property
     def is_interface(self) -> bool:
+        """Interface 유형 여부
+
+        Returns:
+            endpoint_type이 Interface이면 True
+        """
         return self.endpoint_type == "Interface"
 
     @property
     def monthly_cost(self) -> float:
+        """추정 월간 비용
+
+        Returns:
+            추정 월간 비용 (USD). Gateway Endpoint는 무료(0.0).
+        """
         # Gateway Endpoints (S3, DynamoDB) are free
         if self.endpoint_type == "Gateway":
             return 0.0
@@ -71,7 +97,13 @@ class VPCEndpointInfo:
 
 @dataclass
 class EndpointFinding:
-    """Endpoint 분석 결과"""
+    """개별 VPC Endpoint 분석 결과
+
+    Attributes:
+        endpoint: 분석 대상 Endpoint 정보
+        status: 분석으로 판별된 사용 상태
+        recommendation: 권장 조치 사항
+    """
 
     endpoint: VPCEndpointInfo
     status: EndpointStatus
@@ -80,7 +112,20 @@ class EndpointFinding:
 
 @dataclass
 class EndpointAnalysisResult:
-    """Endpoint 분석 결과 집계"""
+    """VPC Endpoint 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        total_count: 전체 Endpoint 수
+        interface_count: Interface Endpoint 수
+        gateway_count: Gateway Endpoint 수
+        unused_count: 미사용 Endpoint 수
+        normal_count: 정상 Endpoint 수
+        unused_monthly_cost: 미사용 Endpoint 추정 월간 비용 (USD)
+        findings: 개별 Endpoint 분석 결과 리스트
+    """
 
     account_id: str
     account_name: str
@@ -100,7 +145,19 @@ class EndpointAnalysisResult:
 
 
 def collect_endpoints(session, account_id: str, account_name: str, region: str) -> list[VPCEndpointInfo]:
-    """VPC Endpoints 수집"""
+    """VPC Endpoint 목록 수집
+
+    DescribeVpcEndpoints API로 모든 VPC Endpoint를 페이지네이션으로 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        VPC Endpoint 정보 리스트
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     endpoints = []
 
@@ -137,9 +194,19 @@ def collect_endpoints(session, account_id: str, account_name: str, region: str) 
 
 
 def check_endpoint_usage(session, region: str, endpoint_id: str, days: int = 7) -> bool:
-    """
-    CloudWatch 메트릭으로 Endpoint 사용량 확인
-    BytesProcessed 또는 ActiveConnections 메트릭 확인
+    """CloudWatch 메트릭으로 Endpoint 사용량 확인
+
+    PrivateLinkEndpoints의 BytesProcessed 메트릭을 조회하여
+    트래픽 존재 여부를 확인합니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: AWS 리전
+        endpoint_id: VPC Endpoint ID
+        days: 분석 기간 (일, 기본 7일)
+
+    Returns:
+        트래픽이 있으면 True. 메트릭 없으면 보수적으로 True 반환.
     """
     from botocore.exceptions import ClientError
 
@@ -187,7 +254,21 @@ def analyze_endpoints(
     account_name: str,
     region: str,
 ) -> EndpointAnalysisResult:
-    """VPC Endpoint 분석"""
+    """VPC Endpoint 사용 상태 분석
+
+    각 Endpoint의 유형(Interface/Gateway)과 상태를 기반으로
+    미사용/정상으로 분류하고, 비용을 집계합니다.
+
+    Args:
+        endpoints: 수집된 VPC Endpoint 정보 리스트
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 Endpoint 수, 비용 포함)
+    """
     result = EndpointAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -255,7 +336,15 @@ def analyze_endpoints(
 
 
 def generate_report(results: list[EndpointAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """VPC Endpoint 분석 Excel 보고서 생성
+
+    Args:
+        results: 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from core.shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
@@ -349,7 +438,17 @@ def generate_report(results: list[EndpointAnalysisResult], output_dir: str) -> s
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EndpointAnalysisResult | None:
-    """단일 계정/리전의 VPC Endpoint 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 VPC Endpoint 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        분석 결과. Endpoint가 없으면 None.
+    """
     endpoints = collect_endpoints(session, account_id, account_name, region)
     if not endpoints:
         return None
@@ -358,7 +457,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """VPC Endpoint 미사용 분석"""
+    """VPC Endpoint 미사용 분석 실행
+
+    멀티 계정/리전에서 VPC Endpoint를 병렬 수집하고,
+    미사용 Endpoint를 식별하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]VPC Endpoint 분석 시작...[/bold]\n")
 
     # 병렬 수집 및 분석

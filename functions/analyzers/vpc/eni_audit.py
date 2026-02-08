@@ -1,5 +1,5 @@
 """
-plugins/cost/unused_eni.py - ENI 미사용 분석
+functions/analyzers/vpc/eni_audit.py - ENI 미사용 분석
 
 미사용 ENI (Elastic Network Interface) 탐지
 
@@ -41,7 +41,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """ENI의 사용 상태 분류
+
+    연결 상태 및 인터페이스 유형으로 판별됩니다.
+    """
 
     UNUSED = "unused"  # 미사용 (available 상태)
     NORMAL = "normal"  # 정상 사용 (in-use)
@@ -50,7 +53,7 @@ class UsageStatus(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도 수준"""
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -60,7 +63,29 @@ class Severity(Enum):
 
 @dataclass
 class ENIInfo:
-    """ENI 정보"""
+    """Elastic Network Interface 정보
+
+    Attributes:
+        id: ENI ID
+        description: ENI 설명
+        status: 연결 상태 (available, in-use, associated)
+        vpc_id: VPC ID
+        subnet_id: 서브넷 ID
+        availability_zone: 가용 영역
+        private_ip: 프라이빗 IP 주소
+        public_ip: 퍼블릭 IP 주소
+        interface_type: 인터페이스 유형 (interface, nat_gateway, lambda 등)
+        requester_id: 요청자 ID (AWS 서비스)
+        owner_id: 소유자 계정 ID
+        instance_id: 연결된 EC2 인스턴스 ID
+        attachment_status: attachment 상태
+        security_groups: 연결된 Security Group ID 리스트
+        tags: 사용자 태그 딕셔너리 (aws: 접두사 제외)
+        name: Name 태그 값
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+    """
 
     id: str
     description: str
@@ -86,12 +111,20 @@ class ENIInfo:
 
     @property
     def is_attached(self) -> bool:
-        """연결 여부"""
+        """EC2 인스턴스 연결 여부
+
+        Returns:
+            status가 in-use이면 True
+        """
         return self.status == "in-use"
 
     @property
     def is_aws_managed(self) -> bool:
-        """AWS 관리형 여부"""
+        """AWS 관리형 ENI 여부
+
+        Returns:
+            requester_id가 다른 서비스이거나 관리형 인터페이스 유형이면 True
+        """
         if self.requester_id and self.requester_id != self.owner_id:
             return True
         aws_managed_types = {
@@ -109,7 +142,15 @@ class ENIInfo:
 
 @dataclass
 class ENIFinding:
-    """ENI 분석 결과"""
+    """개별 ENI 분석 결과
+
+    Attributes:
+        eni: 분석 대상 ENI 정보
+        usage_status: 분석으로 판별된 사용 상태
+        severity: 심각도 수준
+        description: 상태 설명
+        recommendation: 권장 조치 사항
+    """
 
     eni: ENIInfo
     usage_status: UsageStatus
@@ -120,7 +161,19 @@ class ENIFinding:
 
 @dataclass
 class ENIAnalysisResult:
-    """분석 결과"""
+    """ENI 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        findings: 개별 ENI 분석 결과 리스트
+        total_count: 전체 ENI 수
+        unused_count: 미사용 ENI 수
+        normal_count: 정상 사용 ENI 수
+        aws_managed_count: AWS 관리형 ENI 수
+        pending_count: 확인 필요 ENI 수
+    """
 
     account_id: str
     account_name: str
@@ -141,7 +194,19 @@ class ENIAnalysisResult:
 
 
 def collect_enis(session, account_id: str, account_name: str, region: str) -> list[ENIInfo]:
-    """ENI 목록 수집"""
+    """ENI 목록 수집
+
+    DescribeNetworkInterfaces API로 모든 ENI를 페이지네이션으로 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        ENI 정보 리스트
+    """
     from botocore.exceptions import ClientError
 
     enis = []
@@ -198,7 +263,20 @@ def collect_enis(session, account_id: str, account_name: str, region: str) -> li
 
 
 def analyze_enis(enis: list[ENIInfo], account_id: str, account_name: str, region: str) -> ENIAnalysisResult:
-    """ENI 미사용 분석"""
+    """ENI 사용 상태 분석
+
+    각 ENI의 연결 상태 및 인터페이스 유형을 기반으로
+    미사용/정상/AWS관리형/확인필요로 분류합니다.
+
+    Args:
+        enis: 수집된 ENI 정보 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 ENI 수 포함)
+    """
     result = ENIAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -223,7 +301,17 @@ def analyze_enis(enis: list[ENIInfo], account_id: str, account_name: str, region
 
 
 def _analyze_single_eni(eni: ENIInfo) -> ENIFinding:
-    """개별 ENI 분석"""
+    """개별 ENI 사용 상태 분석
+
+    연결 상태, 인터페이스 유형, description 패턴을 기반으로
+    ENI의 사용 상태와 심각도를 판별합니다.
+
+    Args:
+        eni: 분석 대상 ENI 정보
+
+    Returns:
+        ENI 분석 결과 (상태, 심각도, 권장 조치 포함)
+    """
 
     # 1. AWS 관리형
     if eni.is_aws_managed:
@@ -293,7 +381,17 @@ def _analyze_single_eni(eni: ENIInfo) -> ENIFinding:
 
 
 def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """ENI 미사용 분석 Excel 보고서 생성
+
+    Summary 시트와 미사용/확인필요 ENI Findings 시트를 포함합니다.
+
+    Args:
+        results: 계정/리전별 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -398,13 +496,30 @@ def generate_report(results: list[ENIAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ENIAnalysisResult:
-    """단일 계정/리전의 ENI 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 ENI 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        ENI 분석 결과 (상태별 ENI 수 포함)
+    """
     enis = collect_enis(session, account_id, account_name, region)
     return analyze_enis(enis, account_id, account_name, region)
 
 
 def run(ctx: ExecutionContext) -> None:
-    """ENI 미사용 분석 실행"""
+    """ENI 미사용 분석 실행
+
+    멀티 계정/리전에서 ENI를 병렬 수집하고,
+    미사용 ENI를 식별하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]ENI 미사용 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석

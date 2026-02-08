@@ -1,5 +1,5 @@
 """
-plugins/transfer/unused.py - AWS Transfer Family 미사용 서버 분석
+functions/analyzers/transfer/unused.py - AWS Transfer Family 미사용 서버 분석
 
 유휴/미사용 Transfer Family 서버 탐지 (CloudWatch 지표 기반)
 
@@ -45,18 +45,45 @@ ANALYSIS_DAYS = 30
 
 
 class ServerStatus(Enum):
-    """서버 상태"""
+    """Transfer Family 서버 분석 상태.
+
+    CloudWatch 파일 전송 지표, 사용자 수, 서버 상태 기반으로 분류한다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 서버.
+        UNUSED: 분석 기간 동안 파일 전송이 없는 미사용 서버.
+        IDLE: 일 평균 파일 전송이 1건 미만인 저사용 서버.
+        NO_USERS: 등록된 사용자가 없는 서버.
+        STOPPED: 중지 상태인 서버 (OFFLINE, STOPPING, STOP_FAILED).
+    """
 
     NORMAL = "normal"
-    UNUSED = "unused"  # 파일 전송 없음
-    IDLE = "idle"  # 저사용
-    NO_USERS = "no_users"  # 사용자 없음
-    STOPPED = "stopped"  # 중지됨
+    UNUSED = "unused"
+    IDLE = "idle"
+    NO_USERS = "no_users"
+    STOPPED = "stopped"
 
 
 @dataclass
 class TransferServerInfo:
-    """Transfer Family 서버 정보"""
+    """Transfer Family 서버 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 서버가 위치한 리전.
+        server_id: Transfer 서버 ID.
+        endpoint_type: 엔드포인트 유형 (PUBLIC, VPC, VPC_ENDPOINT).
+        protocols: 지원 프로토콜 목록 (SFTP, FTPS, FTP, AS2).
+        state: 서버 상태 (ONLINE, OFFLINE, STARTING, STOPPING, START_FAILED, STOP_FAILED).
+        identity_provider_type: 인증 제공자 유형.
+        user_count: 등록된 사용자 수.
+        files_in: 분석 기간 동안 수신 파일 수 (CloudWatch Sum).
+        files_out: 분석 기간 동안 송신 파일 수 (CloudWatch Sum).
+        bytes_in: 분석 기간 동안 수신 바이트 수 (CloudWatch Sum).
+        bytes_out: 분석 기간 동안 송신 바이트 수 (CloudWatch Sum).
+        estimated_monthly_cost: 예상 월간 비용 (USD).
+    """
 
     account_id: str
     account_name: str
@@ -77,20 +104,41 @@ class TransferServerInfo:
 
     @property
     def total_files(self) -> float:
+        """분석 기간 동안 총 파일 전송 수 (수신 + 송신).
+
+        Returns:
+            총 파일 수.
+        """
         return self.files_in + self.files_out
 
     @property
     def total_bytes(self) -> float:
+        """분석 기간 동안 총 전송 바이트 수 (수신 + 송신).
+
+        Returns:
+            총 바이트 수.
+        """
         return self.bytes_in + self.bytes_out
 
     @property
     def is_active(self) -> bool:
+        """파일 전송 활동이 있는지 여부.
+
+        Returns:
+            파일 전송 또는 바이트 전송이 있으면 True.
+        """
         return self.total_files > 0 or self.total_bytes > 0
 
 
 @dataclass
 class TransferFinding:
-    """서버 분석 결과"""
+    """개별 Transfer Family 서버에 대한 분석 결과.
+
+    Attributes:
+        server: 분석 대상 서버 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     server: TransferServerInfo
     status: ServerStatus
@@ -99,7 +147,21 @@ class TransferFinding:
 
 @dataclass
 class TransferAnalysisResult:
-    """Transfer Family 분석 결과 집계"""
+    """단일 계정/리전의 Transfer Family 서버 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_servers: 전체 서버 수.
+        unused_servers: 미사용 서버 수.
+        idle_servers: 저사용 서버 수.
+        no_users_servers: 사용자 없는 서버 수.
+        stopped_servers: 중지된 서버 수.
+        normal_servers: 정상 서버 수.
+        total_monthly_waste: 미사용/저사용 서버의 월간 낭비 비용 합계 (USD).
+        findings: 개별 서버 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -115,10 +177,20 @@ class TransferAnalysisResult:
 
 
 def collect_servers(session, account_id: str, account_name: str, region: str) -> list[TransferServerInfo]:
-    """Transfer Family 서버 수집 (배치 메트릭 최적화)
+    """지정된 계정/리전의 Transfer Family 서버를 수집하고 CloudWatch 메트릭을 조회한다.
 
-    최적화:
-    - 기존: 서버당 4 API 호출 → 최적화: 전체 1-2 API 호출
+    1단계에서 서버 목록, 상세 정보, 사용자 수를 수집하고,
+    2단계에서 ONLINE 서버에 대해 batch_get_metrics를 통해 파일/바이트 전송 지표를 배치 조회한다.
+    기존 서버당 4 API 호출을 전체 1-2 호출로 최적화했다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 Transfer Family 서버 정보 목록. CloudWatch 메트릭과 비용 정보가 포함된다.
     """
     from botocore.exceptions import ClientError
 
@@ -197,13 +269,16 @@ def _collect_transfer_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """Transfer Family 메트릭 배치 수집 (내부 함수)
+    """Transfer Family 서버의 CloudWatch 메트릭을 배치로 수집하여 서버 객체에 반영한다.
 
-    메트릭:
-    - FilesIn (Sum)
-    - FilesOut (Sum)
-    - BytesIn (Sum)
-    - BytesOut (Sum)
+    FilesIn, FilesOut, BytesIn, BytesOut 네 가지 메트릭의 Sum 값을
+    일별(86400초) 기간으로 조회한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        servers: 메트릭을 수집할 서버 목록 (결과가 각 객체에 직접 반영됨).
+        start_time: 메트릭 조회 시작 시각 (UTC).
+        end_time: 메트릭 조회 종료 시각 (UTC).
     """
     from botocore.exceptions import ClientError
 
@@ -272,7 +347,21 @@ def _collect_transfer_metrics_batch(
 def analyze_servers(
     servers: list[TransferServerInfo], account_id: str, account_name: str, region: str
 ) -> TransferAnalysisResult:
-    """Transfer Family 서버 분석"""
+    """수집된 Transfer Family 서버를 분석하여 미사용/저사용 서버를 식별한다.
+
+    서버 상태, 사용자 수, 파일 전송 활동을 기반으로 STOPPED, NO_USERS,
+    UNUSED, IDLE, NORMAL 상태로 분류한다. 비용 낭비는 미사용/사용자없음은 100%,
+    저사용은 50%로 추정한다.
+
+    Args:
+        servers: 분석 대상 Transfer Family 서버 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+
+    Returns:
+        Transfer Family 서버 분석 결과 집계 객체.
+    """
     result = TransferAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -346,7 +435,17 @@ def analyze_servers(
 
 
 def generate_report(results: list[TransferAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Transfer Family 미사용 서버 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 Servers 시트(비정상 서버 상세)를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -434,7 +533,19 @@ def generate_report(results: list[TransferAnalysisResult], output_dir: str) -> s
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> TransferAnalysisResult | None:
-    """단일 계정/리전의 Transfer Family 서버 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 Transfer Family 서버를 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 서버가 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        분석 결과 객체. 서버가 없으면 None.
+    """
     servers = collect_servers(session, account_id, account_name, region)
     if not servers:
         return None
@@ -442,7 +553,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Transfer Family 미사용 서버 분석"""
+    """Transfer Family 미사용 서버 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]Transfer Family 서버 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="transfer")

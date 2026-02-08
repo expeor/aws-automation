@@ -1,5 +1,12 @@
 """
-plugins/cloudtrail - CloudTrail Log Management Tools
+functions/analyzers/cloudtrail - CloudTrail 로그 관리 및 분석 도구
+
+CloudTrail 설정 현황을 점검하고, 최근 90일간 보안 이벤트
+(루트 로그인, IAM 변경 등)를 조회합니다.
+
+도구 목록:
+    - trail_audit: 전체 계정의 CloudTrail 설정 현황 보고서
+    - security_events: 최근 90일 보안 이벤트 조회 (us-east-1 자동 포함)
 """
 
 CATEGORY = {

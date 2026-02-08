@@ -1,9 +1,23 @@
 """
 core/parallel/rate_limiter.py - Token Bucket 기반 Rate Limiter
 
-AWS API 쓰로틀링 방지를 위한 요청 속도 제한 구현.
+AWS API 쓰로틀링 방지를 위한 요청 속도 제한 구현입니다.
 Thread-safe하며, 버스트 트래픽을 허용하면서 장기적으로
 일정한 요청 속도를 유지합니다.
+
+주요 구성 요소:
+- RateLimiterConfig: Rate limiter 설정 (초당 요청 수, 버스트, 타임아웃)
+- TokenBucketRateLimiter: Token Bucket 알고리즘 구현
+- get_rate_limiter: 서비스별 싱글톤 Rate limiter 조회
+- create_rate_limiter: 커스텀 Rate limiter 생성
+- SERVICE_RATE_LIMITS: AWS 서비스별 기본 Rate limit 설정
+
+Example:
+    from core.parallel.rate_limiter import get_rate_limiter
+
+    limiter = get_rate_limiter("ec2")
+    if limiter.acquire():
+        ec2.describe_instances()
 """
 
 import threading

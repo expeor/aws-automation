@@ -1,5 +1,5 @@
 """
-plugins/acm/unused.py - ACM 미사용 인증서 분석
+functions/analyzers/acm/unused.py - ACM 미사용 인증서 분석
 
 미사용/만료 임박 인증서 탐지
 
@@ -39,7 +39,19 @@ WARNING_EXPIRING_DAYS = 60  # 60일 이내 = 경고
 
 
 class CertStatus(Enum):
-    """인증서 상태"""
+    """ACM 인증서 분석 상태.
+
+    인증서 만료 임박 기준은 AWS Security Hub 권장 기준을 따른다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 인증서.
+        UNUSED: 어떤 리소스에도 연결되지 않은 미사용 인증서.
+        CRITICAL_EXPIRING: 7일 이내 만료 예정 (긴급).
+        EXPIRING: 30일 이내 만료 예정 (주의).
+        WARNING_EXPIRING: 60일 이내 만료 예정 (경고).
+        EXPIRED: 이미 만료된 인증서.
+        PENDING: 검증 대기 중인 인증서.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -52,7 +64,22 @@ class CertStatus(Enum):
 
 @dataclass
 class CertInfo:
-    """ACM 인증서 정보"""
+    """ACM 인증서 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 인증서가 위치한 리전.
+        certificate_arn: 인증서 ARN.
+        domain_name: 인증서 도메인 이름.
+        status: ACM 인증서 상태 (예: ISSUED, PENDING_VALIDATION).
+        cert_type: 인증서 유형 (AMAZON_ISSUED 또는 IMPORTED).
+        key_algorithm: 키 알고리즘 (예: RSA_2048, EC_prime256v1).
+        in_use_by: 인증서를 사용 중인 리소스 ARN 목록.
+        not_before: 인증서 유효 시작일.
+        not_after: 인증서 만료일.
+        renewal_eligibility: 갱신 가능 여부.
+    """
 
     account_id: str
     account_name: str
@@ -69,10 +96,20 @@ class CertInfo:
 
     @property
     def is_in_use(self) -> bool:
+        """인증서가 하나 이상의 리소스에 연결되어 있는지 여부.
+
+        Returns:
+            리소스에 연결되어 있으면 True.
+        """
         return len(self.in_use_by) > 0
 
     @property
     def days_until_expiry(self) -> int | None:
+        """인증서 만료까지 남은 일수.
+
+        Returns:
+            만료까지 남은 일수. 만료일이 없으면 None.
+        """
         if self.not_after:
             now = datetime.now(timezone.utc)
             delta = self.not_after - now
@@ -82,7 +119,13 @@ class CertInfo:
 
 @dataclass
 class CertFinding:
-    """인증서 분석 결과"""
+    """개별 인증서에 대한 분석 결과.
+
+    Attributes:
+        cert: 분석 대상 인증서 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     cert: CertInfo
     status: CertStatus
@@ -91,7 +134,22 @@ class CertFinding:
 
 @dataclass
 class ACMAnalysisResult:
-    """ACM 분석 결과 집계"""
+    """단일 계정/리전의 ACM 인증서 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_certs: 전체 인증서 수.
+        unused_certs: 미사용 인증서 수.
+        critical_expiring_certs: 7일 이내 만료 예정 인증서 수.
+        expiring_certs: 30일 이내 만료 예정 인증서 수.
+        warning_expiring_certs: 60일 이내 만료 예정 인증서 수.
+        expired_certs: 만료된 인증서 수.
+        pending_certs: 검증 대기 중인 인증서 수.
+        normal_certs: 정상 인증서 수.
+        findings: 개별 인증서 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -108,7 +166,19 @@ class ACMAnalysisResult:
 
 
 def collect_certificates(session, account_id: str, account_name: str, region: str) -> list[CertInfo]:
-    """ACM 인증서 수집"""
+    """지정된 계정/리전의 ACM 인증서를 수집한다.
+
+    모든 키 유형의 인증서를 조회하고 상세 정보(도메인, 만료일, 사용 현황 등)를 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 인증서 정보 목록.
+    """
     from botocore.exceptions import ClientError
 
     acm = get_client(session, "acm", region_name=region)
@@ -161,7 +231,20 @@ def collect_certificates(session, account_id: str, account_name: str, region: st
 
 
 def analyze_certificates(certs: list[CertInfo], account_id: str, account_name: str, region: str) -> ACMAnalysisResult:
-    """ACM 인증서 분석"""
+    """수집된 ACM 인증서를 분석하여 미사용/만료 임박 인증서를 식별한다.
+
+    AWS Security Hub 기준에 따라 만료 임박 등급을 분류한다:
+    7일 이내(CRITICAL), 30일 이내(EXPIRING), 60일 이내(WARNING).
+
+    Args:
+        certs: 분석 대상 인증서 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+
+    Returns:
+        인증서 분석 결과 집계 객체.
+    """
     result = ACMAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -260,7 +343,17 @@ def analyze_certificates(certs: list[CertInfo], account_id: str, account_name: s
 
 
 def generate_report(results: list[ACMAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """ACM 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 Detail 시트(비정상 인증서 상세)를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -352,7 +445,19 @@ def generate_report(results: list[ACMAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ACMAnalysisResult | None:
-    """단일 계정/리전의 ACM 인증서 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 ACM 인증서를 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 인증서가 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        분석 결과 객체. 인증서가 없으면 None.
+    """
     certs = collect_certificates(session, account_id, account_name, region)
     if not certs:
         return None
@@ -360,7 +465,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """ACM 미사용 인증서 분석"""
+    """ACM 미사용/만료 임박 인증서 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]ACM 인증서 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="acm")

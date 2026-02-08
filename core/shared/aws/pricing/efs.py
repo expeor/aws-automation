@@ -1,16 +1,23 @@
 """
-plugins/cost/pricing/efs.py - Amazon EFS 가격 조회
+core/shared/aws/pricing/efs.py - Amazon EFS 가격 조회
 
-EFS 비용 계산:
-- Standard Storage: GB당 월 $0.30
-- Infrequent Access: GB당 월 $0.016
-- Throughput: 추가 비용 (Provisioned 모드)
+EFS(Elastic File System) Storage Class별 GB당 월간 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격으로 fallback한다.
+
+비용 구조 (ap-northeast-2 기준):
+    - Standard: $0.30/GB/월
+    - Infrequent Access (IA): $0.016/GB/월
+    - Archive: $0.008/GB/월
+    - Throughput: Provisioned 모드 시 추가 비용 (이 모듈에서 미포함)
 
 사용법:
-    from functions.analyzers.cost.pricing.efs import get_efs_monthly_cost
+    from core.shared.aws.pricing.efs import get_efs_monthly_cost
 
-    # 월간 비용
+    # Standard 100GB 월간 비용
     monthly = get_efs_monthly_cost("ap-northeast-2", storage_gb=100)
+
+    # IA 500GB 월간 비용
+    monthly = get_efs_monthly_cost("ap-northeast-2", storage_gb=500, storage_class="ia")
 """
 
 from __future__ import annotations
@@ -46,7 +53,16 @@ DEFAULT_PRICES = {"standard": 0.30, "ia": 0.016, "archive": 0.008}
 
 
 def get_efs_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 EFS 가격 조회"""
+    """AWS Pricing API를 통해 EFS Storage Class별 가격을 조회한다.
+
+    Args:
+        session: boto3 세션
+        region: 대상 AWS 리전 코드
+
+    Returns:
+        Storage Class별 GB당 월간 가격 딕셔너리 (예: ``{"standard": 0.30, "ia": 0.016}``).
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -89,7 +105,18 @@ def get_efs_prices_from_api(session: boto3.Session, region: str) -> dict[str, fl
 
 
 def get_efs_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
-    """EFS 가격 조회"""
+    """EFS Storage Class별 가격을 조회한다.
+
+    ``session`` 이 제공되면 Pricing API를 우선 호출하고,
+    실패 시 하드코딩된 ``EFS_PRICES`` 에서 fallback한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        ``{"standard": float, "ia": float, "archive": float}`` 형식의 딕셔너리
+    """
     if session:
         api_prices = get_efs_prices_from_api(session, region)
         if api_prices:
@@ -103,7 +130,16 @@ def get_efs_storage_price(
     storage_class: str = "standard",
     session: boto3.Session | None = None,
 ) -> float:
-    """EFS GB당 월 가격"""
+    """EFS 특정 Storage Class의 GB당 월간 가격을 반환한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        storage_class: Storage Class (``"standard"``, ``"ia"``, ``"archive"``, 기본: ``"standard"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        GB당 월간 USD (Standard 기본: ``0.30``)
+    """
     prices = get_efs_prices(region, session)
     return prices.get(storage_class.lower(), prices.get("standard", 0.30))
 
@@ -114,6 +150,16 @@ def get_efs_monthly_cost(
     storage_class: str = "standard",
     session: boto3.Session | None = None,
 ) -> float:
-    """EFS 월간 비용 계산"""
+    """EFS 파일시스템의 월간 스토리지 비용을 계산한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        storage_gb: 저장된 데이터 크기 (GB, 기본: ``0``)
+        storage_class: Storage Class (``"standard"``, ``"ia"``, ``"archive"``, 기본: ``"standard"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        월간 USD 비용 (소수점 2자리 반올림)
+    """
     price = get_efs_storage_price(region, storage_class, session)
     return round(storage_gb * price, 2)

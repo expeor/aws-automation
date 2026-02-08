@@ -1,5 +1,5 @@
 """
-plugins/fn/unused.py - 미사용 Lambda 함수 분석
+functions/analyzers/fn/unused.py - 미사용 Lambda 함수 분석
 
 30일 이상 호출되지 않은 Lambda 함수 탐지
 
@@ -45,7 +45,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """Lambda 함수 사용 상태 분류.
+
+    CloudWatch Invocations 메트릭 기반으로 30일간 호출 빈도를 분석하여 분류한다.
+    """
 
     UNUSED = "unused"  # 30일간 호출 없음
     UNUSED_PROVISIONED = "unused_provisioned"  # 미사용 + PC 설정됨
@@ -55,7 +58,14 @@ class UsageStatus(Enum):
 
 @dataclass
 class LambdaFinding:
-    """Lambda 분석 결과"""
+    """Lambda 개별 함수 분석 결과.
+
+    Attributes:
+        function: Lambda 함수 정보 (메트릭 포함).
+        status: 사용 상태 분류 결과.
+        recommendation: 권장 조치 설명 (한글).
+        monthly_waste: 미사용으로 인한 월간 낭비 비용 (USD). PC 미설정 시 0.
+    """
 
     function: LambdaFunctionInfo
     status: UsageStatus
@@ -65,7 +75,19 @@ class LambdaFinding:
 
 @dataclass
 class LambdaAnalysisResult:
-    """Lambda 분석 결과 집계"""
+    """단일 계정/리전의 Lambda 미사용 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_count: 전체 Lambda 함수 수.
+        unused_count: 미사용 함수 수 (30일간 호출 없음).
+        low_usage_count: 저사용 함수 수 (월 100회 미만 호출).
+        normal_count: 정상 사용 함수 수.
+        unused_monthly_cost: 미사용 함수의 월간 낭비 비용 합계 (USD).
+        findings: 개별 함수 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -89,7 +111,20 @@ def analyze_functions(
     account_name: str,
     region: str,
 ) -> LambdaAnalysisResult:
-    """Lambda 함수 미사용 분석"""
+    """Lambda 함수 목록에 대한 미사용 분석 수행.
+
+    각 함수의 30일간 Invocations 메트릭과 Provisioned Concurrency 설정을
+    기반으로 사용 상태를 분류하고, 낭비 비용을 계산한다.
+
+    Args:
+        functions: Lambda 함수 정보 리스트 (메트릭 포함).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        계정/리전 단위의 분석 결과 집계.
+    """
     result = LambdaAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -113,7 +148,18 @@ def analyze_functions(
 
 
 def _analyze_single_function(func: LambdaFunctionInfo, region: str) -> LambdaFinding:
-    """개별 Lambda 함수 분석"""
+    """개별 Lambda 함수의 사용 상태 분석.
+
+    Invocations 메트릭과 Provisioned Concurrency 설정을 기반으로
+    함수의 사용 상태를 판별하고 비용 낭비를 계산한다.
+
+    Args:
+        func: Lambda 함수 정보 (메트릭 포함).
+        region: AWS 리전 코드 (비용 계산용).
+
+    Returns:
+        함수별 분석 결과 (상태, 권장 조치, 낭비 비용).
+    """
 
     # 메트릭이 없으면 알 수 없음
     if func.metrics is None:
@@ -188,7 +234,17 @@ def _analyze_single_function(func: LambdaFunctionInfo, region: str) -> LambdaFin
 
 
 def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Lambda 미사용 분석 Excel 보고서 생성.
+
+    Summary, Unused, All Functions 시트를 포함하는 Excel 파일을 생성한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일의 절대 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Workbook
@@ -348,13 +404,33 @@ def generate_report(results: list[LambdaAnalysisResult], output_dir: str) -> str
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LambdaAnalysisResult:
-    """단일 계정/리전의 Lambda 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 Lambda 함수를 수집하고 미사용 분석을 수행한다.
+
+    parallel_collect 콜백 함수로, 멀티 계정/리전 병렬 실행에 사용된다.
+
+    Args:
+        session: boto3 세션 (Rate limiting 적용).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        해당 계정/리전의 Lambda 미사용 분석 결과.
+    """
     functions = collect_functions_with_metrics(session, account_id, account_name, region)
     return analyze_functions(functions, account_id, account_name, region)
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Lambda 미사용 분석 실행"""
+    """Lambda 미사용 함수 분석 도구 실행.
+
+    30일간 호출되지 않은 Lambda 함수를 탐지하고, Provisioned Concurrency가
+    설정된 미사용 함수의 비용 낭비를 계산한다. 결과를 콘솔에 출력하고
+    Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 리전, 출력 설정 포함).
+    """
     console.print("[bold]Lambda 미사용 분석 시작...[/bold]\n")
 
     # 병렬 수집 및 분석

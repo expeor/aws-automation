@@ -1,11 +1,18 @@
-# internal/auth/auth.py
+# core/auth/auth.py
 """
-AWS 통합 인증 Manager
+core/auth/auth.py - AWS 통합 인증 Manager
 
-- Provider 등록 및 관리
-- 활성 Provider 설정
-- 멀티 계정 병렬 작업 지원
-- 통합된 인터페이스 제공
+여러 Provider를 등록/관리하고, 활성 Provider를 통해 통합된 인증 API를 제공합니다.
+멀티 계정 순차/병렬 작업, 계정 목록 조회, AWS 설정 파일 로드 등의 기능을 포함합니다.
+
+Example:
+    from core.auth.auth import Manager, create_manager
+
+    manager = create_manager()
+    manager.register_provider(provider)
+    manager.set_active_provider(provider)
+    manager.authenticate()
+    session = manager.get_session(account_id="123456789012", role_name="Admin")
 """
 
 import concurrent.futures
@@ -62,7 +69,10 @@ class Manager:
     """
 
     def __init__(self):
-        """Manager 초기화"""
+        """Manager 초기화
+
+        내부적으로 Provider 딕셔너리, 활성 Provider, Loader를 생성합니다.
+        """
         self._providers: dict[str, Provider] = {}
         self._active_provider: Provider | None = None
         self._config_loader = Loader()
@@ -142,18 +152,34 @@ class Manager:
     # =========================================================================
 
     def _ensure_active_provider(self) -> Provider:
-        """활성 Provider 확인"""
+        """활성 Provider가 설정되어 있는지 확인하고 반환합니다.
+
+        Returns:
+            현재 활성 Provider 인스턴스
+
+        Raises:
+            NotAuthenticatedError: 활성 Provider가 설정되지 않은 경우
+        """
         if not self._active_provider:
             raise NotAuthenticatedError("활성 Provider가 설정되지 않았습니다")
         return self._active_provider
 
     def authenticate(self) -> None:
-        """활성 Provider로 인증"""
+        """활성 Provider로 인증을 수행합니다.
+
+        Raises:
+            NotAuthenticatedError: 활성 Provider가 설정되지 않은 경우
+            AuthError: 인증 실패 시
+        """
         provider = self._ensure_active_provider()
         provider.authenticate()
 
     def is_authenticated(self) -> bool:
-        """인증 상태 확인"""
+        """활성 Provider의 인증 상태를 확인합니다.
+
+        Returns:
+            활성 Provider가 인증된 상태이면 True, 그 외 False
+        """
         if not self._active_provider:
             return False
         return self._active_provider.is_authenticated()
@@ -198,7 +224,14 @@ class Manager:
         return result
 
     def get_default_region(self) -> str:
-        """기본 리전 반환"""
+        """활성 Provider의 기본 리전을 반환합니다.
+
+        Returns:
+            기본 AWS 리전 문자열 (예: "ap-northeast-2")
+
+        Raises:
+            NotAuthenticatedError: 활성 Provider가 설정되지 않은 경우
+        """
         provider = self._ensure_active_provider()
         return provider.get_default_region()
 
@@ -207,12 +240,25 @@ class Manager:
     # =========================================================================
 
     def list_accounts(self) -> dict[str, AccountInfo]:
-        """활성 Provider의 계정 목록"""
+        """활성 Provider의 접근 가능한 계정 목록을 반환합니다.
+
+        Returns:
+            {account_id: AccountInfo} 딕셔너리
+
+        Raises:
+            NotAuthenticatedError: 활성 Provider가 설정되지 않은 경우
+        """
         provider = self._ensure_active_provider()
         return provider.list_accounts()
 
     def list_all_accounts(self) -> dict[str, AccountInfo]:
-        """모든 Provider의 계정 목록 통합"""
+        """등록된 모든 Provider의 계정 목록을 통합하여 반환합니다.
+
+        인증된 Provider만 대상으로 하며, 개별 Provider 조회 실패는 경고 후 건너뜁니다.
+
+        Returns:
+            {account_id: AccountInfo} 딕셔너리 (모든 Provider 통합)
+        """
         all_accounts = {}
 
         for provider in self._providers.values():
@@ -362,27 +408,53 @@ class Manager:
     # =========================================================================
 
     def load_config(self) -> ParsedConfig:
-        """AWS 설정 파일 로드"""
+        """AWS 설정 파일(~/.aws/config, ~/.aws/credentials)을 로드합니다.
+
+        Returns:
+            ParsedConfig 객체 (세션, 프로파일, 기본 프로파일 정보 포함)
+        """
         config: ParsedConfig = self._config_loader.load()
         return config
 
     def list_profiles(self) -> list[str]:
-        """프로파일 목록"""
+        """AWS 설정 파일의 프로파일 이름 목록을 반환합니다.
+
+        Returns:
+            프로파일 이름 리스트
+        """
         config = self.load_config()
         return list(config.profiles.keys())
 
     def list_sso_sessions(self) -> list[str]:
-        """SSO 세션 목록"""
+        """AWS 설정 파일의 SSO 세션 이름 목록을 반환합니다.
+
+        Returns:
+            SSO 세션 이름 리스트
+        """
         config = self.load_config()
         return list(config.sessions.keys())
 
     def get_profile(self, name: str) -> AWSProfile | None:
-        """프로파일 정보 조회"""
+        """특정 프로파일의 설정 정보를 조회합니다.
+
+        Args:
+            name: 프로파일 이름
+
+        Returns:
+            AWSProfile 객체 또는 None (프로파일이 없는 경우)
+        """
         config = self.load_config()
         return config.profiles.get(name)
 
     def get_sso_session(self, name: str) -> AWSSession | None:
-        """SSO 세션 정보 조회"""
+        """특정 SSO 세션의 설정 정보를 조회합니다.
+
+        Args:
+            name: SSO 세션 이름
+
+        Returns:
+            AWSSession 객체 또는 None (세션이 없는 경우)
+        """
         config = self.load_config()
         return config.sessions.get(name)
 
@@ -410,5 +482,9 @@ class Manager:
 
 
 def create_manager() -> Manager:
-    """Manager 인스턴스 생성 (편의 함수)"""
+    """Manager 인스턴스를 생성하여 반환합니다.
+
+    Returns:
+        새로운 Manager 인스턴스
+    """
     return Manager()

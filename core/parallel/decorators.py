@@ -1,8 +1,21 @@
 """
 core/parallel/decorators.py - AWS API 호출 안전 래퍼 데코레이터
 
-@safe_aws_call: Rate limiting + 재시도 + 구조화된 에러 처리
-@with_retry: 간단한 재시도 데코레이터 (하위 호환용)
+AWS API 호출을 안전하게 래핑하는 데코레이터들을 제공합니다.
+
+주요 구성 요소:
+- RetryConfig: 재시도 설정 (지수 백오프 + 지터)
+- @safe_aws_call: Rate limiting + 재시도 + 구조화된 에러 처리 (TaskError 반환)
+- @with_retry: 간단한 재시도 데코레이터 (예외 그대로 raise, 하위 호환용)
+- categorize_error: 예외를 ErrorCategory로 분류
+- get_error_code: 예외에서 에러 코드 추출
+- is_retryable: 재시도 가능 여부 판단
+
+Example:
+    @safe_aws_call(service="ec2", operation="describe_instances")
+    def get_instances(session, region):
+        ec2 = session.client("ec2", region_name=region)
+        return ec2.describe_instances()["Reservations"]
 """
 
 import functools
@@ -86,7 +99,10 @@ RETRYABLE_ERROR_CODES: set[str] = {
 
 
 def categorize_error(error: Exception) -> ErrorCategory:
-    """에러를 카테고리로 분류
+    """예외 객체를 분석하여 ErrorCategory로 분류
+
+    ClientError의 경우 response에서 에러 코드를 추출하고,
+    네트워크/타임아웃 에러는 타입으로 분류합니다.
 
     Args:
         error: 분류할 예외
@@ -121,7 +137,10 @@ def categorize_error(error: Exception) -> ErrorCategory:
 
 
 def get_error_code(error: Exception) -> str:
-    """에러에서 코드 추출
+    """예외 객체에서 에러 코드 문자열 추출
+
+    ClientError의 경우 response에서 Code를 추출하고,
+    그 외에는 예외 클래스명을 반환합니다.
 
     Args:
         error: 예외 객체
@@ -138,6 +157,9 @@ def get_error_code(error: Exception) -> str:
 
 def is_retryable(error: Exception) -> bool:
     """재시도 가능한 에러인지 확인
+
+    RETRYABLE_ERROR_CODES에 포함된 에러 코드이거나
+    네트워크/타임아웃 에러인 경우 True를 반환합니다.
 
     Args:
         error: 확인할 예외

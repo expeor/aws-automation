@@ -1,21 +1,45 @@
 """
-shared/aws/pricing - AWS 서비스 비용 조회 및 계산 유틸리티
+core/shared/aws/pricing - AWS 서비스별 가격 조회 및 월간 비용 계산 패키지
 
-AWS Pricing API를 사용하여 실시간 가격 정보를 조회하고 캐싱합니다.
+AWS Pricing API(us-east-1)를 사용하여 실시간 가격 정보를 조회하고,
+로컬 캐시(7일 TTL, filelock)로 API 호출을 최소화합니다.
+API 실패 시 constants.py의 하드코딩 기본값으로 fallback합니다.
 
 모듈 구성:
-    - utils: PricingService (통합 가격 조회 서비스)
-    - constants: 기본값 및 상수
-    - fetcher: AWS Pricing Bulk API 클라이언트
-    - cache: 로컬 가격 캐시 (7일 TTL, filelock 지원)
-    - ec2: EC2 인스턴스 가격 조회
-    - ebs: EBS 볼륨 가격 조회
-    - nat: NAT Gateway 가격 조회
-    - vpc_endpoint: VPC Endpoint 가격 조회
-    - secretsmanager: Secrets Manager 가격 조회
-    - kms: KMS 가격 조회
-    - ecr: ECR 가격 조회
-    - route53: Route53 가격 조회
+    인프라:
+        - utils: PricingService 싱글톤 (캐시 + API + fallback 통합)
+        - constants: 중앙 관리 상수 및 서비스별 기본 가격
+        - fetcher: PricingFetcher (AWS Pricing get_products API 클라이언트)
+        - cache: PriceCache (파일 기반 캐시, filelock 동시성 보호)
+
+    PricingService 연동 모듈 (캐시/API 자동 관리):
+        - ec2: EC2 인스턴스 On-Demand 가격
+        - ebs: EBS 볼륨 타입별 GB당 가격
+        - sagemaker: SageMaker Endpoint 인스턴스 가격
+        - vpc_endpoint: VPC Endpoint (Interface/Gateway) 가격
+        - secretsmanager: Secrets Manager 시크릿/API 가격
+        - kms: KMS 키/요청 가격
+        - ecr: ECR 스토리지 가격
+        - route53: Route53 Hosted Zone/쿼리 가격 (글로벌)
+        - snapshot: EBS Snapshot 스토리지 가격
+        - eip: Elastic IP 유휴 비용
+        - elb: ELB 타입별 (ALB/NLB/GLB/CLB) 시간당 가격
+        - rds_snapshot: RDS/Aurora Snapshot 가격
+        - cloudwatch: CloudWatch Logs 저장/수집 가격
+        - lambda_: Lambda 요청/실행/Provisioned Concurrency 가격
+        - dynamodb: DynamoDB Provisioned/On-Demand/Storage 가격
+
+    직접 API 조회 모듈 (자체 Pricing API 호출):
+        - ami: AMI 스냅샷 기반 비용 (snapshot 모듈 위임)
+        - nat: NAT Gateway 시간당/데이터 처리 가격
+        - efs: EFS Storage Class별 가격
+        - elasticache: ElastiCache 노드 타입별 가격
+        - fsx: FSx 파일시스템 타입별 가격
+        - kinesis: Kinesis Data Streams Shard/On-Demand 가격
+        - opensearch: OpenSearch 인스턴스/스토리지 가격
+        - rds: RDS 인스턴스/스토리지/Multi-AZ 가격
+        - redshift: Redshift 노드/Managed Storage 가격
+        - transfer: Transfer Family 엔드포인트 가격
 
 사용법:
     from core.shared.aws.pricing import get_ec2_monthly_cost, get_ebs_monthly_cost

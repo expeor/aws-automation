@@ -1,5 +1,5 @@
 """
-plugins/ec2/unused.py - EC2 인스턴스 미사용 분석
+functions/analyzers/ec2/unused.py - EC2 인스턴스 미사용 분석
 
 유휴/저사용 EC2 인스턴스 탐지 (CloudWatch 지표 기반)
 
@@ -65,7 +65,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class InstanceStatus(Enum):
-    """인스턴스 상태"""
+    """EC2 인스턴스의 사용 상태 분류
+
+    CloudWatch 지표 기반으로 판별된 인스턴스 활용도를 나타냅니다.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -75,7 +78,30 @@ class InstanceStatus(Enum):
 
 @dataclass
 class EC2InstanceInfo:
-    """EC2 인스턴스 정보"""
+    """EC2 인스턴스 정보 및 CloudWatch 지표 데이터
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        instance_id: EC2 인스턴스 ID
+        instance_type: 인스턴스 타입 (e.g. t3.micro)
+        state: 인스턴스 상태 (running, stopped 등)
+        name: Name 태그 값
+        launch_time: 인스턴스 시작 시간
+        platform: 운영체제 플랫폼 (linux 또는 windows)
+        vpc_id: VPC ID
+        subnet_id: 서브넷 ID
+        private_ip: 프라이빗 IP 주소
+        public_ip: 퍼블릭 IP 주소
+        tags: 사용자 태그 딕셔너리 (aws: 접두사 제외)
+        avg_cpu: 분석 기간 평균 CPU 사용률 (%)
+        max_cpu: 분석 기간 최대 CPU 사용률 (%)
+        total_network_in: 분석 기간 총 인바운드 네트워크 바이트
+        total_network_out: 분석 기간 총 아웃바운드 네트워크 바이트
+        total_disk_read_ops: 분석 기간 총 디스크 읽기 작업 수
+        total_disk_write_ops: 분석 기간 총 디스크 쓰기 작업 수
+    """
 
     account_id: str
     account_name: str
@@ -102,7 +128,11 @@ class EC2InstanceInfo:
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (AWS Pricing API 동적 조회)"""
+        """월간 비용 추정 (AWS Pricing API 동적 조회)
+
+        Returns:
+            추정 월간 비용 (USD). Windows 플랫폼은 약 1.5배 적용.
+        """
         cost = get_ec2_monthly_cost(self.instance_type, self.region)
         if self.platform == "windows":
             cost *= 1.5  # Windows는 약 1.5배
@@ -110,7 +140,11 @@ class EC2InstanceInfo:
 
     @property
     def age_days(self) -> int:
-        """인스턴스 생성 후 경과 일수"""
+        """인스턴스 생성 후 경과 일수
+
+        Returns:
+            launch_time 기준 경과 일수. launch_time이 없으면 0.
+        """
         if not self.launch_time:
             return 0
         now = datetime.now(timezone.utc)
@@ -119,7 +153,13 @@ class EC2InstanceInfo:
 
 @dataclass
 class InstanceFinding:
-    """인스턴스 분석 결과"""
+    """개별 EC2 인스턴스 분석 결과
+
+    Attributes:
+        instance: 분석 대상 EC2 인스턴스 정보
+        status: 분석으로 판별된 사용 상태
+        recommendation: 권장 조치 사항
+    """
 
     instance: EC2InstanceInfo
     status: InstanceStatus
@@ -128,7 +168,22 @@ class InstanceFinding:
 
 @dataclass
 class EC2AnalysisResult:
-    """EC2 분석 결과 집계"""
+    """EC2 인스턴스 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        total_instances: 전체 인스턴스 수
+        unused_instances: 미사용 인스턴스 수
+        low_usage_instances: 저사용 인스턴스 수
+        stopped_instances: 정지 인스턴스 수
+        normal_instances: 정상 인스턴스 수
+        unused_monthly_cost: 미사용 인스턴스 추정 월간 비용 (USD)
+        low_usage_monthly_cost: 저사용 인스턴스 추정 월간 비용 (USD)
+        stopped_monthly_cost: 정지 인스턴스 추정 월간 비용 (USD)
+        findings: 개별 인스턴스 분석 결과 리스트
+    """
 
     account_id: str
     account_name: str
@@ -145,10 +200,19 @@ class EC2AnalysisResult:
 
 
 def collect_ec2_instances(session, account_id: str, account_name: str, region: str) -> list[EC2InstanceInfo]:
-    """EC2 인스턴스 수집 (배치 메트릭 최적화)
+    """EC2 인스턴스 목록 수집 및 CloudWatch 메트릭 배치 조회
 
-    최적화:
-    - 기존: 인스턴스당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    EC2 인스턴스를 페이지네이션으로 수집하고, 실행 중인 인스턴스에 대해
+    CloudWatch GetMetricData API로 CPU, 네트워크, Disk I/O 지표를 배치 조회합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        EC2 인스턴스 정보 리스트 (메트릭 포함)
     """
     from botocore.exceptions import ClientError
 
@@ -315,7 +379,20 @@ def _collect_ec2_metrics_batch(
 def analyze_instances(
     instances: list[EC2InstanceInfo], account_id: str, account_name: str, region: str
 ) -> EC2AnalysisResult:
-    """EC2 인스턴스 분석"""
+    """EC2 인스턴스 사용 상태 분석 및 비용 영향 평가
+
+    CloudWatch 지표(CPU, 네트워크, Disk I/O)를 기반으로 각 인스턴스를
+    미사용/저사용/정지/정상으로 분류하고, 상태별 추정 월간 비용을 집계합니다.
+
+    Args:
+        instances: 수집된 EC2 인스턴스 정보 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 인스턴스 수, 비용, 개별 finding 포함)
+    """
     result = EC2AnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -560,7 +637,19 @@ def _save_excel(results: list[EC2AnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EC2AnalysisResult | None:
-    """단일 계정/리전의 EC2 인스턴스 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 EC2 인스턴스 수집 및 분석 (parallel_collect 콜백)
+
+    인스턴스 목록을 수집하고 CloudWatch 지표 기반 사용 상태를 분석합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        분석 결과. 인스턴스가 없으면 None.
+    """
     instances = collect_ec2_instances(session, account_id, account_name, region)
     if not instances:
         return None
@@ -568,7 +657,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """EC2 인스턴스 미사용 분석"""
+    """EC2 인스턴스 미사용 분석 실행
+
+    멀티 계정/리전에서 EC2 인스턴스를 병렬 수집하고,
+    CloudWatch 지표 기반으로 미사용/저사용/정지 상태를 분석하여
+    Excel + HTML 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]EC2 인스턴스 미사용 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")

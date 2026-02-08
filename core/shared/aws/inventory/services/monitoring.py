@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/monitoring.py - Monitoring 리소스 수집
+core/shared/aws/inventory/services/monitoring.py - Monitoring 리소스 수집
 
 CloudWatch Alarm, CloudWatch Log Group 수집.
 """
@@ -16,7 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 def collect_cloudwatch_alarms(session, account_id: str, account_name: str, region: str) -> list[CloudWatchAlarm]:
-    """CloudWatch Alarm 수집"""
+    """CloudWatch Metric Alarm 리소스를 수집합니다.
+
+    Metric Alarm 목록 조회 후 각 알람의 메트릭, 임계값, 비교 연산자,
+    평가 기간, Action 설정 등 상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        CloudWatchAlarm 데이터 클래스 목록
+    """
     cw = get_client(session, "cloudwatch", region_name=region)
     alarms = []
 
@@ -64,7 +77,20 @@ def collect_cloudwatch_alarms(session, account_id: str, account_name: str, regio
 
 
 def collect_cloudwatch_log_groups(session, account_id: str, account_name: str, region: str) -> list[CloudWatchLogGroup]:
-    """CloudWatch Log Group 수집"""
+    """CloudWatch Log Group 리소스를 수집합니다.
+
+    Log Group 목록 조회 후 각 그룹의 저장 크기, 보존 기간, Metric Filter 수,
+    KMS 암호화 설정 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        CloudWatchLogGroup 데이터 클래스 목록
+    """
     logs = get_client(session, "logs", region_name=region)
     log_groups = []
 

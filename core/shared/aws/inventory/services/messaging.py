@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/messaging.py - Integration/Messaging 리소스 수집
+core/shared/aws/inventory/services/messaging.py - Integration/Messaging 리소스 수집
 
 SNS Topic, SQS Queue, EventBridge Rule, Step Functions, API Gateway 수집.
 """
@@ -16,7 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 def collect_sns_topics(session, account_id: str, account_name: str, region: str) -> list[SNSTopic]:
-    """SNS Topic 수집"""
+    """SNS Topic 리소스를 수집합니다.
+
+    Topic 목록 조회 후 각 Topic의 속성(구독 수, KMS 암호화, FIFO 설정,
+    Content-Based Deduplication 등)과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        SNSTopic 데이터 클래스 목록
+    """
     sns = get_client(session, "sns", region_name=region)
     topics = []
 
@@ -63,7 +76,20 @@ def collect_sns_topics(session, account_id: str, account_name: str, region: str)
 
 
 def collect_sqs_queues(session, account_id: str, account_name: str, region: str) -> list[SQSQueue]:
-    """SQS Queue 수집"""
+    """SQS Queue 리소스를 수집합니다.
+
+    Queue URL 목록 조회 후 각 Queue의 전체 속성(Visibility Timeout, 보존 기간,
+    메시지 수, DLQ 설정, KMS 암호화 등)과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        SQSQueue 데이터 클래스 목록
+    """
     sqs = get_client(session, "sqs", region_name=region)
     queues = []
 
@@ -118,7 +144,20 @@ def collect_sqs_queues(session, account_id: str, account_name: str, region: str)
 
 
 def collect_eventbridge_rules(session, account_id: str, account_name: str, region: str) -> list[EventBridgeRule]:
-    """EventBridge Rule 수집"""
+    """EventBridge Rule 리소스를 수집합니다.
+
+    Default 버스를 포함한 모든 Event Bus의 Rule을 수집합니다.
+    각 Rule의 상태, 스케줄 표현식, 이벤트 패턴, 타겟 수 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        EventBridgeRule 데이터 클래스 목록
+    """
     events = get_client(session, "events", region_name=region)
     rules = []
 
@@ -181,7 +220,20 @@ def collect_eventbridge_rules(session, account_id: str, account_name: str, regio
 
 
 def collect_step_functions(session, account_id: str, account_name: str, region: str) -> list[StepFunction]:
-    """Step Functions State Machine 수집"""
+    """Step Functions State Machine 리소스를 수집합니다.
+
+    State Machine 목록 조회 후 각 머신의 상세 정보(상태, Role ARN,
+    로깅 레벨, X-Ray 트레이싱 설정 등)와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        StepFunction 데이터 클래스 목록
+    """
     sfn = get_client(session, "stepfunctions", region_name=region)
     state_machines = []
 
@@ -231,7 +283,20 @@ def collect_step_functions(session, account_id: str, account_name: str, region: 
 
 
 def collect_api_gateway_apis(session, account_id: str, account_name: str, region: str) -> list[APIGatewayAPI]:
-    """API Gateway REST/HTTP API 수집"""
+    """API Gateway REST/HTTP/WebSocket API 리소스를 수집합니다.
+
+    API Gateway v1 (REST API)과 v2 (HTTP/WebSocket API)를 모두 수집합니다.
+    각 API의 타입, Endpoint Type, 설명, 버전 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        APIGatewayAPI 데이터 클래스 목록
+    """
     apis = []
 
     # REST API (API Gateway v1)

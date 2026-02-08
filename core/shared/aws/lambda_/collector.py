@@ -1,5 +1,5 @@
 """
-plugins/fn/common/collector.py - Lambda 함수 수집
+core/shared/aws/lambda_/collector.py - Lambda 함수 수집
 
 Lambda 함수 정보 및 CloudWatch 메트릭 수집 공통 로직
 
@@ -25,7 +25,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LambdaMetrics:
-    """Lambda 함수 CloudWatch 메트릭"""
+    """Lambda 함수 CloudWatch 메트릭
+
+    CloudWatch에서 수집된 Lambda 함수의 호출, 성능, 동시성 메트릭입니다.
+
+    Attributes:
+        invocations: 기간 내 총 호출 수
+        errors: 기간 내 에러 횟수
+        throttles: 기간 내 스로틀링 횟수
+        duration_avg_ms: 평균 실행 시간 (밀리초)
+        duration_max_ms: 최대 실행 시간 (밀리초)
+        duration_min_ms: 최소 실행 시간 (밀리초)
+        concurrent_executions_max: 최대 동시 실행 수
+        period_days: 메트릭 조회 기간 (일)
+        last_invocation_time: 마지막 호출 시간
+    """
 
     # 호출 메트릭
     invocations: int = 0
@@ -47,7 +61,32 @@ class LambdaMetrics:
 
 @dataclass
 class LambdaFunctionInfo:
-    """Lambda 함수 정보"""
+    """Lambda 함수 정보
+
+    Lambda 함수의 설정, 실행 환경, 메트릭 등 종합 정보를 담는 데이터 클래스입니다.
+
+    Attributes:
+        function_name: 함수 이름
+        function_arn: 함수 ARN
+        runtime: 런타임 (python3.12, nodejs20.x 등)
+        handler: 핸들러 경로
+        description: 함수 설명
+        memory_mb: 메모리 크기 (MB)
+        timeout_seconds: 타임아웃 (초)
+        code_size_bytes: 배포 패키지 크기 (바이트)
+        last_modified: 마지막 수정 시간
+        role: 실행 역할 ARN
+        vpc_config: VPC 설정 (없으면 None)
+        environment_variables: 환경 변수 개수
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전
+        tags: 태그 딕셔너리
+        metrics: CloudWatch 메트릭 (별도 수집 시 채워짐)
+        provisioned_concurrency: Provisioned Concurrency 할당량
+        reserved_concurrency: Reserved Concurrency (미설정 시 None)
+        estimated_monthly_cost: 예상 월 비용 (USD)
+    """
 
     # 기본 정보
     function_name: str
@@ -356,7 +395,17 @@ def collect_all_function_metrics(
 
 
 def _build_lambda_queries(function_names: list[str]) -> list[MetricQuery]:
-    """Lambda 메트릭 쿼리 목록 생성"""
+    """Lambda 메트릭 쿼리 목록 생성
+
+    함수별로 Invocations, Errors, Throttles, Duration(Avg/Max/Min),
+    ConcurrentExecutions 총 7개 메트릭 쿼리를 생성합니다.
+
+    Args:
+        function_names: Lambda 함수 이름 목록
+
+    Returns:
+        MetricQuery 리스트 (함수당 7개)
+    """
     queries = []
 
     for func_name in function_names:
@@ -423,7 +472,16 @@ def _build_lambda_queries(function_names: list[str]) -> list[MetricQuery]:
 
 
 def _parse_lambda_metrics(safe_id: str, results: dict[str, float], days: int) -> LambdaMetrics:
-    """배치 조회 결과를 LambdaMetrics로 변환"""
+    """배치 조회 결과를 LambdaMetrics로 변환
+
+    Args:
+        safe_id: sanitize_metric_id()로 변환된 함수 식별자
+        results: batch_get_metrics 결과 딕셔너리
+        days: 조회 기간 (일)
+
+    Returns:
+        LambdaMetrics 인스턴스
+    """
     return LambdaMetrics(
         period_days=days,
         invocations=int(results.get(f"{safe_id}_invocations", 0)),

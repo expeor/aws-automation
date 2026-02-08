@@ -1,15 +1,18 @@
-"""
-reports/ip_search - IP Search Tools
+"""functions/reports/ip_search/__init__.py - IP 검색 도구 패키지.
 
-Submodules:
-    - public_ip: Cloud provider IP range search (AWS, GCP, Azure, Oracle)
-    - private_ip: AWS ENI cache-based internal IP search
+클라우드 환경에서 IP 주소의 소유자와 리소스 매핑 정보를 검색합니다.
 
-Each submodule provides its own `run(ctx)` entry point.
+하위 모듈:
+    - public_ip: 클라우드 프로바이더(AWS, GCP, Azure, Oracle) IP 대역 검색.
+      AWS 인증 불필요.
+    - private_ip: AWS ENI 캐시 기반 내부 IP 검색.
+      멀티 계정/리전 캐시 관리 지원.
 
-Usage:
-    from functions.reports.ip_search.public_ip import run as public_search
-    from functions.reports.ip_search.private_ip import run as private_search
+각 하위 모듈은 독립적인 ``run(ctx)`` 엔트리포인트를 제공합니다.
+
+Example:
+    >>> from functions.reports.ip_search.public_ip import run as public_search
+    >>> from functions.reports.ip_search.private_ip import run as private_search
 """
 
 CATEGORY = {

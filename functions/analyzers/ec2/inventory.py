@@ -1,5 +1,5 @@
 """
-plugins/ec2/inventory.py - EC2 인벤토리 조회 (스트리밍 방식)
+functions/analyzers/ec2/inventory.py - EC2 인벤토리 조회 (스트리밍 방식)
 
 EC2 인스턴스 및 Security Group 현황 조회.
 메모리 효율적인 스트리밍 처리 - 수집 → 쓰기 → 해제 순환.
@@ -29,7 +29,17 @@ console = Console()
 
 @dataclass
 class ResourceDef:
-    """리소스 수집 정의"""
+    """리소스 수집 정의
+
+    스트리밍 방식 인벤토리 수집에서 각 리소스 유형의 수집 설정을 정의합니다.
+
+    Attributes:
+        name: 리소스 유형 이름 (콘솔 표시용)
+        sheet_name: Excel 시트 이름
+        method: InventoryCollector의 수집 메서드 이름
+        columns: Excel 컬럼 정의 리스트
+        row_mapper: 리소스 객체를 행 데이터로 변환하는 함수
+    """
 
     name: str
     sheet_name: str
@@ -40,7 +50,13 @@ class ResourceDef:
 
 @dataclass
 class Stats:
-    """수집 통계"""
+    """수집 통계
+
+    Attributes:
+        counts: 리소스 유형별 수집 건수
+        state_counts: EC2 인스턴스 상태별 건수
+        warnings: 경고 메시지 리스트
+    """
 
     counts: dict[str, int] = field(default_factory=dict)
     state_counts: dict[str, int] = field(default_factory=dict)
@@ -48,7 +64,14 @@ class Stats:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """EC2 인벤토리 조회 (스트리밍 방식)"""
+    """EC2 인벤토리 조회 (스트리밍 방식)
+
+    EC2 인스턴스 및 Security Group을 수집하여 Excel 보고서를 생성합니다.
+    메모리 효율적인 스트리밍 처리: 수집 -> Excel 쓰기 -> 메모리 해제 순환.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("\n[bold]EC2 인벤토리[/bold]\n")
 
     collector = InventoryCollector(ctx)

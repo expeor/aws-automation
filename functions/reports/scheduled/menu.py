@@ -1,12 +1,9 @@
-"""
-reports/scheduled/menu.py - 정기 작업 메뉴 UI
+"""functions/reports/scheduled/menu.py - 정기 작업 메뉴 UI.
 
-기능:
-- 주기별 작업 목록 표시 (collapsed/expanded)
-- 실행 이력 조회 (h)
-- 다음 실행 예정일 표시
-- 검색/필터 (/, p)
-- 일괄 선택 실행 (1,2,3 또는 1-5)
+Rich 기반 대화형 메뉴로 정기 작업을 관리합니다.
+주기별 작업 목록 표시(collapsed/expanded), 실행 이력 조회(h),
+다음 실행 예정일 표시, 검색/필터(/, p), 일괄 선택 실행(1,2,3 또는 1-5)을
+지원합니다.
 """
 
 from __future__ import annotations

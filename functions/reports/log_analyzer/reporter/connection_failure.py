@@ -1,4 +1,7 @@
-"""Connection failure analysis sheet writer."""
+"""functions/reports/log_analyzer/reporter/connection_failure.py - 연결 실패 분석 시트 Writer.
+
+ALB와 백엔드 타겟 간 연결 실패 이벤트를 분석하여 시트를 생성합니다.
+"""
 
 from __future__ import annotations
 

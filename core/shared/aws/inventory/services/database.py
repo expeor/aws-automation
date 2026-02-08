@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/database.py - Database/Storage 리소스 수집
+core/shared/aws/inventory/services/database.py - Database/Storage 리소스 수집
 
 RDS Instance, S3 Bucket, DynamoDB Table, ElastiCache Cluster 수집.
 """
@@ -16,7 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 def collect_rds_instances(session, account_id: str, account_name: str, region: str) -> list[RDSInstance]:
-    """RDS Instance 수집"""
+    """RDS Instance 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        RDSInstance 데이터 클래스 목록
+    """
     rds = get_client(session, "rds", region_name=region)
     instances = []
 
@@ -71,7 +81,20 @@ def collect_rds_instances(session, account_id: str, account_name: str, region: s
 
 
 def collect_s3_buckets(session, account_id: str, account_name: str, region: str) -> list[S3Bucket]:
-    """S3 Bucket 수집 (글로벌 리소스, 한 번만 수집)"""
+    """S3 Bucket 리소스를 수집합니다 (글로벌 서비스).
+
+    S3는 글로벌 서비스이므로 us-east-1에서만 수집합니다. 각 버킷의 리전, 버저닝, 암호화,
+    Public Access Block, 로깅, Lifecycle 규칙 등 상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드 (us-east-1이 아니면 빈 목록 반환)
+
+    Returns:
+        S3Bucket 데이터 클래스 목록
+    """
     # S3는 글로벌 서비스이므로 us-east-1에서만 수집
     if region != "us-east-1":
         return []
@@ -174,7 +197,20 @@ def collect_s3_buckets(session, account_id: str, account_name: str, region: str)
 
 
 def collect_dynamodb_tables(session, account_id: str, account_name: str, region: str) -> list[DynamoDBTable]:
-    """DynamoDB Table 수집"""
+    """DynamoDB Table 리소스를 수집합니다.
+
+    테이블 목록 조회 후 각 테이블의 상세 정보(Billing Mode, Provisioned Throughput,
+    GSI/LSI 수, Stream, 암호화 등)와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        DynamoDBTable 데이터 클래스 목록
+    """
     dynamodb = get_client(session, "dynamodb", region_name=region)
     tables = []
 
@@ -246,7 +282,20 @@ def collect_dynamodb_tables(session, account_id: str, account_name: str, region:
 
 
 def collect_elasticache_clusters(session, account_id: str, account_name: str, region: str) -> list[ElastiCacheCluster]:
-    """ElastiCache Cluster 수집"""
+    """ElastiCache Cluster 리소스를 수집합니다.
+
+    Cluster 목록 조회 후 각 Cluster의 노드 정보, Security Group, 암호화 설정 등과
+    태그를 함께 수집합니다. VPC ID는 Subnet Group에서 별도 조회가 필요합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        ElastiCacheCluster 데이터 클래스 목록
+    """
     elasticache = get_client(session, "elasticache", region_name=region)
     clusters = []
 
@@ -293,7 +342,20 @@ def collect_elasticache_clusters(session, account_id: str, account_name: str, re
 
 
 def collect_rds_clusters(session, account_id: str, account_name: str, region: str) -> list[RDSCluster]:
-    """RDS Cluster (Aurora) 수집"""
+    """RDS Cluster (Aurora) 리소스를 수집합니다.
+
+    Aurora DB Cluster 목록 조회 후 각 Cluster의 엔진, Endpoint, Multi-AZ,
+    암호화, 백업 보존 기간 등 상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        RDSCluster 데이터 클래스 목록
+    """
     rds = get_client(session, "rds", region_name=region)
     clusters = []
 
@@ -342,7 +404,21 @@ def collect_rds_clusters(session, account_id: str, account_name: str, region: st
 
 
 def collect_redshift_clusters(session, account_id: str, account_name: str, region: str) -> list[RedshiftCluster]:
-    """Redshift Cluster 수집"""
+    """Redshift Cluster 리소스를 수집합니다.
+
+    Cluster 목록 조회 후 각 Cluster의 노드 타입, 노드 수, Endpoint, 암호화 설정,
+    퍼블릭 접근 가능 여부 등 상세 정보와 태그를 함께 수집합니다.
+    ARN은 리전, 계정 ID, Cluster ID로 직접 구성합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        RedshiftCluster 데이터 클래스 목록
+    """
     redshift = get_client(session, "redshift", region_name=region)
     clusters = []
 

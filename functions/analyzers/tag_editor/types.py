@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/types.py - MAP 태그 관리 데이터 타입
+functions/analyzers/tag_editor/types.py - MAP 태그 관리 데이터 타입
 
 MAP 2.0 마이그레이션 태그 분석/적용을 위한 데이터 구조 정의
 
@@ -245,15 +245,29 @@ RESOURCE_TYPE_GROUPS = {
 
 
 class MapTagStatus(Enum):
-    """MAP 태그 상태"""
+    """MAP 태그 적용 상태.
 
-    TAGGED = "tagged"  # map-migrated 태그 있음
-    UNTAGGED = "untagged"  # map-migrated 태그 없음
-    PARTIAL = "partial"  # 일부 태그됨 (그룹 레벨)
+    개별 리소스 또는 리소스 그룹의 map-migrated 태그 유무를 나타낸다.
+
+    Attributes:
+        TAGGED: map-migrated 태그가 있는 리소스.
+        UNTAGGED: map-migrated 태그가 없는 리소스.
+        PARTIAL: 일부 리소스만 태그된 그룹 (그룹 레벨 집계 시 사용).
+    """
+
+    TAGGED = "tagged"
+    UNTAGGED = "untagged"
+    PARTIAL = "partial"
 
 
 class TagOperationResult(Enum):
-    """태그 적용 결과"""
+    """태그 적용 작업 결과.
+
+    Attributes:
+        SUCCESS: 태그 적용 성공.
+        FAILED: 태그 적용 실패.
+        SKIPPED: 태그 적용 건너뜀 (dry-run 모드 등).
+    """
 
     SUCCESS = "success"
     FAILED = "failed"
@@ -267,7 +281,20 @@ class TagOperationResult(Enum):
 
 @dataclass
 class ResourceTagInfo:
-    """개별 리소스 태그 정보"""
+    """개별 AWS 리소스의 태그 정보.
+
+    Attributes:
+        resource_arn: 리소스 ARN.
+        resource_type: 리소스 타입 (예: "ec2:instance").
+        resource_id: 리소스 ID (예: "i-1234567890abcdef0").
+        name: Name 태그 값.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리소스가 위치한 리전.
+        tags: 현재 태그 딕셔너리 (키-값).
+        has_map_tag: map-migrated 태그 존재 여부.
+        map_tag_value: map-migrated 태그 값 (없으면 None).
+    """
 
     resource_arn: str
     resource_type: str  # e.g., "ec2:instance"
@@ -283,7 +310,15 @@ class ResourceTagInfo:
 
 @dataclass
 class ResourceTypeStats:
-    """리소스 타입별 통계"""
+    """리소스 타입별 MAP 태그 통계.
+
+    Attributes:
+        resource_type: 리소스 타입 코드 (예: "ec2:instance").
+        display_name: UI 표시용 이름 (예: "EC2 Instance").
+        total: 전체 리소스 수.
+        tagged: MAP 태그가 있는 리소스 수.
+        untagged: MAP 태그가 없는 리소스 수.
+    """
 
     resource_type: str
     display_name: str
@@ -293,7 +328,11 @@ class ResourceTypeStats:
 
     @property
     def tag_rate(self) -> float:
-        """태그 적용률 (%)"""
+        """MAP 태그 적용률 (%).
+
+        Returns:
+            태그 적용 비율. 리소스가 없으면 0.0.
+        """
         if self.total == 0:
             return 0.0
         return (self.tagged / self.total) * 100
@@ -301,7 +340,18 @@ class ResourceTypeStats:
 
 @dataclass
 class MapTagAnalysisResult:
-    """MAP 태그 분석 결과 (계정/리전 단위)"""
+    """단일 계정/리전의 MAP 태그 분석 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_resources: 전체 리소스 수.
+        tagged_resources: MAP 태그가 있는 리소스 수.
+        untagged_resources: MAP 태그가 없는 리소스 수.
+        type_stats: 리소스 타입별 통계 목록.
+        resources: 개별 리소스 태그 정보 목록.
+    """
 
     account_id: str
     account_name: str
@@ -320,7 +370,11 @@ class MapTagAnalysisResult:
 
     @property
     def tag_rate(self) -> float:
-        """전체 태그 적용률 (%)"""
+        """전체 MAP 태그 적용률 (%).
+
+        Returns:
+            태그 적용 비율. 리소스가 없으면 0.0.
+        """
         if self.total_resources == 0:
             return 0.0
         return (self.tagged_resources / self.total_resources) * 100
@@ -328,7 +382,19 @@ class MapTagAnalysisResult:
 
 @dataclass
 class TagOperationLog:
-    """태그 적용 작업 로그"""
+    """태그 적용 작업의 개별 로그 항목.
+
+    Attributes:
+        resource_arn: 대상 리소스 ARN.
+        resource_type: 리소스 타입 (예: "ec2:instance").
+        resource_id: 리소스 ID.
+        name: 리소스 Name 태그 값.
+        operation: 작업 유형 ("add", "update", "remove").
+        result: 작업 결과 (SUCCESS, FAILED, SKIPPED).
+        error_message: 실패 시 에러 메시지.
+        previous_value: 이전 태그 값 (업데이트 시).
+        new_value: 새 태그 값.
+    """
 
     resource_arn: str
     resource_type: str
@@ -343,7 +409,19 @@ class TagOperationLog:
 
 @dataclass
 class MapTagApplyResult:
-    """MAP 태그 적용 결과"""
+    """단일 계정/리전의 MAP 태그 적용 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 적용 대상 리전.
+        tag_value: 적용한 map-migrated 태그 값.
+        total_targeted: 적용 대상 리소스 수.
+        success_count: 성공한 적용 수.
+        failed_count: 실패한 적용 수.
+        skipped_count: 건너뛴 적용 수 (dry-run 등).
+        operation_logs: 개별 작업 로그 목록.
+    """
 
     account_id: str
     account_name: str
@@ -361,7 +439,11 @@ class MapTagApplyResult:
 
     @property
     def success_rate(self) -> float:
-        """성공률 (%)"""
+        """태그 적용 성공률 (%).
+
+        Returns:
+            성공 비율. 대상이 없으면 0.0.
+        """
         if self.total_targeted == 0:
             return 0.0
         return (self.success_count / self.total_targeted) * 100

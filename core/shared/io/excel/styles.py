@@ -273,7 +273,11 @@ def _get_fill(name: str) -> PatternFill:
 
 
 class RowStyle:
-    """행 수준 스타일 프리셋"""
+    """행 수준 스타일 프리셋
+
+    Sheet.add_row()의 style 파라미터에 전달할 딕셔너리를 생성합니다.
+    각 메서드는 {"fill": PatternFill, "font": Font} 딕셔너리를 반환합니다.
+    """
 
     @staticmethod
     def data() -> dict:
@@ -342,7 +346,14 @@ class RowStyle:
 
 # 편의를 위한 Styles 클래스
 class Styles:
-    """스타일 프리셋 접근용 클래스"""
+    """스타일 프리셋 접근용 클래스
+
+    RowStyle의 정적 메서드를 클래스 속성으로 노출하여 편리하게 접근할 수 있게 합니다.
+
+    Example:
+        sheet.add_row(data, style=Styles.warning())
+        sheet.add_row(data, style=Styles.danger())
+    """
 
     data = RowStyle.data
     warning = RowStyle.warning

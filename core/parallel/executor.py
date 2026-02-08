@@ -1,8 +1,23 @@
 """
 core/parallel/executor.py - 병렬 세션 실행기
 
-Map-Reduce 패턴으로 멀티 계정/리전 작업을 병렬 처리합니다.
-ThreadPoolExecutor 기반이며, Rate limiting과 재시도를 지원합니다.
+Map-Reduce 패턴으로 멀티 계정/리전 AWS 작업을 병렬 처리합니다.
+ThreadPoolExecutor 기반이며, Rate limiting과 지수 백오프 재시도를 지원합니다.
+
+주요 구성 요소:
+- ParallelConfig: 병렬 실행 설정 (워커 수, 재시도, Rate limit)
+- ParallelSessionExecutor: 멀티 계정/리전 병렬 실행기
+- parallel_collect: 간편한 병렬 수집 래퍼 함수
+
+Example:
+    from core.parallel import parallel_collect
+
+    def collect_volumes(session, account_id, account_name, region):
+        ec2 = session.client("ec2", region_name=region)
+        return ec2.describe_volumes()["Volumes"]
+
+    result = parallel_collect(ctx, collect_volumes, service="ec2")
+    all_volumes = result.get_flat_data()
 """
 
 from __future__ import annotations
@@ -47,7 +62,16 @@ class ParallelConfig:
 
 @dataclass
 class _TaskSpec:
-    """내부 작업 명세"""
+    """내부 작업 명세
+
+    병렬 실행할 개별 작업의 정보를 담습니다.
+
+    Attributes:
+        account_id: AWS 계정 ID 또는 프로파일명
+        account_name: AWS 계정 이름 또는 프로파일명
+        region: 대상 AWS 리전
+        session_getter: boto3 Session을 반환하는 지연 팩토리 함수
+    """
 
     account_id: str
     account_name: str
@@ -198,7 +222,14 @@ class ParallelSessionExecutor:
         return exec_result
 
     def _build_task_list(self) -> list[_TaskSpec]:
-        """실행할 작업 목록 생성"""
+        """컨텍스트 유형에 따라 실행할 작업 목록 생성
+
+        SSO Session, 다중 프로파일, 단일 프로파일 중
+        현재 ExecutionContext의 인증 모드를 감지하여 적절한 작업 목록을 구성합니다.
+
+        Returns:
+            _TaskSpec 리스트 (계정 x 리전 조합)
+        """
         tasks: list[_TaskSpec] = []
 
         if self.ctx.is_sso_session():
@@ -211,7 +242,14 @@ class ParallelSessionExecutor:
         return tasks
 
     def _build_sso_tasks(self) -> list[_TaskSpec]:
-        """SSO Session 기반 작업 목록"""
+        """SSO Session 기반 작업 목록 생성
+
+        대상 계정별 역할(role)과 리전 조합으로 작업 목록을 구성합니다.
+        역할이 없는 계정은 스킵합니다.
+
+        Returns:
+            _TaskSpec 리스트
+        """
         tasks: list[_TaskSpec] = []
         target_accounts = self.ctx.get_target_accounts()
 
@@ -242,7 +280,13 @@ class ParallelSessionExecutor:
         return tasks
 
     def _build_multi_profile_tasks(self) -> list[_TaskSpec]:
-        """다중 프로파일 기반 작업 목록"""
+        """다중 프로파일 기반 작업 목록 생성
+
+        각 프로파일과 리전의 조합으로 작업 목록을 구성합니다.
+
+        Returns:
+            _TaskSpec 리스트
+        """
         from core.auth.session import get_session
 
         tasks: list[_TaskSpec] = []
@@ -265,7 +309,13 @@ class ParallelSessionExecutor:
         return tasks
 
     def _build_single_profile_tasks(self) -> list[_TaskSpec]:
-        """단일 프로파일 기반 작업 목록"""
+        """단일 프로파일 기반 작업 목록 생성
+
+        하나의 프로파일에 대해 각 리전별 작업 목록을 구성합니다.
+
+        Returns:
+            _TaskSpec 리스트
+        """
         from core.auth.session import get_session
 
         tasks: list[_TaskSpec] = []
@@ -295,7 +345,21 @@ class ParallelSessionExecutor:
         quiet: bool = False,
         rate_limiter: TokenBucketRateLimiter | None = None,
     ) -> TaskResult[T]:
-        """단일 작업 실행 (스레드 내에서)"""
+        """단일 작업 실행 (워커 스레드 내에서 호출)
+
+        Rate limiting 적용 후 세션을 획득하고 재시도 로직을 포함하여
+        작업 함수를 실행합니다. 부모 스레드의 quiet 상태를 전파합니다.
+
+        Args:
+            func: (session, account_id, account_name, region) -> T 콜백 함수
+            task: 실행할 작업 명세
+            service: AWS 서비스 이름 (로깅용)
+            quiet: quiet 모드 여부 (부모 스레드에서 전파)
+            rate_limiter: 서비스별 Rate limiter
+
+        Returns:
+            TaskResult[T]: 성공 시 데이터, 실패 시 에러 정보 포함
+        """
         # 워커 스레드에 quiet 상태 전파
         set_quiet(quiet)
         start_time = time.monotonic()
@@ -349,7 +413,21 @@ class ParallelSessionExecutor:
         service: str,
         start_time: float,
     ) -> TaskResult[T]:
-        """재시도 로직을 포함한 작업 실행"""
+        """지수 백오프 재시도 로직을 포함한 작업 실행
+
+        재시도 가능한 에러(throttling, network 등) 발생 시 RetryConfig에 따라
+        지수 백오프로 재시도하고, 재시도 불가능한 에러는 즉시 반환합니다.
+
+        Args:
+            func: (session, account_id, account_name, region) -> T 콜백 함수
+            session: boto3 Session
+            task: 실행할 작업 명세
+            service: AWS 서비스 이름 (로깅용)
+            start_time: 작업 시작 시각 (monotonic, duration 계산용)
+
+        Returns:
+            TaskResult[T]: 성공 또는 실패 결과
+        """
         last_error: Exception | None = None
 
         for attempt in range(self._retry_config.max_retries + 1):

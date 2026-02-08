@@ -1,4 +1,7 @@
-"""Abuse IP sheets writer."""
+"""functions/reports/log_analyzer/reporter/abuse.py - 악성 IP 시트 Writer.
+
+AbuseIPDB 데이터를 기반으로 악성 IP 목록 시트와 보안 이벤트 시트를 생성합니다.
+"""
 
 from __future__ import annotations
 

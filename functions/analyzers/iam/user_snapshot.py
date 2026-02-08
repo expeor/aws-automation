@@ -28,13 +28,32 @@ console = Console()
 
 
 def _collect_user_data(session, account_id: str, account_name: str, region: str) -> IAMData | None:
-    """단일 계정의 IAM 데이터 수집 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정의 IAM 사용자 데이터를 수집한다.
+
+    IAM은 글로벌 서비스이므로 region 파라미터는 사용되지 않는다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드 (IAM은 글로벌이므로 미사용).
+
+    Returns:
+        수집된 IAM 데이터. 실패 시 None.
+    """
     collector = IAMCollector()
     return collector.collect(session, account_id, account_name)
 
 
 def run(ctx: ExecutionContext) -> None:
-    """IAM 사용자 현황 보고서 실행"""
+    """도구의 메인 실행 함수.
+
+    모든 계정에서 IAM 사용자 데이터를 병렬 수집하고, Access Key 경과일,
+    MFA 상태, Git Credential 등을 분석하여 현황 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. 계정/리전 정보와 옵션을 포함한다.
+    """
     console.print("[bold]IAM 사용자 현황 보고서 생성 중...[/bold]")
 
     # 1. 데이터 수집
@@ -77,7 +96,13 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _print_summary(iam_data_list: list[IAMData]) -> None:
-    """분석 결과 요약 출력"""
+    """콘솔에 사용자 현황 요약을 출력한다.
+
+    총 사용자 수, 오래된 Access Key(90일+) 수, 비활성 사용자 수를 표시한다.
+
+    Args:
+        iam_data_list: 계정별 IAM 데이터 목록.
+    """
     OLD_KEY_THRESHOLD = 90
 
     # 전체 통계 계산
@@ -107,7 +132,14 @@ def _print_summary(iam_data_list: list[IAMData]) -> None:
 
 
 def _create_output_directory(ctx) -> str:
-    """출력 디렉토리 생성"""
+    """보고서 출력 디렉토리 경로를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트.
+
+    Returns:
+        생성된 출력 디렉토리 경로.
+    """
     identifier = get_context_identifier(ctx)
 
     output_path = OutputPath(identifier).sub("iam", "user_snapshot").with_date().build()

@@ -1,4 +1,7 @@
-"""SLA (Service Level Agreement) compliance sheet writer."""
+"""functions/reports/log_analyzer/reporter/sla.py - SLA 준수 분석 시트 Writer.
+
+서비스 수준 협약(SLA) 준수 여부를 가용성, 응답 시간, 에러율 기준으로 분석합니다.
+"""
 
 from __future__ import annotations
 

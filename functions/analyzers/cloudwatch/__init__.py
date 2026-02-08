@@ -1,5 +1,12 @@
 """
-plugins/cloudwatch - CloudWatch Monitoring Tools
+functions/analyzers/cloudwatch - CloudWatch 모니터링 및 로그 관리 도구
+
+CloudWatch Log Group과 알람의 사용 현황을 분석하고,
+빈 로그 그룹, 오래된 로그, 모니터링 대상 없는 알람을 탐지합니다.
+
+도구 목록:
+    - loggroup_audit: 빈 로그 그룹 및 오래된 로그 탐지
+    - alarm_orphan: 모니터링 대상 없는 알람 탐지
 """
 
 CATEGORY = {

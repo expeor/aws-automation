@@ -1,24 +1,23 @@
-"""
-reports/cost_dashboard - 미사용 리소스 종합 분석 (병렬 처리)
+"""functions/reports/cost_dashboard/__init__.py - 미사용 리소스 종합 분석 패키지.
 
-모든 미사용 리소스 종합 보고서:
-- NAT Gateway, ENI, EBS, EIP, ELB, Target Group
-- EBS Snapshot, AMI, RDS Snapshot
-- CloudWatch Log Group
-- VPC Endpoint, Secrets Manager, KMS
-- ECR, Route53, S3
-- Lambda, ElastiCache, RDS Instance
-- EFS, SQS, SNS, ACM
-- API Gateway, EventBridge, CloudWatch Alarm
-- DynamoDB
+AWS 전 서비스에 걸쳐 미사용 리소스를 병렬로 수집하고 분석하여 종합 Excel 보고서를 생성합니다.
+
+지원 리소스:
+    - 네트워크: NAT Gateway, ENI, EIP, VPC Endpoint
+    - 스토리지: EBS Volume/Snapshot, AMI, RDS Snapshot, ECR, S3, EFS
+    - 컴퓨팅: Lambda, ElastiCache, RDS Instance, DynamoDB
+    - 로드밸런싱: ELB, Target Group
+    - 보안/관리: KMS, Secrets Manager, ACM
+    - 모니터링: CloudWatch Log Group, CloudWatch Alarm
+    - 기타: Route53, API Gateway, EventBridge, SQS, SNS
 
 병렬 처리 전략:
-1. 계정/리전 레벨: parallel_collect로 병렬 처리
-2. 리소스 타입 레벨: ThreadPoolExecutor로 병렬 수집
+    1. 계정/리전 레벨: ``parallel_collect``로 멀티 계정/리전 병렬 처리
+    2. 리소스 타입 레벨: ``ThreadPoolExecutor``로 리소스 유형별 병렬 수집
 
 플러그인 규약:
-    - run(ctx): 필수. 실행 함수.
-    - collect_options(ctx): 옵션. 사용자 입력 수집.
+    - ``run(ctx)``: 필수. 도구 실행 엔트리포인트.
+    - ``collect_options(ctx)``: 선택. 실행 전 사용자 입력 수집.
 """
 
 # 카테고리 정의 (Discovery용)

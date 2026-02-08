@@ -1,5 +1,5 @@
 """
-plugins/vpc/sg_audit.py - Security Group Audit 도구
+functions/analyzers/vpc/sg_audit.py - Security Group Audit 도구
 
 SG 현황 및 미사용 SG/규칙 분석
 
@@ -35,14 +35,31 @@ REQUIRED_PERMISSIONS = {
 
 
 def _collect_sgs(session, account_id: str, account_name: str, region: str) -> list | None:
-    """단일 계정/리전의 Security Group 수집 (병렬 실행용)"""
+    """단일 계정/리전의 Security Group 수집 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        Security Group 리스트. 없으면 None.
+    """
     collector = SGCollector()
     sgs = collector.collect(session, account_id, account_name, region)
     return sgs if sgs else None
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Security Group Audit 실행"""
+    """Security Group Audit 실행
+
+    멀티 계정/리전에서 Security Group을 병렬 수집하고,
+    미사용 SG 및 Stale Rule을 분석하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]Security Group Audit 시작...[/bold]")
 
     # 1. 데이터 수집
@@ -107,7 +124,14 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _create_output_directory(ctx) -> str:
-    """출력 디렉토리 생성"""
+    """출력 디렉토리 생성
+
+    Args:
+        ctx: CLI 실행 컨텍스트
+
+    Returns:
+        생성된 출력 디렉토리 경로
+    """
     # profile_name: SSO Session 이름 또는 프로파일 이름
     identifier = ctx.profile_name or "default"
     output_path = OutputPath(identifier).sub("vpc", "security").with_date().build()

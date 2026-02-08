@@ -1,4 +1,7 @@
-"""Response time sheet writer."""
+"""functions/reports/log_analyzer/reporter/response_time.py - 응답 시간 시트 Writer.
+
+응답 시간이 가장 긴 요청 Top N을 시트로 생성합니다.
+"""
 
 from __future__ import annotations
 

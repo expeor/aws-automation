@@ -1,5 +1,5 @@
 """
-plugins/s3/empty_bucket.py - 빈 S3 버킷 탐지
+functions/analyzers/s3/empty_bucket.py - 빈 S3 버킷 탐지
 
 객체가 없는 미사용 S3 버킷 분석
 
@@ -42,7 +42,16 @@ UNUSED_DAYS_THRESHOLD = 90
 
 
 class BucketStatus(Enum):
-    """버킷 상태"""
+    """S3 버킷 분석 상태.
+
+    객체 수, 크기, 버전관리 설정 기반으로 분류한다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 버킷 (1MB 이상).
+        EMPTY: 객체가 전혀 없는 빈 버킷.
+        VERSIONING_ONLY: 현재 객체는 없으나 버전 데이터만 존재하는 버킷.
+        SMALL: 총 크기 1MB 미만의 매우 작은 버킷.
+    """
 
     NORMAL = "normal"
     EMPTY = "empty"
@@ -52,7 +61,22 @@ class BucketStatus(Enum):
 
 @dataclass
 class BucketInfo:
-    """S3 버킷 정보"""
+    """S3 버킷 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        name: 버킷 이름.
+        region: 버킷이 위치한 리전.
+        created_at: 버킷 생성일.
+        object_count: 버킷 내 객체 수 (CloudWatch 또는 ListObjects 기반).
+        total_size_bytes: 버킷 총 크기 (바이트).
+        versioning_enabled: 버전관리 활성화 여부.
+        has_lifecycle: Lifecycle 정책 존재 여부.
+        has_logging: 서버 액세스 로깅 활성화 여부.
+        has_replication: 복제 설정 존재 여부.
+        encryption_type: 서버 측 암호화 알고리즘 (예: AES256, aws:kms).
+    """
 
     account_id: str
     account_name: str
@@ -69,16 +93,32 @@ class BucketInfo:
 
     @property
     def total_size_mb(self) -> float:
+        """버킷 총 크기 (MB 단위).
+
+        Returns:
+            MB 단위 크기.
+        """
         return self.total_size_bytes / (1024**2)
 
     @property
     def total_size_gb(self) -> float:
+        """버킷 총 크기 (GB 단위).
+
+        Returns:
+            GB 단위 크기.
+        """
         return self.total_size_bytes / (1024**3)
 
 
 @dataclass
 class BucketFinding:
-    """버킷 분석 결과"""
+    """개별 버킷에 대한 분석 결과.
+
+    Attributes:
+        bucket: 분석 대상 버킷 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     bucket: BucketInfo
     status: BucketStatus
@@ -87,7 +127,18 @@ class BucketFinding:
 
 @dataclass
 class S3AnalysisResult:
-    """S3 분석 결과 집계"""
+    """단일 계정의 S3 버킷 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        total_buckets: 전체 버킷 수.
+        empty_buckets: 빈 버킷 수.
+        versioning_only_buckets: 버전 데이터만 있는 버킷 수.
+        small_buckets: 1MB 미만 소형 버킷 수.
+        total_size_gb: 전체 버킷 총 크기 (GB).
+        findings: 개별 버킷 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -100,7 +151,15 @@ class S3AnalysisResult:
 
 
 def get_bucket_region(s3_client, bucket_name: str) -> str:
-    """버킷 리전 조회"""
+    """S3 버킷의 리전을 조회한다.
+
+    Args:
+        s3_client: S3 클라이언트.
+        bucket_name: 버킷 이름.
+
+    Returns:
+        리전 문자열. LocationConstraint가 None이면 "us-east-1", 조회 실패 시 "unknown".
+    """
     from botocore.exceptions import ClientError
 
     try:
@@ -113,7 +172,18 @@ def get_bucket_region(s3_client, bucket_name: str) -> str:
 
 
 def get_bucket_size_from_cloudwatch(cw_client, bucket_name: str) -> tuple:
-    """CloudWatch에서 버킷 크기/객체수 조회 (더 효율적)"""
+    """CloudWatch 메트릭에서 버킷 크기와 객체 수를 조회한다.
+
+    BucketSizeBytes와 NumberOfObjects 메트릭을 사용하며,
+    ListObjects 대비 API 비용이 적다.
+
+    Args:
+        cw_client: CloudWatch 클라이언트.
+        bucket_name: 버킷 이름.
+
+    Returns:
+        (크기 바이트, 객체 수, 성공 여부) 튜플.
+    """
     from botocore.exceptions import ClientError
 
     try:
@@ -164,7 +234,19 @@ def get_bucket_size_from_cloudwatch(cw_client, bucket_name: str) -> tuple:
 
 
 def collect_buckets(session, account_id: str, account_name: str) -> list[BucketInfo]:
-    """S3 버킷 수집"""
+    """지정된 계정의 모든 S3 버킷을 수집한다.
+
+    CloudWatch 메트릭 또는 ListObjects를 사용하여 버킷 크기/객체 수를 확인하고,
+    버전관리, Lifecycle, 로깅, 암호화 등 설정 정보도 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+
+    Returns:
+        수집된 버킷 정보 목록.
+    """
     from botocore.exceptions import ClientError
 
     s3 = get_client(session, "s3")
@@ -252,7 +334,18 @@ def collect_buckets(session, account_id: str, account_name: str) -> list[BucketI
 
 
 def analyze_buckets(buckets: list[BucketInfo], account_id: str, account_name: str) -> S3AnalysisResult:
-    """버킷 분석"""
+    """수집된 S3 버킷을 분석하여 빈 버킷/소형 버킷을 식별한다.
+
+    빈 버킷, 버전 데이터만 있는 버킷, 1MB 미만 소형 버킷을 분류한다.
+
+    Args:
+        buckets: 분석 대상 버킷 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+
+    Returns:
+        버킷 분석 결과 집계 객체.
+    """
     result = S3AnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -310,7 +403,17 @@ def analyze_buckets(buckets: list[BucketInfo], account_id: str, account_name: st
 
 
 def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """S3 빈 버킷 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정별 통계)와 Detail 시트(비정상 버킷 상세)를 포함한다.
+
+    Args:
+        results: 계정별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -395,10 +498,19 @@ def generate_report(results: list[S3AnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> S3AnalysisResult | None:
-    """단일 계정의 S3 버킷 수집 및 분석 (병렬 실행용)
+    """단일 계정의 S3 버킷을 수집하고 분석한다.
 
-    S3는 글로벌 서비스이므로 region은 무시됩니다.
-    parallel_collect의 중복 제거가 계정당 한 번만 실행되도록 보장합니다.
+    parallel_collect 콜백으로 사용된다. S3는 글로벌 서비스이므로 region 파라미터는
+    무시되며, parallel_collect의 중복 제거가 계정당 한 번만 실행되도록 보장한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전 (S3는 글로벌 서비스이므로 무시됨).
+
+    Returns:
+        분석 결과 객체. 버킷이 없으면 None.
     """
     buckets = collect_buckets(session, account_id, account_name)
     if not buckets:
@@ -407,7 +519,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """빈 S3 버킷 분석"""
+    """빈 S3 버킷 분석 도구의 메인 실행 함수.
+
+    멀티 계정 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]S3 빈 버킷 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="s3")

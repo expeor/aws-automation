@@ -1,5 +1,5 @@
 """
-plugins/fn/common/collector.py - Lambda 함수 수집
+functions/analyzers/fn/common/collector.py - Lambda 함수 수집
 
 Lambda 함수 정보 및 CloudWatch 메트릭 수집 공통 로직
 
@@ -25,7 +25,22 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LambdaMetrics:
-    """Lambda 함수 CloudWatch 메트릭"""
+    """Lambda 함수 CloudWatch 메트릭 데이터.
+
+    30일(기본) 기간의 Invocations, Errors, Throttles, Duration,
+    ConcurrentExecutions 메트릭을 집계한 결과를 보관한다.
+
+    Attributes:
+        invocations: 조회 기간 총 호출 수.
+        errors: 조회 기간 총 에러 수.
+        throttles: 조회 기간 총 Throttle 수.
+        duration_avg_ms: 평균 실행 시간 (밀리초).
+        duration_max_ms: 최대 실행 시간 (밀리초).
+        duration_min_ms: 최소 실행 시간 (밀리초).
+        concurrent_executions_max: 최대 동시 실행 수.
+        period_days: 메트릭 조회 기간 (일).
+        last_invocation_time: 마지막 호출 시각 (추정). None이면 미확인.
+    """
 
     # 호출 메트릭
     invocations: int = 0
@@ -47,7 +62,34 @@ class LambdaMetrics:
 
 @dataclass
 class LambdaFunctionInfo:
-    """Lambda 함수 정보"""
+    """Lambda 함수 메타데이터, 설정, 메트릭 통합 정보.
+
+    AWS Lambda API와 CloudWatch에서 수집한 함수 정보를 하나의 객체로
+    통합한다. metrics 필드는 collect_functions_with_metrics()로 수집 시
+    채워지며, collect_functions()만 호출하면 None이다.
+
+    Attributes:
+        function_name: Lambda 함수 이름.
+        function_arn: Lambda 함수 ARN.
+        runtime: 런타임 식별자 (예: python3.12, nodejs22.x).
+        handler: 핸들러 진입점 (예: index.handler).
+        description: 함수 설명.
+        memory_mb: 메모리 크기 (MB).
+        timeout_seconds: 타임아웃 (초).
+        code_size_bytes: 코드 패키지 크기 (바이트).
+        last_modified: 마지막 수정 시각.
+        role: 실행 IAM Role ARN.
+        vpc_config: VPC 설정 딕셔너리. None이면 VPC 미연결.
+        environment_variables: 환경 변수 개수.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        tags: 리소스 태그 딕셔너리.
+        metrics: CloudWatch 메트릭. None이면 미수집.
+        provisioned_concurrency: 할당된 Provisioned Concurrency 수.
+        reserved_concurrency: Reserved Concurrency 설정값. None이면 미설정.
+        estimated_monthly_cost: 추정 월간 비용 (USD).
+    """
 
     # 기본 정보
     function_name: str
@@ -85,19 +127,31 @@ class LambdaFunctionInfo:
 
     @property
     def is_unused(self) -> bool:
-        """미사용 여부 (30일간 호출 없음)"""
+        """미사용 여부 (30일간 호출 없음).
+
+        Returns:
+            메트릭이 수집되었고 호출 수가 0이면 True.
+        """
         if self.metrics is None:
             return False
         return self.metrics.invocations == 0
 
     @property
     def code_size_mb(self) -> float:
-        """코드 크기 (MB)"""
+        """코드 패키지 크기 (MB).
+
+        Returns:
+            바이트를 MB로 변환한 값.
+        """
         return self.code_size_bytes / (1024 * 1024)
 
     @property
     def has_vpc(self) -> bool:
-        """VPC 연결 여부"""
+        """VPC 연결 여부.
+
+        Returns:
+            SubnetIds가 설정되어 있으면 True.
+        """
         if not self.vpc_config:
             return False
         return bool(self.vpc_config.get("SubnetIds"))
@@ -356,7 +410,17 @@ def collect_all_function_metrics(
 
 
 def _build_lambda_queries(function_names: list[str]) -> list[MetricQuery]:
-    """Lambda 메트릭 쿼리 목록 생성"""
+    """Lambda 함수별 CloudWatch 메트릭 쿼리 목록을 생성한다.
+
+    함수당 7개 메트릭(Invocations, Errors, Throttles, Duration x3,
+    ConcurrentExecutions)에 대한 MetricQuery를 생성한다.
+
+    Args:
+        function_names: Lambda 함수 이름 목록.
+
+    Returns:
+        batch_get_metrics()에 전달할 MetricQuery 목록.
+    """
     queries = []
 
     for func_name in function_names:
@@ -423,7 +487,16 @@ def _build_lambda_queries(function_names: list[str]) -> list[MetricQuery]:
 
 
 def _parse_lambda_metrics(safe_id: str, results: dict[str, float], days: int) -> LambdaMetrics:
-    """배치 조회 결과를 LambdaMetrics로 변환"""
+    """batch_get_metrics() 결과를 LambdaMetrics 객체로 변환한다.
+
+    Args:
+        safe_id: sanitize_metric_id()로 생성된 함수 식별자.
+        results: batch_get_metrics()의 반환 딕셔너리 ({metric_id: value}).
+        days: 조회 기간 (일).
+
+    Returns:
+        파싱된 LambdaMetrics 객체.
+    """
     return LambdaMetrics(
         period_days=days,
         invocations=int(results.get(f"{safe_id}_invocations", 0)),

@@ -1,8 +1,10 @@
-# internal/auth/provider/base.py
+# core/auth/provider/base.py
 """
-Provider 기본 클래스
+core/auth/provider/base.py - Provider 기본 클래스
 
-모든 Provider가 상속받는 공통 기능을 제공합니다.
+모든 Provider가 상속받는 BaseProvider 클래스를 정의합니다.
+인증 상태 관리, 캐시(AccountCache, CredentialsCache), boto3 Session 생성 등
+공통 기능을 제공합니다.
 """
 
 import logging
@@ -67,7 +69,11 @@ class BaseProvider(Provider):
         return self._default_region
 
     def _ensure_authenticated(self) -> None:
-        """인증 상태 확인 (인증되지 않으면 예외 발생)"""
+        """인증 상태를 확인합니다.
+
+        Raises:
+            NotAuthenticatedError: 인증되지 않은 경우
+        """
         if not self._authenticated:
             raise NotAuthenticatedError(f"Provider '{self._name}'이(가) 인증되지 않았습니다")
 
@@ -101,7 +107,15 @@ class BaseProvider(Provider):
         account_id: str,
         role_name: str,
     ) -> dict[str, str] | None:
-        """캐시된 자격증명 조회"""
+        """캐시된 자격증명을 조회합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+            role_name: 역할 이름
+
+        Returns:
+            자격증명 딕셔너리 또는 None (캐시 미스 또는 만료)
+        """
         return self._credentials_cache.get(account_id, role_name)
 
     def _cache_credentials(
@@ -110,11 +124,20 @@ class BaseProvider(Provider):
         role_name: str,
         credentials: dict[str, str],
     ) -> None:
-        """자격증명 캐시"""
+        """자격증명을 메모리 캐시에 저장합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+            role_name: 역할 이름
+            credentials: 자격증명 딕셔너리 (access_key_id, secret_access_key, session_token)
+        """
         self._credentials_cache.set(account_id, role_name, credentials)
 
     def close(self) -> None:
-        """리소스 정리"""
+        """리소스를 정리합니다.
+
+        계정 캐시, 자격증명 캐시를 초기화하고 인증 상태를 해제합니다.
+        """
         self._account_cache.clear()
         self._credentials_cache.clear()
         self._authenticated = False

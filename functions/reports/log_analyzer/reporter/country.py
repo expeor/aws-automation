@@ -1,4 +1,7 @@
-"""Country statistics sheet writer."""
+"""functions/reports/log_analyzer/reporter/country.py - 국가별 통계 시트 Writer.
+
+GeoIP 매핑을 기반으로 국가별 요청 수, 고유 IP 수, 비율을 분석합니다.
+"""
 
 from __future__ import annotations
 

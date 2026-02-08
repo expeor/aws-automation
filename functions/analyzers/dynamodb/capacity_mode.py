@@ -1,5 +1,5 @@
 """
-plugins/dynamodb/capacity_mode.py - DynamoDB 용량 모드 분석
+functions/analyzers/dynamodb/capacity_mode.py - DynamoDB 용량 모드 분석
 
 Provisioned vs On-Demand 용량 모드 최적화 분석
 
@@ -42,7 +42,11 @@ REQUIRED_PERMISSIONS = {
 
 
 class CapacityRecommendation(Enum):
-    """용량 모드 권장 사항"""
+    """DynamoDB 용량 모드 최적화 권장 사항 분류.
+
+    사용률, 쓰로틀링, Provisioned/On-Demand 비용 비교를 기반으로
+    최적 용량 모드를 권장한다.
+    """
 
     KEEP_PROVISIONED = "keep_provisioned"
     SWITCH_TO_ONDEMAND = "switch_to_ondemand"
@@ -54,7 +58,30 @@ class CapacityRecommendation(Enum):
 
 @dataclass
 class TableCapacityInfo:
-    """DynamoDB 테이블 용량 정보"""
+    """DynamoDB 테이블 용량 메타데이터 및 CloudWatch 지표 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        table_name: DynamoDB 테이블 이름.
+        table_status: 테이블 상태 (예: ACTIVE).
+        billing_mode: 용량 모드 (PROVISIONED 또는 PAY_PER_REQUEST).
+        item_count: 테이블 아이템 수.
+        size_bytes: 테이블 크기 (bytes).
+        provisioned_read: 프로비저닝된 읽기 용량 단위 (RCU).
+        provisioned_write: 프로비저닝된 쓰기 용량 단위 (WCU).
+        last_increase_dt: 마지막 용량 증가 시각.
+        last_decrease_dt: 마지막 용량 감소 시각.
+        decreases_today: 오늘 용량 감소 횟수.
+        avg_consumed_read: 14일 평균 소비 읽기 용량 (RCU).
+        avg_consumed_write: 14일 평균 소비 쓰기 용량 (WCU).
+        max_consumed_read: 14일 최대 소비 읽기 용량 (RCU).
+        max_consumed_write: 14일 최대 소비 쓰기 용량 (WCU).
+        throttled_read: 14일간 읽기 쓰로틀링 횟수.
+        throttled_write: 14일간 쓰기 쓰로틀링 횟수.
+        created_at: 테이블 생성 시각.
+    """
 
     account_id: str
     account_name: str
@@ -81,26 +108,42 @@ class TableCapacityInfo:
 
     @property
     def size_mb(self) -> float:
-        """테이블 크기 (MB)"""
+        """테이블 크기를 MB 단위로 반환한다.
+
+        Returns:
+            테이블 크기 (MB).
+        """
         return self.size_bytes / (1024 * 1024)
 
     @property
     def read_utilization(self) -> float:
-        """읽기 용량 사용률 (%)"""
+        """읽기 용량 사용률을 백분율로 반환한다.
+
+        Returns:
+            읽기 사용률 (%). provisioned_read가 0이면 0.
+        """
         if self.provisioned_read <= 0:
             return 0
         return (self.avg_consumed_read / self.provisioned_read) * 100
 
     @property
     def write_utilization(self) -> float:
-        """쓰기 용량 사용률 (%)"""
+        """쓰기 용량 사용률을 백분율로 반환한다.
+
+        Returns:
+            쓰기 사용률 (%). provisioned_write가 0이면 0.
+        """
         if self.provisioned_write <= 0:
             return 0
         return (self.avg_consumed_write / self.provisioned_write) * 100
 
     @property
     def estimated_provisioned_cost(self) -> float:
-        """Provisioned 모드 예상 월간 비용 (pricing 모듈 사용)"""
+        """Provisioned 모드 기준 월간 예상 비용.
+
+        Returns:
+            Provisioned 모드 월간 예상 비용 (USD).
+        """
         storage_gb = self.size_bytes / (1024**3)
         return get_dynamodb_monthly_cost(
             region=self.region,
@@ -112,7 +155,11 @@ class TableCapacityInfo:
 
     @property
     def estimated_ondemand_cost(self) -> float:
-        """On-Demand 모드 예상 월간 비용 (pricing 모듈 사용)"""
+        """On-Demand 모드 기준 월간 예상 비용.
+
+        Returns:
+            On-Demand 모드 월간 예상 비용 (USD).
+        """
         storage_gb = self.size_bytes / (1024**3)
         return estimate_ondemand_cost(
             region=self.region,
@@ -124,7 +171,14 @@ class TableCapacityInfo:
 
 @dataclass
 class TableCapacityFinding:
-    """테이블 용량 분석 결과"""
+    """개별 DynamoDB 테이블의 용량 모드 분석 결과.
+
+    Attributes:
+        table: 분석 대상 테이블 용량 정보.
+        recommendation: 용량 모드 권장 사항.
+        reason: 권장 사유 설명 문자열.
+        potential_savings: 예상 월간 절감액 (USD).
+    """
 
     table: TableCapacityInfo
     recommendation: CapacityRecommendation
@@ -134,7 +188,19 @@ class TableCapacityFinding:
 
 @dataclass
 class CapacityAnalysisResult:
-    """용량 분석 결과 집계"""
+    """단일 계정/리전의 DynamoDB 용량 모드 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_tables: 전체 테이블 수.
+        provisioned_tables: Provisioned 모드 테이블 수.
+        ondemand_tables: On-Demand 모드 테이블 수.
+        optimization_candidates: 최적화 대상 테이블 수.
+        potential_savings: 예상 총 월간 절감액 (USD).
+        findings: 개별 테이블별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -148,7 +214,20 @@ class CapacityAnalysisResult:
 
 
 def collect_capacity_info(session, account_id: str, account_name: str, region: str) -> list[TableCapacityInfo]:
-    """DynamoDB 테이블 용량 정보 수집"""
+    """DynamoDB 테이블 용량 정보 및 CloudWatch 지표를 수집한다.
+
+    ListTables + DescribeTable로 프로비저닝 설정을 수집하고,
+    CloudWatch GetMetricStatistics로 14일간 소비 용량/쓰로틀링 지표를 조회한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        TableCapacityInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     dynamodb = get_client(session, "dynamodb", region_name=region)
@@ -265,7 +344,20 @@ def collect_capacity_info(session, account_id: str, account_name: str, region: s
 def analyze_capacity(
     tables: list[TableCapacityInfo], account_id: str, account_name: str, region: str
 ) -> CapacityAnalysisResult:
-    """DynamoDB 용량 모드 분석"""
+    """DynamoDB 테이블의 용량 모드를 분석하여 최적화 권장 사항을 도출한다.
+
+    Provisioned/On-Demand 비용을 비교하고, 사용률과 쓰로틀링을 분석하여
+    모드 전환, 용량 축소/증가, 또는 최적 상태를 판별한다.
+
+    Args:
+        tables: 분석할 테이블 용량 정보 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        용량 분석 결과 집계 (CapacityAnalysisResult).
+    """
     result = CapacityAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -372,7 +464,17 @@ def analyze_capacity(
 
 
 def generate_report(results: list[CapacityAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """DynamoDB 용량 모드 분석 Excel 보고서를 생성한다.
+
+    Summary 시트(계정/리전별 집계)와 Tables 시트(전체 테이블 상세, 권장 사항 포함)를 포함.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        저장된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -480,7 +582,19 @@ def generate_report(results: list[CapacityAnalysisResult], output_dir: str) -> s
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> CapacityAnalysisResult | None:
-    """단일 계정/리전의 DynamoDB 용량 분석 (병렬 실행용)"""
+    """단일 계정/리전의 DynamoDB 용량 정보를 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 병렬로 실행된다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        용량 분석 결과. 테이블이 없으면 None.
+    """
     tables = collect_capacity_info(session, account_id, account_name, region)
     if not tables:
         return None
@@ -488,7 +602,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """DynamoDB 용량 모드 분석"""
+    """DynamoDB 용량 모드 분석 도구의 진입점.
+
+    멀티 계정/리전 병렬 수집 후 콘솔 요약 출력, Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 리전, 출력 설정 포함).
+    """
     console.print("[bold]DynamoDB 용량 모드 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="dynamodb")

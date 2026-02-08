@@ -1,5 +1,11 @@
 """
-plugins/route53 - Route 53 DNS Management Tools
+functions/analyzers/route53 - Route 53 DNS 관리 도구
+
+Route 53 Hosted Zone의 사용 현황을 분석하고
+레코드가 없는 빈 Hosted Zone을 탐지합니다.
+
+도구 목록:
+    - empty_zone: 레코드가 없는 빈 Hosted Zone 탐지
 """
 
 CATEGORY = {

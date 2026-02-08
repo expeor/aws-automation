@@ -1,12 +1,12 @@
-"""
-reports/scheduled - 정기 작업 시스템 (Scheduled Operations)
+"""functions/reports/scheduled/__init__.py - 정기 작업 시스템 (Scheduled Operations).
 
-회사 거버넌스에 맞게 일간/월간/분기/반기/연간 정기 작업을 관리합니다.
+회사 거버넌스에 맞게 일간/주간/월간/분기/반기/연간 정기 작업을 관리합니다.
+YAML 설정 파일로 회사별 작업 목록을 정의하고, 실행 이력을 JSON으로 관리합니다.
 
 작업 유형:
-- 점검 (read): 현황 파악, 보고서 생성
-- 적용 (write): 설정 변경, 태그 적용
-- 정리 (delete): 리소스 삭제, 정리
+    - 점검 (read): 현황 파악, 보고서 생성.
+    - 적용 (write): 설정 변경, 태그 적용.
+    - 정리 (delete): 리소스 삭제, 정리.
 """
 
 CATEGORY = {

@@ -1,7 +1,18 @@
 """
-plugins/elb - Elastic Load Balancing Analysis Tools
+functions/analyzers/elb - Elastic Load Balancing 분석 도구
 
-Includes all load balancer types: ALB, NLB, CLB, GWLB
+ALB, NLB, CLB, GWLB 등 모든 로드밸런서 유형을 분석합니다.
+미사용 리소스 탐지, 보안 점검, CLB 마이그레이션 검토,
+리스너 규칙 현황, ALB 로그 분석, 인벤토리 기능을 제공합니다.
+
+도구 목록:
+    - unused: 타겟이 없는 로드밸런서 탐지 (ALB/NLB/CLB/GWLB)
+    - target_group_audit: 미연결/빈 타겟 그룹 탐지
+    - security_audit: SSL/TLS, WAF, 인증서, 액세스 로그 보안 점검
+    - migration_advisor: CLB에서 ALB/NLB로의 마이그레이션 분석
+    - listener_rules: ALB 리스너 규칙 복잡도 및 현황
+    - alb_log: S3에 저장된 ALB 액세스 로그 분석
+    - inventory: 모든 유형의 로드밸런서 및 Target Group 현황 조회
 """
 
 CATEGORY = {

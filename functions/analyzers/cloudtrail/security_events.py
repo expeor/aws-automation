@@ -1,5 +1,5 @@
 """
-plugins/cloudtrail/security_events.py - CloudTrail 보안 이벤트 분석
+functions/analyzers/cloudtrail/security_events.py - CloudTrail 보안 이벤트 분석
 
 최근 90일간 보안 관련 이벤트를 분석합니다:
 - 루트 계정 로그인
@@ -37,7 +37,17 @@ REQUIRED_PERMISSIONS = {
 
 
 class EventSeverity(Enum):
-    """이벤트 심각도"""
+    """보안 이벤트 심각도.
+
+    이벤트의 위험 수준을 분류한다. 루트 계정 사용 시 한 단계 상향된다.
+
+    Attributes:
+        CRITICAL: 즉시 대응이 필요한 심각한 이벤트 (CloudTrail 삭제, 조직 탈퇴 등).
+        HIGH: 높은 위험 이벤트 (IAM 변경, 권한 상승, 외부 공유 등).
+        MEDIUM: 주의가 필요한 이벤트.
+        LOW: 낮은 위험 이벤트.
+        INFO: 정보성 이벤트 (일반 콘솔 로그인 등).
+    """
 
     CRITICAL = "critical"
     HIGH = "high"
@@ -238,7 +248,27 @@ SECURITY_EVENTS = {
 
 @dataclass
 class SecurityEvent:
-    """보안 이벤트 정보"""
+    """CloudTrail 보안 이벤트 정보.
+
+    단일 보안 이벤트의 상세 정보를 보관한다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 이벤트 발생 리전.
+        event_time: 이벤트 발생 시간 (UTC).
+        event_name: AWS API 이벤트 이름 (CreateUser, ConsoleLogin 등).
+        event_source: 이벤트 소스 서비스 (iam.amazonaws.com 등).
+        category: 이벤트 카테고리 (인증, IAM, S3, KMS 등).
+        description: 이벤트 설명.
+        severity: 이벤트 심각도.
+        user_identity: 행위자 이름 또는 ARN.
+        user_type: 행위자 유형 (Root, IAMUser, AssumedRole, AWSService 등).
+        source_ip: 요청 소스 IP 주소.
+        error_code: 오류 코드 (실패 시).
+        error_message: 오류 메시지 (실패 시).
+        resources: 관련 리소스 정보 (최대 3개).
+    """
 
     account_id: str
     account_name: str
@@ -258,16 +288,37 @@ class SecurityEvent:
 
     @property
     def is_root(self) -> bool:
+        """루트 계정에 의한 이벤트인지 판단한다.
+
+        Returns:
+            행위자가 Root이면 True.
+        """
         return self.user_type == "Root"
 
     @property
     def is_failed(self) -> bool:
+        """실패한 이벤트인지 판단한다.
+
+        Returns:
+            오류 코드가 있으면 True.
+        """
         return bool(self.error_code)
 
 
 @dataclass
 class SecurityEventResult:
-    """보안 이벤트 분석 결과"""
+    """계정/리전별 보안 이벤트 분석 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        events: 수집된 보안 이벤트 목록.
+        root_logins: 루트 계정 로그인 횟수.
+        failed_logins: 콘솔 로그인 실패 횟수.
+        iam_changes: IAM 변경 이벤트 수.
+        critical_events: CRITICAL 심각도 이벤트 수.
+    """
 
     account_id: str
     account_name: str
@@ -280,7 +331,16 @@ class SecurityEventResult:
 
 
 def _parse_user_identity(user_identity: dict) -> tuple[str, str]:
-    """사용자 정보 파싱"""
+    """CloudTrail userIdentity 필드에서 행위자 정보를 추출한다.
+
+    Root, IAMUser, AssumedRole, AWSService 등 유형별로 적절한 이름을 파싱한다.
+
+    Args:
+        user_identity: CloudTrail 이벤트의 userIdentity 딕셔너리.
+
+    Returns:
+        (행위자 이름, 행위자 유형) 튜플.
+    """
     user_type = user_identity.get("type", "Unknown")
 
     if user_type == "Root":
@@ -301,7 +361,20 @@ def _parse_user_identity(user_identity: dict) -> tuple[str, str]:
 
 
 def _collect_security_events(session, account_id: str, account_name: str, region: str) -> SecurityEventResult | None:
-    """단일 계정/리전의 보안 이벤트 수집"""
+    """parallel_collect 콜백: 단일 계정/리전의 보안 이벤트를 수집한다.
+
+    최근 90일간 SECURITY_EVENTS에 정의된 이벤트 타입별로 LookupEvents API를 호출하고,
+    루트 계정/로그인 실패 시 심각도를 상향 조정한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        보안 이벤트 분석 결과. 이벤트가 없으면 None.
+    """
     from botocore.exceptions import ClientError
 
     result = SecurityEventResult(
@@ -396,7 +469,18 @@ def _collect_security_events(session, account_id: str, account_name: str, region
 
 
 def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """보안 이벤트 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary, Actors(행위자별), IP Analysis, Timeline(시간대별), Events(상세) 시트를 포함한다.
+    심각도별로 셀 색상을 적용한다.
+
+    Args:
+        results: 계정/리전별 보안 이벤트 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from collections import defaultdict
 
     from openpyxl.styles import PatternFill
@@ -673,7 +757,14 @@ def generate_report(results: list[SecurityEventResult], output_dir: str) -> str:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """보안 이벤트 분석"""
+    """CloudTrail 보안 이벤트 분석 도구의 메인 실행 함수.
+
+    최근 90일간 보안 관련 이벤트(루트 로그인, IAM 변경, 데이터 유출 등)를 수집하고 분석한다.
+    IAM 등 글로벌 서비스 이벤트를 위해 us-east-1 리전을 자동 추가한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]CloudTrail 보안 이벤트 분석 시작...[/bold]\n")
 
     # us-east-1 자동 추가 (IAM 등 글로벌 서비스 이벤트는 us-east-1에 기록됨)

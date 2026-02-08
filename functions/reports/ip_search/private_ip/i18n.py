@@ -1,5 +1,8 @@
-"""
-plugins/vpc/ip_search/private_ip/i18n.py - Internationalization for Private IP Search
+"""functions/reports/ip_search/private_ip/i18n.py - Private IP Search 국제화(i18n).
+
+Private IP Search Tool의 한국어/영어 메시지 번역을 관리합니다.
+MESSAGES 딕셔너리에 키별로 ko/en 번역을 정의하고,
+t() 함수로 현재 언어에 맞는 메시지를 반환합니다.
 """
 
 from __future__ import annotations

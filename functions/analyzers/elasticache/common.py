@@ -1,5 +1,5 @@
 """
-plugins/elasticache/common.py - ElastiCache 공통 유틸리티
+functions/analyzers/elasticache/common.py - ElastiCache 공통 유틸리티
 
 Redis, Memcached에서 공유하는 데이터 구조와 헬퍼 함수.
 """
@@ -17,14 +17,21 @@ LOW_USAGE_CPU_THRESHOLD = 5.0
 
 
 class CacheEngine(Enum):
-    """캐시 엔진 타입"""
+    """ElastiCache 캐시 엔진 유형 분류.
+
+    AWS ElastiCache가 지원하는 캐시 엔진을 구분한다.
+    """
 
     REDIS = "redis"
     MEMCACHED = "memcached"
 
 
 class ClusterStatus(Enum):
-    """클러스터 상태"""
+    """ElastiCache 클러스터 사용 상태 분류.
+
+    CloudWatch 지표(CurrConnections, CPUUtilization)를 기반으로
+    유휴/저사용/정상 상태를 분류한다.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -33,7 +40,22 @@ class ClusterStatus(Enum):
 
 @dataclass
 class ClusterInfo:
-    """ElastiCache 클러스터 정보"""
+    """ElastiCache 클러스터 메타데이터 및 CloudWatch 지표 정보 (공통).
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        cluster_id: 클러스터 식별자.
+        engine: 캐시 엔진 (redis 또는 memcached).
+        node_type: 노드 타입 (예: cache.r6g.large).
+        num_nodes: 노드 수.
+        status: 클러스터 상태.
+        created_at: 생성 시각.
+        avg_connections: 평균 현재 연결 수.
+        avg_cpu: 평균 CPU 사용률 (%).
+        avg_memory: 평균 메모리 사용률 (%).
+    """
 
     account_id: str
     account_name: str
@@ -51,7 +73,11 @@ class ClusterInfo:
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """대략적인 월간 비용 추정"""
+        """노드 타입별 시간당 단가 기반 월간 비용 추정.
+
+        Returns:
+            월간 예상 비용 (USD). 알 수 없는 노드 타입은 $0.10/hr 기본값 적용.
+        """
         price_map = {
             "cache.t3.micro": 0.017,
             "cache.t3.small": 0.034,
@@ -70,7 +96,13 @@ class ClusterInfo:
 
 @dataclass
 class ClusterFinding:
-    """클러스터 분석 결과"""
+    """개별 ElastiCache 클러스터의 분석 결과 (공통).
+
+    Attributes:
+        cluster: 분석 대상 클러스터 정보.
+        status: 분석된 사용 상태.
+        recommendation: 권장 조치 사항 문자열.
+    """
 
     cluster: ClusterInfo
     status: ClusterStatus
@@ -79,7 +111,21 @@ class ClusterFinding:
 
 @dataclass
 class ElastiCacheAnalysisResult:
-    """ElastiCache 분석 결과 집계"""
+    """ElastiCache 분석 결과 집계 (공통).
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        engine_filter: 엔진 필터 (redis, memcached, 또는 None=전체).
+        total_clusters: 전체 클러스터 수.
+        unused_clusters: 미사용 클러스터 수.
+        low_usage_clusters: 저사용 클러스터 수.
+        normal_clusters: 정상 클러스터 수.
+        unused_monthly_cost: 미사용 클러스터 월간 비용 합계 (USD).
+        low_usage_monthly_cost: 저사용 클러스터 월간 비용 합계 (USD).
+        findings: 개별 클러스터별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -100,7 +146,17 @@ class ElastiCacheAnalysisResult:
 
 
 def collect_redis_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
-    """Redis 클러스터 수집 (Replication Groups)"""
+    """Redis Replication Group 목록을 수집하고 CloudWatch 지표를 조회한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        Redis ClusterInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     from core.parallel import get_client
@@ -142,7 +198,19 @@ def collect_redis_clusters(session, account_id: str, account_name: str, region: 
 
 
 def collect_memcached_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
-    """Memcached 클러스터 수집"""
+    """Memcached 독립 클러스터 목록을 수집하고 CloudWatch 지표를 조회한다.
+
+    Redis Replication Group에 속한 클러스터는 제외한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        Memcached ClusterInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     from core.parallel import get_client
@@ -187,7 +255,16 @@ def collect_memcached_clusters(session, account_id: str, account_name: str, regi
 def _fetch_cloudwatch_metrics(
     cloudwatch, cluster: ClusterInfo, cluster_id: str, dimension_name: str, start_time, end_time
 ):
-    """CloudWatch 지표 조회"""
+    """개별 클러스터의 CurrConnections, CPUUtilization CloudWatch 지표를 조회한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 client.
+        cluster: 지표를 설정할 ClusterInfo 객체 (in-place 수정).
+        cluster_id: CloudWatch Dimension 값.
+        dimension_name: CloudWatch Dimension 이름 (ReplicationGroupId 또는 CacheClusterId).
+        start_time: 조회 시작 시각.
+        end_time: 조회 종료 시각.
+    """
     from botocore.exceptions import ClientError
 
     try:
@@ -232,7 +309,21 @@ def analyze_clusters(
     region: str,
     engine_filter: str | None = None,
 ) -> ElastiCacheAnalysisResult:
-    """ElastiCache 클러스터 분석"""
+    """ElastiCache 클러스터를 CloudWatch 지표 기준으로 분석하여 유휴/저사용을 판별한다.
+
+    미사용: 연결 수 평균 0.
+    저사용: CPU < 5%.
+
+    Args:
+        clusters: 분석할 클러스터 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        engine_filter: 엔진 필터 (redis, memcached, 또는 None=전체).
+
+    Returns:
+        분석 결과 집계 (ElastiCacheAnalysisResult).
+    """
     result = ElastiCacheAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -290,7 +381,18 @@ def generate_unused_report(
     output_dir: str,
     engine_name: str = "ElastiCache",
 ) -> str:
-    """미사용 분석 Excel 보고서 생성"""
+    """ElastiCache 미사용 분석 Excel 보고서를 생성한다.
+
+    Summary 시트(계정/리전별 집계)와 Clusters 시트(미사용/저사용 클러스터 상세)를 포함.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+        engine_name: 보고서 파일명에 사용할 엔진 이름 (기본: ElastiCache).
+
+    Returns:
+        저장된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook

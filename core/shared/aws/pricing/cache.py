@@ -1,14 +1,22 @@
 """
-plugins/cost/pricing/cache.py - 가격 정보 로컬 캐시
+core/shared/aws/pricing/cache.py - 가격 정보 로컬 파일 캐시
 
-가격 데이터를 로컬에 캐싱하여 API 호출을 최소화합니다.
-기본 만료: 7일 (가격 변동이 자주 없음)
+AWS Pricing API 응답을 JSON 파일로 캐싱하여 반복 API 호출을 최소화한다.
+가격 변동이 드물기 때문에 기본 TTL은 7일이며, 필요 시 수동 무효화 가능.
 
-캐시 경로: {project_root}/temp/pricing/
+캐시 경로:
+    ``{project_root}/temp/pricing/{service}_{region}.json``
 
 동시성 보호:
-- 파일 락(filelock)으로 멀티 프로세스 환경에서 안전한 캐시 쓰기
-- 읽기는 락 없이 수행 (성능 최적화)
+    - 쓰기: ``filelock`` 라이브러리로 멀티 프로세스 환경에서 안전하게 보호
+    - 읽기: 락 없이 수행하여 성능 최적화 (stale read 허용)
+
+사용법:
+    from core.shared.aws.pricing.cache import PriceCache, clear_cache
+
+    cache = PriceCache(ttl_days=7)
+    cached = cache.get("ec2", "ap-northeast-2")
+    cache.set("ec2", "ap-northeast-2", {"t3.medium": 0.0416})
 """
 
 from __future__ import annotations
@@ -38,10 +46,15 @@ def _get_pricing_cache_dir() -> Path:
 
 
 class PriceCache:
-    """가격 정보 캐시 관리자
+    """가격 정보 파일 기반 캐시 관리자.
 
-    멀티 프로세스 환경에서 안전한 파일 기반 캐시입니다.
-    filelock 라이브러리를 사용하여 동시 쓰기를 방지합니다.
+    서비스/리전 조합별로 JSON 파일을 생성하여 가격 데이터를 캐싱한다.
+    ``filelock`` 라이브러리로 멀티 프로세스 동시 쓰기를 방지하며,
+    읽기는 락 없이 수행하여 성능을 최적화한다.
+
+    Attributes:
+        ttl_days: 캐시 만료 일수 (기본: 7일)
+        cache_dir: 캐시 파일 저장 디렉토리 (``pathlib.Path``)
     """
 
     def __init__(self, ttl_days: int = DEFAULT_TTL_DAYS):
@@ -53,22 +66,42 @@ class PriceCache:
         self.cache_dir = _get_pricing_cache_dir()
 
     def _get_cache_path(self, service: str, region: str) -> Path:
-        """캐시 파일 경로 반환"""
+        """서비스/리전 조합의 캐시 파일 경로를 반환한다.
+
+        Args:
+            service: AWS 서비스 코드 (예: ``"ec2"``, ``"ebs"``)
+            region: AWS 리전 코드 (예: ``"ap-northeast-2"``)
+
+        Returns:
+            ``{cache_dir}/{service}_{region}.json`` 형태의 ``Path`` 객체
+        """
         return self.cache_dir / f"{service}_{region}.json"
 
     def _get_lock_path(self, service: str, region: str) -> Path:
-        """락 파일 경로 반환"""
+        """서비스/리전 조합의 락 파일 경로를 반환한다.
+
+        Args:
+            service: AWS 서비스 코드
+            region: AWS 리전 코드
+
+        Returns:
+            ``{cache_dir}/{service}_{region}.json.lock`` 형태의 ``Path`` 객체
+        """
         return self.cache_dir / f"{service}_{region}.json.lock"
 
     def get(self, service: str, region: str) -> dict[str, Any] | None:
-        """캐시된 가격 데이터 조회 (락 없이 읽기)
+        """캐시된 가격 데이터를 조회한다 (락 없이 읽기).
+
+        파일이 존재하고 TTL 이내이면 가격 딕셔너리를 반환하고,
+        파일이 없거나 만료되었으면 ``None`` 을 반환한다.
 
         Args:
-            service: 서비스 코드 (ec2, ebs, rds 등)
-            region: AWS 리전
+            service: AWS 서비스 코드 (예: ``"ec2"``, ``"ebs"``, ``"rds"``)
+            region: AWS 리전 코드 (예: ``"ap-northeast-2"``)
 
         Returns:
-            캐시된 데이터 또는 None (만료/없음)
+            캐시된 가격 딕셔너리 (예: ``{"t3.medium": 0.0416}``),
+            또는 캐시가 없거나 만료된 경우 ``None``
         """
         cache_path = self._get_cache_path(service, region)
 
@@ -93,12 +126,14 @@ class PriceCache:
             return None
 
     def set(self, service: str, region: str, prices: dict[str, Any]) -> None:
-        """가격 데이터 캐싱 (파일 락으로 동시 쓰기 방지)
+        """가격 데이터를 캐시 파일에 저장한다 (파일 락으로 동시 쓰기 방지).
+
+        ``filelock`` 으로 동시 쓰기를 방지하며, 타임아웃(10초) 초과 시 저장을 건너뛴다.
 
         Args:
-            service: 서비스 코드
-            region: AWS 리전
-            prices: 가격 데이터 딕셔너리
+            service: AWS 서비스 코드 (예: ``"ec2"``)
+            region: AWS 리전 코드 (예: ``"ap-northeast-2"``)
+            prices: 가격 데이터 딕셔너리 (예: ``{"t3.medium": 0.0416}``)
         """
         cache_path = self._get_cache_path(service, region)
         lock_path = self._get_lock_path(service, region)
@@ -121,14 +156,14 @@ class PriceCache:
             logger.warning(f"캐시 저장 오류: {e}")
 
     def invalidate(self, service: str, region: str) -> bool:
-        """특정 캐시 무효화
+        """특정 서비스/리전의 캐시 파일을 삭제한다.
 
         Args:
-            service: 서비스 코드
-            region: AWS 리전
+            service: AWS 서비스 코드 (예: ``"ec2"``)
+            region: AWS 리전 코드 (예: ``"ap-northeast-2"``)
 
         Returns:
-            삭제 성공 여부
+            캐시 파일이 존재하여 삭제한 경우 ``True``, 파일이 없었으면 ``False``
         """
         cache_path = self._get_cache_path(service, region)
 
@@ -138,10 +173,27 @@ class PriceCache:
         return False
 
     def get_info(self) -> dict[str, Any]:
-        """캐시 상태 정보
+        """전체 캐시 상태 정보를 반환한다.
 
         Returns:
-            캐시 파일 목록 및 상태
+            캐시 상태 딕셔너리::
+
+                {
+                    "cache_dir": str,     # 캐시 디렉토리 경로
+                    "ttl_days": int,       # TTL (일)
+                    "files": [             # 캐시 파일 목록
+                        {
+                            "name": str,
+                            "service": str,
+                            "region": str,
+                            "cached_at": str,   # ISO 8601 타임스탬프
+                            "age_days": int,
+                            "expired": bool,
+                            "item_count": int,
+                        },
+                        ...
+                    ],
+                }
         """
         files: list[dict[str, Any]] = []
         info: dict[str, Any] = {
@@ -180,14 +232,16 @@ _cache = PriceCache()
 
 
 def clear_cache(service: str | None = None, region: str | None = None) -> int:
-    """캐시 삭제
+    """캐시 파일을 삭제한다.
+
+    서비스와 리전을 지정하면 해당 캐시만, 둘 다 ``None`` 이면 전체 캐시를 삭제한다.
 
     Args:
-        service: 서비스 코드 (None이면 전체)
-        region: AWS 리전 (None이면 전체)
+        service: AWS 서비스 코드 (``None`` 이면 전체 서비스)
+        region: AWS 리전 코드 (``None`` 이면 전체 리전)
 
     Returns:
-        삭제된 파일 수
+        삭제된 캐시 파일 수
     """
     count = 0
 
@@ -209,5 +263,9 @@ def clear_cache(service: str | None = None, region: str | None = None) -> int:
 
 
 def get_cache_info() -> dict[str, Any]:
-    """캐시 상태 정보 조회"""
+    """모듈 레벨 캐시 인스턴스의 상태 정보를 조회한다.
+
+    Returns:
+        ``PriceCache.get_info()`` 와 동일한 형식의 딕셔너리
+    """
     return _cache.get_info()

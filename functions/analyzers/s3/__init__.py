@@ -1,10 +1,11 @@
 """
-plugins/s3 - S3 Storage Management Tools
+functions/analyzers/s3 - S3 스토리지 관리 도구
 
-Bucket inventory, unused buckets, storage analysis
+S3 버킷의 사용 현황을 분석하고
+객체가 없는 빈 버킷을 탐지합니다.
 
-Tools:
-    - Empty Bucket Analysis: Detect S3 buckets with no objects
+도구 목록:
+    - empty_bucket: 객체가 없는 빈 S3 버킷 탐지
 """
 
 CATEGORY = {

@@ -1,9 +1,15 @@
-# internal/auth/config/__init__.py
+# core/auth/config/__init__.py
 """
-AWS 설정 파일 파싱 모듈
+core/auth/config - AWS 설정 파일 파싱 모듈
 
-이 모듈은 ~/.aws/config 및 ~/.aws/credentials 파일을 파싱하고
-Provider 타입을 자동 감지합니다.
+~/.aws/config 및 ~/.aws/credentials 파일을 파싱하여 SSO 세션,
+프로파일 정보를 추출하고, 각 프로파일의 Provider 타입을 자동 감지합니다.
+
+주요 클래스:
+    - Loader: AWS 설정 파일 로더 (config + credentials 파싱)
+    - AWSProfile: 프로파일 설정 데이터 클래스
+    - AWSSession: SSO 세션 설정 데이터 클래스
+    - ParsedConfig: 파싱 결과 전체를 담는 데이터 클래스
 """
 
 from .loader import (

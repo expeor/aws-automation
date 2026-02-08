@@ -1,5 +1,5 @@
 """
-plugins/elasticache/unused.py - ElastiCache 미사용 클러스터 분석
+functions/analyzers/elasticache/unused.py - ElastiCache 미사용 클러스터 분석
 
 유휴/저사용 ElastiCache 클러스터 탐지 (CloudWatch 지표 기반)
 
@@ -56,7 +56,11 @@ REQUIRED_PERMISSIONS = {
 
 
 class ClusterStatus(Enum):
-    """클러스터 상태"""
+    """ElastiCache 클러스터 사용 상태 분류.
+
+    CloudWatch 지표(CurrConnections, CPUUtilization, NetworkBytesIn, CacheHits)를
+    기반으로 유휴/저사용/정상 상태를 분류한다.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -65,7 +69,25 @@ class ClusterStatus(Enum):
 
 @dataclass
 class ClusterInfo:
-    """ElastiCache 클러스터 정보"""
+    """ElastiCache 클러스터 메타데이터 및 CloudWatch 지표 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        cluster_id: 클러스터/Replication Group 식별자.
+        engine: 캐시 엔진 (redis 또는 memcached).
+        node_type: 노드 타입 (예: cache.r6g.large).
+        num_nodes: 노드 수.
+        status: 클러스터 상태.
+        created_at: 생성 시각.
+        avg_connections: 7일 평균 현재 연결 수.
+        avg_cpu: 7일 평균 CPU 사용률 (%).
+        avg_memory: 7일 평균 메모리 사용률 (%).
+        network_bytes_in: 7일 평균 수신 네트워크 바이트.
+        network_bytes_out: 7일 평균 송신 네트워크 바이트.
+        cache_hits: 7일간 캐시 히트 횟수.
+    """
 
     account_id: str
     account_name: str
@@ -85,20 +107,37 @@ class ClusterInfo:
     cache_hits: float = 0.0
 
     def get_estimated_monthly_cost(self, session=None) -> float:
-        """월간 비용 추정 (Pricing API 사용)"""
+        """Pricing API를 사용하여 월간 예상 비용을 계산한다.
+
+        Args:
+            session: boto3 Session. None이면 기본 세션 사용.
+
+        Returns:
+            월간 예상 비용 (USD).
+        """
         from functions.analyzers.cost.pricing.elasticache import get_elasticache_monthly_cost
 
         return get_elasticache_monthly_cost(self.region, self.node_type, self.num_nodes, session=session)
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (후방 호환용)"""
+        """월간 예상 비용 (후방 호환용 property).
+
+        Returns:
+            월간 예상 비용 (USD).
+        """
         return self.get_estimated_monthly_cost()
 
 
 @dataclass
 class ClusterFinding:
-    """클러스터 분석 결과"""
+    """개별 ElastiCache 클러스터의 분석 결과.
+
+    Attributes:
+        cluster: 분석 대상 클러스터 정보.
+        status: 분석된 사용 상태.
+        recommendation: 권장 조치 사항 문자열.
+    """
 
     cluster: ClusterInfo
     status: ClusterStatus
@@ -107,7 +146,20 @@ class ClusterFinding:
 
 @dataclass
 class ElastiCacheAnalysisResult:
-    """ElastiCache 분석 결과 집계"""
+    """단일 계정/리전의 ElastiCache 미사용 클러스터 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_clusters: 전체 클러스터 수.
+        unused_clusters: 미사용 클러스터 수.
+        low_usage_clusters: 저사용 클러스터 수.
+        normal_clusters: 정상 클러스터 수.
+        unused_monthly_cost: 미사용 클러스터 월간 비용 합계 (USD).
+        low_usage_monthly_cost: 저사용 클러스터 월간 비용 합계 (USD).
+        findings: 개별 클러스터별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -122,11 +174,23 @@ class ElastiCacheAnalysisResult:
 
 
 def collect_elasticache_clusters(session, account_id: str, account_name: str, region: str) -> list[ClusterInfo]:
-    """ElastiCache 클러스터 수집 (배치 메트릭 최적화)
+    """ElastiCache 클러스터 목록 수집 및 CloudWatch 메트릭 배치 조회.
+
+    Redis(DescribeReplicationGroups)와 Memcached(DescribeCacheClusters)를
+    각각 수집한 후, GetMetricData API로 CloudWatch 지표를 배치 조회한다.
 
     최적화:
-    - 기존: 클러스터당 2 API 호출 → 최적화: 전체 1-2 API 호출
-    - 예: 30개 클러스터 × 2 메트릭 = 60 API → 1 API
+    - 기존: 클러스터당 2 API 호출 -> 최적화: 전체 1-2 API 호출
+    - 예: 30개 클러스터 x 2 메트릭 = 60 API -> 1 API
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        ClusterInfo 목록 (Redis + Memcached).
     """
     from botocore.exceptions import ClientError
 
@@ -205,7 +269,18 @@ def _collect_elasticache_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """ElastiCache 클러스터 메트릭 배치 수집 (내부 함수)"""
+    """ElastiCache 클러스터의 CloudWatch 메트릭을 배치로 수집한다.
+
+    CurrConnections, CPUUtilization, NetworkBytesIn/Out, CacheHits 메트릭을
+    GetMetricData API로 한 번에 조회하여 각 클러스터에 매핑한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 client.
+        clusters: 메트릭을 수집할 클러스터 목록.
+        dimension_name: CloudWatch Dimension 이름 (ReplicationGroupId 또는 CacheClusterId).
+        start_time: 조회 시작 시각 (UTC).
+        end_time: 조회 종료 시각 (UTC).
+    """
     from botocore.exceptions import ClientError
 
     metrics_to_fetch = [
@@ -257,7 +332,20 @@ def _collect_elasticache_metrics_batch(
 def analyze_clusters(
     clusters: list[ClusterInfo], account_id: str, account_name: str, region: str
 ) -> ElastiCacheAnalysisResult:
-    """ElastiCache 클러스터 분석"""
+    """ElastiCache 클러스터를 CloudWatch 지표 기준으로 분석하여 유휴/저사용을 판별한다.
+
+    미사용: 연결 수 = 0 AND 네트워크 트래픽 없음.
+    저사용: CPU < 2% AND CacheHits < 100/일 (Trend Micro Conformity 기준).
+
+    Args:
+        clusters: 분석할 ElastiCache 클러스터 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과 집계 (ElastiCacheAnalysisResult).
+    """
     result = ElastiCacheAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -308,7 +396,17 @@ def analyze_clusters(
 
 
 def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """ElastiCache 미사용 클러스터 분석 Excel 보고서를 생성한다.
+
+    Summary 시트(계정/리전별 집계)와 Clusters 시트(미사용/저사용 클러스터 상세)를 포함.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        저장된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -400,7 +498,19 @@ def generate_report(results: list[ElastiCacheAnalysisResult], output_dir: str) -
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ElastiCacheAnalysisResult | None:
-    """단일 계정/리전의 ElastiCache 클러스터 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 ElastiCache 클러스터를 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 병렬로 실행된다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과. 클러스터가 없으면 None.
+    """
     clusters = collect_elasticache_clusters(session, account_id, account_name, region)
     if not clusters:
         return None
@@ -408,7 +518,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """ElastiCache 미사용 클러스터 분석"""
+    """ElastiCache 미사용 클러스터 분석 도구의 진입점.
+
+    멀티 계정/리전 병렬 수집 후 콘솔 요약 출력, Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 리전, 출력 설정 포함).
+    """
     console.print("[bold]ElastiCache 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elasticache")

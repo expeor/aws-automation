@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/ecr.py - ECR 가격 조회
+functions/analyzers/cost/pricing/ecr.py - ECR 가격 조회
 
 ECR 비용 계산:
 - Storage: ~$0.10/GB/월 (리전별 상이)

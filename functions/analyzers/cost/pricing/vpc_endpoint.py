@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/vpc_endpoint.py - VPC Endpoint 가격 조회
+functions/analyzers/cost/pricing/vpc_endpoint.py - VPC Endpoint 가격 조회
 
 VPC Endpoint 비용 계산:
 - Interface Endpoint: 시간당 ~$0.01 (리전별 상이) + 데이터 처리 비용

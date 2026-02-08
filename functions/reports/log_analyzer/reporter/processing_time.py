@@ -1,4 +1,8 @@
-"""Processing time breakdown sheet writer."""
+"""functions/reports/log_analyzer/reporter/processing_time.py - 처리 시간 분석 시트 Writer.
+
+요청 처리(Request Processing), 타겟 처리(Target Processing),
+응답 처리(Response Processing) 시간을 구간별로 분석합니다.
+"""
 
 from __future__ import annotations
 

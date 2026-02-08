@@ -1,5 +1,5 @@
 """
-plugins/apigateway/unused.py - API Gateway 미사용 분석
+functions/analyzers/apigateway/unused.py - API Gateway 미사용 분석
 
 유휴/미사용 API 탐지 (CloudWatch 지표 기반)
 
@@ -45,7 +45,16 @@ LOW_USAGE_REQUESTS_PER_DAY = 1
 
 
 class APIStatus(Enum):
-    """API 상태"""
+    """API Gateway의 사용 상태를 분류하는 열거형.
+
+    CloudWatch 지표 기반으로 판별한 API의 사용 상태를 나타낸다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 API.
+        UNUSED: 분석 기간 동안 요청이 없는 API.
+        NO_STAGES: 배포된 스테이지가 없는 API.
+        LOW_USAGE: 하루 평균 요청이 임계치 미만인 저사용 API.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -55,7 +64,26 @@ class APIStatus(Enum):
 
 @dataclass
 class APIInfo:
-    """API Gateway 정보"""
+    """API Gateway 개별 API의 메타데이터 및 CloudWatch 지표.
+
+    REST API, HTTP API, WebSocket API 모두를 포함하며,
+    배치 수집된 CloudWatch 지표도 함께 보관한다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        api_id: API의 고유 ID.
+        api_name: API 이름.
+        api_type: API 유형 (REST, HTTP, WEBSOCKET).
+        protocol_type: 프로토콜 유형.
+        endpoint_type: 엔드포인트 유형 (EDGE, REGIONAL, PRIVATE).
+        stage_count: 배포된 스테이지 수.
+        created_date: API 생성 일시.
+        total_requests: 분석 기간 내 총 요청 수.
+        error_4xx: 분석 기간 내 4XX 에러 수.
+        error_5xx: 분석 기간 내 5XX 에러 수.
+    """
 
     account_id: str
     account_name: str
@@ -75,7 +103,13 @@ class APIInfo:
 
 @dataclass
 class APIFinding:
-    """API 분석 결과"""
+    """개별 API에 대한 분석 결과.
+
+    Attributes:
+        api: 분석 대상 API 정보.
+        status: 판별된 API 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     api: APIInfo
     status: APIStatus
@@ -84,7 +118,19 @@ class APIFinding:
 
 @dataclass
 class APIGatewayAnalysisResult:
-    """API Gateway 분석 결과 집계"""
+    """단일 계정/리전의 API Gateway 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        total_apis: 전체 API 수.
+        unused_apis: 미사용 API 수.
+        no_stages: 스테이지 없는 API 수.
+        low_usage: 저사용 API 수.
+        normal_apis: 정상 사용 API 수.
+        findings: 개별 API별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -98,7 +144,20 @@ class APIGatewayAnalysisResult:
 
 
 def collect_rest_apis(session, account_id: str, account_name: str, region: str) -> list[APIInfo]:
-    """REST API 수집 (메트릭 제외)"""
+    """REST API(v1) 목록을 수집한다.
+
+    Paginator로 모든 REST API를 조회하고, 각 API의 스테이지 수와 엔드포인트 타입을 확인한다.
+    CloudWatch 지표는 별도 배치 수집에서 처리하므로 여기서는 수집하지 않는다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        REST API 정보 목록.
+    """
     from botocore.exceptions import ClientError
 
     apigw = get_client(session, "apigateway", region_name=region)
@@ -151,7 +210,20 @@ def collect_rest_apis(session, account_id: str, account_name: str, region: str) 
 
 
 def collect_http_apis(session, account_id: str, account_name: str, region: str) -> list[APIInfo]:
-    """HTTP API (API Gateway v2) 수집 (메트릭 제외)"""
+    """HTTP API 및 WebSocket API(v2) 목록을 수집한다.
+
+    API Gateway v2 엔드포인트를 Paginator로 조회하고, 프로토콜 유형에 따라
+    HTTP 또는 WEBSOCKET으로 구분한다. REST API와 마찬가지로 지표는 별도 처리한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        HTTP/WebSocket API 정보 목록.
+    """
     from botocore.exceptions import ClientError
 
     apigwv2 = get_client(session, "apigatewayv2", region_name=region)
@@ -303,7 +375,23 @@ def _collect_apigateway_metrics_batch(
 
 
 def analyze_apis(apis: list[APIInfo], account_id: str, account_name: str, region: str) -> APIGatewayAnalysisResult:
-    """API Gateway 분석"""
+    """수집된 API 목록을 분석하여 사용 상태를 판별한다.
+
+    판별 기준 (우선순위 순):
+    1. 스테이지가 없으면 NO_STAGES
+    2. 요청이 0이면 UNUSED
+    3. 일 평균 요청이 LOW_USAGE_REQUESTS_PER_DAY 미만이면 LOW_USAGE
+    4. 그 외 NORMAL
+
+    Args:
+        apis: 분석 대상 API 정보 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과 집계 객체.
+    """
     result = APIGatewayAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -362,7 +450,17 @@ def analyze_apis(apis: list[APIInfo], account_id: str, account_name: str, region
 
 
 def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보고서를 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 APIs 시트(비정상 API 상세)로 구성된다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -440,7 +538,20 @@ def generate_report(results: list[APIGatewayAnalysisResult], output_dir: str) ->
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> APIGatewayAnalysisResult | None:
-    """단일 계정/리전의 API Gateway 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 API Gateway를 수집하고 분석한다.
+
+    REST API(v1)와 HTTP/WebSocket API(v2)를 모두 수집한 뒤 CloudWatch 지표를
+    배치 조회하고, 사용 상태를 판별하여 결과를 반환한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과 집계 객체. API가 없으면 None.
+    """
     apis = collect_apis(session, account_id, account_name, region)
     if not apis:
         return None
@@ -448,7 +559,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """API Gateway 미사용 분석"""
+    """도구의 메인 실행 함수.
+
+    모든 계정/리전에서 API Gateway를 병렬 수집하고 미사용/저사용 API를 분석한다.
+    콘솔에 종합 결과를 출력하고 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. 계정/리전 정보와 옵션을 포함한다.
+    """
     console.print("[bold]API Gateway 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="apigateway")

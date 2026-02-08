@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/utils.py - 가격 조회 통합 서비스
+functions/analyzers/cost/pricing/utils.py - 가격 조회 통합 서비스
 
 PricingService: 캐시 + API + fallback을 통합 관리하는 싱글톤 서비스
 - Thread Lock: 동일 프로세스 내 동시성 보호
@@ -43,7 +43,17 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PricingMetrics:
-    """가격 조회 메트릭"""
+    """가격 조회 메트릭
+
+    PricingService의 성능 모니터링을 위한 thread-safe 메트릭 컨테이너.
+
+    Attributes:
+        api_calls: AWS Pricing API 호출 횟수
+        cache_hits: 캐시 히트 횟수
+        cache_misses: 캐시 미스 횟수
+        errors: API 호출 오류 횟수
+        retries: API 재시도 횟수
+    """
 
     api_calls: int = 0
     cache_hits: int = 0
@@ -54,7 +64,11 @@ class PricingMetrics:
 
     @property
     def hit_rate(self) -> float:
-        """캐시 히트율"""
+        """캐시 히트율 계산
+
+        Returns:
+            0.0~1.0 사이의 히트율. 요청이 없으면 0.0.
+        """
         total = self.cache_hits + self.cache_misses
         return self.cache_hits / total if total > 0 else 0.0
 
@@ -79,7 +93,12 @@ class PricingMetrics:
             self.retries += 1
 
     def to_dict(self) -> dict[str, float | int]:
-        """메트릭을 딕셔너리로 변환"""
+        """메트릭을 딕셔너리로 변환
+
+        Returns:
+            api_calls, cache_hits, cache_misses, hit_rate, errors, retries를
+            포함하는 딕셔너리
+        """
         return {
             "api_calls": self.api_calls,
             "cache_hits": self.cache_hits,
@@ -157,13 +176,24 @@ class PricingService:
 
     @property
     def fetcher(self) -> PricingFetcher:
-        """Fetcher lazy initialization"""
+        """PricingFetcher lazy initialization
+
+        Returns:
+            PricingFetcher 인스턴스 (최초 호출 시 생성)
+        """
         if self._fetcher is None:
             self._fetcher = PricingFetcher()
         return self._fetcher
 
     def _get_lock(self, key: str) -> threading.Lock:
-        """Per-region 락 획득 (double-checked locking)"""
+        """Per-region 락 획득 (double-checked locking)
+
+        Args:
+            key: 락 키 (일반적으로 ``{service}_{region}`` 형식)
+
+        Returns:
+            해당 키에 대한 threading.Lock 인스턴스
+        """
         if key not in self._lock_registry:
             with self._registry_mutex:
                 if key not in self._lock_registry:

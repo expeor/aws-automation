@@ -18,7 +18,10 @@ from .collector import SSOData, SSOGroup, SSOPermissionSet, SSOUser
 
 
 class IssueType(Enum):
-    """이슈 타입"""
+    """SSO 보안 이슈 유형 분류.
+
+    Permission Set, User, Group, Account Assignment 관련 이슈를 구분한다.
+    """
 
     # Permission Set
     ADMIN_PERMISSION_SET = "admin_permission_set"
@@ -40,7 +43,15 @@ class IssueType(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """SSO 보안 이슈의 심각도.
+
+    Attributes:
+        CRITICAL: 즉시 조치 필요.
+        HIGH: 높은 위험.
+        MEDIUM: 중간 위험.
+        LOW: 낮은 위험.
+        INFO: 참고 정보.
+    """
 
     CRITICAL = "critical"
     HIGH = "high"
@@ -51,7 +62,18 @@ class Severity(Enum):
 
 @dataclass
 class Issue:
-    """보안 이슈"""
+    """발견된 SSO 보안 이슈.
+
+    Attributes:
+        issue_type: 이슈 유형.
+        severity: 심각도.
+        resource_type: 리소스 유형 (permission_set, user, group, assignment).
+        resource_name: 리소스 이름.
+        resource_id: 리소스 ID.
+        description: 이슈 상세 설명.
+        recommendation: 권장 조치 사항.
+        details: 추가 상세 정보 딕셔너리.
+    """
 
     issue_type: IssueType
     severity: Severity
@@ -102,7 +124,11 @@ class AdminAccountSummary:
 
 @dataclass
 class SSOAnalysisResult:
-    """SSO 전체 분석 결과"""
+    """IAM Identity Center 전체 보안 분석 결과.
+
+    Permission Set, User, Group 분석 결과와 계정별 Admin 권한 요약,
+    전체 이슈 목록, 요약 통계를 집계한다.
+    """
 
     sso_data: SSOData
     permission_set_analyses: list[PermissionSetAnalysis] = field(default_factory=list)
@@ -122,7 +148,11 @@ class SSOAnalysisResult:
 
 
 class SSOAnalyzer:
-    """IAM Identity Center 보안 분석기"""
+    """IAM Identity Center 보안 분석기.
+
+    Permission Set의 위험 정책, 사용자 Admin 접근, 미사용 사용자,
+    빈 그룹, 직접 사용자 할당 등을 분석한다.
+    """
 
     def __init__(self, sso_data: SSOData):
         self.sso_data = sso_data

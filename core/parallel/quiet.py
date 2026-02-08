@@ -30,9 +30,14 @@ _quiet_state = threading.local()
 
 
 class _QuietFilter(logging.Filter):
-    """스레드별 quiet 상태에 따라 WARNING 이하 로그를 필터링"""
+    """스레드별 quiet 상태에 따라 WARNING 이하 로그를 필터링
+
+    quiet 모드가 활성화된 스레드에서는 ERROR 미만의 로그 레코드를
+    차단하여 병렬 실행 중 불필요한 콘솔 출력을 방지합니다.
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
+        """로그 레코드 필터링"""
         return not (is_quiet() and record.levelno < logging.ERROR)
 
 
@@ -49,7 +54,11 @@ def is_quiet() -> bool:
 
 
 def set_quiet(value: bool) -> None:
-    """현재 스레드의 quiet 모드 설정"""
+    """현재 스레드의 quiet 모드 설정
+
+    Args:
+        value: True이면 quiet 모드 활성화, False이면 비활성화
+    """
     _quiet_state.quiet = value
 
 
@@ -83,5 +92,12 @@ def quiet_mode() -> Generator[None, None, None]:
 
 # 모든 스레드에서 상태를 상속받도록 하는 헬퍼
 def inherit_quiet_state() -> bool:
-    """부모 스레드의 quiet 상태를 반환 (ThreadPoolExecutor에서 사용)"""
+    """부모 스레드의 quiet 상태를 반환
+
+    ThreadPoolExecutor의 워커 스레드에서 부모 스레드의
+    quiet 상태를 상속받기 위해 사용합니다.
+
+    Returns:
+        현재 스레드의 quiet 모드 여부
+    """
     return is_quiet()

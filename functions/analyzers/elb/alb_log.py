@@ -189,7 +189,14 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _create_output_directory(ctx) -> str:
-    """출력 디렉토리 생성"""
+    """ALB 로그 분석 보고서 출력 디렉토리를 생성한다.
+
+    Args:
+        ctx: ExecutionContext.
+
+    Returns:
+        생성된 출력 디렉토리의 절대 경로.
+    """
     from core.shared.io.output import OutputPath
 
     # identifier 결정
@@ -206,7 +213,13 @@ def _create_output_directory(ctx) -> str:
 
 
 def _cleanup_temp_files(analyzer, gz_directory: str, log_directory: str) -> None:
-    """임시 파일 정리 (분석 완료 후 gz, log 파일 삭제)"""
+    """분석 완료 후 gz/log 임시 파일을 정리한다.
+
+    Args:
+        analyzer: ALBLogAnalyzer 인스턴스 (내부 리소스 정리용).
+        gz_directory: 압축 파일 임시 디렉토리 경로.
+        log_directory: 압축 해제된 로그 임시 디렉토리 경로.
+    """
     print_sub_info("임시 파일 정리 중...")
 
     try:

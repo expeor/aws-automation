@@ -331,7 +331,17 @@ class SummarySheet:
 
 @dataclass
 class Sheet:
-    """시트 래퍼 클래스"""
+    """시트 래퍼 클래스
+
+    Workbook.new_sheet()로 생성된 데이터 시트를 래핑합니다.
+    행 추가, 요약 행, 자동 필터 등의 기능을 제공합니다.
+
+    Attributes:
+        _ws: 내부 openpyxl Worksheet 인스턴스
+        _columns: 컬럼 정의 리스트
+        _current_row: 다음 데이터가 추가될 행 번호 (1은 헤더)
+        _workbook: 부모 Workbook 참조
+    """
 
     _ws: Worksheet
     _columns: list[ColumnDef]
@@ -389,7 +399,12 @@ class Sheet:
         return self.add_row(values, style=Styles.summary())
 
     def _apply_cell_style(self, cell, col_def: ColumnDef) -> None:
-        """컬럼 정의에 따른 셀 스타일 적용 (자동 줄바꿈 포함)"""
+        """컬럼 정의에 따른 셀 스타일 적용 (자동 줄바꿈 포함)
+
+        Args:
+            cell: openpyxl Cell 객체
+            col_def: 해당 컬럼의 ColumnDef 정의
+        """
         style_map = {
             "data": (_get_align_wrap(), None),  # 줄바꿈 적용
             "center": (_get_align_center_wrap(), None),  # 줄바꿈 적용

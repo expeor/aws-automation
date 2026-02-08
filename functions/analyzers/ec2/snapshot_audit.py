@@ -1,5 +1,5 @@
 """
-plugins/ec2/snapshot_audit.py - EBS Snapshot 미사용 분석
+functions/analyzers/ec2/snapshot_audit.py - EBS Snapshot 미사용 분석
 
 오래되거나 고아 상태인 EBS Snapshot 탐지
 
@@ -56,7 +56,10 @@ OLD_SNAPSHOT_DAYS = 90
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """EBS Snapshot의 사용 상태 분류
+
+    AMI 연결 여부 및 경과 일수로 판별됩니다.
+    """
 
     ORPHAN = "orphan"  # 고아 (AMI 삭제됨)
     OLD = "old"  # 오래됨
@@ -64,7 +67,10 @@ class UsageStatus(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도 수준
+
+    스냅샷 용량 기반으로 결정되며, 비용 영향도를 반영합니다.
+    """
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -74,7 +80,25 @@ class Severity(Enum):
 
 @dataclass
 class SnapshotInfo:
-    """EBS Snapshot 정보"""
+    """EBS Snapshot 정보
+
+    Attributes:
+        id: 스냅샷 ID
+        name: Name 태그 값
+        description: 스냅샷 설명
+        state: 스냅샷 상태 (pending, completed, error)
+        volume_id: 원본 볼륨 ID
+        volume_size_gb: 원본 볼륨 크기 (GB)
+        start_time: 스냅샷 생성 시작 시간
+        encrypted: 암호화 여부
+        owner_id: 소유자 계정 ID
+        tags: 사용자 태그 딕셔너리 (aws: 접두사 제외)
+        ami_ids: 이 스냅샷을 사용하는 AMI ID 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        monthly_cost: 추정 월간 비용 (USD)
+    """
 
     id: str
     name: str
@@ -100,7 +124,11 @@ class SnapshotInfo:
 
     @property
     def age_days(self) -> int:
-        """스냅샷 나이 (일)"""
+        """스냅샷 생성 후 경과 일수
+
+        Returns:
+            start_time 기준 경과 일수. start_time이 없으면 0.
+        """
         if not self.start_time:
             return 0
         now = datetime.now(timezone.utc)
@@ -109,18 +137,34 @@ class SnapshotInfo:
 
     @property
     def is_old(self) -> bool:
-        """오래된 스냅샷 여부"""
+        """오래된 스냅샷 여부
+
+        Returns:
+            경과 일수가 OLD_SNAPSHOT_DAYS 이상이면 True
+        """
         return self.age_days >= OLD_SNAPSHOT_DAYS
 
     @property
     def has_ami(self) -> bool:
-        """AMI 연결 여부"""
+        """AMI 연결 여부
+
+        Returns:
+            ami_ids가 하나 이상 존재하면 True
+        """
         return len(self.ami_ids) > 0
 
 
 @dataclass
 class SnapshotFinding:
-    """Snapshot 분석 결과"""
+    """개별 EBS Snapshot 분석 결과
+
+    Attributes:
+        snapshot: 분석 대상 스냅샷 정보
+        usage_status: 분석으로 판별된 사용 상태
+        severity: 심각도 수준
+        description: 상태 설명
+        recommendation: 권장 조치 사항
+    """
 
     snapshot: SnapshotInfo
     usage_status: UsageStatus
@@ -131,7 +175,23 @@ class SnapshotFinding:
 
 @dataclass
 class SnapshotAnalysisResult:
-    """분석 결과"""
+    """EBS Snapshot 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        findings: 개별 스냅샷 분석 결과 리스트
+        total_count: 전체 스냅샷 수
+        orphan_count: 고아 스냅샷 수 (AMI 삭제됨)
+        old_count: 오래된 스냅샷 수
+        normal_count: 정상 스냅샷 수
+        total_size_gb: 전체 스냅샷 용량 (GB)
+        orphan_size_gb: 고아 스냅샷 용량 (GB)
+        old_size_gb: 오래된 스냅샷 용량 (GB)
+        orphan_monthly_cost: 고아 스냅샷 추정 월간 비용 (USD)
+        old_monthly_cost: 오래된 스냅샷 추정 월간 비용 (USD)
+    """
 
     account_id: str
     account_name: str
@@ -158,7 +218,19 @@ class SnapshotAnalysisResult:
 
 
 def collect_snapshots(session, account_id: str, account_name: str, region: str) -> list[SnapshotInfo]:
-    """EBS Snapshot 목록 수집 (자체 소유만)"""
+    """EBS Snapshot 목록 수집 (자체 소유만)
+
+    DescribeSnapshots API로 자체 소유 스냅샷을 페이지네이션으로 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        스냅샷 정보 리스트
+    """
     from botocore.exceptions import ClientError
 
     snapshots = []
@@ -209,8 +281,14 @@ def collect_snapshots(session, account_id: str, account_name: str, region: str) 
 def get_ami_snapshot_mapping(session, region: str) -> dict[str, list[str]]:
     """AMI가 사용하는 스냅샷 ID 매핑 조회
 
+    자체 소유 AMI의 BlockDeviceMappings에서 스냅샷 ID를 추출합니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: AWS 리전
+
     Returns:
-        {snapshot_id: [ami_id, ...]}
+        스냅샷 ID를 키로, AMI ID 리스트를 값으로 하는 딕셔너리
     """
     from botocore.exceptions import ClientError
 
@@ -252,7 +330,21 @@ def analyze_snapshots(
     account_name: str,
     region: str,
 ) -> SnapshotAnalysisResult:
-    """Snapshot 미사용 분석"""
+    """EBS Snapshot 사용 상태 분석
+
+    각 스냅샷을 AMI 연결 여부 및 경과 일수 기반으로 고아/오래됨/정상으로
+    분류하고, 상태별 용량과 비용을 집계합니다.
+
+    Args:
+        snapshots: 수집된 스냅샷 정보 리스트
+        ami_mapping: 스냅샷-AMI 매핑 딕셔너리
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 스냅샷 수, 용량, 비용 포함)
+    """
     result = SnapshotAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -283,7 +375,16 @@ def analyze_snapshots(
 
 
 def _analyze_single_snapshot(snapshot: SnapshotInfo) -> SnapshotFinding:
-    """개별 스냅샷 분석"""
+    """개별 스냅샷 사용 상태 분석
+
+    AMI 연결 여부, 경과 일수, 용량을 기반으로 사용 상태와 심각도를 결정합니다.
+
+    Args:
+        snapshot: 분석 대상 스냅샷 정보
+
+    Returns:
+        개별 스냅샷 분석 결과 (사용 상태, 심각도, 권장 조치 포함)
+    """
 
     # 완료되지 않은 스냅샷
     if snapshot.state != "completed":
@@ -349,7 +450,18 @@ def _analyze_single_snapshot(snapshot: SnapshotInfo) -> SnapshotFinding:
 
 
 def generate_report(results: list[SnapshotAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """EBS Snapshot 분석 Excel 보고서 생성
+
+    Summary 시트(통계 요약)와 Findings 시트(개별 스냅샷 상세)를 포함하는
+    Excel 파일을 생성합니다.
+
+    Args:
+        results: 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -460,7 +572,19 @@ def generate_report(results: list[SnapshotAnalysisResult], output_dir: str) -> s
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SnapshotAnalysisResult | None:
-    """단일 계정/리전의 스냅샷 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 스냅샷 수집 및 분석 (parallel_collect 콜백)
+
+    스냅샷 목록과 AMI-스냅샷 매핑을 수집하여 사용 상태를 분석합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        분석 결과. 스냅샷이 없으면 None.
+    """
     snapshots = collect_snapshots(session, account_id, account_name, region)
     if not snapshots:
         return None
@@ -470,7 +594,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """EBS Snapshot 미사용 분석 실행 (병렬 처리)"""
+    """EBS Snapshot 미사용 분석 실행
+
+    멀티 계정/리전에서 EBS 스냅샷을 병렬 수집하고,
+    고아(AMI 삭제)/오래된 스냅샷을 식별하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]EBS Snapshot 미사용 분석 시작...[/bold]")
     console.print(f"  [dim]기준: {OLD_SNAPSHOT_DAYS}일 이상 오래된 스냅샷[/dim]")
 

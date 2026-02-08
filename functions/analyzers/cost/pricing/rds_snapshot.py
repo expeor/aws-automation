@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/rds_snapshot.py - RDS Snapshot 가격 조회
+functions/analyzers/cost/pricing/rds_snapshot.py - RDS Snapshot 가격 조회
 
 RDS Snapshot 비용 계산:
 - RDS: ~$0.02/GB/월 (리전별 상이)

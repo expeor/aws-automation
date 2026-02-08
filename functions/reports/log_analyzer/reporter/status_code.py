@@ -1,4 +1,9 @@
-"""Status code sheets writer."""
+"""functions/reports/log_analyzer/reporter/status_code.py - 상태 코드 시트 Writer.
+
+ELB/Backend HTTP 상태 코드(2xx, 3xx, 4xx, 5xx)별 Count 및 Timestamp 시트를
+생성합니다. StatusCodeSheetWriter, ClientStatusSheetWriter, TargetStatusSheetWriter를
+제공합니다.
+"""
 
 from __future__ import annotations
 

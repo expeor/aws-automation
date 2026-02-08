@@ -28,7 +28,20 @@ JOB_DAYS = 30
 
 
 def _collect_rds_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """RDS/Aurora 백업 상태 수집"""
+    """RDS DB 인스턴스와 Aurora 클러스터의 백업 상태를 수집한다.
+
+    Aurora 클러스터는 클러스터 단위로 백업되므로 멤버 인스턴스는 별도로 조회하지 않는다.
+    각 리소스의 자동 백업 활성화 여부와 보존 기간을 확인한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        RDS/Aurora 리소스별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
     rds = get_client(session, "rds", region_name=region)
 
@@ -126,7 +139,20 @@ def _collect_rds_backup_status(session, account_id: str, account_name: str, regi
 
 
 def _collect_dynamodb_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """DynamoDB PITR 상태 수집"""
+    """DynamoDB 테이블의 PITR(Point-In-Time Recovery) 상태를 수집한다.
+
+    PITR이 활성화된 경우 복원 가능한 기간 정보도 함께 수집한다.
+    PITR 보존 기간은 35일로 고정되어 있다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        DynamoDB 테이블별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
     dynamodb = get_client(session, "dynamodb", region_name=region)
 
@@ -184,7 +210,20 @@ def _collect_dynamodb_backup_status(session, account_id: str, account_name: str,
 
 
 def _collect_efs_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """EFS 백업 정책 상태 수집"""
+    """EFS 파일시스템의 백업 정책 상태를 수집한다.
+
+    EFS는 네이티브 스냅샷 기능이 없으며, AWS Backup을 통해서만 보호할 수 있다.
+    has_native_backup이 False로 설정된다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        EFS 파일시스템별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
     efs = get_client(session, "efs", region_name=region)
 
@@ -237,7 +276,21 @@ def _collect_efs_backup_status(session, account_id: str, account_name: str, regi
 
 
 def _collect_fsx_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """FSx 자동 백업 상태 수집"""
+    """FSx 파일시스템의 자동 백업 상태를 수집한다.
+
+    Windows, Lustre, ONTAP, OpenZFS 모든 FSx 유형을 지원하며,
+    각 유형별 설정에서 자동 백업 보존 기간을 확인한다.
+    최신 백업 시간은 describe_backups에서 추출한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        FSx 파일시스템별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
     fsx = get_client(session, "fsx", region_name=region)
 
@@ -331,7 +384,21 @@ def _collect_fsx_backup_status(session, account_id: str, account_name: str, regi
 
 
 def _collect_ec2_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """EC2 인스턴스 백업 상태 수집 (AWS Backup 보호 여부만 체크)"""
+    """EC2 인스턴스의 백업 상태를 수집한다.
+
+    EC2는 자체 백업 기능이 없으므로 has_native_backup=False로 설정된다.
+    AWS Backup 보호 여부는 나중에 _collect_comprehensive_backup_data에서 매핑된다.
+    terminated 상태의 인스턴스는 제외한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        EC2 인스턴스별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
     ec2 = get_client(session, "ec2", region_name=region)
 
@@ -384,7 +451,20 @@ def _collect_ec2_backup_status(session, account_id: str, account_name: str, regi
 
 
 def _collect_documentdb_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """DocumentDB 클러스터 백업 상태 수집"""
+    """DocumentDB 클러스터의 백업 상태를 수집한다.
+
+    DocumentDB는 docdb 서비스 엔드포인트를 사용하며, Engine이 'docdb'인
+    클러스터만 필터링하여 자동 백업 보존 기간을 확인한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        DocumentDB 클러스터별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
 
     # DocumentDB는 RDS API를 사용하지만 별도 엔드포인트
@@ -437,7 +517,19 @@ def _collect_documentdb_backup_status(session, account_id: str, account_name: st
 
 
 def _collect_neptune_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """Neptune 클러스터 백업 상태 수집"""
+    """Neptune 클러스터의 백업 상태를 수집한다.
+
+    Engine이 'neptune'인 클러스터만 필터링하여 자동 백업 보존 기간을 확인한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        Neptune 클러스터별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
 
     try:
@@ -488,7 +580,20 @@ def _collect_neptune_backup_status(session, account_id: str, account_name: str, 
 
 
 def _collect_redshift_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """Redshift 백업 상태 수집 (Provisioned + Serverless)"""
+    """Redshift의 백업 상태를 수집한다 (Provisioned + Serverless).
+
+    Provisioned 클러스터는 자동 스냅샷 보존 기간을 확인하고,
+    Serverless Namespace는 스냅샷이 기본 활성화되어 있으므로 항상 OK로 처리한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        Redshift 리소스별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
 
     # 1. Provisioned Clusters
@@ -574,7 +679,21 @@ def _collect_redshift_backup_status(session, account_id: str, account_name: str,
 
 
 def _collect_elasticache_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """ElastiCache 백업 상태 수집 (Redis/Valkey + Memcached)"""
+    """ElastiCache의 백업 상태를 수집한다 (Redis/Valkey + Memcached).
+
+    Redis/Valkey Replication Group의 스냅샷 보존 설정을 확인하고,
+    Memcached는 스냅샷을 지원하지 않으므로 NOT_SUPPORTED로 기록한다.
+    Replication Group 멤버 클러스터는 중복 방지를 위해 스킵한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        ElastiCache 리소스별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
     elasticache = get_client(session, "elasticache", region_name=region)
 
@@ -694,7 +813,17 @@ def _collect_elasticache_backup_status(session, account_id: str, account_name: s
 
 
 def _collect_memorydb_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """MemoryDB 백업 상태 수집"""
+    """MemoryDB 클러스터의 스냅샷 백업 상태를 수집한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        MemoryDB 클러스터별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
 
     try:
@@ -739,7 +868,20 @@ def _collect_memorydb_backup_status(session, account_id: str, account_name: str,
 
 
 def _collect_opensearch_backup_status(session, account_id: str, account_name: str, region: str) -> list[BackupStatus]:
-    """OpenSearch 백업 상태 수집 (자동 스냅샷 항상 활성화)"""
+    """OpenSearch 도메인의 백업 상태를 수집한다.
+
+    OpenSearch는 자동 스냅샷이 항상 활성화되어 있으며 14일간 보존된다.
+    시작 시간만 설정 가능하므로 모든 도메인의 status는 ALWAYS_ON이다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        OpenSearch 도메인별 백업 상태 목록.
+    """
     results: list[BackupStatus] = []
 
     try:
@@ -989,7 +1131,19 @@ def _collect_backup_plan_tag_conditions(
 
 
 def _collect_failed_backup_jobs(session, account_id: str, account_name: str, region: str) -> list[FailedBackupJob]:
-    """실패한 AWS Backup 작업 수집"""
+    """최근 JOB_DAYS일 이내에 실패/중단/부분 완료된 AWS Backup 작업을 수집한다.
+
+    FAILED, ABORTED, PARTIAL 상태의 작업을 각각 별도로 조회한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        실패한 백업 작업 목록.
+    """
     results: list[FailedBackupJob] = []
     backup = get_client(session, "backup", region_name=region)
 
@@ -1081,7 +1235,21 @@ def _collect_resource_tags_by_arn(
 def _collect_comprehensive_backup_data(
     session, account_id: str, account_name: str, region: str
 ) -> ComprehensiveBackupResult | None:
-    """단일 계정/리전의 통합 백업 데이터 수집"""
+    """parallel_collect 콜백: 단일 계정/리전의 통합 백업 데이터를 수집한다.
+
+    11개 AWS 서비스(RDS, DynamoDB, EFS, FSx, EC2, DocumentDB, Neptune,
+    Redshift, ElastiCache, MemoryDB, OpenSearch)의 백업 상태를 수집하고,
+    AWS Backup 보호 여부와 Backup Plan 매핑 정보를 추가한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        통합 백업 분석 결과. 데이터가 없으면 None.
+    """
     result = ComprehensiveBackupResult(
         account_id=account_id,
         account_name=account_name,

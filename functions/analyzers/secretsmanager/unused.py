@@ -1,5 +1,5 @@
 """
-plugins/secretsmanager/unused.py - Secrets Manager 미사용 분석
+functions/analyzers/secretsmanager/unused.py - Secrets Manager 미사용 분석
 
 미사용 시크릿 탐지 및 비용 분석
 
@@ -37,7 +37,15 @@ UNUSED_DAYS_THRESHOLD = 90
 
 
 class SecretStatus(Enum):
-    """시크릿 상태"""
+    """Secrets Manager 시크릿 분석 상태.
+
+    액세스 이력 및 삭제 예정 여부 기반으로 분류한다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 시크릿.
+        UNUSED: 기준 기간(90일) 동안 액세스가 없는 미사용 시크릿.
+        PENDING_DELETE: 삭제 예정인 시크릿.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -46,7 +54,21 @@ class SecretStatus(Enum):
 
 @dataclass
 class SecretInfo:
-    """Secrets Manager 시크릿 정보"""
+    """Secrets Manager 시크릿 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 시크릿이 위치한 리전.
+        arn: 시크릿 ARN.
+        name: 시크릿 이름.
+        description: 시크릿 설명.
+        created_date: 시크릿 생성일.
+        last_accessed_date: 마지막 액세스일.
+        last_changed_date: 마지막 변경일.
+        rotation_enabled: 자동 교체 활성화 여부.
+        deleted_date: 삭제 예정일 (삭제 예약된 경우).
+    """
 
     account_id: str
     account_name: str
@@ -62,10 +84,20 @@ class SecretInfo:
 
     @property
     def monthly_cost(self) -> float:
+        """시크릿 월간 비용 (USD).
+
+        Returns:
+            리전별 시크릿 호스팅 가격.
+        """
         return get_secret_price(self.region)
 
     @property
     def days_since_access(self) -> int | None:
+        """마지막 액세스 이후 경과 일수.
+
+        Returns:
+            경과 일수. 액세스 기록이 없으면 None.
+        """
         if self.last_accessed_date:
             return (datetime.now(timezone.utc) - self.last_accessed_date).days
         return None
@@ -73,7 +105,13 @@ class SecretInfo:
 
 @dataclass
 class SecretFinding:
-    """시크릿 분석 결과"""
+    """개별 시크릿에 대한 분석 결과.
+
+    Attributes:
+        secret: 분석 대상 시크릿 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     secret: SecretInfo
     status: SecretStatus
@@ -82,7 +120,20 @@ class SecretFinding:
 
 @dataclass
 class SecretAnalysisResult:
-    """시크릿 분석 결과 집계"""
+    """단일 계정/리전의 시크릿 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_count: 전체 시크릿 수.
+        unused_count: 미사용 시크릿 수.
+        pending_delete_count: 삭제 예정 시크릿 수.
+        normal_count: 정상 시크릿 수.
+        total_monthly_cost: 전체 시크릿 월간 비용 합계 (USD).
+        unused_monthly_cost: 미사용 시크릿 월간 비용 합계 (USD).
+        findings: 개별 시크릿 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -97,7 +148,17 @@ class SecretAnalysisResult:
 
 
 def collect_secrets(session, account_id: str, account_name: str, region: str) -> list[SecretInfo]:
-    """Secrets Manager 시크릿 수집"""
+    """지정된 계정/리전의 시크릿을 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 시크릿 정보 목록.
+    """
     sm = get_client(session, "secretsmanager", region_name=region)
     secrets = []
 
@@ -124,7 +185,19 @@ def collect_secrets(session, account_id: str, account_name: str, region: str) ->
 
 
 def analyze_secrets(secrets: list[SecretInfo], account_id: str, account_name: str, region: str) -> SecretAnalysisResult:
-    """시크릿 분석"""
+    """수집된 시크릿을 분석하여 미사용/삭제 예정 시크릿을 식별한다.
+
+    90일 이상 액세스가 없거나, 생성 후 한 번도 액세스되지 않은 시크릿을 미사용으로 분류한다.
+
+    Args:
+        secrets: 분석 대상 시크릿 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+
+    Returns:
+        시크릿 분석 결과 집계 객체.
+    """
     result = SecretAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -185,7 +258,17 @@ def analyze_secrets(secrets: list[SecretInfo], account_id: str, account_name: st
 
 
 def generate_report(results: list[SecretAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Secrets Manager 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 Detail 시트(비정상 시크릿 상세)를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Workbook
@@ -258,7 +341,19 @@ def generate_report(results: list[SecretAnalysisResult], output_dir: str) -> str
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SecretAnalysisResult | None:
-    """단일 계정/리전의 시크릿 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 시크릿을 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 시크릿이 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        분석 결과 객체. 시크릿이 없으면 None.
+    """
     secrets = collect_secrets(session, account_id, account_name, region)
     if not secrets:
         return None
@@ -266,7 +361,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Secrets Manager 미사용 분석"""
+    """Secrets Manager 미사용 시크릿 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]Secrets Manager 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="secretsmanager")

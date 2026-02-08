@@ -1,5 +1,5 @@
 """
-plugins/cloudformation/resource_finder.py - CloudFormation Stack 리소스 검색기
+functions/analyzers/cloudformation/resource_finder.py - CloudFormation Stack 리소스 검색기
 
 모든 CloudFormation Stack에서 Physical ID 또는 Resource Type으로 리소스를 검색합니다.
 
@@ -38,7 +38,23 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class StackResource:
-    """CloudFormation Stack 리소스 정보"""
+    """CloudFormation Stack에 속한 개별 리소스 정보.
+
+    Stack 내 리소스의 Logical/Physical ID, 타입, 상태 등을 보관한다.
+
+    Attributes:
+        stack_name: Stack 이름.
+        stack_status: Stack 상태 (CREATE_COMPLETE, UPDATE_COMPLETE 등).
+        logical_id: CloudFormation 템플릿 내 논리적 리소스 ID.
+        physical_id: 실제 AWS 리소스 ID (인스턴스 ID, ARN 등).
+        resource_type: AWS 리소스 타입 (AWS::EC2::Instance 등).
+        resource_status: 리소스 상태 (CREATE_COMPLETE 등).
+        region: 리전.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        stack_creation_time: Stack 생성 시간.
+        last_updated_time: 리소스 마지막 업데이트 시간.
+    """
 
     stack_name: str
     stack_status: str
@@ -53,7 +69,11 @@ class StackResource:
     last_updated_time: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """딕셔너리로 변환"""
+        """인스턴스를 딕셔너리로 변환한다.
+
+        Returns:
+            모든 필드를 포함하는 딕셔너리.
+        """
         return {
             "account_id": self.account_id,
             "account_name": self.account_name,
@@ -71,7 +91,15 @@ class StackResource:
 
 @dataclass
 class SearchResult:
-    """검색 결과"""
+    """CloudFormation 리소스 검색 결과.
+
+    검색된 리소스 목록과 검색 범위 정보를 보관한다.
+
+    Attributes:
+        resources: 검색 조건에 일치하는 StackResource 목록.
+        total_stacks_searched: 검색 대상으로 조회한 Stack 총 수.
+        regions_searched: 검색을 수행한 리전 목록.
+    """
 
     resources: list[StackResource] = field(default_factory=list)
     total_stacks_searched: int = 0
@@ -79,10 +107,21 @@ class SearchResult:
 
     @property
     def count(self) -> int:
+        """검색 결과 리소스 수.
+
+        Returns:
+            일치하는 리소스 개수.
+        """
         return len(self.resources)
 
     def get_by_stack(self) -> dict[str, list[StackResource]]:
-        """Stack별로 그룹화"""
+        """검색 결과를 Stack별로 그룹화한다.
+
+        키는 "account_name/region/stack_name" 형식이다.
+
+        Returns:
+            Stack 키를 기준으로 그룹화된 리소스 딕셔너리.
+        """
         grouped: dict[str, list[StackResource]] = {}
         for res in self.resources:
             key = f"{res.account_name}/{res.region}/{res.stack_name}"
@@ -92,7 +131,11 @@ class SearchResult:
         return grouped
 
     def get_by_resource_type(self) -> dict[str, list[StackResource]]:
-        """Resource Type별로 그룹화"""
+        """검색 결과를 Resource Type별로 그룹화한다.
+
+        Returns:
+            리소스 타입을 키로 그룹화된 리소스 딕셔너리.
+        """
         grouped: dict[str, list[StackResource]] = {}
         for res in self.resources:
             if res.resource_type not in grouped:
@@ -102,9 +145,10 @@ class SearchResult:
 
 
 class ResourceFinder:
-    """CloudFormation Stack 리소스 검색기
+    """CloudFormation Stack 리소스 검색기.
 
-    모든 Stack에서 Physical ID 또는 Resource Type으로 리소스를 검색합니다.
+    모든 Stack에서 Physical ID 또는 Resource Type으로 리소스를 검색한다.
+    부분 일치(case-insensitive) 검색을 지원하며, 복수 리전에 걸쳐 검색할 수 있다.
     """
 
     def __init__(
@@ -113,12 +157,12 @@ class ResourceFinder:
         regions: list[str] | None = None,
         max_workers: int = 5,
     ):
-        """초기화
+        """ResourceFinder를 초기화한다.
 
         Args:
-            session: boto3.Session 객체
-            regions: 검색할 리전 리스트 (기본: ap-northeast-2)
-            max_workers: 병렬 처리 워커 수
+            session: boto3 Session 객체.
+            regions: 검색할 리전 목록. 미지정 시 ap-northeast-2만 검색.
+            max_workers: 병렬 처리 워커 수.
         """
         self.session = session
         self.regions = regions or ["ap-northeast-2"]
@@ -130,15 +174,18 @@ class ResourceFinder:
         resource_type: str | None = None,
         stack_name_filter: str | None = None,
     ) -> SearchResult:
-        """리소스 검색
+        """지정 조건으로 CloudFormation 리소스를 검색한다.
+
+        모든 지정 리전의 Stack을 순회하며 조건에 일치하는 리소스를 수집한다.
+        검색 조건은 대소문자 무시 부분 일치로 동작한다.
 
         Args:
-            physical_id: 검색할 Physical ID (부분 일치)
-            resource_type: 검색할 Resource Type (부분 일치)
-            stack_name_filter: Stack 이름 필터 (부분 일치)
+            physical_id: 검색할 Physical ID (부분 일치).
+            resource_type: 검색할 Resource Type (부분 일치).
+            stack_name_filter: Stack 이름 필터 (부분 일치).
 
         Returns:
-            SearchResult 객체
+            검색 결과를 담은 SearchResult 객체.
         """
         all_resources = []
         total_stacks = 0
@@ -168,7 +215,17 @@ class ResourceFinder:
         resource_type: str | None = None,
         stack_name_filter: str | None = None,
     ) -> tuple[list[StackResource], int]:
-        """특정 리전에서 검색"""
+        """특정 리전의 모든 Stack에서 조건에 일치하는 리소스를 검색한다.
+
+        Args:
+            region: 검색 대상 리전.
+            physical_id: Physical ID 필터 (부분 일치).
+            resource_type: Resource Type 필터 (부분 일치).
+            stack_name_filter: Stack 이름 필터 (부분 일치).
+
+        Returns:
+            (일치하는 리소스 목록, 검색한 Stack 수) 튜플.
+        """
         matched_resources = []
         stack_count = 0
 
@@ -206,7 +263,17 @@ class ResourceFinder:
         cfn,
         name_filter: str | None = None,
     ) -> list[dict[str, Any]]:
-        """모든 Stack 조회"""
+        """리전 내 모든 Stack을 조회한다.
+
+        DELETE_COMPLETE 상태의 Stack은 제외한다.
+
+        Args:
+            cfn: CloudFormation boto3 클라이언트.
+            name_filter: Stack 이름 필터 (부분 일치, 대소문자 무시).
+
+        Returns:
+            Stack 정보 딕셔너리 목록.
+        """
         stacks = []
 
         try:
@@ -234,7 +301,18 @@ class ResourceFinder:
         stack: dict[str, Any],
         region: str,
     ) -> list[StackResource]:
-        """Stack의 모든 리소스 조회"""
+        """특정 Stack의 모든 리소스를 조회한다.
+
+        list_stack_resources Paginator를 사용하여 Stack 내 전체 리소스를 수집한다.
+
+        Args:
+            cfn: CloudFormation boto3 클라이언트.
+            stack: Stack 정보 딕셔너리 (StackName, StackStatus 등 포함).
+            region: 리전.
+
+        Returns:
+            StackResource 목록.
+        """
         resources = []
         stack_name = stack["StackName"]
 
@@ -262,11 +340,29 @@ class ResourceFinder:
         return resources
 
     def search_by_physical_id(self, physical_id: str) -> SearchResult:
-        """Physical ID로 검색 (편의 메서드)"""
+        """Physical ID로 리소스를 검색한다.
+
+        search() 메서드의 편의 래퍼이다.
+
+        Args:
+            physical_id: 검색할 Physical ID (부분 일치).
+
+        Returns:
+            검색 결과를 담은 SearchResult 객체.
+        """
         return self.search(physical_id=physical_id)
 
     def search_by_resource_type(self, resource_type: str) -> SearchResult:
-        """Resource Type으로 검색 (편의 메서드)"""
+        """Resource Type으로 리소스를 검색한다.
+
+        search() 메서드의 편의 래퍼이다.
+
+        Args:
+            resource_type: 검색할 Resource Type (부분 일치).
+
+        Returns:
+            검색 결과를 담은 SearchResult 객체.
+        """
         return self.search(resource_type=resource_type)
 
 
@@ -283,9 +379,17 @@ COLUMNS_RESOURCES = [
 
 
 class ResourceFinderReporter:
-    """리소스 검색 결과 리포터"""
+    """CloudFormation 리소스 검색 결과 리포터.
+
+    SearchResult를 콘솔 요약 또는 Excel 보고서로 출력한다.
+    """
 
     def __init__(self, result: SearchResult):
+        """ResourceFinderReporter를 초기화한다.
+
+        Args:
+            result: 리소스 검색 결과 객체.
+        """
         self.result = result
 
     def generate_report(
@@ -293,7 +397,17 @@ class ResourceFinderReporter:
         output_dir: str,
         file_prefix: str = "cfn_resource_search",
     ) -> Path:
-        """Excel 리포트 생성"""
+        """검색 결과를 Excel 보고서로 생성한다.
+
+        검색 결과 요약, All Resources, Resource Type별 상위 5개 시트를 포함한다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+            file_prefix: 파일명 접두사.
+
+        Returns:
+            생성된 Excel 파일 경로.
+        """
         wb = Workbook()
 
         # 요약 시트
@@ -314,7 +428,13 @@ class ResourceFinderReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """요약 시트"""
+        """검색 결과 요약 시트를 생성한다.
+
+        검색 현황, Resource Type별 현황(상위 10개), 리포트 정보를 포함한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         summary = wb.new_summary_sheet("검색 결과 요약")
 
         summary.add_title("CloudFormation 리소스 검색 결과")
@@ -340,7 +460,11 @@ class ResourceFinderReporter:
         summary.add_item("생성 일시", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_resources_sheet(self, wb: Workbook) -> None:
-        """전체 리소스 시트"""
+        """전체 리소스 목록 시트를 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="All Resources", columns=COLUMNS_RESOURCES)
 
         for res in self.result.resources:
@@ -368,7 +492,13 @@ class ResourceFinderReporter:
         )
 
     def _create_by_type_sheets(self, wb: Workbook) -> None:
-        """Resource Type별 시트 (상위 5개만)"""
+        """Resource Type별 시트를 생성한다 (리소스 수 상위 5개 타입만).
+
+        시트 이름은 "AWS::" 접두사를 제거하고 31자로 제한한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         by_type = self.result.get_by_resource_type()
         sorted_types = sorted(by_type.items(), key=lambda x: len(x[1]), reverse=True)
 
@@ -390,7 +520,10 @@ class ResourceFinderReporter:
                 sheet.add_row(row)
 
     def print_summary(self) -> None:
-        """콘솔에 요약 출력"""
+        """검색 결과 요약을 콘솔에 출력한다.
+
+        검색된 리소스 수, Stack 수, 리전 정보와 함께 상위 10개 리소스를 표시한다.
+        """
         print("\n=== CloudFormation 리소스 검색 결과 ===")
         print(f"검색된 리소스: {self.result.count}개")
         print(f"검색된 Stack: {self.result.total_stacks_searched}개")
@@ -411,7 +544,18 @@ def generate_report(
     output_dir: str,
     file_prefix: str = "cfn_resource_search",
 ) -> Path:
-    """리포트 생성 (편의 함수)"""
+    """검색 결과를 Excel 보고서로 생성하는 편의 함수.
+
+    내부적으로 ResourceFinderReporter를 생성하여 위임한다.
+
+    Args:
+        result: 리소스 검색 결과 객체.
+        output_dir: 보고서 저장 디렉토리 경로.
+        file_prefix: 파일명 접두사.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     reporter = ResourceFinderReporter(result)
     return reporter.generate_report(output_dir, file_prefix)
 
@@ -422,7 +566,17 @@ def generate_report(
 
 
 def run_search(ctx) -> dict[str, Any] | None:
-    """CloudFormation 리소스 검색"""
+    """CloudFormation 리소스 검색 도구의 메인 실행 함수.
+
+    ctx.options에서 physical_id, resource_type 검색어를 가져와
+    ResourceFinder로 검색하고, 결과를 콘솔에 출력한 뒤 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 리전, 프로파일, options(physical_id, resource_type) 등을 포함한다.
+
+    Returns:
+        검색 결과 요약 딕셔너리. count, stacks_searched, report_path 등을 포함한다.
+    """
     from core.auth.session import get_context_session
     from core.shared.io.output import OutputPath
 
@@ -469,7 +623,16 @@ def run_search(ctx) -> dict[str, Any] | None:
 
 
 def run_search_by_physical_id(ctx) -> dict[str, Any] | None:
-    """Physical ID로 Stack 검색"""
+    """Physical ID로 CloudFormation Stack을 검색하는 편의 실행 함수.
+
+    ctx.options에서 physical_id를 가져와 run_search에 위임한다.
+
+    Args:
+        ctx: 실행 컨텍스트. options에 physical_id가 필요하다.
+
+    Returns:
+        검색 결과 요약 딕셔너리. physical_id가 없으면 에러 딕셔너리를 반환한다.
+    """
     physical_id = ctx.options.get("physical_id")
     if not physical_id:
         print("physical_id가 필요합니다.")

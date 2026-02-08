@@ -869,7 +869,17 @@ def _generate_html_report(ctx, analyzer, analysis_results: dict[str, Any], outpu
 
 
 def _generate_report_filename(analyzer, analysis_results: dict[str, Any]) -> str:
-    """보고서 파일명 생성"""
+    """ALB 로그 분석 보고서 파일명을 생성한다.
+
+    S3 경로에서 계정 ID와 리전을 추출하고 랜덤 접미사를 추가한다.
+
+    Args:
+        analyzer: ALBLogAnalyzer 인스턴스 (bucket_name, prefix 참조).
+        analysis_results: 분석 결과 딕셔너리 (alb_name 참조).
+
+    Returns:
+        ``{account_id}_{region}_{alb_name}_report_{random}.xlsx`` 형식 파일명.
+    """
     import secrets
 
     try:

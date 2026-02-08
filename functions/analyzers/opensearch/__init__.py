@@ -1,7 +1,11 @@
 """
-plugins/opensearch - OpenSearch Domain Analysis Tools
+functions/analyzers/opensearch - OpenSearch 도메인 관리 및 최적화 도구
 
-OpenSearch (Elasticsearch Service) domain management and optimization
+OpenSearch(Elasticsearch Service) 도메인의 사용량을 CloudWatch 지표
+기반으로 분석하고 유휴/저사용 도메인을 탐지합니다.
+
+도구 목록:
+    - unused: 유휴/저사용 OpenSearch 도메인 탐지 (CloudWatch 지표 기반)
 """
 
 CATEGORY = {

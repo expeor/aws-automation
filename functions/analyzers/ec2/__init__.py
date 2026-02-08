@@ -1,7 +1,20 @@
 """
-plugins/ec2 - EC2 Analysis Tools
+functions/analyzers/ec2 - EC2 분석 도구
 
-Analyze EC2, EBS, EIP and other compute resources
+EC2 인스턴스, EBS 볼륨, EIP, Snapshot, AMI 등 컴퓨팅 리소스를
+분석하고 미사용/저사용 리소스를 탐지합니다. 보안 점검(EBS 암호화)과
+리소스 정리(Snapshot/AMI 삭제) 기능도 제공합니다.
+
+도구 목록:
+    - unused: 유휴/저사용 EC2 인스턴스 탐지 (CloudWatch 기반)
+    - ebs_audit: 미연결 EBS 볼륨 탐지
+    - ebs_encryption: 암호화되지 않은 EBS 볼륨 및 연결된 인스턴스 탐지
+    - eip_audit: 미연결 Elastic IP 탐지
+    - snapshot_audit: 고아/오래된 EBS Snapshot 탐지
+    - ami_audit: 미사용 AMI 탐지
+    - inventory: EC2 인스턴스 및 Security Group 인벤토리 조회
+    - snapshot_cleanup: 고아/오래된 EBS Snapshot 삭제 (Dry-run 지원)
+    - ami_cleanup: 미사용 AMI 및 연관 스냅샷 삭제 (Dry-run 지원)
 """
 
 CATEGORY = {

@@ -1,5 +1,5 @@
 """
-plugins/iam/iam_audit.py - IAM 종합 점검 도구
+functions/analyzers/iam/iam_audit.py - IAM 종합 점검 도구
 
 IAM 보안 감사 및 모범 사례 점검:
 - Users: MFA 설정, Access Key 관리, 비활성 사용자
@@ -48,7 +48,20 @@ REQUIRED_PERMISSIONS = {
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> tuple[Any, dict[str, Any]] | None:
-    """단일 계정의 IAM 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정의 IAM 데이터를 수집하고 분석한다.
+
+    IAMCollector로 사용자, 역할, 패스워드 정책 등을 수집하고
+    IAMAnalyzer로 보안 이슈를 분석한 뒤 요약 통계를 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전 (IAM은 글로벌이므로 실제 사용되지 않음).
+
+    Returns:
+        (분석 결과, 요약 통계 딕셔너리) 튜플. 데이터가 없으면 None.
+    """
     collector = IAMCollector()
     iam_data = collector.collect(session, account_id, account_name)
     analyzer = IAMAnalyzer(iam_data)
@@ -58,7 +71,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """IAM 종합 점검 실행"""
+    """IAM 종합 점검 도구의 메인 실행 함수.
+
+    IAM 보안 감사를 수행하여 MFA 미설정 사용자, 비활성 사용자,
+    오래된 Access Key, 미사용 Role, Root 계정 보안 등을 점검하고
+    Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]IAM 종합 점검 시작...[/bold]")
 
     # 1. 데이터 수집 (IAM은 글로벌이지만 병렬 처리 프레임워크 사용)
@@ -107,7 +128,14 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _print_summary(stats_list: list[dict[str, Any]]) -> None:
-    """분석 결과 요약 출력"""
+    """IAM 분석 결과 요약을 콘솔에 출력한다.
+
+    전체 계정의 통계를 합산하여 Critical/High 이슈, 사용자 현황,
+    Access Key 현황, Role 현황을 출력한다.
+
+    Args:
+        stats_list: 계정별 요약 통계 딕셔너리 목록.
+    """
     # 전체 통계 계산
     totals = {
         "total_users": sum(s["total_users"] for s in stats_list),
@@ -160,7 +188,14 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
 
 
 def _create_output_directory(ctx) -> str:
-    """출력 디렉토리 생성"""
+    """IAM 감사 보고서 출력 디렉토리를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트.
+
+    Returns:
+        생성된 출력 디렉토리 경로.
+    """
     # identifier 결정
     identifier = get_context_identifier(ctx)
 

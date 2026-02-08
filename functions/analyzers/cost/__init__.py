@@ -1,8 +1,15 @@
 """
-plugins/cost - Cost Optimization and Cost Explorer Tools
+functions/analyzers/cost - 비용 최적화 및 Cost Explorer 도구
 
-Cost analysis, unused resources report, budget management
-Individual unused resource analysis is in each service category (vpc, ec2, etc.)
+AWS Cost Optimization Hub를 통해 비용 최적화 권장사항(Rightsizing,
+Idle Resources, Commitment)을 조회하고 분석합니다.
+개별 서비스의 미사용 리소스 분석은 각 서비스 카테고리(ec2, vpc 등)에 있습니다.
+
+도구 목록:
+    - coh: Cost Optimization Hub 전체 권장사항 조회
+    - coh (run_rightsizing): EC2, RDS, Lambda, ECS 등 라이트사이징 권장사항
+    - coh (run_idle_resources): 유휴/미사용 리소스 권장사항 (Stop, Delete)
+    - coh (run_commitment): Savings Plans 및 Reserved Instances 권장사항
 """
 
 CATEGORY = {

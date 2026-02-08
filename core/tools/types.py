@@ -1,24 +1,46 @@
-"""
-core/tools/types.py - 도구 메타데이터 타입 정의
+"""도구 메타데이터 타입 정의.
 
-Area(영역) 분류의 단일 소스.
-UI 레이어(main_menu, category step)는 이 모듈을 import해서 사용.
+Area(영역) 분류의 단일 소스(Single Source of Truth).
+UI 레이어(main_menu, category step)는 이 모듈을 import해서 사용합니다.
+
+도구의 영역(area) 분류 체계, 메타데이터 TypedDict, 그리고
+영역/도구/카테고리의 국제화(i18n) 헬퍼 함수를 제공합니다.
+
+Attributes:
+    AREA_REGISTRY: 전체 Area 분류 목록 (ReportType + ToolType).
+    AREA_COMMANDS: CLI 명령어 -> Area 키 매핑 딕셔너리.
+    AREA_KEYWORDS: 한글 키워드 -> Area 키 매핑 딕셔너리.
+    AREA_DISPLAY_BY_KEY: Area 키 -> 표시 정보 딕셔너리.
 """
 
 from typing import TypedDict
 
 
 class AreaInfo(TypedDict):
-    """Area 메타데이터"""
+    """Area 메타데이터 타입.
 
-    key: str  # 내부 키 (security, cost 등)
-    command: str  # CLI 명령어 (/cost, /security)
-    label: str  # 한글 라벨
-    label_en: str  # 영어 라벨
-    desc: str  # 설명 (한글)
-    desc_en: str  # 설명 (영어)
-    color: str  # Rich 색상
-    icon: str  # 이모지 아이콘
+    도구 영역(area) 분류 항목의 구조를 정의합니다.
+    AREA_REGISTRY에 등록되는 각 영역의 메타데이터 형식입니다.
+
+    Attributes:
+        key: 내부 키 (예: "security", "cost", "unused").
+        command: CLI 명령어 (예: "/cost", "/security").
+        label: 한글 라벨 (예: "보안", "비용").
+        label_en: 영어 라벨 (예: "Security", "Cost").
+        desc: 설명 (한글).
+        desc_en: 설명 (영어).
+        color: Rich 라이브러리 색상 이름 (예: "red", "cyan").
+        icon: 이모지 아이콘 (예: "🔒", "💰").
+    """
+
+    key: str
+    command: str
+    label: str
+    label_en: str
+    desc: str
+    desc_en: str
+    color: str
+    icon: str
 
 
 # ============================================================================
@@ -245,14 +267,14 @@ AREA_DISPLAY_BY_KEY: dict[str, dict[str, str]] = {
 
 
 def get_area_label(key: str, lang: str = "ko") -> str:
-    """Get area label by key and language.
+    """Area 키에 해당하는 라벨 텍스트를 반환합니다.
 
     Args:
-        key: Area key (e.g., "security", "cost")
-        lang: Language code ("ko" or "en")
+        key: Area 키 (예: "security", "cost", "unused").
+        lang: 언어 코드 ("ko" 또는 "en"). 기본값은 "ko".
 
     Returns:
-        Label text in the specified language
+        지정 언어의 라벨 텍스트. 키가 존재하지 않으면 키 자체를 반환.
     """
     area = AREA_DISPLAY_BY_KEY.get(key)
     if not area:
@@ -261,14 +283,14 @@ def get_area_label(key: str, lang: str = "ko") -> str:
 
 
 def get_area_desc(key: str, lang: str = "ko") -> str:
-    """Get area description by key and language.
+    """Area 키에 해당하는 설명 텍스트를 반환합니다.
 
     Args:
-        key: Area key (e.g., "security", "cost")
-        lang: Language code ("ko" or "en")
+        key: Area 키 (예: "security", "cost", "unused").
+        lang: 언어 코드 ("ko" 또는 "en"). 기본값은 "ko".
 
     Returns:
-        Description text in the specified language
+        지정 언어의 설명 텍스트. 키가 존재하지 않으면 빈 문자열 반환.
     """
     area = AREA_DISPLAY_BY_KEY.get(key)
     if not area:
@@ -277,14 +299,14 @@ def get_area_desc(key: str, lang: str = "ko") -> str:
 
 
 def get_tool_name(tool: dict, lang: str = "ko") -> str:
-    """Get tool name by language.
+    """도구 메타데이터에서 지정 언어의 이름을 반환합니다.
 
     Args:
-        tool: Tool metadata dictionary
-        lang: Language code ("ko" or "en")
+        tool: 도구 메타데이터 딕셔너리 (ToolMeta 형식).
+        lang: 언어 코드 ("ko" 또는 "en"). 기본값은 "ko".
 
     Returns:
-        Tool name in the specified language
+        지정 언어의 도구 이름 문자열.
     """
     if lang == "en":
         return str(tool.get("name_en") or tool.get("name", ""))
@@ -292,14 +314,14 @@ def get_tool_name(tool: dict, lang: str = "ko") -> str:
 
 
 def get_tool_description(tool: dict, lang: str = "ko") -> str:
-    """Get tool description by language.
+    """도구 메타데이터에서 지정 언어의 설명을 반환합니다.
 
     Args:
-        tool: Tool metadata dictionary
-        lang: Language code ("ko" or "en")
+        tool: 도구 메타데이터 딕셔너리 (ToolMeta 형식).
+        lang: 언어 코드 ("ko" 또는 "en"). 기본값은 "ko".
 
     Returns:
-        Tool description in the specified language
+        지정 언어의 도구 설명 문자열.
     """
     if lang == "en":
         return str(tool.get("description_en") or tool.get("description", ""))
@@ -307,14 +329,14 @@ def get_tool_description(tool: dict, lang: str = "ko") -> str:
 
 
 def get_category_description(category: dict, lang: str = "ko") -> str:
-    """Get category description by language.
+    """카테고리 메타데이터에서 지정 언어의 설명을 반환합니다.
 
     Args:
-        category: Category metadata dictionary
-        lang: Language code ("ko" or "en")
+        category: 카테고리 메타데이터 딕셔너리 (CategoryMeta 형식).
+        lang: 언어 코드 ("ko" 또는 "en"). 기본값은 "ko".
 
     Returns:
-        Category description in the specified language
+        지정 언어의 카테고리 설명 문자열.
     """
     if lang == "en":
         return str(category.get("description_en") or category.get("description", ""))
@@ -322,56 +344,93 @@ def get_category_description(category: dict, lang: str = "ko") -> str:
 
 
 class ToolMeta(TypedDict, total=False):
-    """도구 메타데이터 타입"""
+    """도구 메타데이터 타입.
+
+    각 플러그인의 TOOLS 리스트에 정의되는 개별 도구의 메타데이터 구조입니다.
+    ``total=False``이므로 모든 필드가 선택 사항이지만,
+    name, description, permission, module은 사실상 필수입니다.
+
+    Attributes:
+        name: 도구 이름 (메뉴에 표시, 한국어).
+        description: 도구 설명 (한국어).
+        permission: 권한 레벨 ("read" | "write" | "delete").
+        module: 모듈 경로 (파일명 또는 폴더.파일명, .py 제외).
+        name_en: 도구 이름 (영어, i18n용).
+        description_en: 도구 설명 (영어, i18n용).
+        area: 영역 분류 값 (예: "security", "cost", "unused").
+        sub_service: 하위 서비스명 (예: "alb", "nlb", "redis").
+            elb -> alb/nlb/gwlb, elasticache -> redis/memcached 등 분류에 사용.
+        ref: 다른 카테고리 도구 참조 (예: "iam/unused_role"). 컬렉션용.
+        single_region_only: True면 단일 리전만 지원 (기본: False).
+        single_account_only: True면 단일 계정만 지원 (기본: False).
+        meta: 추가 메타데이터 딕셔너리 (예: cycle, internal_only 등).
+        function: 실행 함수명 (기본: "run").
+    """
 
     # 필수 필드
-    name: str  # 도구 이름 (메뉴에 표시, 한국어)
-    description: str  # 설명 (한국어)
-    permission: str  # "read" | "write" | "delete"
-    module: str  # 모듈 경로 (파일명 또는 폴더.파일명)
+    name: str
+    description: str
+    permission: str
+    module: str
 
     # i18n 필드 (영어)
-    name_en: str  # 도구 이름 (영어)
-    description_en: str  # 설명 (영어)
+    name_en: str
+    description_en: str
 
     # 영역 분류
-    area: str  # ToolArea 값 (security, cost, performance 등)
+    area: str
 
-    # 하위 서비스 분류 (예: elb→alb/nlb/gwlb, elasticache→redis/memcached)
-    sub_service: str  # 하위 서비스명 (예: "alb", "nlb", "redis")
+    # 하위 서비스 분류
+    sub_service: str
 
     # 참조 (컬렉션용)
-    ref: str  # 다른 카테고리 도구 참조 ("iam/unused_role")
+    ref: str
 
     # 실행 제약 조건
-    single_region_only: bool  # True면 단일 리전만 지원 (기본: False)
-    single_account_only: bool  # True면 단일 계정만 지원 (기본: False)
+    single_region_only: bool
+    single_account_only: bool
 
     # 추가 메타
-    meta: dict[str, str]  # 추가 메타데이터 (cycle, internal_only 등)
-    function: str  # 실행 함수명 (기본: "run")
+    meta: dict[str, str]
+    function: str
 
 
 class CategoryMeta(TypedDict, total=False):
-    """카테고리 메타데이터 타입"""
+    """카테고리 메타데이터 타입.
+
+    각 플러그인 폴더의 ``__init__.py``에 정의되는 CATEGORY 딕셔너리의 구조입니다.
+    ``total=False``이므로 모든 필드가 선택 사항이지만,
+    name과 description은 사실상 필수입니다.
+
+    Attributes:
+        name: 카테고리 이름 (CLI 명령어, 폴더명). 예: "ec2", "vpc".
+        description: 카테고리 설명 (한국어).
+        description_en: 카테고리 설명 (영어, i18n용).
+        display_name: UI 표시 이름 (없으면 name 사용).
+        aliases: 별칭 목록 (예: ["gov"]). 검색/CLI에서 매칭용.
+        group: 그룹 분류 ("aws" | "special" | "collection").
+        icon: 아이콘 문자열 (메뉴 표시용).
+        sub_services: 하위 서비스 목록 (예: elb -> ["alb", "nlb", "gwlb", "clb"]).
+            sub_services에 정의된 이름으로 CLI 명령어가 자동 등록되며,
+            각 도구의 sub_service 필드와 매칭되어 필터링됩니다.
+        collection: 컬렉션 여부 (True면 다른 카테고리의 도구를 ref로 참조).
+    """
 
     # 필수 필드
-    name: str  # 카테고리 이름 (CLI 명령어, 폴더명)
-    description: str  # 설명 (한국어)
+    name: str
+    description: str
 
     # i18n 필드 (영어)
-    description_en: str  # 설명 (영어)
+    description_en: str
 
     # 선택 필드
-    display_name: str  # UI 표시 이름 (없으면 name 사용)
-    aliases: list[str]  # 별칭 (예: ["gov"])
-    group: str  # 그룹 ("aws" | "special" | "collection")
-    icon: str  # 아이콘 (메뉴 표시용)
+    display_name: str
+    aliases: list[str]
+    group: str
+    icon: str
 
-    # 하위 서비스 (예: elb→["alb", "nlb", "gwlb", "clb"])
-    # sub_services에 정의된 이름으로 CLI 명령어 자동 등록
-    # 각 도구의 sub_service 필드와 매칭되어 필터링됨
+    # 하위 서비스
     sub_services: list[str]
 
     # 컬렉션 전용
-    collection: bool  # 컬렉션 여부 (True면 다른 도구 참조)
+    collection: bool

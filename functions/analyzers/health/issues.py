@@ -1,5 +1,5 @@
 """
-plugins/health/issues.py - 서비스 장애 현황 조회
+functions/analyzers/health/issues.py - 서비스 장애 현황 조회
 
 현재 진행 중인 AWS 서비스 장애 조회
 멀티 계정 지원: parallel_collect 패턴 사용
@@ -25,16 +25,19 @@ console = Console()
 
 
 def _collect_issues(session, account_id: str, account_name: str, region: str) -> list[HealthEvent] | None:
-    """단일 계정의 서비스 장애 수집 (병렬 실행용)
+    """parallel_collect 콜백: 단일 계정의 서비스 장애 이벤트를 수집한다.
+
+    HealthCollector를 사용하여 현재 진행 중인(open) 서비스 장애를 수집한다.
+    Business/Enterprise Support 플랜이 필요하다.
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전 (Health API는 항상 us-east-1 사용)
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전 (Health API는 항상 us-east-1에서 동작).
 
     Returns:
-        HealthEvent 리스트 또는 None
+        장애 이벤트 HealthEvent 목록. 장애가 없으면 None.
     """
     try:
         collector = HealthCollector(session, account_id, account_name)
@@ -52,7 +55,14 @@ def _collect_issues(session, account_id: str, account_name: str, region: str) ->
 
 
 def run(ctx: ExecutionContext) -> None:
-    """서비스 장애 현황 조회"""
+    """서비스 장애 현황 조회 도구의 메인 실행 함수.
+
+    현재 진행 중인 AWS 서비스 장애를 조회하여 콘솔 테이블로 출력한다.
+    여러 계정에서 수집된 장애 이벤트를 ARN 기준으로 중복 제거한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]서비스 장애 현황 조회 중...[/bold]\n")
 
     # 병렬 수집

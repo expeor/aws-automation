@@ -1,11 +1,13 @@
-"""
-reports/inventory/inventory.py - 종합 인벤토리 조회 (스트리밍 방식)
+"""functions/reports/inventory/inventory.py - 종합 인벤토리 조회 (스트리밍 방식).
 
-60개 리소스 타입을 카테고리별로 수집하여 즉시 Excel에 기록.
-메모리 효율적인 스트리밍 처리 - 수집 → 쓰기 → 해제 순환.
+60개 리소스 타입을 카테고리별로 수집하여 즉시 Excel에 기록합니다.
+메모리 효율적인 스트리밍 처리 방식으로 수집 -> 쓰기 -> 해제 순환을 반복합니다.
 
-플러그인 규약:
-    - run(ctx): 필수. 실행 함수.
+처리 흐름:
+    1. InventoryCollector를 통해 리소스 수집
+    2. 카테고리별로 Excel 시트에 즉시 기록 (메모리 해제)
+    3. 요약 시트 생성 (전체 리소스 수, 카테고리별 통계, 경고)
+    4. Excel 파일 저장 후 탐색기에서 열기
 """
 
 from __future__ import annotations
@@ -30,17 +32,29 @@ console = Console()
 
 @dataclass
 class ResourceDef:
-    """리소스 수집 정의"""
+    """단일 리소스 타입의 수집 정의.
 
-    name: str  # 표시명
-    method: str  # collector 메서드명
+    Attributes:
+        name: 리소스 표시명 (예: "EC2 Instances").
+        method: InventoryCollector의 수집 메서드명 (예: "collect_ec2").
+        columns: Excel 시트의 컬럼 정의 목록.
+        row_mapper: 수집된 데이터를 Excel 행으로 변환하는 콜백 함수.
+    """
+
+    name: str
+    method: str
     columns: list[ColumnDef]
-    row_mapper: Callable  # 데이터 → 행 변환 함수
+    row_mapper: Callable
 
 
 @dataclass
 class CategoryDef:
-    """카테고리 정의"""
+    """리소스 카테고리 정의.
+
+    Attributes:
+        name: 카테고리명 (예: "Compute", "Networking").
+        resources: 이 카테고리에 속하는 리소스 정의 목록.
+    """
 
     name: str
     resources: list[ResourceDef]
@@ -48,7 +62,13 @@ class CategoryDef:
 
 @dataclass
 class CategoryStats:
-    """카테고리별 통계"""
+    """카테고리별 수집 통계.
+
+    Attributes:
+        name: 카테고리명.
+        counts: 리소스 타입별 수집된 항목 수 (키: 리소스명, 값: 개수).
+        warnings: 수집 중 발생한 경고 메시지 목록.
+    """
 
     name: str
     counts: dict[str, int] = field(default_factory=dict)
@@ -56,7 +76,15 @@ class CategoryStats:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """종합 리소스 인벤토리 조회 (스트리밍 방식)"""
+    """종합 리소스 인벤토리를 수집하고 Excel 보고서를 생성합니다.
+
+    60개 이상의 리소스 타입을 카테고리별로 스트리밍 수집하여
+    Excel 파일에 기록합니다. 수집 완료 후 요약 시트를 추가하고
+    파일 탐색기에서 결과를 엽니다.
+
+    Args:
+        ctx: 실행 컨텍스트. 프로파일, 리전, 세션 정보를 포함합니다.
+    """
     console.print("\n[bold]AWS 종합 리소스 인벤토리[/bold]\n")
 
     collector = InventoryCollector(ctx)

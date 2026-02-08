@@ -1,5 +1,5 @@
 """
-plugins/vpc/sg_inventory.py - Security Group 정책 내역 추출
+functions/analyzers/vpc/sg_inventory.py - Security Group 정책 내역 추출
 
 모든 Security Group의 인바운드/아웃바운드 규칙을 멀티 계정/리전에서 수집하여 Excel로 출력.
 
@@ -37,14 +37,34 @@ REQUIRED_PERMISSIONS = {
 
 
 def _collect_sgs(session, account_id: str, account_name: str, region: str) -> list | None:
-    """단일 계정/리전의 Security Group 수집 (병렬 실행용)"""
+    """단일 계정/리전의 Security Group 수집 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        Security Group 리스트. 없으면 None.
+    """
     collector = SGCollector()
     sgs = collector.collect(session, account_id, account_name, region)
     return sgs if sgs else None
 
 
 def _flatten_rules(sgs: list[SecurityGroup]) -> list[dict]:
-    """SG 규칙을 평탄화하여 행 데이터로 변환"""
+    """SG 규칙을 평탄화하여 행 데이터로 변환
+
+    각 SG의 인바운드/아웃바운드 규칙을 개별 행으로 변환합니다.
+    규칙이 없는 SG도 빈 규칙 행으로 포함됩니다.
+
+    Args:
+        sgs: Security Group 리스트
+
+    Returns:
+        규칙별 평탄화된 행 데이터 딕셔너리 리스트
+    """
     rows = []
 
     for sg in sgs:
@@ -119,7 +139,14 @@ def _flatten_rules(sgs: list[SecurityGroup]) -> list[dict]:
 
 
 def _flatten_resources(sgs: list[SecurityGroup]) -> list[dict]:
-    """SG에 연결된 리소스를 평탄화하여 행 데이터로 변환"""
+    """SG에 연결된 리소스를 평탄화하여 행 데이터로 변환
+
+    Args:
+        sgs: Security Group 리스트
+
+    Returns:
+        리소스별 평탄화된 행 데이터 딕셔너리 리스트
+    """
     rows = []
 
     for sg in sgs:
@@ -144,7 +171,19 @@ def _flatten_resources(sgs: list[SecurityGroup]) -> list[dict]:
 
 
 def _create_excel_report(rows: list[dict], resource_rows: list[dict], output_path: str) -> str:
-    """Excel 보고서 생성"""
+    """SG 정책 내역 Excel 보고서 생성
+
+    SG Rules, Attached Resources, SG Summary 3개 시트를 포함하는
+    Excel 파일을 생성합니다.
+
+    Args:
+        rows: 평탄화된 규칙 행 데이터
+        resource_rows: 평탄화된 리소스 행 데이터
+        output_path: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     wb = Workbook()
 
     # 전체 규칙 시트
@@ -210,7 +249,12 @@ def _create_excel_report(rows: list[dict], resource_rows: list[dict], output_pat
 
 
 def _add_resources_sheet(wb: Workbook, resource_rows: list[dict]) -> None:
-    """SG에 연결된 리소스 시트 추가"""
+    """SG에 연결된 리소스 시트 추가
+
+    Args:
+        wb: Excel Workbook 객체
+        resource_rows: 평탄화된 리소스 행 데이터
+    """
     columns = [
         ColumnDef("계정 ID", width=15),
         ColumnDef("계정명", width=20),
@@ -245,7 +289,15 @@ def _add_resources_sheet(wb: Workbook, resource_rows: list[dict]) -> None:
 
 
 def _add_summary_sheet(wb: Workbook, rows: list[dict], resource_rows: list[dict]) -> None:
-    """SG별 요약 시트 추가"""
+    """SG별 요약 시트 추가
+
+    SG별 인바운드/아웃바운드 규칙 수, 연결 리소스 수를 집계합니다.
+
+    Args:
+        wb: Excel Workbook 객체
+        rows: 평탄화된 규칙 행 데이터
+        resource_rows: 평탄화된 리소스 행 데이터
+    """
     # SG별 규칙 수 집계
     sg_stats: dict[str, dict] = {}
 
@@ -321,7 +373,14 @@ def _add_summary_sheet(wb: Workbook, rows: list[dict], resource_rows: list[dict]
 
 
 def _create_output_directory(ctx: ExecutionContext) -> str:
-    """출력 디렉토리 생성"""
+    """출력 디렉토리 생성
+
+    Args:
+        ctx: CLI 실행 컨텍스트
+
+    Returns:
+        생성된 출력 디렉토리 경로
+    """
     # profile_name: SSO Session 이름 또는 프로파일 이름
     identifier = ctx.profile_name or "default"
     output_path = OutputPath(identifier).sub("vpc", "sg_inventory").with_date().build()
@@ -329,7 +388,14 @@ def _create_output_directory(ctx: ExecutionContext) -> str:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Security Group 정책 내역 추출 실행"""
+    """Security Group 정책 내역 추출 실행
+
+    멀티 계정/리전에서 모든 Security Group의 인바운드/아웃바운드 규칙을
+    병렬 수집하고, 규칙 내역 및 연결 리소스를 Excel 보고서로 출력합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]Security Group 정책 내역 추출 시작...[/bold]")
 
     # 1. 데이터 수집

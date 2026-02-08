@@ -1,4 +1,7 @@
-"""SSL/TLS security analysis sheet writer."""
+"""functions/reports/log_analyzer/reporter/ssl_security.py - SSL/TLS 보안 분석 시트 Writer.
+
+SSL/TLS 프로토콜 버전, 암호화 스위트 분포를 분석하여 보안 현황 시트를 생성합니다.
+"""
 
 from __future__ import annotations
 

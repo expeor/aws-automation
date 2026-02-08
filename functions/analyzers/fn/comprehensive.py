@@ -1,5 +1,5 @@
 """
-plugins/fn/comprehensive.py - Lambda 종합 분석 보고서
+functions/analyzers/fn/comprehensive.py - Lambda 종합 분석 보고서
 
 Lambda 함수 종합 분석:
 - 런타임 EOL 분석
@@ -54,7 +54,11 @@ REQUIRED_PERMISSIONS = {
 
 
 class IssueType(Enum):
-    """이슈 유형"""
+    """Lambda 종합 분석 이슈 유형 분류.
+
+    런타임 EOL, 메모리, 에러, Throttle, 미사용, Timeout 등
+    다양한 카테고리의 이슈를 식별한다.
+    """
 
     RUNTIME_EOL = "runtime_eol"
     MEMORY_OVERSIZED = "memory_oversized"
@@ -66,7 +70,10 @@ class IssueType(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """이슈 심각도 분류.
+
+    CRITICAL > HIGH > MEDIUM > LOW > INFO 순서로 긴급도를 나타낸다.
+    """
 
     CRITICAL = "critical"
     HIGH = "high"
@@ -77,7 +84,15 @@ class Severity(Enum):
 
 @dataclass
 class LambdaIssue:
-    """Lambda 이슈"""
+    """Lambda 개별 이슈 정보.
+
+    Attributes:
+        issue_type: 이슈 유형 (런타임 EOL, 메모리, 에러 등).
+        severity: 심각도.
+        description: 이슈 설명 (한글).
+        recommendation: 권장 조치 설명 (한글).
+        potential_savings: 이슈 해결 시 절감 가능 비용 (USD). 해당 없으면 0.
+    """
 
     issue_type: IssueType
     severity: Severity
@@ -88,7 +103,15 @@ class LambdaIssue:
 
 @dataclass
 class LambdaComprehensiveResult:
-    """Lambda 종합 분석 결과"""
+    """Lambda 개별 함수 종합 분석 결과.
+
+    Attributes:
+        function: Lambda 함수 정보.
+        issues: 발견된 이슈 목록.
+        estimated_monthly_cost: 추정 월간 비용 (USD, PC 비용 포함).
+        memory_recommendation: 권장 메모리 크기 (MB). None이면 변경 불필요.
+        potential_savings: 전체 이슈 해결 시 절감 가능 총액 (USD).
+    """
 
     function: LambdaFunctionInfo
     issues: list[LambdaIssue] = field(default_factory=list)
@@ -98,20 +121,51 @@ class LambdaComprehensiveResult:
 
     @property
     def has_critical_issues(self) -> bool:
+        """CRITICAL 심각도 이슈 존재 여부.
+
+        Returns:
+            CRITICAL 이슈가 1개 이상이면 True.
+        """
         return any(i.severity == Severity.CRITICAL for i in self.issues)
 
     @property
     def has_high_issues(self) -> bool:
+        """HIGH 심각도 이슈 존재 여부.
+
+        Returns:
+            HIGH 이슈가 1개 이상이면 True.
+        """
         return any(i.severity == Severity.HIGH for i in self.issues)
 
     @property
     def issue_count(self) -> int:
+        """발견된 이슈 총 수.
+
+        Returns:
+            이슈 목록의 길이.
+        """
         return len(self.issues)
 
 
 @dataclass
 class ComprehensiveAnalysisResult:
-    """종합 분석 결과 집계"""
+    """종합 분석 결과 집계.
+
+    단일 계정/리전의 Lambda 종합 분석 통계를 집계한다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_functions: 분석된 전체 함수 수.
+        functions_with_issues: 이슈가 1개 이상인 함수 수.
+        runtime_eol_count: 런타임 EOL 이슈 수.
+        memory_issue_count: 메모리 이슈 수 (과다 + 부족).
+        error_issue_count: 에러율 이슈 수.
+        total_monthly_cost: 전체 함수 월간 비용 합계 (USD).
+        potential_savings: 모든 이슈 해결 시 절감 가능 총액 (USD).
+        results: 함수별 종합 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -136,7 +190,19 @@ def analyze_function_comprehensive(
     region: str,
     memory_stats: dict | None = None,
 ) -> LambdaComprehensiveResult:
-    """Lambda 함수 종합 분석"""
+    """단일 Lambda 함수에 대해 종합 분석을 수행한다.
+
+    런타임 EOL, 메모리, 에러율, Throttle, 미사용, Timeout 위험을
+    순차적으로 점검하고, 비용과 절감 가능액을 계산한다.
+
+    Args:
+        func: Lambda 함수 정보 (메트릭 포함).
+        region: AWS 리전 코드 (비용 계산용).
+        memory_stats: CloudWatch Logs Insights 메모리 통계. None이면 휴리스틱 사용.
+
+    Returns:
+        함수의 종합 분석 결과 (이슈 목록, 비용, 절감액).
+    """
     result = LambdaComprehensiveResult(function=func)
     metrics = func.metrics
 
@@ -183,7 +249,12 @@ def analyze_function_comprehensive(
 
 
 def _analyze_runtime_eol(func: LambdaFunctionInfo, result: LambdaComprehensiveResult):
-    """런타임 EOL 분석"""
+    """런타임 EOL 상태를 분석하여 이슈를 추가한다.
+
+    Args:
+        func: Lambda 함수 정보.
+        result: 이슈를 추가할 종합 분석 결과 객체.
+    """
     runtime_info = get_runtime_info(func.runtime)
     if not runtime_info:
         return
@@ -239,7 +310,16 @@ def _analyze_memory(
     result: LambdaComprehensiveResult,
     memory_stats: dict | None = None,
 ):
-    """메모리 사용량 분석"""
+    """메모리 사용량을 분석하여 과다/부족 이슈를 추가한다.
+
+    memory_stats가 제공되면 실측 데이터 기반으로, 없으면 Duration 기반
+    휴리스틱으로 판단한다.
+
+    Args:
+        func: Lambda 함수 정보.
+        result: 이슈를 추가할 종합 분석 결과 객체.
+        memory_stats: CloudWatch Logs Insights 메모리 통계. None이면 휴리스틱 사용.
+    """
     metrics = func.metrics
     if not metrics or metrics.invocations == 0:
         return
@@ -313,7 +393,14 @@ def _analyze_memory(
 
 
 def _analyze_errors(func: LambdaFunctionInfo, result: LambdaComprehensiveResult):
-    """에러율 분석"""
+    """에러율을 분석하여 이슈를 추가한다.
+
+    에러율 10% 이상이면 CRITICAL, 5% 이상이면 HIGH, 1% 이상이면 MEDIUM으로 분류한다.
+
+    Args:
+        func: Lambda 함수 정보.
+        result: 이슈를 추가할 종합 분석 결과 객체.
+    """
     metrics = func.metrics
     if not metrics or metrics.invocations == 0:
         return
@@ -350,7 +437,12 @@ def _analyze_errors(func: LambdaFunctionInfo, result: LambdaComprehensiveResult)
 
 
 def _analyze_throttles(func: LambdaFunctionInfo, result: LambdaComprehensiveResult):
-    """Throttle 분석"""
+    """Throttle 발생을 분석하여 이슈를 추가한다.
+
+    Args:
+        func: Lambda 함수 정보.
+        result: 이슈를 추가할 종합 분석 결과 객체.
+    """
     metrics = func.metrics
     if not metrics or metrics.throttles == 0:
         return
@@ -378,7 +470,15 @@ def _analyze_throttles(func: LambdaFunctionInfo, result: LambdaComprehensiveResu
 
 
 def _analyze_usage(func: LambdaFunctionInfo, result: LambdaComprehensiveResult):
-    """미사용 분석"""
+    """미사용 상태를 분석하여 이슈를 추가한다.
+
+    30일간 호출이 없는 함수를 탐지하며, PC가 설정된 미사용 함수는
+    CRITICAL로 분류한다.
+
+    Args:
+        func: Lambda 함수 정보.
+        result: 이슈를 추가할 종합 분석 결과 객체.
+    """
     metrics = func.metrics
     if not metrics:
         return
@@ -412,7 +512,14 @@ def _analyze_usage(func: LambdaFunctionInfo, result: LambdaComprehensiveResult):
 
 
 def _analyze_timeout_risk(func: LambdaFunctionInfo, result: LambdaComprehensiveResult):
-    """Timeout 위험 분석"""
+    """Timeout 위험을 분석하여 이슈를 추가한다.
+
+    최대 실행 시간이 Timeout의 80% 이상이면 HIGH, 60% 이상이면 LOW로 분류한다.
+
+    Args:
+        func: Lambda 함수 정보.
+        result: 이슈를 추가할 종합 분석 결과 객체.
+    """
     metrics = func.metrics
     if not metrics or metrics.invocations == 0:
         return
@@ -447,7 +554,17 @@ def analyze_comprehensive(
     account_name: str,
     region: str,
 ) -> ComprehensiveAnalysisResult:
-    """Lambda 함수들 종합 분석"""
+    """Lambda 함수 목록에 대해 종합 분석을 수행하고 결과를 집계한다.
+
+    Args:
+        functions: Lambda 함수 정보 목록 (메트릭 포함).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        종합 분석 결과 (통계 + 함수별 상세 결과).
+    """
     result = ComprehensiveAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -485,7 +602,17 @@ def analyze_comprehensive(
 
 
 def _build_excel(results: list[ComprehensiveAnalysisResult]):
-    """Excel Workbook 빌더 (저장하지 않고 반환)"""
+    """종합 분석 결과를 Excel Workbook으로 구성한다.
+
+    Summary Data, Issues, All Functions 시트를 포함하며, 심각도별로
+    셀 색상을 다르게 적용한다.
+
+    Args:
+        results: 계정/리전별 종합 분석 결과 목록.
+
+    Returns:
+        저장 전 Workbook 객체.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -639,13 +766,33 @@ def _build_excel(results: list[ComprehensiveAnalysisResult]):
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> ComprehensiveAnalysisResult:
-    """단일 계정/리전의 Lambda 종합 분석 (병렬 실행용)"""
+    """단일 계정/리전의 Lambda 함수를 수집하고 종합 분석을 수행한다.
+
+    parallel_collect 콜백 함수로, 멀티 계정/리전 병렬 실행에 사용된다.
+
+    Args:
+        session: boto3 세션 (Rate limiting 적용).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        해당 계정/리전의 Lambda 종합 분석 결과.
+    """
     functions = collect_functions_with_metrics(session, account_id, account_name, region)
     return analyze_comprehensive(functions, account_id, account_name, region)
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Lambda 종합 분석 실행"""
+    """Lambda 종합 분석 도구를 실행한다.
+
+    모든 Lambda 함수에 대해 런타임 EOL, 메모리, 에러율, Throttle,
+    미사용, Timeout 위험을 종합적으로 분석한다. 결과를 콘솔에 출력하고
+    Excel + HTML 듀얼 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 리전, 출력 설정 포함).
+    """
     console.print("[bold]Lambda 종합 분석 시작...[/bold]\n")
 
     # 병렬 수집 및 분석

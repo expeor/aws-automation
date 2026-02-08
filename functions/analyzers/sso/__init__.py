@@ -1,5 +1,12 @@
 """
-plugins/sso - IAM Identity Center (SSO) Security Audit Tools
+functions/analyzers/sso - IAM Identity Center(SSO) 보안 감사 도구
+
+IAM Identity Center의 Permission Set 위험 정책, Admin 권한 현황,
+미사용 사용자, MFA 설정을 점검합니다.
+글로벌 서비스로 리전 선택이 불필요합니다.
+
+도구 목록:
+    - sso_audit: Permission Set 위험 정책, Admin 권한 현황, 미사용 사용자, MFA 점검
 """
 
 CATEGORY = {

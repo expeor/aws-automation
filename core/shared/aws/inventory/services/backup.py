@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/backup.py - Backup 리소스 수집
+core/shared/aws/inventory/services/backup.py - Backup 리소스 수집
 
 Backup Vault, Backup Plan 수집.
 """
@@ -16,7 +16,19 @@ logger = logging.getLogger(__name__)
 
 
 def collect_backup_vaults(session, account_id: str, account_name: str, region: str) -> list[BackupVault]:
-    """Backup Vault 수집"""
+    """AWS Backup Vault 리소스를 수집합니다.
+
+    Vault 목록 조회 후 각 Vault의 암호화 키, 복구 포인트 수, 잠금 상태 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        BackupVault 데이터 클래스 목록
+    """
     backup = get_client(session, "backup", region_name=region)
     vaults = []
 
@@ -59,7 +71,19 @@ def collect_backup_vaults(session, account_id: str, account_name: str, region: s
 
 
 def collect_backup_plans(session, account_id: str, account_name: str, region: str) -> list[BackupPlan]:
-    """Backup Plan 수집"""
+    """AWS Backup Plan 리소스를 수집합니다.
+
+    Plan 목록 조회 후 각 Plan의 상세 정보(규칙 수, 고급 설정 여부 등)와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        BackupPlan 데이터 클래스 목록
+    """
     backup = get_client(session, "backup", region_name=region)
     plans = []
 

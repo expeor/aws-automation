@@ -1,5 +1,5 @@
 """
-plugins/health/collector.py - AWS Health 이벤트 수집기
+core/shared/aws/health/collector.py - AWS Health 이벤트 수집기
 
 Health 이벤트를 수집하고 패치/유지보수 중심으로 분류합니다.
 - 긴급도별 분류 (critical, high, medium, low)
@@ -27,7 +27,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PatchItem:
-    """패치/유지보수 항목"""
+    """패치/유지보수 항목
+
+    HealthEvent를 패치 분석에 적합한 형태로 가공한 데이터 클래스입니다.
+
+    Attributes:
+        event: 원본 HealthEvent 객체
+        service: AWS 서비스 이름
+        event_type: 이벤트 타입 코드
+        urgency: 긴급도 (critical, high, medium, low)
+        scheduled_date: 예정 일시
+        deadline: 조치 마감 일시
+        affected_resources: 영향받는 리소스 ID 목록
+        action_required: 필요한 조치 설명 (한글)
+        description_summary: 이벤트 설명 요약 (최대 200자)
+    """
 
     event: HealthEvent
     service: str
@@ -41,7 +55,16 @@ class PatchItem:
 
     @classmethod
     def from_event(cls, event: HealthEvent) -> PatchItem:
-        """HealthEvent에서 PatchItem 생성"""
+        """HealthEvent에서 PatchItem 생성
+
+        이벤트 설명을 요약하고, 이벤트 타입 코드에 따라 필요한 조치를 자동 판단합니다.
+
+        Args:
+            event: 원본 HealthEvent 객체
+
+        Returns:
+            변환된 PatchItem 인스턴스
+        """
         # 설명에서 요약 추출 (첫 200자)
         summary = event.description[:200] + "..." if len(event.description) > 200 else event.description
         summary = summary.replace("\n", " ").strip()
@@ -66,7 +89,16 @@ class PatchItem:
 
     @staticmethod
     def _determine_action(event: HealthEvent) -> str:
-        """필요한 조치 판단"""
+        """필요한 조치 판단
+
+        이벤트 타입 코드에서 키워드를 분석하여 한글 조치 메시지를 반환합니다.
+
+        Args:
+            event: HealthEvent 객체
+
+        Returns:
+            필요한 조치 설명 문자열 (한글)
+        """
         code = event.event_type_code.lower()
 
         if "reboot" in code or "restart" in code:
@@ -89,7 +121,17 @@ class PatchItem:
 
 @dataclass
 class CollectionResult:
-    """수집 결과"""
+    """수집 결과
+
+    HealthCollector의 수집 결과를 담는 데이터 클래스입니다.
+
+    Attributes:
+        events: 전체 HealthEvent 목록
+        patches: PatchItem 목록 (긴급도순 정렬)
+        summary_by_urgency: 긴급도별 요약 (count, services, affected_resources)
+        summary_by_service: 서비스별 요약 (count, 긴급도별 개수, affected_resources)
+        summary_by_month: 월별 PatchItem 그룹 ("YYYY-MM" 키)
+    """
 
     events: list[HealthEvent]
     patches: list[PatchItem]
@@ -125,11 +167,25 @@ class CollectionResult:
         return sum(len(p.affected_resources) for p in self.patches)
 
     def get_patches_by_urgency(self, urgency: str) -> list[PatchItem]:
-        """긴급도별 패치 목록"""
+        """긴급도별 패치 목록
+
+        Args:
+            urgency: 긴급도 ("critical", "high", "medium", "low")
+
+        Returns:
+            해당 긴급도의 PatchItem 리스트
+        """
         return [p for p in self.patches if p.urgency == urgency]
 
     def get_patches_by_service(self, service: str) -> list[PatchItem]:
-        """서비스별 패치 목록"""
+        """서비스별 패치 목록
+
+        Args:
+            service: AWS 서비스 이름 (예: "EC2", "RDS")
+
+        Returns:
+            해당 서비스의 PatchItem 리스트
+        """
         return [p for p in self.patches if p.service == service]
 
 
@@ -272,7 +328,14 @@ class HealthCollector:
         return issues
 
     def _summarize_by_urgency(self, patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
-        """긴급도별 요약"""
+        """긴급도별 요약
+
+        Args:
+            patches: PatchItem 목록
+
+        Returns:
+            긴급도를 키로 하는 요약 딕셔너리
+        """
         summary: dict[str, dict[str, Any]] = {}
 
         for patch in patches:
@@ -295,7 +358,14 @@ class HealthCollector:
         return summary
 
     def _summarize_by_service(self, patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
-        """서비스별 요약"""
+        """서비스별 요약
+
+        Args:
+            patches: PatchItem 목록
+
+        Returns:
+            서비스명을 키로 하는 요약 딕셔너리
+        """
         summary: dict[str, dict[str, Any]] = {}
 
         for patch in patches:
@@ -317,7 +387,14 @@ class HealthCollector:
         return summary
 
     def _group_by_month(self, patches: list[PatchItem]) -> dict[str, list[PatchItem]]:
-        """월별 그룹화"""
+        """월별 그룹화
+
+        Args:
+            patches: PatchItem 목록
+
+        Returns:
+            "YYYY-MM" 또는 "미정"을 키로, PatchItem 리스트를 값으로 하는 딕셔너리
+        """
         grouped: dict[str, list[PatchItem]] = {}
 
         for patch in patches:

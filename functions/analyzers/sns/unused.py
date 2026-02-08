@@ -1,5 +1,5 @@
 """
-plugins/sns/unused.py - SNS 미사용 토픽 분석
+functions/analyzers/sns/unused.py - SNS 미사용 토픽 분석
 
 유휴/미사용 SNS 토픽 탐지 (구독자 및 CloudWatch 지표 기반)
 
@@ -46,7 +46,17 @@ REQUIRED_PERMISSIONS = {
 
 
 class TopicStatus(Enum):
-    """토픽 상태"""
+    """SNS 토픽 분석 상태.
+
+    구독자 수 및 CloudWatch 메시지 발행 지표 기반으로 분류한다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 토픽.
+        NO_SUBSCRIBERS: 구독자가 없는 토픽 (메시지는 발행됨).
+        NO_MESSAGES: 분석 기간 동안 메시지 발행이 없는 토픽.
+        LOW_USAGE: 일 평균 메시지 발행이 기준치 미만인 저사용 토픽.
+        UNUSED: 구독자도 없고 메시지 발행도 없는 완전 미사용 토픽.
+    """
 
     NORMAL = "normal"
     NO_SUBSCRIBERS = "no_subscribers"
@@ -57,7 +67,19 @@ class TopicStatus(Enum):
 
 @dataclass
 class SNSTopicInfo:
-    """SNS 토픽 정보"""
+    """SNS 토픽 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 토픽이 위치한 리전.
+        topic_name: 토픽 이름.
+        topic_arn: 토픽 ARN.
+        subscription_count: 구독자 수.
+        messages_published: 분석 기간 동안 발행된 메시지 수 (CloudWatch Sum).
+        notifications_delivered: 분석 기간 동안 전달된 알림 수 (CloudWatch Sum).
+        notifications_failed: 분석 기간 동안 실패한 알림 수 (CloudWatch Sum).
+    """
 
     account_id: str
     account_name: str
@@ -73,7 +95,13 @@ class SNSTopicInfo:
 
 @dataclass
 class TopicFinding:
-    """토픽 분석 결과"""
+    """개별 토픽에 대한 분석 결과.
+
+    Attributes:
+        topic: 분석 대상 토픽 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     topic: SNSTopicInfo
     status: TopicStatus
@@ -82,7 +110,20 @@ class TopicFinding:
 
 @dataclass
 class SNSAnalysisResult:
-    """SNS 분석 결과 집계"""
+    """단일 계정/리전의 SNS 토픽 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_topics: 전체 토픽 수.
+        no_subscribers: 구독자 없는 토픽 수.
+        no_messages: 메시지 발행 없는 토픽 수.
+        low_usage: 저사용 토픽 수.
+        unused_topics: 완전 미사용 토픽 수.
+        normal_topics: 정상 토픽 수.
+        findings: 개별 토픽 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -97,10 +138,19 @@ class SNSAnalysisResult:
 
 
 def collect_sns_topics(session, account_id: str, account_name: str, region: str) -> list[SNSTopicInfo]:
-    """SNS 토픽 수집 (배치 메트릭 최적화)
+    """지정된 계정/리전의 SNS 토픽을 수집하고 CloudWatch 메트릭을 조회한다.
 
-    최적화:
-    - 기존: 토픽당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    1단계에서 토픽 목록과 구독자 수를 수집하고, 2단계에서 batch_get_metrics를 통해
+    메시지 발행/전달/실패 지표를 배치 조회한다. 기존 토픽당 3 API 호출을 전체 1-2 호출로 최적화했다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 SNS 토픽 정보 목록. CloudWatch 메트릭이 포함된다.
     """
     from botocore.exceptions import ClientError
 
@@ -160,12 +210,16 @@ def _collect_sns_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """SNS 메트릭 배치 수집 (내부 함수)
+    """SNS 토픽의 CloudWatch 메트릭을 배치로 수집하여 토픽 객체에 반영한다.
 
-    메트릭:
-    - NumberOfMessagesPublished (Sum)
-    - NumberOfNotificationsDelivered (Sum)
-    - NumberOfNotificationsFailed (Sum)
+    NumberOfMessagesPublished, NumberOfNotificationsDelivered,
+    NumberOfNotificationsFailed 세 가지 메트릭의 Sum 값을 일별(86400초) 기간으로 조회한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        topics: 메트릭을 수집할 SNS 토픽 목록 (결과가 각 객체에 직접 반영됨).
+        start_time: 메트릭 조회 시작 시각 (UTC).
+        end_time: 메트릭 조회 종료 시각 (UTC).
     """
     from botocore.exceptions import ClientError
 
@@ -224,7 +278,20 @@ def _collect_sns_metrics_batch(
 
 
 def analyze_topics(topics: list[SNSTopicInfo], account_id: str, account_name: str, region: str) -> SNSAnalysisResult:
-    """SNS 토픽 분석"""
+    """수집된 SNS 토픽을 분석하여 미사용/저사용 토픽을 식별한다.
+
+    구독자 수와 메시지 발행 지표를 기반으로 UNUSED, NO_SUBSCRIBERS, NO_MESSAGES,
+    LOW_USAGE, NORMAL 상태로 분류한다. 저사용 기준은 일 평균 메시지 발행 수이다.
+
+    Args:
+        topics: 분석 대상 SNS 토픽 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+
+    Returns:
+        SNS 토픽 분석 결과 집계 객체.
+    """
     result = SNSAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -295,7 +362,17 @@ def analyze_topics(topics: list[SNSTopicInfo], account_id: str, account_name: st
 
 
 def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """SNS 미사용 토픽 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 Topics 시트(비정상 토픽 상세)를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -376,7 +453,19 @@ def generate_report(results: list[SNSAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SNSAnalysisResult | None:
-    """단일 계정/리전의 SNS 토픽 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 SNS 토픽을 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 토픽이 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        분석 결과 객체. 토픽이 없으면 None.
+    """
     topics = collect_sns_topics(session, account_id, account_name, region)
     if not topics:
         return None
@@ -384,7 +473,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """SNS 미사용 토픽 분석"""
+    """SNS 미사용 토픽 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]SNS 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="sns")

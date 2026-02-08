@@ -1,5 +1,5 @@
 """
-plugins/kms/audit.py - KMS 감사 보고서
+functions/analyzers/kms/audit.py - KMS 감사 보고서
 
 KMS 키 보안 감사:
 - 자동 로테이션 비활성화 CMK 탐지
@@ -41,7 +41,16 @@ REQUIRED_PERMISSIONS = {
 
 
 class RiskLevel(Enum):
-    """위험도"""
+    """KMS 키 정책 위험도 수준.
+
+    키 정책 분석 결과의 심각도를 분류한다.
+
+    Attributes:
+        HIGH: 무제한 Principal(*) 등 즉시 조치가 필요한 고위험 이슈.
+        MEDIUM: 외부 계정 접근 허용, 광범위 Action 등 검토가 필요한 중위험 이슈.
+        LOW: 정책 파싱 실패 등 참고 수준의 저위험 이슈.
+        INFO: 정보성 항목 (이슈 없음).
+    """
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -51,7 +60,13 @@ class RiskLevel(Enum):
 
 @dataclass
 class PolicyFinding:
-    """정책 분석 결과"""
+    """KMS 키 정책 분석에서 발견된 개별 이슈.
+
+    Attributes:
+        risk_level: 이슈의 위험도 수준.
+        issue: 이슈 제목 (무제한 Principal, 외부 계정 접근 허용 등).
+        detail: 이슈 상세 설명.
+    """
 
     risk_level: RiskLevel
     issue: str
@@ -60,7 +75,13 @@ class PolicyFinding:
 
 @dataclass
 class GrantInfo:
-    """권한 부여 정보"""
+    """KMS 키 권한 부여(Grant) 정보.
+
+    Attributes:
+        grantee_principal: 권한을 부여받은 Principal ARN.
+        operations: 허용된 KMS 작업 목록 (Encrypt, Decrypt, GenerateDataKey 등).
+        constraints: 권한 부여 조건 문자열 (EncryptionContext 등).
+    """
 
     grantee_principal: str
     operations: list[str]
@@ -69,7 +90,21 @@ class GrantInfo:
 
 @dataclass
 class KMSKeyAudit:
-    """KMS 키 감사 결과"""
+    """개별 KMS CMK에 대한 감사 결과.
+
+    로테이션 설정, 키 정책 분석 결과, 권한 부여(Grant) 현황을 포함한다.
+
+    Attributes:
+        key_id: KMS 키 ID.
+        arn: KMS 키 ARN.
+        alias: 키 별칭 (alias/xxx 형식, 없으면 빈 문자열).
+        description: 키 설명.
+        key_state: 키 상태 (Enabled, Disabled, PendingDeletion 등).
+        creation_date: 키 생성 시각.
+        rotation_enabled: 자동 키 로테이션 활성화 여부.
+        policy_findings: 키 정책 분석에서 발견된 이슈 목록.
+        grants: 키에 부여된 Grant 목록.
+    """
 
     key_id: str
     arn: str
@@ -86,14 +121,29 @@ class KMSKeyAudit:
 
     @property
     def has_rotation_issue(self) -> bool:
+        """자동 키 로테이션이 비활성화되었는지 여부.
+
+        Returns:
+            로테이션이 비활성화이면 True.
+        """
         return not self.rotation_enabled
 
     @property
     def has_policy_issue(self) -> bool:
+        """HIGH 또는 MEDIUM 수준의 정책 이슈가 있는지 여부.
+
+        Returns:
+            HIGH/MEDIUM 이슈가 하나라도 있으면 True.
+        """
         return any(f.risk_level in (RiskLevel.HIGH, RiskLevel.MEDIUM) for f in self.policy_findings)
 
     @property
     def max_risk_level(self) -> RiskLevel:
+        """정책 이슈 중 가장 높은 위험도 수준.
+
+        Returns:
+            가장 높은 RiskLevel. 이슈가 없으면 INFO.
+        """
         if not self.policy_findings:
             return RiskLevel.INFO
         levels = [f.risk_level for f in self.policy_findings]
@@ -108,7 +158,19 @@ class KMSKeyAudit:
 
 @dataclass
 class KMSAuditResult:
-    """KMS 감사 결과 집계"""
+    """계정/리전별 KMS 감사 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_cmk: 분석된 CMK 수.
+        rotation_disabled: 자동 로테이션 미설정 CMK 수.
+        high_risk: HIGH 수준 정책 이슈가 있는 CMK 수.
+        medium_risk: MEDIUM 수준 정책 이슈가 있는 CMK 수.
+        total_grants: 전체 Grant 수.
+        audits: 개별 CMK 감사 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -122,7 +184,18 @@ class KMSAuditResult:
 
 
 def analyze_key_policy(policy_str: str, account_id: str) -> list[PolicyFinding]:
-    """키 정책 분석"""
+    """KMS 키 정책 JSON을 분석하여 보안 이슈를 탐지한다.
+
+    * Principal 허용, 외부 계정 접근, 광범위 Action(kms:*, *) 등을
+    검사하고 Condition 유무에 따라 위험도를 차등 부여한다.
+
+    Args:
+        policy_str: 키 정책 JSON 문자열.
+        account_id: 해당 키가 속한 AWS 계정 ID (외부 계정 판별용).
+
+    Returns:
+        발견된 PolicyFinding 목록.
+    """
     findings = []
 
     try:
@@ -214,7 +287,20 @@ def analyze_key_policy(policy_str: str, account_id: str) -> list[PolicyFinding]:
 
 
 def collect_kms_audit(session, account_id: str, account_name: str, region: str) -> list[KMSKeyAudit]:
-    """KMS 키 감사 정보 수집"""
+    """KMS CMK의 감사 정보를 수집한다.
+
+    활성 상태(Enabled)인 CMK만 대상으로 로테이션 상태, 키 정책,
+    Grant 현황을 수집한다. AWS 관리 키(aws/*)는 제외한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 KMSKeyAudit 목록.
+    """
     from botocore.exceptions import ClientError
 
     kms = get_client(session, "kms", region_name=region)
@@ -308,7 +394,19 @@ def collect_kms_audit(session, account_id: str, account_name: str, region: str) 
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> KMSAuditResult | None:
-    """병렬 실행용"""
+    """parallel_collect 콜백: 단일 계정/리전의 KMS CMK를 감사한다.
+
+    감사 정보를 수집한 뒤 로테이션 미설정, 정책 위험도, Grant 수를 집계한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        KMS 감사 결과. CMK가 없으면 None.
+    """
     audits = collect_kms_audit(session, account_id, account_name, region)
 
     if not audits:
@@ -335,7 +433,18 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """KMS 감사 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계), Rotation(로테이션 현황), Policy Issues(정책 이슈),
+    Grants(권한 부여 현황) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 KMS 감사 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -489,7 +598,14 @@ def generate_report(results: list[KMSAuditResult], output_dir: str) -> str:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """KMS 감사 보고서"""
+    """KMS 감사 도구의 메인 실행 함수.
+
+    KMS CMK의 보안 상태를 점검하여 자동 로테이션 미설정, 위험한 키 정책,
+    권한 부여(Grant) 현황을 분석하고 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]KMS 감사 시작...[/bold]\n")
     console.print("[dim]분석 항목: 키 로테이션, 키 정책, 권한 부여(Grants)[/dim]\n")
 

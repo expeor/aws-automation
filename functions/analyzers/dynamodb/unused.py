@@ -1,5 +1,5 @@
 """
-plugins/dynamodb/unused.py - DynamoDB 미사용 테이블 분석
+functions/analyzers/dynamodb/unused.py - DynamoDB 미사용 테이블 분석
 
 유휴/저사용 DynamoDB 테이블 탐지 (CloudWatch 지표 기반)
 
@@ -57,7 +57,11 @@ LOW_USAGE_THRESHOLD_PERCENT = 30
 
 
 class TableStatus(Enum):
-    """테이블 상태"""
+    """DynamoDB 테이블 사용 상태 분류.
+
+    CloudWatch 지표(ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits)를
+    기반으로 유휴/저사용/정상 상태를 분류한다.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -66,7 +70,24 @@ class TableStatus(Enum):
 
 @dataclass
 class TableInfo:
-    """DynamoDB 테이블 정보"""
+    """DynamoDB 테이블 메타데이터 및 CloudWatch 지표 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        table_name: DynamoDB 테이블 이름.
+        table_status: 테이블 상태 (예: ACTIVE).
+        billing_mode: 용량 모드 (PROVISIONED 또는 PAY_PER_REQUEST).
+        item_count: 테이블 아이템 수.
+        size_bytes: 테이블 크기 (bytes).
+        provisioned_read: 프로비저닝된 읽기 용량 단위 (RCU).
+        provisioned_write: 프로비저닝된 쓰기 용량 단위 (WCU).
+        consumed_read: 7일 평균 소비 읽기 용량.
+        consumed_write: 7일 평균 소비 쓰기 용량.
+        throttled_requests: 7일간 쓰로틀링 발생 횟수.
+        created_at: 테이블 생성 시각.
+    """
 
     account_id: str
     account_name: str
@@ -86,12 +107,22 @@ class TableInfo:
 
     @property
     def size_mb(self) -> float:
-        """테이블 크기 (MB)"""
+        """테이블 크기를 MB 단위로 반환한다.
+
+        Returns:
+            테이블 크기 (MB).
+        """
         return self.size_bytes / (1024 * 1024)
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (pricing 모듈 사용)"""
+        """Pricing 모듈을 사용하여 월간 예상 비용을 계산한다.
+
+        billing_mode에 따라 On-Demand 또는 Provisioned 비용을 계산한다.
+
+        Returns:
+            월간 예상 비용 (USD).
+        """
         storage_gb = self.size_bytes / (1024**3)
 
         if self.billing_mode == "PAY_PER_REQUEST":
@@ -117,7 +148,13 @@ class TableInfo:
 
 @dataclass
 class TableFinding:
-    """테이블 분석 결과"""
+    """개별 DynamoDB 테이블의 분석 결과.
+
+    Attributes:
+        table: 분석 대상 테이블 정보.
+        status: 분석된 사용 상태.
+        recommendation: 권장 조치 사항 문자열.
+    """
 
     table: TableInfo
     status: TableStatus
@@ -126,7 +163,20 @@ class TableFinding:
 
 @dataclass
 class DynamoDBAnalysisResult:
-    """DynamoDB 분석 결과 집계"""
+    """단일 계정/리전의 DynamoDB 미사용 테이블 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        total_tables: 전체 테이블 수.
+        unused_tables: 미사용 테이블 수.
+        low_usage_tables: 저사용 테이블 수.
+        normal_tables: 정상 테이블 수.
+        unused_monthly_cost: 미사용 테이블 월간 비용 합계 (USD).
+        low_usage_monthly_cost: 저사용 테이블 월간 비용 합계 (USD).
+        findings: 개별 테이블별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -141,10 +191,22 @@ class DynamoDBAnalysisResult:
 
 
 def collect_dynamodb_tables(session, account_id: str, account_name: str, region: str) -> list[TableInfo]:
-    """DynamoDB 테이블 수집 (배치 메트릭 최적화)
+    """DynamoDB 테이블 목록 수집 및 CloudWatch 메트릭 배치 조회.
+
+    ListTables + DescribeTable로 테이블 메타데이터를 수집한 후,
+    GetMetricData API를 사용하여 CloudWatch 지표를 배치로 조회한다.
 
     최적화:
-    - 기존: 테이블당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    - 기존: 테이블당 3 API 호출 -> 최적화: 전체 1-2 API 호출
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        TableInfo 목록.
     """
     from botocore.exceptions import ClientError
 
@@ -215,11 +277,20 @@ def _collect_dynamodb_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """DynamoDB 테이블 메트릭 배치 수집 (내부 함수)
+    """DynamoDB 테이블의 CloudWatch 메트릭을 배치로 수집한다.
+
+    ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ThrottledRequests
+    메트릭을 GetMetricData API로 한 번에 조회하여 각 테이블에 매핑한다.
 
     최적화:
     - 기존: 테이블당 3 API 호출 (read, write, throttle)
     - 최적화: 전체 테이블 1-2 API 호출 (500개 단위 자동 분할)
+
+    Args:
+        cloudwatch: CloudWatch boto3 client.
+        tables: 메트릭을 수집할 DynamoDB 테이블 목록.
+        start_time: 조회 시작 시각 (UTC).
+        end_time: 조회 종료 시각 (UTC).
     """
     from botocore.exceptions import ClientError
 
@@ -291,7 +362,20 @@ def _collect_dynamodb_metrics_batch(
 
 
 def analyze_tables(tables: list[TableInfo], account_id: str, account_name: str, region: str) -> DynamoDBAnalysisResult:
-    """DynamoDB 테이블 분석"""
+    """DynamoDB 테이블을 CloudWatch 지표 기준으로 분석하여 유휴/저사용을 판별한다.
+
+    미사용: 읽기/쓰기 소비 용량이 모두 0.
+    저사용: Provisioned 모드에서 사용량이 프로비저닝의 30% 미만 (AWS nOps 기준).
+
+    Args:
+        tables: 분석할 DynamoDB 테이블 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과 집계 (DynamoDBAnalysisResult).
+    """
     result = DynamoDBAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -343,7 +427,17 @@ def analyze_tables(tables: list[TableInfo], account_id: str, account_name: str, 
 
 
 def generate_report(results: list[DynamoDBAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """DynamoDB 미사용 테이블 분석 Excel 보고서를 생성한다.
+
+    Summary 시트(계정/리전별 집계)와 Tables 시트(미사용/저사용 테이블 상세)를 포함.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        저장된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -438,7 +532,19 @@ def generate_report(results: list[DynamoDBAnalysisResult], output_dir: str) -> s
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> DynamoDBAnalysisResult | None:
-    """단일 계정/리전의 DynamoDB 테이블 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 DynamoDB 테이블을 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 병렬로 실행된다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과. 테이블이 없으면 None.
+    """
     tables = collect_dynamodb_tables(session, account_id, account_name, region)
     if not tables:
         return None
@@ -446,7 +552,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """DynamoDB 미사용 테이블 분석"""
+    """DynamoDB 미사용 테이블 분석 도구의 진입점.
+
+    멀티 계정/리전 병렬 수집 후 콘솔 요약 출력, Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 리전, 출력 설정 포함).
+    """
     console.print("[bold]DynamoDB 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="dynamodb")

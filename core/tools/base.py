@@ -1,22 +1,21 @@
-# internal/tools/base.py
-"""
-BaseToolRunner - 모든 도구 Runner의 공통 베이스 클래스
+"""모든 도구 Runner의 공통 베이스 클래스.
 
 각 서비스의 runner.py는 이 클래스를 상속받아 구현합니다.
-internal/flow/runner.py에서 동적으로 로드하여 실행합니다.
+core/cli/flow/runner.py에서 동적으로 로드하여 실행합니다.
 
-Usage:
-    # internal/tools/{service}/runner.py
-    from core.tools.base import BaseToolRunner
+Example:
+    ::
 
-    class ToolRunner(BaseToolRunner):
-        def get_tools(self) -> dict:
-            return {
-                "도구이름": self._run_some_tool,
-            }
+        from core.tools.base import BaseToolRunner
 
-        def _run_some_tool(self) -> None:
-            ...
+        class ToolRunner(BaseToolRunner):
+            def get_tools(self) -> dict:
+                return {
+                    "도구이름": self._run_some_tool,
+                }
+
+            def _run_some_tool(self) -> None:
+                ...
 """
 
 from abc import ABC, abstractmethod
@@ -31,7 +30,11 @@ if TYPE_CHECKING:
 
 
 def _get_console() -> "Console":
-    """Lazy console 인스턴스 반환"""
+    """Rich Console 인스턴스를 lazy하게 생성하여 반환합니다.
+
+    Returns:
+        Rich Console 인스턴스.
+    """
     from rich.console import Console
 
     return Console()
@@ -67,8 +70,12 @@ class BaseToolRunner(ABC):
     start_url: str | None = None
     session_name: str | None = None
 
-    def __post_init__(self):
-        """ctx에서 값 추출하여 하위 호환 필드 설정"""
+    def __post_init__(self) -> None:
+        """ctx에서 값을 추출하여 하위 호환 필드를 설정합니다.
+
+        ExecutionContext가 제공된 경우, regions, profiles, SSO 정보를
+        자동으로 하위 호환 필드에 복사합니다.
+        """
         if self.ctx:
             # regions 설정
             if not self.regions and self.ctx.regions:

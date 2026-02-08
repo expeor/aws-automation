@@ -1,23 +1,31 @@
 """
-plugins/resource_explorer/common/services - 서비스별 수집기
+core/shared/aws/inventory/services - 서비스별 리소스 수집기 패키지
 
-각 AWS 서비스별 리소스 수집 로직.
+각 AWS 서비스별 리소스 수집 로직을 제공합니다.
 
-카테고리:
-- Network: VPC, Subnet, RouteTable, InternetGateway, ElasticIP, ENI, NATGateway, VPCEndpoint
-          TransitGateway, TransitGatewayAttachment, VPNGateway, VPNConnection, NetworkACL, VPCPeering
-- Compute: EC2, EBSVolume, LambdaFunction, ECSCluster, ECSService
-           AutoScalingGroup, LaunchTemplate, EKSCluster, EKSNodeGroup, AMI, Snapshot
-- Database/Storage: RDSInstance, RDSCluster, S3Bucket, DynamoDBTable, ElastiCacheCluster
-                    RedshiftCluster, EFSFileSystem, FSxFileSystem
-- Security: SecurityGroup, KMSKey, Secret, IAMRole, IAMUser, IAMPolicy, ACMCertificate, WAFWebACL
-- CDN/DNS: CloudFrontDistribution, Route53HostedZone
-- Load Balancing: LoadBalancer, TargetGroup
-- Integration/Messaging: SNSTopic, SQSQueue, EventBridgeRule, StepFunction, APIGatewayAPI
-- Monitoring: CloudWatchAlarm, CloudWatchLogGroup
-- Analytics: KinesisStream, KinesisFirehose, GlueDatabase
-- DevOps: CloudFormationStack, CodePipeline, CodeBuildProject
-- Backup: BackupVault, BackupPlan
+각 서비스 모듈은 ``collect_*`` 함수를 제공하며, 단일 계정/리전에서 해당 리소스를
+수집합니다. 이 함수들은 ``InventoryCollector``에서 ``parallel_collect``를 통해
+멀티 계정/리전으로 확장됩니다. ``helpers`` 모듈은 태그 파싱, 보안 규칙 분석 등
+유틸리티 함수를 제공합니다.
+
+카테고리 (11개, 총 60종):
+    - Network (14): VPC, Subnet, RouteTable, InternetGateway, ElasticIP, ENI,
+      NATGateway, VPCEndpoint, TransitGateway, TransitGatewayAttachment,
+      VPNGateway, VPNConnection, NetworkACL, VPCPeeringConnection
+    - Compute (11): EC2Instance, EBSVolume, LambdaFunction, ECSCluster, ECSService,
+      AutoScalingGroup, LaunchTemplate, EKSCluster, EKSNodeGroup, AMI, Snapshot
+    - Database/Storage (8): RDSInstance, RDSCluster, S3Bucket, DynamoDBTable,
+      ElastiCacheCluster, RedshiftCluster, EFSFileSystem, FSxFileSystem
+    - Security (8): SecurityGroup, KMSKey, Secret, IAMRole, IAMUser, IAMPolicy,
+      ACMCertificate, WAFWebACL
+    - CDN/DNS (2): CloudFrontDistribution, Route53HostedZone
+    - Load Balancing (2): LoadBalancer, TargetGroup
+    - Integration/Messaging (5): SNSTopic, SQSQueue, EventBridgeRule, StepFunction,
+      APIGatewayAPI
+    - Monitoring (2): CloudWatchAlarm, CloudWatchLogGroup
+    - Analytics (3): KinesisStream, KinesisFirehose, GlueDatabase
+    - DevOps (3): CloudFormationStack, CodePipeline, CodeBuildProject
+    - Backup (2): BackupVault, BackupPlan
 """
 
 # Network (Basic)

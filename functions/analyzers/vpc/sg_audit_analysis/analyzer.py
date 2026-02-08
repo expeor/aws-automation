@@ -27,7 +27,15 @@ from .critical_ports import (
 
 
 class SGStatus(Enum):
-    """Security Group 상태"""
+    """Security Group의 사용 상태를 분류하는 열거형.
+
+    ENI 연결 및 다른 SG의 참조 여부를 기반으로 판별한다.
+
+    Attributes:
+        ACTIVE: ENI가 연결되어 있거나 다른 SG에서 참조 중인 활성 SG.
+        UNUSED: ENI 연결 없고 다른 SG에서도 참조되지 않는 미사용 SG.
+        DEFAULT_SG: VPC 기본 SG (삭제 불가, 규칙 정리만 가능).
+    """
 
     ACTIVE = "Active"
     UNUSED = "Unused"
@@ -35,7 +43,15 @@ class SGStatus(Enum):
 
 
 class RuleStatus(Enum):
-    """Security Group Rule 상태"""
+    """Security Group Rule의 유효성 상태를 분류하는 열거형.
+
+    SG 참조 규칙에서 참조 대상의 존재/사용 여부를 기반으로 판별한다.
+
+    Attributes:
+        ACTIVE: 유효한 규칙.
+        STALE_SG_DELETED: 참조된 SG가 존재하지 않는 Stale 규칙.
+        STALE_SG_UNUSED: 참조된 SG에 ENI가 연결되지 않은 Stale 규칙.
+    """
 
     ACTIVE = "Active"
     STALE_SG_DELETED = "Stale (referenced SG not found)"
@@ -44,7 +60,14 @@ class RuleStatus(Enum):
 
 @dataclass
 class SGAnalysisResult:
-    """SG 분석 결과"""
+    """개별 Security Group에 대한 분석 결과.
+
+    Attributes:
+        sg: 분석 대상 SecurityGroup 인스턴스.
+        status: SG 사용 상태 (Active, Unused, Default SG).
+        unused_reasons: 미사용 판단 근거 목록.
+        action_recommendation: 권장 조치 사항.
+    """
 
     sg: SecurityGroup
     status: SGStatus
@@ -54,7 +77,34 @@ class SGAnalysisResult:
 
 @dataclass
 class RuleAnalysisResult:
-    """Rule 분석 결과"""
+    """개별 Security Group Rule에 대한 분석 결과.
+
+    Stale 여부, 위험도 평가, 추가 경고 사항을 포함한다.
+
+    Attributes:
+        sg_id: 소속 Security Group ID.
+        sg_name: Security Group 이름.
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        region: AWS 리전 코드.
+        rule: 분석 대상 SGRule 인스턴스.
+        status: 규칙 유효성 상태 (Active, Stale).
+        stale_reason: Stale 판단 사유.
+        is_open_to_world: 0.0.0.0/0 또는 ::/0 허용 여부.
+        is_wide_cidr: CIDR prefix가 /24 미만인 넓은 범위 여부.
+        cidr_prefix: CIDR prefix 길이 (CIDR이 아니면 -1).
+        is_all_ports: 모든 포트 허용 여부.
+        is_all_protocols: 모든 프로토콜 허용 여부.
+        exposed_critical_ports: 노출된 위험 포트 목록.
+        risk_level: 위험도 등급 (HIGH, MEDIUM, LOW, 또는 빈 문자열).
+        is_egress_all_open: Egress ALL + 0.0.0.0/0 여부 (데이터 유출 위험).
+        is_self_all_ports: Self 참조 + ALL 포트 여부 (횡이동 위험).
+        is_cross_account: Cross-account SG 참조 여부.
+        cross_account_id: 참조된 외부 계정 ID.
+        has_no_description: 규칙 설명 미작성 여부.
+        hidden_risky_ports: 넓은 포트 범위에 포함된 위험 포트 목록.
+        warnings: 추가 경고 메시지 목록.
+    """
 
     sg_id: str
     sg_name: str
@@ -85,14 +135,25 @@ class RuleAnalysisResult:
 
 
 class SGAnalyzer:
-    """Security Group 분석기"""
+    """Security Group 보안 분석기.
+
+    SG 미사용 여부, 규칙 Stale 판단, 위험 포트 노출,
+    AWS Trusted Advisor 기준 Risk Level 평가를 수행한다.
+
+    Args:
+        security_groups: 분석 대상 SecurityGroup 목록.
+    """
 
     def __init__(self, security_groups: list[SecurityGroup]):
         self.security_groups = security_groups
         self.sg_map: dict[str, SecurityGroup] = {sg.sg_id: sg for sg in security_groups}
 
     def analyze(self) -> tuple[list[SGAnalysisResult], list[RuleAnalysisResult]]:
-        """전체 분석 실행"""
+        """모든 Security Group과 규칙에 대해 보안 분석을 수행한다.
+
+        Returns:
+            (SG 분석 결과 목록, Rule 분석 결과 목록) 튜플.
+        """
         sg_results = []
         rule_results = []
 
@@ -109,7 +170,7 @@ class SGAnalyzer:
         return sg_results, rule_results
 
     def _analyze_sg(self, sg: SecurityGroup) -> SGAnalysisResult:
-        """단일 SG 분석"""
+        """개별 Security Group의 사용 상태를 분석한다."""
         unused_reasons = []
         status = SGStatus.ACTIVE
 
@@ -154,7 +215,7 @@ class SGAnalyzer:
         )
 
     def _analyze_rule(self, sg: SecurityGroup, rule: SGRule) -> RuleAnalysisResult:
-        """단일 Rule 분석"""
+        """개별 규칙의 Stale 여부, 위험도, 추가 경고를 분석한다."""
         status = RuleStatus.ACTIVE
         stale_reason = ""
         warnings: list[str] = []
@@ -395,7 +456,7 @@ class SGAnalyzer:
             return []
 
     def _get_cidr_prefix(self, source_dest: str) -> int:
-        """CIDR prefix 길이 추출 (CIDR이 아니면 -1)"""
+        """CIDR 문자열에서 prefix 길이를 추출한다. CIDR이 아니면 -1을 반환."""
         if "/" not in source_dest:
             return -1
         try:
@@ -405,7 +466,14 @@ class SGAnalyzer:
             return -1
 
     def get_summary(self, sg_results: list[SGAnalysisResult]) -> dict[str, dict[str, Any]]:
-        """계정/리전별 요약 통계"""
+        """계정/리전별 SG 현황 요약 통계를 생성한다.
+
+        Args:
+            sg_results: SGAnalysisResult 목록.
+
+        Returns:
+            ``{account_id/region: {total, active, unused, default_sg, ...}}`` 딕셔너리.
+        """
         summary: dict[str, dict[str, Any]] = {}
 
         for result in sg_results:

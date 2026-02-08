@@ -1,7 +1,10 @@
-"""
-core/tools/cache/path.py - 캐시 경로 유틸리티
+"""캐시 경로 유틸리티.
 
-모든 캐시는 프로젝트 루트의 temp/ 디렉토리에 저장됩니다.
+모든 캐시는 프로젝트 루트의 ``temp/`` 디렉토리에 저장됩니다.
+캐시 루트 경로 상수와 카테고리별 캐시 디렉토리/파일 경로 생성 함수를 제공합니다.
+
+Attributes:
+    CACHE_ROOT: 캐시 루트 디렉토리 절대 경로 (``{project_root}/temp``).
 """
 
 import os
@@ -9,9 +12,13 @@ from pathlib import Path
 
 
 def _get_project_root() -> str:
-    """프로젝트 루트 경로 반환
+    """프로젝트 루트 경로를 반환합니다.
 
-    core/tools/cache/path.py → core/tools/cache/ → core/tools/ → core/ → project_root/
+    파일 위치 기준으로 4단계 상위 디렉토리를 계산합니다:
+    ``core/tools/cache/path.py`` -> ``core/tools/cache/`` -> ``core/tools/`` -> ``core/`` -> ``project_root/``
+
+    Returns:
+        프로젝트 루트 디렉토리 절대 경로 문자열.
     """
     current = Path(__file__).resolve()
     return str(current.parent.parent.parent.parent)

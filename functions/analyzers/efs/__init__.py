@@ -1,5 +1,11 @@
 """
-plugins/efs - EFS File System Management Tools
+functions/analyzers/efs - EFS 파일시스템 관리 도구
+
+EFS 파일시스템의 사용 현황을 분석하고
+유휴 또는 미사용 파일시스템을 탐지합니다.
+
+도구 목록:
+    - unused: 유휴/미사용 EFS 파일시스템 탐지
 """
 
 CATEGORY = {

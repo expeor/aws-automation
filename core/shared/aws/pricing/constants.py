@@ -1,8 +1,15 @@
 """
-plugins/cost/pricing/constants.py - 가격 모듈 상수 및 기본값
+core/shared/aws/pricing/constants.py - 가격 모듈 중앙 상수 및 기본값
 
-모든 기본 가격 값과 상수를 중앙 관리합니다.
-API 실패 시 fallback으로 사용됩니다.
+모든 서비스의 기본 가격과 공통 상수를 중앙에서 관리한다.
+AWS Pricing API 호출 실패 시 fallback 가격으로 사용되며,
+ap-northeast-2(서울) 리전 기준 2025년 가격이다.
+
+상수:
+    - ``HOURS_PER_MONTH``: 월간 시간 (730h = 365일 * 24h / 12개월)
+    - ``LAMBDA_FREE_TIER_REQUESTS``: Lambda 무료 티어 월간 요청 수 (100만)
+    - ``LAMBDA_FREE_TIER_GB_SECONDS``: Lambda 무료 티어 월간 GB-초 (40만)
+    - ``DEFAULT_PRICES``: 서비스별 기본 가격 딕셔너리 (14개 서비스)
 """
 
 from __future__ import annotations
@@ -174,12 +181,20 @@ DEFAULT_PRICES: dict[str, dict[str, float]] = {
 
 
 def get_default_prices(service: str) -> dict[str, float]:
-    """서비스별 기본 가격 반환
+    """서비스별 기본 가격(fallback) 딕셔너리의 복사본을 반환한다.
+
+    ``DEFAULT_PRICES`` 에서 해당 서비스의 가격 맵을 복사하여 반환한다.
+    호출자가 반환값을 수정해도 원본 상수에 영향을 주지 않는다.
 
     Args:
-        service: 서비스 코드 (ec2, ebs, sagemaker 등)
+        service: AWS 서비스 코드 (예: ``"ec2"``, ``"ebs"``, ``"sagemaker"``,
+            ``"nat"``, ``"lambda"`` 등 ``DEFAULT_PRICES`` 의 키)
 
     Returns:
-        기본 가격 딕셔너리 (없으면 빈 딕셔너리)
+        기본 가격 딕셔너리의 shallow copy. 등록되지 않은 서비스이면 빈 딕셔너리.
+
+    Example:
+        >>> get_default_prices("ec2")
+        {"t3.nano": 0.0052, "t3.micro": 0.0104, ...}
     """
     return DEFAULT_PRICES.get(service, {}).copy()

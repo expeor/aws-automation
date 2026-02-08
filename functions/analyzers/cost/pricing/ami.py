@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/ami.py - Amazon AMI 가격 조회
+functions/analyzers/cost/pricing/ami.py - Amazon AMI 가격 조회
 
 AMI 비용 계산:
 - AMI 자체는 무료, 스냅샷 스토리지 비용만 발생

@@ -1,17 +1,23 @@
 """
-plugins/cost/pricing/transfer.py - AWS Transfer Family 가격 조회
+core/shared/aws/pricing/transfer.py - AWS Transfer Family 가격 조회
 
-Transfer Family 비용 계산:
-- 프로토콜 엔드포인트 시간당 비용: $0.30/hour (SFTP, FTPS, FTP, AS2)
+Transfer Family 프로토콜 엔드포인트의 시간당/월간 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격으로 fallback한다.
+
+비용 구조:
+    - 프로토콜 엔드포인트: $0.30/hour (SFTP, FTPS, FTP, AS2 동일)
+    - 각 프로토콜마다 별도 과금
 
 사용법:
-    from functions.analyzers.cost.pricing.transfer import get_transfer_hourly_price, get_transfer_monthly_cost
+    from core.shared.aws.pricing.transfer import (
+        get_transfer_hourly_price,
+        get_transfer_monthly_cost,
+    )
 
-    # 시간당 가격
-    hourly = get_transfer_hourly_price("ap-northeast-2")
-
-    # 월간 비용
-    monthly = get_transfer_monthly_cost("ap-northeast-2", protocols=["SFTP", "FTPS"])
+    # SFTP + FTPS 2개 프로토콜 월간 비용
+    monthly = get_transfer_monthly_cost(
+        "ap-northeast-2", protocols=["SFTP", "FTPS"]
+    )
 """
 
 from __future__ import annotations
