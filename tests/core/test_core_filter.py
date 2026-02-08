@@ -5,7 +5,7 @@ tests/test_core_filter.py - core/filter.py 테스트
 import pytest
 
 from core.auth.types import AccountInfo
-from core.filter import (
+from core.region.filter import (
     AccountFilter,
     expand_region_pattern,
     filter_accounts_by_pattern,

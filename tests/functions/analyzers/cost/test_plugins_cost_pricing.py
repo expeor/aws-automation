@@ -166,7 +166,7 @@ class TestClearCache:
 
     def test_clear_all(self, temp_cache_setup):
         """전체 캐시 삭제"""
-        with patch("functions.analyzers.cost.pricing.cache._cache") as mock_cache:
+        with patch("core.shared.aws.pricing.cache._cache") as mock_cache:
             mock_cache.cache_dir = temp_cache_setup
             mock_cache.invalidate.return_value = True
 

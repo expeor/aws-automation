@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from core.cli.flow.context import RoleSelection
 
 from core.cli.i18n import t
-from core.filter import expand_region_pattern
+from core.region.filter import expand_region_pattern
 
 console = Console()
 

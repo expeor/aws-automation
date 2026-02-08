@@ -11,6 +11,15 @@ from .availability import (
     validate_regions,
 )
 from .data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
+from .filter import (
+    AccountFilter,
+    expand_region_pattern,
+    filter_accounts_by_pattern,
+    filter_strings_by_pattern,
+    match_any_pattern,
+    match_pattern,
+    parse_patterns,
+)
 
 __all__: list[str] = [
     # 리전 데이터
@@ -25,4 +34,12 @@ __all__: list[str] = [
     "filter_available_regions",
     "validate_regions",
     "reset_region_checkers",
+    # 필터링
+    "AccountFilter",
+    "expand_region_pattern",
+    "filter_accounts_by_pattern",
+    "filter_strings_by_pattern",
+    "match_any_pattern",
+    "match_pattern",
+    "parse_patterns",
 ]

@@ -70,7 +70,7 @@ from typing import TYPE_CHECKING, Any, Literal
 if TYPE_CHECKING:
     from core.auth import AccountInfo, Provider
     from core.cli.ui.timeline import TimelineTracker
-    from core.filter import AccountFilter
+    from core.region.filter import AccountFilter
     from core.shared.aws.inventory import InventoryCollector
     from core.shared.io.config import OutputConfig
 

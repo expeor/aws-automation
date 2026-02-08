@@ -20,7 +20,7 @@ Claude Code의 토큰 사용량을 줄이고 프로젝트 탐색을 빠르게 �
 ### 1. 스크립트 실행
 
 ```bash
-python core/scripts/generate_index.py
+python scripts/generate_index.py
 ```
 
 스크립트가 수행하는 작업:
@@ -94,7 +94,7 @@ head -50 .claude/project-index.md
 
 ## 참조 파일
 
-- `core/scripts/generate_index.py` - 인덱스 생성 스크립트
+- `scripts/generate_index.py` - 인덱스 생성 스크립트
 - `.claude/project-index.md` - 생성된 인덱스 (읽기 전용)
 - `CLAUDE.md` - 프로젝트 규칙 (Progressive Disclosure)
 

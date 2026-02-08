@@ -18,7 +18,7 @@ Usage:
         print("서울 리전 사용 가능")
 
     # 리전 패턴 필터링과 함께 사용
-    from core.filter import expand_region_pattern
+    from core.region.filter import expand_region_pattern
     requested = expand_region_pattern("ap-*")
     available = checker.filter_available_regions(requested)
 """

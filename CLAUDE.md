@@ -24,13 +24,13 @@ aws-automation/
 │   ├── auth/           # 인증
 │   ├── parallel/       # 병렬 처리
 │   ├── tools/          # 도구 관리
-│   ├── region/         # 리전
+│   ├── region/         # 리전 + 필터링
 │   ├── cli/            # Click CLI, 플로우, UI, i18n
-│   ├── shared/         # 공유 유틸리티 (AWS, I/O)
-│   └── scripts/        # 개발 도구
+│   └── shared/         # 공유 유틸리티 (AWS, I/O)
 ├── functions/          # 기능 모듈
 │   ├── analyzers/      # AWS 서비스별 분석 도구 (30개 카테고리)
 │   └── reports/        # 종합 리포트 (cost_dashboard, inventory, ip_search, log_analyzer)
+├── scripts/            # 개발 도구 (generate_index.py)
 └── tests/              # pytest 테스트
 ```
 
@@ -55,9 +55,10 @@ core/
 │   ├── discovery.py      # 플러그인/리포트 발견
 │   ├── history/          # 사용 기록, 즐겨찾기
 │   └── cache/            # 캐시 관리
-├── region/         # 리전 데이터 및 가용성 확인
+├── region/         # 리전 데이터, 가용성 확인, 필터링
 │   ├── data.py           # ALL_REGIONS, REGION_NAMES
-│   └── availability.py   # 리전 가용성 확인
+│   ├── availability.py   # 리전 가용성 확인
+│   └── filter.py         # 계정/리전 패턴 필터링
 ├── cli/            # Click 기반 CLI
 │   ├── app.py            # 메인 엔트리포인트
 │   ├── headless.py       # 비대화형 모드
@@ -67,9 +68,7 @@ core/
 ├── shared/         # 공유 유틸리티
 │   ├── aws/              # AWS (metrics, pricing, inventory, ip_ranges, health)
 │   └── io/               # I/O (excel, html, csv, output)
-├── scripts/        # 개발 도구
-│   └── generate_index.py # 프로젝트 인덱스 생성
-└── filter.py       # 리전 필터링
+└── filter.py       # DEPRECATED: core.region.filter re-export shim
 ```
 
 ### Reports 모듈 구조

@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 CACHE_TTL: dict[str, timedelta] = {
     "pricing": timedelta(days=1),
     "ip": timedelta(hours=1),
+    "ip_ranges": timedelta(hours=24),
     "region": timedelta(weeks=1),
     "eni": timedelta(hours=4),
 }
