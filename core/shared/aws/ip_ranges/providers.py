@@ -24,6 +24,7 @@ from typing import Any
 import requests
 
 from core.parallel import ErrorCollector, ErrorSeverity
+from core.tools.cache.path import get_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +52,7 @@ class PublicIPResult:
 
 def _get_cache_dir() -> str:
     """Get cache directory path (project root's temp folder)"""
-    # plugins/vpc/ip_search/common/ip_ranges -> ip_ranges -> common -> ip_search -> vpc -> plugins -> project_root
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-    )
-    cache_dir = os.path.join(project_root, "temp", "ip_ranges")
-    os.makedirs(cache_dir, exist_ok=True)
-    return cache_dir
+    return get_cache_dir("ip_ranges")
 
 
 def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:

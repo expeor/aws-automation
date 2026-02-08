@@ -24,12 +24,12 @@ class TestPriceCache:
     @pytest.fixture
     def cache(self, temp_cache_dir):
         """테스트용 캐시 인스턴스"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             return PriceCache(ttl_days=7)
 
     def test_set_and_get(self, cache, temp_cache_dir):
         """캐시 저장 및 조회"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             test_prices = {"t3.micro": 0.0104, "t3.small": 0.0208}
             cache.set("ec2", "ap-northeast-2", test_prices)
 
@@ -40,13 +40,13 @@ class TestPriceCache:
 
     def test_get_nonexistent(self, cache, temp_cache_dir):
         """존재하지 않는 캐시 조회"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             result = cache.get("nonexistent", "us-east-1")
             assert result is None
 
     def test_cache_expiration(self, cache, temp_cache_dir):
         """캐시 만료 테스트"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             # 캐시 저장
             test_prices = {"t3.micro": 0.0104}
             cache.set("ec2", "ap-northeast-2", test_prices)
@@ -69,7 +69,7 @@ class TestPriceCache:
 
     def test_invalidate(self, cache, temp_cache_dir):
         """캐시 무효화 테스트"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             test_prices = {"t3.micro": 0.0104}
             cache.set("ec2", "ap-northeast-2", test_prices)
 
@@ -85,13 +85,13 @@ class TestPriceCache:
 
     def test_invalidate_nonexistent(self, cache, temp_cache_dir):
         """존재하지 않는 캐시 무효화"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             result = cache.invalidate("nonexistent", "us-east-1")
             assert result is False
 
     def test_get_info(self, cache, temp_cache_dir):
         """캐시 정보 조회"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             cache.set("ec2", "ap-northeast-2", {"t3.micro": 0.0104})
             cache.set("ebs", "ap-northeast-2", {"gp3": 0.08})
 
@@ -103,7 +103,7 @@ class TestPriceCache:
 
     def test_empty_prices(self, cache, temp_cache_dir):
         """빈 가격 딕셔너리 저장 및 조회"""
-        with patch("functions.analyzers.cost.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
+        with patch("core.shared.aws.pricing.cache._get_pricing_cache_dir", return_value=temp_cache_dir):
             cache.set("ec2", "us-west-2", {})
             result = cache.get("ec2", "us-west-2")
             assert result == {}
