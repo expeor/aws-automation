@@ -146,7 +146,7 @@ def get_core_modules() -> list[dict]:
 
     core_subdirs = [
         ("auth", "Authentication providers (SSO Session, SSO Profile, Static)"),
-        ("parallel", "Parallel execution, rate limiting, quotas"),
+        ("parallel", "Parallel execution, rate limiting"),
         ("tools", "Tool management, file I/O, history"),
         ("region", "Region data and availability"),
         ("cli", "Click CLI, interactive menu, i18n"),
