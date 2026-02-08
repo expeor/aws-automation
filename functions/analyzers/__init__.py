@@ -1,10 +1,10 @@
 """
-plugins/ - AWS Automation 플러그인 모듈
+functions/analyzers/ - AWS 서비스별 분석 도구
 
-플러그인 구조:
-    plugins/
-    ├── analysis/        # 통합 분석 플랫폼 (cost, security, inventory, network, compliance, log, report)
-    ├── {service}/       # AWS 서비스별 도구 (rds, ec2, s3, iam, kms, ...)
-    ├── trusted_advisor/ # Trusted Advisor 점검
-    └── identity_center/ # IAM Identity Center
+구조:
+    functions/analyzers/
+    ├── {service}/       # AWS 서비스별 도구 (ec2, rds, vpc, iam, kms, ...)
+    ├── cost/            # 비용 분석 (pricing, unused_all)
+    ├── health/          # AWS Health 이벤트
+    └── sso/             # IAM Identity Center
 """
