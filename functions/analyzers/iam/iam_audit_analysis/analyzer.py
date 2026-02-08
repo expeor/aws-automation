@@ -26,7 +26,15 @@ from .collector import (
 
 
 class Severity(Enum):
-    """위험도 수준"""
+    """IAM 보안 이슈의 위험도 수준.
+
+    Attributes:
+        CRITICAL: 즉시 조치 필요 (Root Access Key, Public Trust Policy 등).
+        HIGH: 높은 위험 (MFA 미설정, 관리자 권한 등).
+        MEDIUM: 중간 위험 (오래된 키, 취약한 정책 등).
+        LOW: 낮은 위험 (비활성 사용자 등).
+        INFO: 참고 정보.
+    """
 
     CRITICAL = "Critical"
     HIGH = "High"
@@ -36,7 +44,11 @@ class Severity(Enum):
 
 
 class IssueType(Enum):
-    """이슈 유형"""
+    """IAM 보안 이슈 유형 분류.
+
+    User, Role, Trust Policy, Password Policy, Account, Group 관련 이슈를
+    구분하여 분류한다.
+    """
 
     # User 관련
     NO_MFA = "MFA 미설정"
@@ -76,7 +88,14 @@ class IssueType(Enum):
 
 @dataclass
 class Issue:
-    """발견된 이슈"""
+    """발견된 IAM 보안 이슈.
+
+    Attributes:
+        issue_type: 이슈 유형.
+        severity: 위험도 수준.
+        description: 이슈 상세 설명.
+        recommendation: 권장 조치 사항.
+    """
 
     issue_type: IssueType
     severity: Severity
@@ -86,7 +105,15 @@ class Issue:
 
 @dataclass
 class UserAnalysisResult:
-    """User 분석 결과"""
+    """개별 IAM User의 보안 분석 결과.
+
+    Attributes:
+        user: IAM User 데이터.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        issues: 발견된 이슈 목록.
+        risk_score: 위험도 점수 (0~100).
+    """
 
     user: IAMUser
     account_id: str
@@ -105,7 +132,14 @@ class UserAnalysisResult:
 
 @dataclass
 class KeyAnalysisResult:
-    """Access Key 분석 결과"""
+    """개별 Access Key의 보안 분석 결과.
+
+    Attributes:
+        key: Access Key 데이터.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        issues: 발견된 이슈 목록.
+    """
 
     key: IAMAccessKey
     account_id: str
@@ -123,7 +157,15 @@ class KeyAnalysisResult:
 
 @dataclass
 class RoleAnalysisResult:
-    """Role 분석 결과"""
+    """개별 IAM Role의 보안 분석 결과.
+
+    Attributes:
+        role: IAM Role 데이터.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        issues: 발견된 이슈 목록.
+        risk_score: 위험도 점수 (0~100).
+    """
 
     role: IAMRole
     account_id: str
@@ -138,7 +180,14 @@ class RoleAnalysisResult:
 
 @dataclass
 class GroupAnalysisResult:
-    """Group 분석 결과"""
+    """개별 IAM Group의 보안 분석 결과.
+
+    Attributes:
+        group: IAM Group 데이터.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        issues: 발견된 이슈 목록.
+    """
 
     group: IAMGroup
     account_id: str
@@ -152,7 +201,15 @@ class GroupAnalysisResult:
 
 @dataclass
 class PolicyAnalysisResult:
-    """Password Policy 분석 결과"""
+    """Password Policy 보안 분석 결과.
+
+    Attributes:
+        policy: Password Policy 데이터.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        issues: 발견된 이슈 목록.
+        score: 보안 점수 (0~100, 높을수록 좋음).
+    """
 
     policy: PasswordPolicy
     account_id: str
@@ -163,7 +220,12 @@ class PolicyAnalysisResult:
 
 @dataclass
 class AccountAnalysisResult:
-    """Account 분석 결과"""
+    """Account 수준 보안 분석 결과 (Root 계정 등).
+
+    Attributes:
+        summary: 계정 요약 정보 (Root Access Key, MFA 등).
+        issues: 발견된 이슈 목록.
+    """
 
     summary: AccountSummary
     issues: list[Issue] = field(default_factory=list)
@@ -171,7 +233,18 @@ class AccountAnalysisResult:
 
 @dataclass
 class IAMAnalysisResult:
-    """전체 분석 결과"""
+    """단일 계정의 IAM 전체 보안 분석 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        user_results: User별 분석 결과 목록.
+        key_results: Access Key별 분석 결과 목록.
+        role_results: Role별 분석 결과 목록.
+        group_results: Group별 분석 결과 목록.
+        policy_result: Password Policy 분석 결과.
+        account_result: Account 수준 분석 결과.
+    """
 
     account_id: str
     account_name: str
@@ -184,7 +257,11 @@ class IAMAnalysisResult:
 
 
 class IAMAnalyzer:
-    """IAM 분석기"""
+    """IAM 보안 종합 분석기.
+
+    User, Role, Group, Password Policy, Account 수준의 보안 이슈를 탐지하고,
+    Trust Policy 위험 평가와 권한 상승 경로 분석을 수행한다.
+    """
 
     # 관리자 수준 권한 정책 (경고 대상)
     # Tier 1: 직접 권한 상승 가능

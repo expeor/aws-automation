@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/redshift.py - Amazon Redshift 가격 조회
+functions/analyzers/cost/pricing/redshift.py - Amazon Redshift 가격 조회
 
 Redshift 비용 계산:
 - 노드 시간당 비용 (타입별)
@@ -74,7 +74,20 @@ DEFAULT_STORAGE_PRICE = 0.024
 
 
 def get_redshift_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 Redshift 가격 조회"""
+    """AWS Pricing API를 통해 Redshift 노드/스토리지 가격 조회
+
+    OnDemand 가격을 조회하며, Managed Storage 가격은
+    ``managed_storage`` 키로 포함됩니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: 가격을 조회할 AWS 리전 코드
+
+    Returns:
+        노드 타입별 시간당 가격 딕셔너리 (USD).
+        ``managed_storage`` 키로 RA3용 스토리지 가격 포함 가능.
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -118,7 +131,18 @@ def get_redshift_prices(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> dict[str, float]:
-    """Redshift 가격 조회"""
+    """Redshift 노드 타입별 시간당 가격 조회
+
+    API 조회 실패 시 하드코딩된 기본값을 반환합니다.
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        노드 타입별 시간당 가격 (USD) 딕셔너리.
+        예: ``{"ra3.xlplus": 1.086, "dc2.large": 0.25}``
+    """
     if session:
         api_prices = get_redshift_prices_from_api(session, region)
         if api_prices:
@@ -132,7 +156,16 @@ def get_redshift_node_price(
     node_type: str = "dc2.large",
     session: boto3.Session | None = None,
 ) -> float:
-    """Redshift 노드 시간당 가격"""
+    """Redshift 특정 노드 타입의 시간당 가격 조회
+
+    Args:
+        region: AWS 리전 코드
+        node_type: Redshift 노드 타입 (예: dc2.large, ra3.xlplus)
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        시간당 가격 (USD). 알 수 없는 노드 타입이면 DEFAULT_NODE_PRICE 반환.
+    """
     prices = get_redshift_prices(region, session)
     return prices.get(node_type, DEFAULT_NODE_PRICE)
 
@@ -141,7 +174,15 @@ def get_redshift_storage_price(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> float:
-    """Redshift Managed Storage GB당 월 가격 (RA3 노드용)"""
+    """Redshift Managed Storage GB당 월간 가격 조회 (RA3 노드용)
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        GB당 월간 가격 (USD)
+    """
     if session:
         api_prices = get_redshift_prices_from_api(session, region)
         if api_prices and "managed_storage" in api_prices:

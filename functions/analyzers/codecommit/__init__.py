@@ -1,5 +1,12 @@
 """
-plugins/codecommit - CodeCommit Repository Management Tools
+functions/analyzers/codecommit - CodeCommit 리포지토리 관리 및 분석 도구
+
+CodeCommit 리포지토리 및 브랜치 현황을 분석하고,
+브랜치가 없는 빈 리포지토리를 탐지합니다.
+
+도구 목록:
+    - unused (run_audit): CodeCommit 리포지토리 및 브랜치 현황 분석
+    - unused (run_empty_repos): 브랜치가 없는 빈 리포지토리 탐지
 """
 
 CATEGORY = {

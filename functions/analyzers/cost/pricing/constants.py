@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/constants.py - 가격 모듈 상수 및 기본값
+functions/analyzers/cost/pricing/constants.py - 가격 모듈 상수 및 기본값
 
 모든 기본 가격 값과 상수를 중앙 관리합니다.
 API 실패 시 fallback으로 사용됩니다.

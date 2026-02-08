@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/helpers.py - 공통 헬퍼 함수
+core/shared/aws/inventory/services/helpers.py - 공통 헬퍼 함수
 
 태그 파싱, 이름 추출 등 공통 유틸리티.
 """

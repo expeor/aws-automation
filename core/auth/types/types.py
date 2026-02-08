@@ -1,11 +1,15 @@
-# internal/auth/types/types.py
+# core/auth/types/types.py
 """
-AWS 인증 모듈의 핵심 타입 정의
+core/auth/types/types.py - AWS 인증 모듈의 핵심 타입 정의
 
-- Provider 인터페이스 (ABC)
-- ProviderType enum
-- AccountInfo 데이터 클래스
-- 에러 클래스들
+이 모듈은 인증 시스템 전체에서 사용되는 기본 타입들을 정의합니다.
+
+포함 항목:
+    - ProviderType: 인증 Provider 타입 열거형 (SSO_SESSION, SSO_PROFILE, STATIC_CREDENTIALS)
+    - AccountInfo: AWS 계정 정보 데이터 클래스
+    - Provider: 모든 인증 Provider가 구현해야 하는 추상 기본 클래스 (ABC)
+    - 에러 클래스: AuthError, NotAuthenticatedError, AccountNotFoundError,
+      TokenExpiredError, ConfigurationError, ProviderError
 """
 
 from __future__ import annotations
@@ -79,7 +83,11 @@ class AccountInfo:
     tags: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
-        """데이터 유효성 검사"""
+        """데이터 유효성 검사
+
+        계정 ID가 12자리 숫자가 아닌 경우 경고를 출력합니다.
+        이름이 비어있으면 "account-{id}" 형식으로 자동 설정합니다.
+        """
         if not self.id or len(self.id) != 12 or not self.id.isdigit():
             logger.warning("유효하지 않은 AWS 계정 ID: '%s' (12자리 숫자여야 함)", self.id)
         if not self.name:
@@ -104,9 +112,11 @@ class AccountInfo:
         return self.roles[0] if self.roles else self.default_role
 
     def __hash__(self):
+        """계정 ID 기반 해시값 반환."""
         return hash(self.id)
 
     def __eq__(self, other):
+        """계정 ID 기반 동등성 비교."""
         if isinstance(other, AccountInfo):
             return self.id == other.id
         return False
@@ -251,7 +261,15 @@ class Provider(ABC):
 
 
 class AuthError(Exception):
-    """인증 관련 기본 에러 클래스"""
+    """인증 관련 기본 에러 클래스
+
+    모든 인증 에러의 부모 클래스입니다.
+    원인 예외(cause)를 체이닝하여 디버깅을 용이하게 합니다.
+
+    Attributes:
+        message: 에러 메시지
+        cause: 원인 예외 (옵션)
+    """
 
     def __init__(self, message: str, cause: Exception | None = None):
         super().__init__(message)
@@ -265,14 +283,24 @@ class AuthError(Exception):
 
 
 class NotAuthenticatedError(AuthError):
-    """인증되지 않은 상태에서 작업을 시도할 때 발생하는 에러"""
+    """인증되지 않은 상태에서 작업을 시도할 때 발생하는 에러
+
+    Provider가 authenticate()를 호출하지 않았거나,
+    활성 Provider가 설정되지 않은 상태에서 세션을 요청할 때 발생합니다.
+    """
 
     def __init__(self, message: str = "인증이 필요합니다", cause: Exception | None = None):
         super().__init__(message, cause)
 
 
 class AccountNotFoundError(AuthError):
-    """계정을 찾을 수 없을 때 발생하는 에러"""
+    """계정을 찾을 수 없을 때 발생하는 에러
+
+    SSO Provider에서 지정된 account_id에 해당하는 계정이 없을 때 발생합니다.
+
+    Attributes:
+        account_id: 찾을 수 없는 계정 ID
+    """
 
     def __init__(self, account_id: str, cause: Exception | None = None):
         message = f"계정을 찾을 수 없습니다: {account_id}"
@@ -281,7 +309,13 @@ class AccountNotFoundError(AuthError):
 
 
 class TokenExpiredError(AuthError):
-    """토큰이 만료되었을 때 발생하는 에러"""
+    """토큰이 만료되었을 때 발생하는 에러
+
+    SSO 액세스 토큰이 만료되었거나 디바이스 인증 시간이 초과된 경우 발생합니다.
+
+    Attributes:
+        expired_at: 토큰 만료 시간 (옵션)
+    """
 
     def __init__(
         self,
@@ -294,7 +328,13 @@ class TokenExpiredError(AuthError):
 
 
 class ConfigurationError(AuthError):
-    """설정 오류가 발생했을 때 발생하는 에러"""
+    """설정 오류가 발생했을 때 발생하는 에러
+
+    AWS 설정 파일 파싱 실패, 필수 설정값 누락 등의 경우 발생합니다.
+
+    Attributes:
+        config_key: 문제가 된 설정 키 이름 (옵션)
+    """
 
     def __init__(
         self,
@@ -309,7 +349,12 @@ class ConfigurationError(AuthError):
 class ProviderError(AuthError):
     """Provider에서 발생하는 에러
 
-    Provider 타입과 작업 정보를 포함합니다.
+    Provider 이름과 실패한 작업 정보를 포함하여 디버깅을 용이하게 합니다.
+    에러 메시지 형식: "[provider] operation: message"
+
+    Attributes:
+        provider: 에러가 발생한 Provider 이름
+        operation: 실패한 작업 이름 (예: "authenticate", "get_role_credentials")
     """
 
     def __init__(

@@ -1,9 +1,14 @@
-# internal/auth/provider/static.py
+# core/auth/provider/static.py
 """
-Static Credentials Provider 구현
-- 정적 액세스 키 기반 인증
-- 단일 계정만 지원
-- 가장 단순한 인증 방식
+core/auth/provider/static.py - Static Credentials Provider 구현
+
+정적 AWS 액세스 키 기반 인증 Provider입니다. 가장 단순한 인증 방식으로,
+프로파일 기반(~/.aws/credentials 자동 로드) 또는 직접 자격증명 지정을 지원합니다.
+
+특징:
+    - 단일 계정만 지원 (멀티 계정 미지원)
+    - STS GetCallerIdentity로 자격증명 유효성 검증
+    - 리전별 세션 생성 지원
 """
 
 import logging
@@ -155,7 +160,15 @@ class StaticCredentialsProvider(BaseProvider):
             ) from e
 
     def _extract_name_from_arn(self, arn: str) -> str:
-        """ARN에서 사용자/역할 이름 추출"""
+        """ARN에서 사용자/역할 이름을 추출합니다.
+
+        Args:
+            arn: AWS ARN 문자열
+
+        Returns:
+            "user-{name}", "role-{name}", "assumed-{name}" 형식의 식별자
+            또는 "unknown"
+        """
         if ":user/" in arn:
             return f"user-{arn.split(':user/')[-1]}"
         elif ":role/" in arn:
@@ -205,7 +218,18 @@ class StaticCredentialsProvider(BaseProvider):
         role_name: str | None = None,
         region: str | None = None,
     ) -> dict[str, Any]:
-        """AWS 설정 정보 반환 (민감 정보 마스킹)"""
+        """AWS 설정 정보를 반환합니다 (민감 정보 마스킹).
+
+        secret_access_key는 앞 4자/뒤 4자만 표시하고 나머지는 마스킹합니다.
+
+        Args:
+            account_id: 무시됨
+            role_name: 무시됨
+            region: AWS 리전 (다른 리전 사용 시)
+
+        Returns:
+            {"region_name": str, "credentials": {"access_key_id": str, ...}} 딕셔너리
+        """
         session = self.get_session(region=region)
         secret = self._config.secret_access_key
         masked_secret = f"{secret[:4]}****{secret[-4:]}" if secret and len(secret) > 8 else "****"
@@ -231,9 +255,17 @@ class StaticCredentialsProvider(BaseProvider):
         return {self._account_info.id: self._account_info}
 
     def supports_multi_account(self) -> bool:
-        """멀티 계정 지원 여부"""
+        """멀티 계정 지원 여부를 반환합니다.
+
+        Returns:
+            항상 False (Static Credentials는 단일 계정만 지원)
+        """
         return False
 
     def get_account_info(self) -> AccountInfo | None:
-        """현재 계정 정보 반환"""
+        """현재 인증된 계정 정보를 반환합니다.
+
+        Returns:
+            AccountInfo 객체 또는 None (인증 전)
+        """
         return self._account_info

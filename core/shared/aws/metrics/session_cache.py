@@ -53,7 +53,17 @@ _global_cache_lock = threading.Lock()
 
 @dataclass
 class CacheStats:
-    """캐시 통계 (스레드 안전)"""
+    """캐시 통계 (스레드 안전)
+
+    CloudWatch 메트릭 캐시의 히트/미스/저장/eviction 통계를 추적합니다.
+    모든 카운터 조작은 threading.Lock으로 보호됩니다.
+
+    Attributes:
+        hits: 캐시 히트 횟수
+        misses: 캐시 미스 횟수
+        sets: 캐시 저장 횟수
+        evictions: LRU eviction 횟수
+    """
 
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     hits: int = 0
@@ -63,32 +73,56 @@ class CacheStats:
 
     @property
     def hit_rate(self) -> float:
-        """캐시 히트율 (0.0 ~ 1.0)"""
+        """캐시 히트율 (0.0 ~ 1.0)
+
+        Returns:
+            히트 횟수 / (히트 + 미스) 비율. 조회 없으면 0.0
+        """
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
 
     def add_hit(self, count: int = 1) -> None:
-        """히트 카운트 증가 (스레드 안전)"""
+        """히트 카운트 증가 (스레드 안전)
+
+        Args:
+            count: 증가할 횟수 (기본 1)
+        """
         with self._lock:
             self.hits += count
 
     def add_miss(self, count: int = 1) -> None:
-        """미스 카운트 증가 (스레드 안전)"""
+        """미스 카운트 증가 (스레드 안전)
+
+        Args:
+            count: 증가할 횟수 (기본 1)
+        """
         with self._lock:
             self.misses += count
 
     def add_set(self, count: int = 1) -> None:
-        """저장 카운트 증가 (스레드 안전)"""
+        """저장 카운트 증가 (스레드 안전)
+
+        Args:
+            count: 증가할 횟수 (기본 1)
+        """
         with self._lock:
             self.sets += count
 
     def add_eviction(self, count: int = 1) -> None:
-        """eviction 카운트 증가 (스레드 안전)"""
+        """eviction 카운트 증가 (스레드 안전)
+
+        Args:
+            count: 증가할 횟수 (기본 1)
+        """
         with self._lock:
             self.evictions += count
 
     def summary(self) -> str:
-        """통계 요약 문자열"""
+        """통계 요약 문자열
+
+        Returns:
+            "hits=N, misses=N, hit_rate=N%, evictions=N" 형식의 문자열
+        """
         return f"hits={self.hits}, misses={self.misses}, hit_rate={self.hit_rate:.1%}, evictions={self.evictions}"
 
 
@@ -170,7 +204,14 @@ class MetricSessionCache:
         return self._stats
 
     def get(self, key: str) -> float | None:
-        """캐시에서 값 조회"""
+        """캐시에서 값 조회
+
+        Args:
+            key: 캐시 키 (메트릭 쿼리 해시)
+
+        Returns:
+            캐시된 메트릭 값 또는 None (미스 시)
+        """
         cache = _session_cache.get()
         if cache is None:
             return None
@@ -184,14 +225,26 @@ class MetricSessionCache:
         return value
 
     def set(self, key: str, value: float) -> None:
-        """캐시에 값 저장"""
+        """캐시에 값 저장
+
+        Args:
+            key: 캐시 키 (메트릭 쿼리 해시)
+            value: 저장할 메트릭 값
+        """
         cache = _session_cache.get()
         if cache is not None:
             cache[key] = value
             self._stats.sets += 1
 
     def get_many(self, keys: list[str]) -> dict[str, float]:
-        """여러 키를 한번에 조회"""
+        """여러 키를 한번에 조회
+
+        Args:
+            keys: 조회할 캐시 키 목록
+
+        Returns:
+            {키: 값} 딕셔너리 (캐시 히트된 항목만 포함)
+        """
         cache = _session_cache.get()
         if not cache:
             self._stats.misses += len(keys)
@@ -208,27 +261,43 @@ class MetricSessionCache:
         return result
 
     def set_many(self, items: dict[str, float]) -> None:
-        """여러 값을 한번에 저장"""
+        """여러 값을 한번에 저장
+
+        Args:
+            items: {캐시 키: 메트릭 값} 딕셔너리
+        """
         cache = _session_cache.get()
         if cache is not None:
             cache.update(items)
             self._stats.sets += len(items)
 
     def size(self) -> int:
-        """현재 캐시 크기 반환"""
+        """현재 캐시 크기 반환
+
+        Returns:
+            캐시에 저장된 항목 수 (비활성 시 0)
+        """
         cache = _session_cache.get()
         return len(cache) if cache else 0
 
 
 def get_active_cache() -> MetricSessionCache | None:
-    """현재 활성화된 ContextVar 캐시 반환"""
+    """현재 활성화된 ContextVar 캐시 반환
+
+    Returns:
+        활성 MetricSessionCache 인스턴스 또는 None (비활성 시)
+    """
     if _session_cache.get() is not None:
         return MetricSessionCache()
     return None
 
 
 def is_cache_active() -> bool:
-    """ContextVar 캐시가 활성화되어 있는지 확인"""
+    """ContextVar 캐시가 활성화되어 있는지 확인
+
+    Returns:
+        ContextVar 기반 캐시가 현재 스레드에서 활성 상태이면 True
+    """
     return _session_cache.get() is not None
 
 
@@ -472,13 +541,27 @@ class FileBackedMetricCache:
         return self._stats
 
     def _key_to_filename(self, key: str) -> Path:
-        """캐시 키를 파일명으로 변환"""
+        """캐시 키를 파일명으로 변환
+
+        Args:
+            key: 캐시 키 문자열
+
+        Returns:
+            SHA256 해시 기반의 안전한 파일 경로 (.json)
+        """
         # SHA256 해시로 안전한 파일명 생성
         hash_val = hashlib.sha256(key.encode()).hexdigest()[:32]
         return self._cache_dir / f"{hash_val}.json"
 
     def _is_expired(self, filepath: Path) -> bool:
-        """파일 캐시 만료 확인"""
+        """파일 캐시 만료 확인
+
+        Args:
+            filepath: 확인할 캐시 파일 경로
+
+        Returns:
+            파일이 없거나 TTL 초과 시 True
+        """
         if not filepath.exists():
             return True
         mtime = filepath.stat().st_mtime
@@ -576,7 +659,11 @@ class FileBackedMetricCache:
         return self._memory_cache.size()
 
     def clear_file_cache(self) -> int:
-        """파일 캐시 전체 삭제"""
+        """파일 캐시 전체 삭제
+
+        Returns:
+            삭제된 캐시 파일 수
+        """
         removed = 0
         if self._cache_dir.exists():
             for filepath in self._cache_dir.glob("*.json"):

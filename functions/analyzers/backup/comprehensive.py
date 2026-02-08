@@ -1,5 +1,5 @@
 """
-plugins/backup/comprehensive.py - 통합 백업 현황 분석
+functions/analyzers/backup/comprehensive.py - 통합 백업 현황 분석
 
 AWS Backup + 각 서비스별 자체 자동 백업 현황을 통합 조회합니다.
 
@@ -75,7 +75,18 @@ __all__ = [
 
 
 def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """통합 백업 현황 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary, Backup Status, Backup Plan Tags, Failed Jobs 시트를 포함한다.
+    Backup Status 시트에는 보호 상태/백업 지연/실패 횟수에 따라 셀 색상을 적용한다.
+
+    Args:
+        results: 계정/리전별 통합 백업 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -357,7 +368,15 @@ def generate_report(results: list[ComprehensiveBackupResult], output_dir: str) -
 
 
 def run(ctx: ExecutionContext) -> None:
-    """통합 백업 현황 분석"""
+    """통합 백업 현황 분석 도구의 메인 실행 함수.
+
+    RDS/Aurora, DynamoDB, EFS, FSx, EC2, DocumentDB, Neptune, Redshift,
+    ElastiCache, MemoryDB, OpenSearch 등 13개 서비스의 백업 현황을 통합 분석한다.
+    AWS Backup과 서비스 자체 백업을 모두 조회하고, 최근 실패 작업을 포함하여 보고한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     from core.shared.io.output import OutputPath, open_in_explorer
 
     console.print("[bold]통합 백업 현황 분석 시작...[/bold]\n")

@@ -1,7 +1,7 @@
-"""
-plugins/vpc/ip_search/private_ip/export.py - Export Utilities
+"""functions/reports/ip_search/private_ip/export.py - 검색 결과 내보내기 유틸리티.
 
-Export search results to CSV, Excel, or Clipboard.
+Private IP Search 결과를 CSV, Excel, 클립보드(TSV) 형식으로 내보냅니다.
+한국어/영어 헤더를 지원하며, 전체/간략 클립보드 복사를 제공합니다.
 """
 
 from __future__ import annotations

@@ -1,5 +1,11 @@
 """
-plugins/sagemaker - SageMaker ML Resource Management Tools
+functions/analyzers/sagemaker - SageMaker ML 리소스 관리 도구
+
+SageMaker Endpoint의 사용 현황을 CloudWatch 지표 기반으로 분석하고
+유휴/미사용 엔드포인트를 탐지합니다.
+
+도구 목록:
+    - unused: 유휴/미사용 SageMaker Endpoint 탐지 (CloudWatch 기반)
 """
 
 CATEGORY = {

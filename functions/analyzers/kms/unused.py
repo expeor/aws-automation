@@ -1,5 +1,5 @@
 """
-plugins/kms/unused.py - KMS 키 미사용 분석
+functions/analyzers/kms/unused.py - KMS 키 미사용 분석
 
 미사용/비활성화 고객 관리 키 (CMK) 탐지
 
@@ -36,7 +36,15 @@ REQUIRED_PERMISSIONS = {
 
 
 class KMSKeyStatus(Enum):
-    """KMS 키 상태"""
+    """KMS 키 분석 상태.
+
+    고객 관리 키(CMK)의 활성화/비활성화/삭제 예정 상태를 분류한다.
+
+    Attributes:
+        NORMAL: 정상 활성화된 키.
+        DISABLED: 비활성화된 키 (비용은 계속 발생).
+        PENDING_DELETE: 삭제 예정인 키.
+    """
 
     NORMAL = "normal"
     DISABLED = "disabled"
@@ -45,7 +53,21 @@ class KMSKeyStatus(Enum):
 
 @dataclass
 class KMSKeyInfo:
-    """KMS 키 정보"""
+    """KMS 키 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 키가 위치한 리전.
+        key_id: KMS 키 ID.
+        arn: 키 ARN.
+        description: 키 설명.
+        key_state: 키 상태 (Enabled, Disabled, PendingDeletion 등).
+        key_manager: 키 관리자 (AWS 또는 CUSTOMER).
+        creation_date: 키 생성일.
+        deletion_date: 삭제 예정일 (PendingDeletion 상태인 경우).
+        alias: 키 별칭 (aws/ 접두사 제외).
+    """
 
     account_id: str
     account_name: str
@@ -61,16 +83,32 @@ class KMSKeyInfo:
 
     @property
     def is_customer_managed(self) -> bool:
+        """고객 관리 키(CMK) 여부.
+
+        Returns:
+            CUSTOMER 관리 키이면 True.
+        """
         return self.key_manager == "CUSTOMER"
 
     @property
     def monthly_cost(self) -> float:
+        """키 월간 비용 (USD).
+
+        Returns:
+            리전 및 키 관리자 유형에 따른 월 비용.
+        """
         return get_kms_key_price(self.region, self.key_manager)
 
 
 @dataclass
 class KMSKeyFinding:
-    """KMS 키 분석 결과"""
+    """개별 KMS 키에 대한 분석 결과.
+
+    Attributes:
+        key: 분석 대상 키 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     key: KMSKeyInfo
     status: KMSKeyStatus
@@ -79,7 +117,21 @@ class KMSKeyFinding:
 
 @dataclass
 class KMSKeyAnalysisResult:
-    """KMS 키 분석 결과 집계"""
+    """단일 계정/리전의 KMS 키 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_count: 전체 키 수.
+        customer_managed_count: 고객 관리 키(CMK) 수.
+        aws_managed_count: AWS 관리 키 수.
+        disabled_count: 비활성화된 CMK 수.
+        pending_delete_count: 삭제 예정 키 수.
+        normal_count: 정상 키 수.
+        disabled_monthly_cost: 비활성화 키의 월간 비용 합계 (USD).
+        findings: 개별 키 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -95,7 +147,19 @@ class KMSKeyAnalysisResult:
 
 
 def collect_kms_keys(session, account_id: str, account_name: str, region: str) -> list[KMSKeyInfo]:
-    """KMS 키 수집"""
+    """지정된 계정/리전의 KMS 키를 수집한다.
+
+    모든 키(AWS 관리 + 고객 관리)를 조회하고 별칭 정보도 함께 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 KMS 키 정보 목록.
+    """
     from botocore.exceptions import ClientError
 
     kms = get_client(session, "kms", region_name=region)
@@ -139,7 +203,19 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
 
 
 def analyze_kms_keys(keys: list[KMSKeyInfo], account_id: str, account_name: str, region: str) -> KMSKeyAnalysisResult:
-    """KMS 키 분석"""
+    """수집된 KMS 키를 분석하여 비활성화/삭제 예정 키를 식별한다.
+
+    AWS 관리 키는 무료이므로 정상 처리하고, CMK 중 비활성화/삭제 예정인 키를 분류한다.
+
+    Args:
+        keys: 분석 대상 KMS 키 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+
+    Returns:
+        KMS 키 분석 결과 집계 객체.
+    """
     result = KMSKeyAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -198,7 +274,17 @@ def analyze_kms_keys(keys: list[KMSKeyInfo], account_id: str, account_name: str,
 
 
 def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """KMS 미사용 키 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 Detail 시트(CMK 상세)를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -280,7 +366,19 @@ def generate_report(results: list[KMSKeyAnalysisResult], output_dir: str) -> str
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> KMSKeyAnalysisResult | None:
-    """단일 계정/리전의 KMS 키 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 KMS 키를 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 키가 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        분석 결과 객체. 키가 없으면 None.
+    """
     keys = collect_kms_keys(session, account_id, account_name, region)
     if not keys:
         return None
@@ -288,7 +386,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """KMS 키 미사용 분석"""
+    """KMS 미사용/비활성화 키 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]KMS 키 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="kms")

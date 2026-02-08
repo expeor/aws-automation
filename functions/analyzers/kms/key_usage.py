@@ -1,5 +1,5 @@
 """
-plugins/kms/key_usage.py - CMK 사용처 분석
+functions/analyzers/kms/key_usage.py - CMK 사용처 분석
 
 고객 관리 키(CMK)가 사용되는 AWS 리소스를 찾아서 매핑합니다.
 
@@ -78,7 +78,16 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class KMSKeyInfo:
-    """KMS 키 정보"""
+    """KMS 키 기본 정보.
+
+    Attributes:
+        key_id: KMS 키 ID.
+        arn: KMS 키 ARN.
+        alias: 키 별칭 (alias/xxx 형식, 없으면 빈 문자열).
+        key_manager: 키 관리자 (CUSTOMER 또는 AWS).
+        key_state: 키 상태 (Enabled, Disabled, PendingDeletion 등).
+        description: 키 설명.
+    """
 
     key_id: str
     arn: str
@@ -90,7 +99,14 @@ class KMSKeyInfo:
 
 @dataclass
 class ResourceUsage:
-    """KMS 키를 사용하는 리소스"""
+    """KMS 키를 암호화에 사용하는 개별 AWS 리소스 정보.
+
+    Attributes:
+        service: AWS 서비스명 (S3, EBS, RDS, Lambda 등).
+        resource_type: 리소스 유형 (bucket, volume, instance, function 등).
+        resource_id: 리소스 ID 또는 ARN.
+        resource_name: 리소스 이름 (표시용).
+    """
 
     service: str  # S3, EBS, RDS, SecretsManager, Lambda, SNS, SQS
     resource_type: str  # bucket, volume, instance, secret, function, topic, queue
@@ -100,23 +116,48 @@ class ResourceUsage:
 
 @dataclass
 class KMSKeyUsage:
-    """KMS 키별 사용처"""
+    """KMS 키와 해당 키를 사용하는 리소스 매핑.
+
+    Attributes:
+        key: KMS 키 기본 정보.
+        usages: 해당 키를 사용하는 리소스 목록.
+    """
 
     key: KMSKeyInfo
     usages: list[ResourceUsage] = field(default_factory=list)
 
     @property
     def usage_count(self) -> int:
+        """해당 키를 사용하는 리소스 수.
+
+        Returns:
+            사용처 수.
+        """
         return len(self.usages)
 
     @property
     def is_unused(self) -> bool:
+        """해당 키가 어떤 리소스에서도 사용되지 않는지 여부.
+
+        Returns:
+            사용처가 없으면 True.
+        """
         return self.usage_count == 0
 
 
 @dataclass
 class KMSUsageResult:
-    """KMS 사용처 분석 결과"""
+    """계정/리전별 KMS CMK 사용처 분석 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_keys: 전체 KMS 키 수 (AWS 관리 키 포함).
+        customer_keys: CMK(고객 관리 키) 수.
+        unused_keys: 어떤 리소스에서도 사용되지 않는 CMK 수.
+        key_usages: CMK별 사용처 매핑 목록.
+    """
 
     account_id: str
     account_name: str
@@ -128,7 +169,17 @@ class KMSUsageResult:
 
 
 def collect_kms_keys(kms_client) -> list[KMSKeyInfo]:
-    """KMS 키 목록 수집"""
+    """KMS 키 목록과 별칭을 수집한다.
+
+    list_aliases로 별칭 맵을 먼저 구성하고, list_keys + describe_key로
+    모든 키의 상세 정보를 수집한다. AWS 관리 키(alias/aws/*)의 별칭은 제외한다.
+
+    Args:
+        kms_client: KMS boto3 클라이언트.
+
+    Returns:
+        수집된 KMSKeyInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     keys = []
@@ -170,7 +221,19 @@ def collect_kms_keys(kms_client) -> list[KMSKeyInfo]:
 
 
 def find_s3_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """S3 버킷에서 KMS 키 사용처 찾기"""
+    """S3 버킷의 기본 암호화에서 KMS 키 사용처를 찾는다.
+
+    해당 리전의 버킷만 대상으로 ServerSideEncryptionConfiguration의
+    KMSMasterKeyID를 확인한다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -210,7 +273,16 @@ def find_s3_usage(session, region: str, key_arns: set[str]) -> dict[str, list[Re
 
 
 def find_ebs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """EBS 볼륨에서 KMS 키 사용처 찾기"""
+    """EBS 볼륨 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -243,7 +315,16 @@ def find_ebs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_rds_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """RDS에서 KMS 키 사용처 찾기"""
+    """RDS 인스턴스 및 Aurora 클러스터 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -289,7 +370,16 @@ def find_rds_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_secrets_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Secrets Manager에서 KMS 키 사용처 찾기"""
+    """Secrets Manager 시크릿 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -316,7 +406,16 @@ def find_secrets_usage(session, region: str, key_arns: set[str]) -> dict[str, li
 
 
 def find_lambda_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Lambda에서 KMS 키 사용처 찾기"""
+    """Lambda 함수 환경 변수 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -343,7 +442,16 @@ def find_lambda_usage(session, region: str, key_arns: set[str]) -> dict[str, lis
 
 
 def find_sns_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """SNS에서 KMS 키 사용처 찾기"""
+    """SNS 토픽 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -376,7 +484,16 @@ def find_sns_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_sqs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """SQS에서 KMS 키 사용처 찾기"""
+    """SQS 큐 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -409,7 +526,16 @@ def find_sqs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_opensearch_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """OpenSearch (Elasticsearch)에서 KMS 키 사용처 찾기"""
+    """OpenSearch 도메인 Encryption at Rest에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -442,7 +568,16 @@ def find_opensearch_usage(session, region: str, key_arns: set[str]) -> dict[str,
 
 
 def find_efs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """EFS에서 KMS 키 사용처 찾기"""
+    """EFS 파일 시스템 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -475,7 +610,16 @@ def find_efs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_dynamodb_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """DynamoDB에서 KMS 키 사용처 찾기"""
+    """DynamoDB 테이블 SSE에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -507,7 +651,16 @@ def find_dynamodb_usage(session, region: str, key_arns: set[str]) -> dict[str, l
 
 
 def find_elasticache_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """ElastiCache에서 KMS 키 사용처 찾기"""
+    """ElastiCache Replication Group 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -534,7 +687,16 @@ def find_elasticache_usage(session, region: str, key_arns: set[str]) -> dict[str
 
 
 def find_kinesis_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Kinesis에서 KMS 키 사용처 찾기"""
+    """Kinesis Data Stream 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -565,7 +727,16 @@ def find_kinesis_usage(session, region: str, key_arns: set[str]) -> dict[str, li
 
 
 def find_redshift_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Redshift에서 KMS 키 사용처 찾기"""
+    """Redshift 클러스터 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -592,7 +763,16 @@ def find_redshift_usage(session, region: str, key_arns: set[str]) -> dict[str, l
 
 
 def find_fsx_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """FSx에서 KMS 키 사용처 찾기"""
+    """FSx 파일 시스템 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -626,7 +806,16 @@ def find_fsx_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_cloudwatch_logs_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """CloudWatch Logs에서 KMS 키 사용처 찾기"""
+    """CloudWatch Logs 로그 그룹 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -653,7 +842,18 @@ def find_cloudwatch_logs_usage(session, region: str, key_arns: set[str]) -> dict
 
 
 def find_documentdb_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """DocumentDB에서 KMS 키 사용처 찾기"""
+    """DocumentDB 클러스터 암호화에서 KMS 키 사용처를 찾는다.
+
+    Engine이 docdb인 클러스터만 필터링한다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -683,7 +883,16 @@ def find_documentdb_usage(session, region: str, key_arns: set[str]) -> dict[str,
 
 
 def find_neptune_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Neptune에서 KMS 키 사용처 찾기"""
+    """Neptune 클러스터 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -710,7 +919,16 @@ def find_neptune_usage(session, region: str, key_arns: set[str]) -> dict[str, li
 
 
 def find_backup_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """AWS Backup에서 KMS 키 사용처 찾기"""
+    """AWS Backup Vault 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -737,7 +955,16 @@ def find_backup_usage(session, region: str, key_arns: set[str]) -> dict[str, lis
 
 
 def find_glue_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Glue Data Catalog에서 KMS 키 사용처 찾기"""
+    """Glue Data Catalog 암호화(Encryption at Rest, Connection Password)에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -781,7 +1008,16 @@ def find_glue_usage(session, region: str, key_arns: set[str]) -> dict[str, list[
 
 
 def find_msk_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """MSK (Managed Kafka)에서 KMS 키 사용처 찾기"""
+    """MSK(Amazon Managed Streaming for Apache Kafka) 클러스터 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -813,7 +1049,18 @@ def find_msk_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_sagemaker_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """SageMaker에서 KMS 키 사용처 찾기"""
+    """SageMaker Notebook Instance 및 Training Job에서 KMS 키 사용처를 찾는다.
+
+    Notebook Instance의 KmsKeyId와 Training Job의 OutputDataConfig.KmsKeyId를 확인한다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -869,7 +1116,16 @@ def find_sagemaker_usage(session, region: str, key_arns: set[str]) -> dict[str, 
 
 
 def find_eks_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """EKS에서 KMS 키 사용처 찾기 (Secrets 암호화)"""
+    """EKS 클러스터의 Secrets 암호화(encryptionConfig)에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -903,7 +1159,16 @@ def find_eks_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_memorydb_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """MemoryDB에서 KMS 키 사용처 찾기"""
+    """MemoryDB 클러스터 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -929,7 +1194,16 @@ def find_memorydb_usage(session, region: str, key_arns: set[str]) -> dict[str, l
 
 
 def find_ecr_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """ECR에서 KMS 키 사용처 찾기"""
+    """ECR 리포지토리 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -957,7 +1231,16 @@ def find_ecr_usage(session, region: str, key_arns: set[str]) -> dict[str, list[R
 
 
 def find_athena_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Athena WorkGroup에서 KMS 키 사용처 찾기"""
+    """Athena WorkGroup 결과 암호화에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -999,7 +1282,16 @@ def find_athena_usage(session, region: str, key_arns: set[str]) -> dict[str, lis
 
 
 def find_ssm_parameter_usage(session, region: str, key_arns: set[str]) -> dict[str, list[ResourceUsage]]:
-    """Systems Manager Parameter Store에서 KMS 키 사용처 찾기"""
+    """Systems Manager Parameter Store SecureString 파라미터에서 KMS 키 사용처를 찾는다.
+
+    Args:
+        session: boto3 Session 객체.
+        region: 조회 대상 리전.
+        key_arns: 검색 대상 KMS 키 ARN 집합.
+
+    Returns:
+        키 ARN을 키로, 해당 키를 사용하는 ResourceUsage 목록을 값으로 하는 딕셔너리.
+    """
     from botocore.exceptions import ClientError
 
     usages: dict[str, list[ResourceUsage]] = {arn: [] for arn in key_arns}
@@ -1026,7 +1318,12 @@ def find_ssm_parameter_usage(session, region: str, key_arns: set[str]) -> dict[s
 
 
 def merge_usages(base: dict[str, list[ResourceUsage]], *others: dict[str, list[ResourceUsage]]) -> None:
-    """사용처 딕셔너리 병합"""
+    """여러 서비스에서 수집한 KMS 키 사용처 딕셔너리를 base에 병합한다.
+
+    Args:
+        base: 병합 대상 기본 딕셔너리 (키 ARN -> ResourceUsage 목록).
+        *others: 병합할 추가 딕셔너리들.
+    """
     for other in others:
         for key_arn, usages in other.items():
             if key_arn in base:
@@ -1034,7 +1331,20 @@ def merge_usages(base: dict[str, list[ResourceUsage]], *others: dict[str, list[R
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> KMSUsageResult:
-    """단일 계정/리전의 KMS 사용처 수집 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 CMK 사용처를 26개 서비스에서 수집한다.
+
+    CMK(고객 관리 키)만 필터링한 뒤 S3, EBS, RDS 등 26개 서비스에서
+    해당 키를 사용하는 리소스를 탐색한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        KMS 사용처 분석 결과.
+    """
     kms = get_client(session, "kms", region_name=region)
     keys = collect_kms_keys(kms)
 
@@ -1104,7 +1414,18 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def generate_report(results: list[KMSUsageResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """CMK 사용처 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계), Summary Data(키 수 상세), Key Usage(키별 사용처)
+    시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 KMS 사용처 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -1198,7 +1519,14 @@ def generate_report(results: list[KMSUsageResult], output_dir: str) -> str:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """CMK 사용처 분석"""
+    """CMK 사용처 분석 도구의 메인 실행 함수.
+
+    고객 관리 키(CMK)가 사용되는 AWS 리소스를 26개 서비스에서 찾아
+    매핑하고, 미사용 CMK를 식별하여 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]CMK 사용처 분석 시작...[/bold]\n")
     console.print(
         "[dim]스캔 대상 (26개): S3, EBS, RDS, SecretsManager, Lambda, SNS, SQS, OpenSearch, "

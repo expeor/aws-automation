@@ -1,5 +1,5 @@
 """
-plugins/codecommit/unused.py - CodeCommit 미사용 리포지토리 분석
+functions/analyzers/codecommit/unused.py - CodeCommit 미사용 리포지토리 분석
 
 빈 리포지토리(브랜치 없음) 탐지
 
@@ -34,7 +34,24 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class Repository:
-    """CodeCommit 리포지토리 정보"""
+    """CodeCommit 리포지토리 정보.
+
+    리포지토리 메타데이터와 브랜치 목록을 보관한다.
+
+    Attributes:
+        name: 리포지토리 이름.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        description: 리포지토리 설명.
+        clone_url_http: HTTPS 클론 URL.
+        clone_url_ssh: SSH 클론 URL.
+        arn: 리포지토리 ARN.
+        creation_date: 생성 일시.
+        last_modified_date: 마지막 수정 일시.
+        default_branch: 기본 브랜치 이름.
+        branches: 브랜치 이름 목록.
+    """
 
     name: str
     account_id: str = ""
@@ -51,14 +68,28 @@ class Repository:
 
     @property
     def branch_count(self) -> int:
+        """브랜치 수.
+
+        Returns:
+            리포지토리의 브랜치 개수.
+        """
         return len(self.branches)
 
     @property
     def is_empty(self) -> bool:
-        """브랜치가 없는 빈 리포지토리인지"""
+        """브랜치가 없는 빈 리포지토리인지 판단한다.
+
+        Returns:
+            브랜치가 하나도 없으면 True.
+        """
         return self.branch_count == 0
 
     def to_dict(self) -> dict[str, Any]:
+        """인스턴스를 딕셔너리로 변환한다.
+
+        Returns:
+            모든 필드를 포함하는 딕셔너리.
+        """
         return {
             "name": self.name,
             "description": self.description,
@@ -74,26 +105,53 @@ class Repository:
 
 @dataclass
 class AuditResult:
-    """리포지토리 감사 결과"""
+    """리포지토리 감사 결과.
+
+    수집된 리포지토리 목록과 감사 중 발생한 오류를 보관한다.
+
+    Attributes:
+        repositories: 수집된 리포지토리 목록.
+        errors: 감사 중 발생한 오류 메시지 목록.
+    """
 
     repositories: list[Repository] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     @property
     def total_repos(self) -> int:
+        """총 리포지토리 수.
+
+        Returns:
+            수집된 리포지토리 개수.
+        """
         return len(self.repositories)
 
     @property
     def total_branches(self) -> int:
+        """모든 리포지토리의 브랜치 총 수.
+
+        Returns:
+            전체 브랜치 개수 합계.
+        """
         return sum(r.branch_count for r in self.repositories)
 
     @property
     def empty_repos(self) -> list[Repository]:
-        """빈 리포지토리 목록"""
+        """빈 리포지토리 목록.
+
+        Returns:
+            브랜치가 없는 리포지토리 목록.
+        """
         return [r for r in self.repositories if r.is_empty]
 
     def get_repo_branch_pairs(self) -> list[dict[str, str]]:
-        """리포지토리-브랜치 쌍 목록"""
+        """리포지토리-브랜치 쌍 목록을 생성한다.
+
+        빈 리포지토리는 branch가 "(empty)"로 표시된다.
+
+        Returns:
+            repository, branch, account_id 키를 가진 딕셔너리 목록.
+        """
         pairs = []
         for repo in self.repositories:
             if repo.branches:
@@ -117,26 +175,28 @@ class AuditResult:
 
 
 class RepoAuditor:
-    """CodeCommit 리포지토리 감사기
+    """CodeCommit 리포지토리 감사기.
 
-    모든 리포지토리와 브랜치 정보를 수집합니다.
+    모든 리포지토리와 브랜치 정보를 수집하여 빈 리포지토리를 탐지한다.
     """
 
     def __init__(self, session, region: str | None = None):
-        """초기화
+        """RepoAuditor를 초기화한다.
 
         Args:
-            session: boto3.Session 객체
-            region: 리전 (기본: 세션 리전)
+            session: boto3 Session 객체.
+            region: 리전. 미지정 시 세션의 기본 리전을 사용한다.
         """
         self.session = session
         self.region = region
 
     def audit(self) -> AuditResult:
-        """리포지토리 감사 실행
+        """리포지토리 감사를 실행한다.
+
+        모든 리포지토리를 조회하고 각 리포지토리의 브랜치 정보를 수집한다.
 
         Returns:
-            AuditResult 객체
+            감사 결과를 담은 AuditResult 객체.
         """
         repositories = []
         errors = []
@@ -169,7 +229,14 @@ class RepoAuditor:
         return AuditResult(repositories=repositories, errors=errors)
 
     def _list_repositories(self, client) -> list[str]:
-        """리포지토리 이름 목록 조회"""
+        """리포지토리 이름 목록을 조회한다.
+
+        Args:
+            client: CodeCommit boto3 클라이언트.
+
+        Returns:
+            리포지토리 이름 문자열 목록.
+        """
         repo_names = []
 
         try:
@@ -183,7 +250,15 @@ class RepoAuditor:
         return repo_names
 
     def _get_repository_info(self, client, repo_name: str) -> Repository:
-        """리포지토리 상세 정보 조회"""
+        """리포지토리 상세 정보(메타데이터 + 브랜치 목록)를 조회한다.
+
+        Args:
+            client: CodeCommit boto3 클라이언트.
+            repo_name: 리포지토리 이름.
+
+        Returns:
+            Repository 객체.
+        """
         # 리포지토리 메타데이터
         response = client.get_repository(repositoryName=repo_name)
         metadata = response.get("repositoryMetadata", {})
@@ -205,7 +280,15 @@ class RepoAuditor:
         )
 
     def _list_branches(self, client, repo_name: str) -> list[str]:
-        """브랜치 목록 조회"""
+        """리포지토리의 브랜치 목록을 조회한다.
+
+        Args:
+            client: CodeCommit boto3 클라이언트.
+            repo_name: 리포지토리 이름.
+
+        Returns:
+            브랜치 이름 문자열 목록.
+        """
         branches = []
 
         try:
@@ -235,9 +318,17 @@ COLUMNS_BRANCHES = [
 
 
 class RepoAuditReporter:
-    """리포지토리 감사 결과 리포터"""
+    """CodeCommit 리포지토리 감사 결과 리포터.
+
+    AuditResult를 콘솔 요약 또는 Excel 보고서로 출력한다.
+    """
 
     def __init__(self, result: AuditResult):
+        """RepoAuditReporter를 초기화한다.
+
+        Args:
+            result: 리포지토리 감사 결과 객체.
+        """
         self.result = result
 
     def generate_report(
@@ -245,7 +336,17 @@ class RepoAuditReporter:
         output_dir: str,
         file_prefix: str = "codecommit_repos",
     ) -> Path:
-        """Excel 리포트 생성"""
+        """감사 결과를 Excel 보고서로 생성한다.
+
+        분석 요약, Repositories, Branches, Empty Repos(해당 시) 시트를 포함한다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+            file_prefix: 파일명 접두사.
+
+        Returns:
+            생성된 Excel 파일 경로.
+        """
         wb = Workbook()
 
         # 요약 시트
@@ -270,7 +371,13 @@ class RepoAuditReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """요약 시트"""
+        """분석 요약 시트를 생성한다.
+
+        전체 현황(리포지토리 수, 브랜치 수, 빈 리포지토리 수)과 오류 정보를 포함한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         summary = wb.new_summary_sheet("분석 요약")
 
         summary.add_title("CodeCommit 리포지토리 분석 결과")
@@ -295,7 +402,13 @@ class RepoAuditReporter:
         summary.add_item("생성 일시", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_repos_sheet(self, wb: Workbook) -> None:
-        """리포지토리 시트"""
+        """리포지토리 목록 시트를 생성한다.
+
+        이름 순으로 정렬하여 각 리포지토리의 상세 정보를 출력한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="Repositories", columns=COLUMNS_REPOS)
 
         for repo in sorted(self.result.repositories, key=lambda r: r.name):
@@ -321,7 +434,13 @@ class RepoAuditReporter:
         )
 
     def _create_branches_sheet(self, wb: Workbook) -> None:
-        """브랜치 시트"""
+        """리포지토리-브랜치 쌍 시트를 생성한다.
+
+        빈 리포지토리는 "(empty)"로 표시한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="Branches", columns=COLUMNS_BRANCHES)
 
         for repo in sorted(self.result.repositories, key=lambda r: r.name):
@@ -332,7 +451,11 @@ class RepoAuditReporter:
                 sheet.add_row([repo.name, "(empty)"])
 
     def _create_empty_repos_sheet(self, wb: Workbook) -> None:
-        """빈 리포지토리 시트"""
+        """빈 리포지토리(브랜치 없음) 전용 시트를 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         columns = [
             ColumnDef(header="Repository", width=30, style="data"),
             ColumnDef(header="Created", width=12, style="date"),
@@ -350,7 +473,10 @@ class RepoAuditReporter:
             )
 
     def print_summary(self) -> None:
-        """콘솔에 요약 출력"""
+        """감사 결과 요약을 콘솔에 출력한다.
+
+        리포지토리 수, 브랜치 수, 빈 리포지토리 수와 함께 상위 10개 리포지토리를 표시한다.
+        """
         print("\n=== CodeCommit 리포지토리 분석 결과 ===")
         print(f"총 리포지토리: {self.result.total_repos}개")
         print(f"총 브랜치: {self.result.total_branches}개")
@@ -370,7 +496,18 @@ def generate_report(
     output_dir: str,
     file_prefix: str = "codecommit_repos",
 ) -> Path:
-    """리포트 생성 (편의 함수)"""
+    """감사 결과를 Excel 보고서로 생성하는 편의 함수.
+
+    내부적으로 RepoAuditReporter를 생성하여 위임한다.
+
+    Args:
+        result: 리포지토리 감사 결과 객체.
+        output_dir: 보고서 저장 디렉토리 경로.
+        file_prefix: 파일명 접두사.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     reporter = RepoAuditReporter(result)
     return reporter.generate_report(output_dir, file_prefix)
 
@@ -382,7 +519,21 @@ def generate_report(
 
 @dataclass
 class CodeCommitAnalysisResult:
-    """CodeCommit 분석 결과 (unused_all 연동용)"""
+    """CodeCommit 분석 결과 (unused_all 연동용).
+
+    미사용 리소스 종합 분석(unused_all)과의 연동을 위한 결과 데이터.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_repos: 총 리포지토리 수.
+        empty_repos: 빈 리포지토리 수.
+        total_branches: 전체 브랜치 수.
+        repos: 수집된 리포지토리 목록.
+        empty_repo_list: 빈 리포지토리 목록.
+        unused_monthly_cost: 미사용 리소스 월 예상 비용. 빈 리포지토리는 무료이므로 항상 0.
+    """
 
     account_id: str
     account_name: str
@@ -403,16 +554,18 @@ def collect_repos(
     account_name: str,
     region: str,
 ) -> list[Repository]:
-    """CodeCommit 리포지토리 수집
+    """CodeCommit 리포지토리를 수집한다.
+
+    리포지토리 목록을 조회한 뒤, 각 리포지토리의 메타데이터와 브랜치 정보를 수집한다.
 
     Args:
-        session: boto3.Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
 
     Returns:
-        Repository 리스트
+        수집된 Repository 목록.
     """
     repos = []
 
@@ -459,7 +612,15 @@ def collect_repos(
 
 
 def _list_branches(client, repo_name: str) -> list[str]:
-    """브랜치 목록 조회"""
+    """리포지토리의 브랜치 목록을 조회한다.
+
+    Args:
+        client: CodeCommit boto3 클라이언트.
+        repo_name: 리포지토리 이름.
+
+    Returns:
+        브랜치 이름 문자열 목록.
+    """
     branches = []
 
     try:
@@ -478,16 +639,18 @@ def analyze_repos(
     account_name: str,
     region: str,
 ) -> CodeCommitAnalysisResult:
-    """CodeCommit 리포지토리 분석
+    """수집된 CodeCommit 리포지토리를 분석한다.
+
+    빈 리포지토리(브랜치 없음)를 식별하고 통계를 집계한다.
 
     Args:
-        repos: Repository 리스트
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전
+        repos: 수집된 Repository 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
 
     Returns:
-        CodeCommitAnalysisResult
+        분석 결과를 담은 CodeCommitAnalysisResult 객체.
     """
     empty_repos = [r for r in repos if r.is_empty]
     total_branches = sum(r.branch_count for r in repos)
@@ -511,7 +674,16 @@ def analyze_repos(
 
 
 def run_audit(ctx) -> dict[str, Any]:
-    """CodeCommit 리포지토리 분석"""
+    """CodeCommit 리포지토리 분석 도구의 메인 실행 함수.
+
+    모든 리포지토리를 감사하고, 결과를 콘솔에 출력한 뒤 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 리전, 프로파일 등을 포함한다.
+
+    Returns:
+        분석 결과 요약 딕셔너리. total_repos, total_branches, empty_repos, report_path 등을 포함한다.
+    """
     from core.auth.session import get_context_session
     from core.shared.io.output import OutputPath
 
@@ -546,7 +718,16 @@ def run_audit(ctx) -> dict[str, Any]:
 
 
 def run_empty_repos(ctx) -> dict[str, Any]:
-    """빈 리포지토리 조회"""
+    """빈 리포지토리(브랜치 없음)만 조회하는 실행 함수.
+
+    감사 결과에서 빈 리포지토리만 필터링하여 콘솔에 출력한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 리전, 프로파일 등을 포함한다.
+
+    Returns:
+        빈 리포지토리 이름 목록과 개수를 포함하는 딕셔너리.
+    """
     from core.auth.session import get_context_session
 
     region = ctx.regions[0] if ctx.regions else "ap-northeast-2"

@@ -1,7 +1,12 @@
 """
-plugins/rds - RDS Analysis Tools
+functions/analyzers/rds - RDS 및 Aurora 데이터베이스 분석 도구
 
-RDS and Aurora database analysis
+RDS/Aurora 인스턴스와 스냅샷의 사용 현황을 분석하고,
+유휴/저사용 인스턴스 및 오래된 수동 스냅샷을 탐지합니다.
+
+도구 목록:
+    - snapshot_audit: 오래된 수동 스냅샷 탐지 (RDS/Aurora)
+    - unused: 유휴/저사용 RDS 인스턴스 탐지
 """
 
 CATEGORY = {

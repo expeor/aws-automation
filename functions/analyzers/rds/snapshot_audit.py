@@ -1,5 +1,5 @@
 """
-plugins/rds/snapshot_audit.py - RDS Snapshot 미사용 분석
+functions/analyzers/rds/snapshot_audit.py - RDS Snapshot 미사용 분석
 
 오래된 수동 RDS/Aurora 스냅샷 탐지
 
@@ -58,21 +58,31 @@ OLD_SNAPSHOT_DAYS = 14
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """RDS 스냅샷 사용 상태 분류.
+
+    OLD_SNAPSHOT_DAYS 기준으로 오래된 스냅샷과 최근 스냅샷을 구분한다.
+    """
 
     OLD = "old"  # 오래됨
     NORMAL = "normal"  # 최근
 
 
 class SnapshotType(Enum):
-    """스냅샷 유형"""
+    """RDS 스냅샷 유형 분류.
+
+    RDS 인스턴스 스냅샷과 Aurora 클러스터 스냅샷을 구분한다.
+    """
 
     RDS = "rds"
     AURORA = "aurora"
 
 
 class Severity(Enum):
-    """심각도"""
+    """스냅샷 분석 심각도 분류.
+
+    스냅샷 크기(allocated_storage_gb)를 기준으로 분류한다.
+    500GB 이상이면 HIGH, 100GB 이상이면 MEDIUM, 그 외 LOW.
+    """
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -82,7 +92,25 @@ class Severity(Enum):
 
 @dataclass
 class RDSSnapshotInfo:
-    """RDS Snapshot 정보"""
+    """RDS/Aurora 수동 스냅샷 메타데이터.
+
+    Attributes:
+        id: 스냅샷 식별자.
+        db_identifier: 원본 DB 인스턴스/클러스터 식별자.
+        snapshot_type: 스냅샷 유형 (RDS 또는 AURORA).
+        engine: DB 엔진 (예: mysql, aurora-postgresql).
+        engine_version: DB 엔진 버전.
+        status: 스냅샷 상태 (예: available).
+        create_time: 스냅샷 생성 시각.
+        allocated_storage_gb: 할당된 스토리지 용량 (GB).
+        encrypted: 암호화 여부.
+        arn: 스냅샷 ARN.
+        tags: AWS 태그 딕셔너리 (aws: 접두사 제외).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        monthly_cost: 월간 스토리지 비용 (USD).
+    """
 
     id: str
     db_identifier: str
@@ -106,7 +134,11 @@ class RDSSnapshotInfo:
 
     @property
     def age_days(self) -> int:
-        """스냅샷 나이 (일)"""
+        """스냅샷 생성 후 경과 일수.
+
+        Returns:
+            경과 일수. create_time이 없으면 0.
+        """
         if not self.create_time:
             return 0
         now = datetime.now(timezone.utc)
@@ -115,13 +147,25 @@ class RDSSnapshotInfo:
 
     @property
     def is_old(self) -> bool:
-        """오래된 스냅샷 여부"""
+        """OLD_SNAPSHOT_DAYS 기준 초과 여부.
+
+        Returns:
+            age_days >= OLD_SNAPSHOT_DAYS이면 True.
+        """
         return self.age_days >= OLD_SNAPSHOT_DAYS
 
 
 @dataclass
 class RDSSnapshotFinding:
-    """Snapshot 분석 결과"""
+    """개별 스냅샷의 분석 결과.
+
+    Attributes:
+        snapshot: 분석 대상 스냅샷 정보.
+        usage_status: 사용 상태 (OLD 또는 NORMAL).
+        severity: 심각도 (스토리지 크기 기준).
+        description: 분석 결과 설명 문자열.
+        recommendation: 권장 조치 사항 문자열.
+    """
 
     snapshot: RDSSnapshotInfo
     usage_status: UsageStatus
@@ -132,7 +176,20 @@ class RDSSnapshotFinding:
 
 @dataclass
 class RDSSnapshotAnalysisResult:
-    """분석 결과"""
+    """단일 계정/리전의 RDS 스냅샷 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+        findings: 개별 스냅샷별 분석 결과 목록.
+        total_count: 전체 수동 스냅샷 수.
+        old_count: 오래된 스냅샷 수.
+        normal_count: 최근 스냅샷 수.
+        total_size_gb: 전체 스냅샷 용량 (GB).
+        old_size_gb: 오래된 스냅샷 용량 (GB).
+        old_monthly_cost: 오래된 스냅샷 월간 비용 (USD).
+    """
 
     account_id: str
     account_name: str
@@ -156,7 +213,20 @@ class RDSSnapshotAnalysisResult:
 
 
 def collect_rds_snapshots(session, account_id: str, account_name: str, region: str) -> list[RDSSnapshotInfo]:
-    """RDS 수동 스냅샷 수집 (RDS + Aurora)"""
+    """RDS 및 Aurora 수동 스냅샷을 수집한다.
+
+    DescribeDBSnapshots(RDS)와 DescribeDBClusterSnapshots(Aurora) API로
+    수동 스냅샷만 필터링하여 수집하고, 각 스냅샷의 태그와 비용을 계산한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        RDSSnapshotInfo 목록 (available 상태의 수동 스냅샷만).
+    """
     from botocore.exceptions import ClientError
 
     snapshots = []
@@ -205,7 +275,18 @@ def collect_rds_snapshots(session, account_id: str, account_name: str, region: s
 
 
 def _parse_rds_snapshot(data: dict, rds, account_id: str, account_name: str, region: str) -> RDSSnapshotInfo | None:
-    """RDS 스냅샷 파싱"""
+    """RDS 인스턴스 스냅샷 API 응답을 RDSSnapshotInfo로 변환한다.
+
+    Args:
+        data: DescribeDBSnapshots API 응답의 단일 스냅샷 딕셔너리.
+        rds: RDS boto3 client (태그 조회용).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        파싱된 스냅샷 정보. 파싱 실패 시 None.
+    """
     try:
         arn = data.get("DBSnapshotArn", "")
         allocated_storage = data.get("AllocatedStorage", 0)
@@ -244,7 +325,18 @@ def _parse_rds_snapshot(data: dict, rds, account_id: str, account_name: str, reg
 
 
 def _parse_aurora_snapshot(data: dict, rds, account_id: str, account_name: str, region: str) -> RDSSnapshotInfo | None:
-    """Aurora 스냅샷 파싱"""
+    """Aurora 클러스터 스냅샷 API 응답을 RDSSnapshotInfo로 변환한다.
+
+    Args:
+        data: DescribeDBClusterSnapshots API 응답의 단일 스냅샷 딕셔너리.
+        rds: RDS boto3 client (태그 조회용).
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        파싱된 스냅샷 정보. 파싱 실패 시 None.
+    """
     try:
         arn = data.get("DBClusterSnapshotArn", "")
         allocated_storage = data.get("AllocatedStorage", 0)
@@ -290,7 +382,20 @@ def _parse_aurora_snapshot(data: dict, rds, account_id: str, account_name: str, 
 def analyze_rds_snapshots(
     snapshots: list[RDSSnapshotInfo], account_id: str, account_name: str, region: str
 ) -> RDSSnapshotAnalysisResult:
-    """RDS Snapshot 미사용 분석"""
+    """수동 스냅샷을 경과 일수 기준으로 분석한다.
+
+    OLD_SNAPSHOT_DAYS 이상 경과한 스냅샷을 오래된 것으로 분류하고,
+    크기에 따라 심각도를 결정한다.
+
+    Args:
+        snapshots: 분석할 스냅샷 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과 집계 (RDSSnapshotAnalysisResult).
+    """
     result = RDSSnapshotAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -314,7 +419,14 @@ def analyze_rds_snapshots(
 
 
 def _analyze_single_snapshot(snapshot: RDSSnapshotInfo) -> RDSSnapshotFinding:
-    """개별 스냅샷 분석"""
+    """개별 스냅샷의 경과 일수와 크기를 기준으로 분석한다.
+
+    Args:
+        snapshot: 분석 대상 스냅샷.
+
+    Returns:
+        스냅샷 분석 결과 (RDSSnapshotFinding).
+    """
 
     # 최근 생성
     if not snapshot.is_old:
@@ -350,7 +462,17 @@ def _analyze_single_snapshot(snapshot: RDSSnapshotInfo) -> RDSSnapshotFinding:
 
 
 def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """RDS 스냅샷 미사용 분석 Excel 보고서를 생성한다.
+
+    Summary 시트(총괄 통계)와 Findings 시트(오래된 스냅샷 상세, 비용순 정렬)를 포함.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        저장된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -449,7 +571,19 @@ def generate_report(results: list[RDSSnapshotAnalysisResult], output_dir: str) -
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> RDSSnapshotAnalysisResult | None:
-    """단일 계정/리전의 RDS 스냅샷 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 RDS 수동 스냅샷을 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 병렬로 실행된다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: AWS 리전 코드.
+
+    Returns:
+        분석 결과. 스냅샷이 없으면 None.
+    """
     snapshots = collect_rds_snapshots(session, account_id, account_name, region)
     if not snapshots:
         return None
@@ -457,7 +591,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """RDS Snapshot 미사용 분석 실행"""
+    """RDS Snapshot 미사용 분석 도구의 진입점.
+
+    멀티 계정/리전 병렬 수집 후 콘솔 요약 출력, Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 리전, 출력 설정 포함).
+    """
     console.print("[bold]RDS Snapshot 미사용 분석 시작...[/bold]")
     console.print(f"  [dim]기준: {OLD_SNAPSHOT_DAYS}일 이상 오래된 수동 스냅샷[/dim]")
 

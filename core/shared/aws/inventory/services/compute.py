@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/compute.py - Compute 리소스 수집
+core/shared/aws/inventory/services/compute.py - Compute 리소스 수집
 
 EBS Volume, Lambda Function, ECS Cluster/Service, ASG, Launch Template, EKS, AMI, Snapshot 수집.
 """
@@ -28,7 +28,17 @@ logger = logging.getLogger(__name__)
 
 
 def collect_ebs_volumes(session, account_id: str, account_name: str, region: str) -> list[EBSVolume]:
-    """EBS Volume 수집"""
+    """EBS Volume 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        EBSVolume 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     volumes = []
 
@@ -72,7 +82,17 @@ def collect_ebs_volumes(session, account_id: str, account_name: str, region: str
 
 
 def collect_lambda_functions(session, account_id: str, account_name: str, region: str) -> list[LambdaFunction]:
-    """Lambda Function 수집"""
+    """Lambda Function 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        LambdaFunction 데이터 클래스 목록
+    """
     lambda_client = get_client(session, "lambda", region_name=region)
     functions = []
 
@@ -120,7 +140,17 @@ def collect_lambda_functions(session, account_id: str, account_name: str, region
 
 
 def collect_ecs_clusters(session, account_id: str, account_name: str, region: str) -> list[ECSCluster]:
-    """ECS Cluster 수집"""
+    """ECS Cluster 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        ECSCluster 데이터 클래스 목록
+    """
     ecs = get_client(session, "ecs", region_name=region)
     clusters: list[ECSCluster] = []
 
@@ -166,7 +196,17 @@ def collect_ecs_clusters(session, account_id: str, account_name: str, region: st
 
 
 def collect_ecs_services(session, account_id: str, account_name: str, region: str) -> list[ECSService]:
-    """ECS Service 수집"""
+    """ECS Service 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        ECSService 데이터 클래스 목록
+    """
     ecs = get_client(session, "ecs", region_name=region)
     services = []
 
@@ -225,7 +265,17 @@ def collect_ecs_services(session, account_id: str, account_name: str, region: st
 
 
 def collect_auto_scaling_groups(session, account_id: str, account_name: str, region: str) -> list[AutoScalingGroup]:
-    """Auto Scaling Group 수집"""
+    """Auto Scaling Group 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        AutoScalingGroup 데이터 클래스 목록
+    """
     asg = get_client(session, "autoscaling", region_name=region)
     groups = []
 
@@ -278,7 +328,17 @@ def collect_auto_scaling_groups(session, account_id: str, account_name: str, reg
 
 
 def collect_launch_templates(session, account_id: str, account_name: str, region: str) -> list[LaunchTemplate]:
-    """Launch Template 수집"""
+    """Launch Template 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        LaunchTemplate 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     templates = []
 
@@ -329,7 +389,17 @@ def collect_launch_templates(session, account_id: str, account_name: str, region
 
 
 def collect_eks_clusters(session, account_id: str, account_name: str, region: str) -> list[EKSCluster]:
-    """EKS Cluster 수집"""
+    """EKS Cluster 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        EKSCluster 데이터 클래스 목록
+    """
     eks = get_client(session, "eks", region_name=region)
     clusters: list[EKSCluster] = []
 
@@ -379,7 +449,17 @@ def collect_eks_clusters(session, account_id: str, account_name: str, region: st
 
 
 def collect_eks_node_groups(session, account_id: str, account_name: str, region: str) -> list[EKSNodeGroup]:
-    """EKS Node Group 수집"""
+    """EKS Node Group 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        EKSNodeGroup 데이터 클래스 목록
+    """
     eks = get_client(session, "eks", region_name=region)
     node_groups: list[EKSNodeGroup] = []
 
@@ -437,7 +517,17 @@ def collect_eks_node_groups(session, account_id: str, account_name: str, region:
 
 
 def collect_amis(session, account_id: str, account_name: str, region: str) -> list[AMI]:
-    """EC2 AMI (자체 소유) 수집"""
+    """자체 소유 EC2 AMI 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        AMI 데이터 클래스 목록 (자체 소유 이미지만 포함)
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     amis = []
 
@@ -473,7 +563,17 @@ def collect_amis(session, account_id: str, account_name: str, region: str) -> li
 
 
 def collect_snapshots(session, account_id: str, account_name: str, region: str) -> list[Snapshot]:
-    """EC2 Snapshot (자체 소유) 수집"""
+    """자체 소유 EC2 Snapshot 리소스를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        Snapshot 데이터 클래스 목록 (자체 소유 스냅샷만 포함)
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     snapshots = []
 

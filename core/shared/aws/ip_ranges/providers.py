@@ -1,5 +1,5 @@
 """
-plugins/vpc/ip_search/common/ip_ranges/providers.py - Cloud Provider IP Range Services
+core/shared/aws/ip_ranges/providers.py - Cloud Provider IP Range Services
 
 클라우드 프로바이더별 IP 대역 데이터 서비스:
 - AWS, GCP, Azure, Oracle Cloud, Cloudflare, Fastly
@@ -35,7 +35,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PublicIPResult:
-    """Public IP search result"""
+    """Public IP 검색 결과
+
+    IP 주소가 어떤 클라우드 프로바이더의 어떤 서비스에 속하는지를 나타냅니다.
+
+    Attributes:
+        ip_address: 검색한 IP 주소
+        provider: 클라우드 프로바이더 (AWS, GCP, Azure, Oracle, Unknown)
+        service: 서비스 이름 (EC2, S3, CLOUDFRONT 등)
+        ip_prefix: 매칭된 CIDR 대역
+        region: 리전 이름
+        extra: 추가 메타데이터 (network_border_group 등)
+    """
 
     ip_address: str
     provider: str  # AWS, GCP, Azure, Oracle, Unknown
@@ -56,7 +67,15 @@ def _get_cache_dir() -> str:
 
 
 def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:
-    """Load data from cache"""
+    """캐시에서 데이터 로드
+
+    Args:
+        name: 캐시 파일 이름 (확장자 제외)
+        max_age_hours: 캐시 유효 시간 (시간 단위, 기본 24시간)
+
+    Returns:
+        캐시된 딕셔너리 데이터. 캐시 없거나 만료 시 None.
+    """
     cache_file = os.path.join(_get_cache_dir(), f"{name}.json")
     if not os.path.exists(cache_file):
         return None
@@ -75,7 +94,12 @@ def _load_from_cache(name: str, max_age_hours: int = 24) -> dict | None:
 
 
 def _save_to_cache(name: str, data: dict) -> None:
-    """Save data to cache"""
+    """데이터를 캐시 파일로 저장
+
+    Args:
+        name: 캐시 파일 이름 (확장자 제외)
+        data: 저장할 딕셔너리 데이터
+    """
     cache_file = os.path.join(_get_cache_dir(), f"{name}.json")
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
@@ -175,7 +199,15 @@ def refresh_public_cache(
 
 
 def _fetch_and_cache(name: str, url: str) -> dict[Any, Any] | None:
-    """Download data from URL and save to cache"""
+    """URL에서 데이터를 다운로드하고 캐시에 저장
+
+    Args:
+        name: 캐시 파일 이름
+        url: 다운로드 URL
+
+    Returns:
+        다운로드된 JSON 딕셔너리. 실패 시 None.
+    """
     try:
         response = requests.get(url, timeout=15)
         if response.status_code == 200:
@@ -188,7 +220,13 @@ def _fetch_and_cache(name: str, url: str) -> dict[Any, Any] | None:
 
 
 def _fetch_azure_fresh() -> dict[Any, Any] | None:
-    """Download Azure data (weekly update URL search)"""
+    """Azure IP 대역 데이터 다운로드
+
+    Azure는 주간 업데이트 URL이 날짜 기반이므로 최근 5주간의 날짜를 순회하여 탐색합니다.
+
+    Returns:
+        Azure ServiceTags JSON 딕셔너리. 실패 시 None.
+    """
     from datetime import datetime, timedelta
 
     base_url = (
@@ -215,7 +253,11 @@ def _fetch_azure_fresh() -> dict[Any, Any] | None:
 
 
 def get_public_cache_status() -> dict[str, Any]:
-    """Get public IP cache status"""
+    """Public IP 캐시 상태 조회
+
+    Returns:
+        프로바이더별 캐시 상태 (cached, time, valid, count)를 담은 딕셔너리
+    """
     from datetime import datetime
 
     cache_dir = _get_cache_dir()
@@ -943,7 +985,14 @@ def search_public_cidr(
 
 
 def list_aws_regions(data: dict) -> list[str]:
-    """Get unique region list from AWS IP ranges"""
+    """AWS IP 대역 데이터에서 고유 리전 목록 추출
+
+    Args:
+        data: get_aws_ip_ranges() 결과 딕셔너리
+
+    Returns:
+        정렬된 리전 이름 리스트
+    """
     regions = set()
     for prefix in data.get("prefixes", []):
         region = prefix.get("region", "")
@@ -953,7 +1002,14 @@ def list_aws_regions(data: dict) -> list[str]:
 
 
 def list_aws_services(data: dict) -> list[str]:
-    """Get unique service list from AWS IP ranges"""
+    """AWS IP 대역 데이터에서 고유 서비스 목록 추출
+
+    Args:
+        data: get_aws_ip_ranges() 결과 딕셔너리
+
+    Returns:
+        정렬된 서비스 이름 리스트
+    """
     services = set()
     for prefix in data.get("prefixes", []):
         service = prefix.get("service", "")
@@ -1109,7 +1165,14 @@ def search_by_filter(
 
 
 def get_available_filters(provider: str = "aws") -> dict[str, list[str]]:
-    """Get available region/service lists"""
+    """프로바이더별 사용 가능한 리전/서비스 필터 목록 조회
+
+    Args:
+        provider: 클라우드 프로바이더 이름 (aws, gcp, azure, oracle, cloudflare, fastly)
+
+    Returns:
+        {"regions": [...], "services": [...]} 딕셔너리
+    """
     provider = provider.lower()
 
     loaders = {

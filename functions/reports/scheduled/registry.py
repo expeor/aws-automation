@@ -1,12 +1,11 @@
-"""
-reports/scheduled/registry.py - 정기 작업 레지스트리
+"""functions/reports/scheduled/registry.py - 정기 작업 레지스트리.
 
-YAML 설정 파일 로드 및 주기별 그룹화
+YAML 설정 파일을 로드하고 주기별 그룹(ScheduleGroup)으로 변환합니다.
 
 설정 선택 우선순위:
-1. 함수 파라미터 (company)
-2. 환경변수 (AA_SCHEDULED_CONFIG)
-3. 기본값 (default.yaml)
+    1. 함수 파라미터 (company).
+    2. 환경변수 (AA_SCHEDULED_CONFIG).
+    3. 기본값 (default.yaml).
 """
 
 import os

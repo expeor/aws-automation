@@ -1,20 +1,23 @@
 """
-core/pricing/nat.py - NAT Gateway 가격 조회
+core/shared/aws/pricing/nat.py - NAT Gateway 가격 조회
 
-NAT Gateway 비용 계산:
-- 시간당 고정 비용: ~$0.045/hour (리전별 상이)
-- 데이터 처리 비용: ~$0.045/GB (리전별 상이)
+NAT Gateway의 시간당 고정 비용과 데이터 처리(GB당) 비용을 조회한다.
+가격 변동이 드물어 하드코딩 가격을 사용하며, Pricing API는 호출하지 않는다.
+
+비용 구조:
+    - 시간당 고정 비용: $0.045/hour (대부분 리전 동일)
+    - 데이터 처리 비용: $0.045/GB (대부분 리전 동일)
 
 사용법:
-    from core.pricing import get_nat_hourly_price, get_nat_monthly_cost
+    from core.shared.aws.pricing.nat import get_nat_hourly_price, get_nat_monthly_cost
 
     # 시간당 가격
     hourly = get_nat_hourly_price("ap-northeast-2")
 
-    # 월간 고정 비용 (가동 시간 기준)
+    # 월간 고정 비용 (730시간 기준)
     monthly = get_nat_monthly_cost("ap-northeast-2")
 
-    # 데이터 처리 비용 포함
+    # 100GB 데이터 처리 비용 포함
     total = get_nat_monthly_cost("ap-northeast-2", data_processed_gb=100)
 """
 
@@ -63,38 +66,40 @@ HOURS_PER_MONTH = 730
 
 
 def get_nat_prices(region: str = "ap-northeast-2") -> dict[str, float]:
-    """NAT Gateway 가격 조회
+    """NAT Gateway 시간당/데이터 처리 가격을 조회한다.
 
     Args:
-        region: AWS 리전
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
 
     Returns:
-        {"hourly": float, "per_gb": float}
+        가격 딕셔너리::
+
+            {"hourly": float, "per_gb": float}
     """
     return NAT_GATEWAY_PRICES.get(region, DEFAULT_PRICES)
 
 
 def get_nat_hourly_price(region: str = "ap-northeast-2") -> float:
-    """NAT Gateway 시간당 가격
+    """NAT Gateway 시간당 고정 가격을 반환한다.
 
     Args:
-        region: AWS 리전
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
 
     Returns:
-        시간당 USD
+        시간당 USD (기본값: ``0.045``)
     """
     prices = get_nat_prices(region)
     return prices["hourly"]
 
 
 def get_nat_data_price(region: str = "ap-northeast-2") -> float:
-    """NAT Gateway 데이터 처리 GB당 가격
+    """NAT Gateway 데이터 처리 GB당 가격을 반환한다.
 
     Args:
-        region: AWS 리전
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
 
     Returns:
-        GB당 USD
+        처리 GB당 USD (기본값: ``0.045``)
     """
     prices = get_nat_prices(region)
     return prices["per_gb"]
@@ -105,15 +110,17 @@ def get_nat_monthly_cost(
     hours: int = HOURS_PER_MONTH,
     data_processed_gb: float = 0.0,
 ) -> float:
-    """NAT Gateway 월간 비용 계산
+    """NAT Gateway의 월간 총 비용(고정 + 데이터 처리)을 계산한다.
+
+    ``(hourly * hours) + (per_gb * data_processed_gb)`` 로 산출한다.
 
     Args:
-        region: AWS 리전
-        hours: 가동 시간 (기본: 730시간 = 한 달)
-        data_processed_gb: 처리된 데이터량 (GB)
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        hours: 가동 시간 (기본: ``730`` = 한 달)
+        data_processed_gb: 처리된 데이터량 (GB, 기본: ``0.0``)
 
     Returns:
-        월간 USD 비용
+        월간 USD 비용 (소수점 2자리 반올림)
     """
     prices = get_nat_prices(region)
 
@@ -127,13 +134,13 @@ def get_nat_monthly_cost(
 
 
 def get_nat_monthly_fixed_cost(region: str = "ap-northeast-2") -> float:
-    """NAT Gateway 월간 고정 비용 (데이터 처리 비용 제외)
+    """NAT Gateway 월간 고정 비용만 반환한다 (데이터 처리 비용 제외).
 
     Args:
-        region: AWS 리전
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
 
     Returns:
-        월간 고정 USD 비용
+        월간 고정 USD 비용 (소수점 2자리 반올림, 예: ``32.85``)
     """
     return get_nat_monthly_cost(region, hours=HOURS_PER_MONTH, data_processed_gb=0)
 
@@ -143,15 +150,25 @@ def estimate_savings(
     region: str = "ap-northeast-2",
     months: int = 12,
 ) -> dict[str, float | int | str]:
-    """NAT Gateway 제거 시 예상 절감액 계산
+    """NAT Gateway 제거 시 예상 고정 비용 절감액을 계산한다.
+
+    데이터 처리 비용은 사용량에 따라 달라지므로 고정 비용만 포함한다.
 
     Args:
-        nat_count: NAT Gateway 개수
-        region: AWS 리전
-        months: 계산 기간 (개월)
+        nat_count: 제거 대상 NAT Gateway 개수
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        months: 절감액 계산 기간 (개월, 기본: ``12``)
 
     Returns:
-        절감액 정보 딕셔너리
+        절감액 정보 딕셔너리::
+
+            {
+                "monthly_per_nat": float,   # NAT Gateway 1개 월간 고정 비용
+                "monthly_total": float,     # 전체 월간 절감액
+                "annual_total": float,      # 기간 합계 절감액
+                "nat_count": int,           # NAT Gateway 개수
+                "region": str,             # 리전
+            }
     """
     monthly_fixed = get_nat_monthly_fixed_cost(region)
     monthly_savings = monthly_fixed * nat_count

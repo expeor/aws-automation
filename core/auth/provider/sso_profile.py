@@ -1,10 +1,14 @@
-# internal/auth/provider/sso_profile.py
+# core/auth/provider/sso_profile.py
 """
-SSO Profile Provider 구현
+core/auth/provider/sso_profile.py - SSO Profile Provider 구현
 
-- AWS SSO 프로파일 기반 인증
-- 특정 계정/역할에 바인딩
-- 멀티 계정 지원 (다른 계정 접근 가능)
+AWS SSO 프로파일 기반 인증 Provider입니다. SSOSessionProvider를 상속하여
+특정 계정/역할에 바인딩된 기본값 기능을 추가합니다.
+
+특징:
+    - 기본 account_id/role_name이 설정되어 get_session() 호출 시 생략 가능
+    - SSOSessionProvider의 멀티 계정 기능도 사용 가능
+    - Legacy SSO (sso_session 없이 직접 설정) 형식도 지원
 """
 
 import logging
@@ -143,7 +147,16 @@ class SSOProfileProvider(SSOSessionProvider):
         role_name: str | None = None,
         region: str | None = None,
     ) -> dict[str, Any]:
-        """AWS 설정 정보 반환 (기본값 사용 가능)"""
+        """AWS 설정 정보를 반환합니다 (기본값 사용 가능).
+
+        Args:
+            account_id: AWS 계정 ID (None이면 기본값 사용)
+            role_name: 역할 이름 (None이면 기본값 사용)
+            region: AWS 리전
+
+        Returns:
+            {"region_name": str, "credentials": ...} 딕셔너리
+        """
         return super().get_aws_config(
             account_id=account_id or self._default_account_id,
             role_name=role_name or self._default_role_name,
@@ -151,7 +164,13 @@ class SSOProfileProvider(SSOSessionProvider):
         )
 
     def get_default_account_info(self) -> AccountInfo:
-        """기본 계정 정보 반환"""
+        """프로파일에 설정된 기본 계정 정보를 반환합니다.
+
+        SSO 계정 목록에서 기본 계정을 찾고, 없으면 기본 정보를 생성합니다.
+
+        Returns:
+            AccountInfo 객체
+        """
         accounts = self.list_accounts()
         if self._default_account_id in accounts:
             return accounts[self._default_account_id]

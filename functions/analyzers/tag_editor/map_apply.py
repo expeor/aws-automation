@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/map_apply.py - MAP 태그 적용
+functions/analyzers/tag_editor/map_apply.py - MAP 태그 적용
 
 AWS 리소스에 map-migrated 태그 일괄 적용
 
@@ -91,7 +91,20 @@ def _apply_via_tagging_api(
     dry_run: bool,
     result: MapTagApplyResult,
 ) -> None:
-    """ResourceGroupsTaggingAPI로 일반 리소스에 태그 적용"""
+    """ResourceGroupsTaggingAPI로 일반 리소스에 MAP 태그를 적용한다.
+
+    최대 20개씩 배치로 처리하며, dry_run 모드에서는 실제 적용하지 않는다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+        resources: 태그를 적용할 리소스 목록.
+        tag_value: 적용할 map-migrated 태그 값.
+        dry_run: True이면 실제 적용하지 않고 시뮬레이션.
+        result: 적용 결과 객체 (작업 로그와 카운트가 직접 반영됨).
+    """
     if not resources:
         return
 
@@ -207,12 +220,24 @@ def apply_map_tag(
     tag_value: str,
     dry_run: bool = True,
 ) -> MapTagApplyResult:
-    """리소스에 MAP 태그 적용 (하이브리드)
+    """리소스에 MAP 태그를 적용한다 (하이브리드 전략).
 
-    리소스 타입에 따라 적절한 API 사용:
+    리소스 타입에 따라 적절한 API를 사용한다:
     - logs:log-group: CloudWatch Logs Native API
-    - s3:bucket: S3 Native API (기존 태그 보존!)
+    - s3:bucket: S3 Native API (기존 태그 보존)
     - 기타: ResourceGroupsTaggingAPI
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+        resources: 태그를 적용할 리소스 목록.
+        tag_value: 적용할 map-migrated 태그 값.
+        dry_run: True이면 실제 적용하지 않고 시뮬레이션 (기본값: True).
+
+    Returns:
+        MAP 태그 적용 결과 객체.
     """
     result = MapTagApplyResult(
         account_id=account_id,
@@ -296,7 +321,13 @@ def apply_map_tag(
 
 
 def _select_resource_types() -> list[str] | None:
-    """리소스 타입 선택"""
+    """사용자에게 태그 적용 대상 리소스 타입을 선택받는다.
+
+    전체/카테고리별/개별 타입 선택을 지원한다.
+
+    Returns:
+        선택된 리소스 타입 목록. 전체 선택 시 None.
+    """
     console.print("\n[bold]리소스 타입 선택[/bold]")
     console.print("1. 전체 리소스")
     console.print("2. 카테고리별 선택")
@@ -333,7 +364,13 @@ def _select_resource_types() -> list[str] | None:
 
 
 def collect_options(ctx: ExecutionContext) -> None:
-    """MAP 태그 적용 옵션 수집"""
+    """MAP 태그 적용 실행 전 사용자 옵션을 수집한다.
+
+    태그 값, 적용 대상(미태그만/전체), 리소스 타입, dry-run 모드를 설정한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (options 딕셔너리에 설정값이 저장됨).
+    """
     console.print("\n[bold cyan]MAP 태그 적용 설정[/bold cyan]")
 
     # 1. MAP 태그 값 입력
@@ -391,12 +428,25 @@ def _collect_and_apply(
     untagged_only: bool,
     dry_run: bool,
 ) -> MapTagApplyResult:
-    """단일 계정/리전의 MAP 태그 적용 (하이브리드 수집)
+    """단일 계정/리전의 리소스를 수집하고 MAP 태그를 적용한다.
 
     하이브리드 수집 전략:
     1. ResourceGroupsTaggingAPI로 일반 리소스 수집
     2. CloudWatch Logs Native API로 로그 그룹 수집
-    3. S3 Native API로 버킷 수집 (리전별)
+    3. S3 Native API로 해당 리전 버킷 수집
+    수집 후 대상 필터링(미태그만 또는 전체)을 거쳐 태그를 적용한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+        tag_value: 적용할 map-migrated 태그 값.
+        untagged_only: True이면 미태그 리소스만 대상.
+        dry_run: True이면 실제 적용하지 않고 시뮬레이션.
+
+    Returns:
+        MAP 태그 적용 결과 객체.
     """
     # 1. Tagging API로 기본 수집
     audit_result = collect_resources_with_tags(session, account_id, account_name, region)
@@ -437,7 +487,14 @@ def _collect_and_apply(
 
 
 def run(ctx: ExecutionContext) -> None:
-    """MAP 태그 적용 실행"""
+    """MAP 태그 적용 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 태그를 적용하고, 결과를 콘솔에 요약 출력한 뒤
+    Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     tag_value = ctx.options.get("tag_value", "")
     if not tag_value:
         console.print("[red]태그 값이 설정되지 않았습니다.[/red]")

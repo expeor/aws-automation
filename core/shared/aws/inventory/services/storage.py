@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/storage.py - Storage 리소스 수집
+core/shared/aws/inventory/services/storage.py - Storage 리소스 수집
 
 EFS File System, FSx File System 수집.
 """
@@ -16,7 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 def collect_efs_file_systems(session, account_id: str, account_name: str, region: str) -> list[EFSFileSystem]:
-    """EFS File System 수집"""
+    """EFS File System 리소스를 수집합니다.
+
+    File System 목록 조회 후 각 파일 시스템의 Performance Mode, Throughput Mode,
+    크기, Mount Target 수, 암호화 설정 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        EFSFileSystem 데이터 클래스 목록
+    """
     efs = get_client(session, "efs", region_name=region)
     file_systems = []
 
@@ -59,7 +72,20 @@ def collect_efs_file_systems(session, account_id: str, account_name: str, region
 
 
 def collect_fsx_file_systems(session, account_id: str, account_name: str, region: str) -> list[FSxFileSystem]:
-    """FSx File System 수집"""
+    """FSx File System 리소스를 수집합니다.
+
+    File System 목록 조회 후 각 파일 시스템의 타입(Lustre, Windows, ONTAP, OpenZFS),
+    스토리지 용량/타입, VPC/Subnet 정보, DNS Name 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        FSxFileSystem 데이터 클래스 목록
+    """
     fsx = get_client(session, "fsx", region_name=region)
     file_systems = []
 

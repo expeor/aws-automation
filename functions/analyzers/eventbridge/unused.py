@@ -1,5 +1,5 @@
 """
-plugins/eventbridge/unused.py - EventBridge 미사용 규칙 분석
+functions/analyzers/eventbridge/unused.py - EventBridge 미사용 규칙 분석
 
 비활성화/미사용 규칙 탐지 (CloudWatch 지표 기반)
 
@@ -44,7 +44,16 @@ REQUIRED_PERMISSIONS = {
 
 
 class RuleStatus(Enum):
-    """규칙 상태"""
+    """EventBridge 규칙 분석 상태.
+
+    규칙의 활성/비활성/미사용 상태를 분류한다.
+
+    Attributes:
+        NORMAL: 정상 동작 중인 규칙 (최근 7일간 트리거 있음).
+        DISABLED: 비활성화된 규칙.
+        NO_TARGETS: 트리거 대상 타겟이 설정되지 않은 규칙.
+        UNUSED: 활성화되었으나 최근 7일간 트리거가 없는 규칙.
+    """
 
     NORMAL = "normal"
     DISABLED = "disabled"
@@ -54,7 +63,23 @@ class RuleStatus(Enum):
 
 @dataclass
 class RuleInfo:
-    """EventBridge 규칙 정보"""
+    """EventBridge 규칙 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        rule_name: 규칙 이름.
+        rule_arn: 규칙 ARN.
+        event_bus_name: 이벤트 버스 이름 (default 또는 커스텀).
+        state: 규칙 상태 (ENABLED, DISABLED).
+        schedule_expression: 스케줄 표현식 (cron/rate).
+        event_pattern: 이벤트 패턴 (최대 100자).
+        target_count: 타겟 수.
+        invocations: 최근 7일간 Invocations 합계 (CloudWatch 지표).
+        failed_invocations: 최근 7일간 FailedInvocations 합계.
+        triggered_rules: 최근 7일간 TriggeredRules 합계.
+    """
 
     account_id: str
     account_name: str
@@ -74,7 +99,13 @@ class RuleInfo:
 
 @dataclass
 class RuleFinding:
-    """규칙 분석 결과"""
+    """개별 규칙에 대한 분석 결과.
+
+    Attributes:
+        rule: 분석 대상 규칙 정보.
+        status: 분석된 규칙 상태.
+        recommendation: 권장 조치 메시지.
+    """
 
     rule: RuleInfo
     status: RuleStatus
@@ -83,7 +114,19 @@ class RuleFinding:
 
 @dataclass
 class EventBridgeAnalysisResult:
-    """EventBridge 분석 결과 집계"""
+    """계정/리전별 EventBridge 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_rules: 전체 규칙 수.
+        disabled_rules: 비활성화된 규칙 수.
+        no_targets: 타겟 미설정 규칙 수.
+        unused_rules: 미사용 규칙 수 (활성화되었으나 트리거 없음).
+        normal_rules: 정상 규칙 수.
+        findings: 개별 규칙 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -97,10 +140,20 @@ class EventBridgeAnalysisResult:
 
 
 def collect_rules(session, account_id: str, account_name: str, region: str) -> list[RuleInfo]:
-    """EventBridge 규칙 수집 (배치 메트릭 최적화)
+    """EventBridge 규칙을 수집하고 CloudWatch 메트릭을 배치 조회한다.
 
-    최적화:
-    - 기존: 규칙당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    1단계에서 기본 이벤트 버스와 커스텀 이벤트 버스의 규칙 목록을 수집하고,
+    2단계에서 활성화된 규칙에 대해 batch_get_metrics로 TriggeredRules/Invocations/
+    FailedInvocations 지표를 배치 조회한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 RuleInfo 목록.
     """
     from botocore.exceptions import ClientError
 
@@ -186,12 +239,16 @@ def _collect_eventbridge_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """EventBridge 메트릭 배치 수집 (내부 함수)
+    """활성화된 규칙의 CloudWatch 메트릭을 배치 수집한다.
 
-    메트릭:
-    - TriggeredRules (Sum)
-    - Invocations (Sum)
-    - FailedInvocations (Sum)
+    TriggeredRules, Invocations, FailedInvocations 지표를 한 번에 조회하여
+    각 RuleInfo 객체에 반영한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        rules: 활성화된 규칙 목록 (메트릭 값이 직접 업데이트됨).
+        start_time: 조회 시작 시간.
+        end_time: 조회 종료 시간.
     """
     from botocore.exceptions import ClientError
 
@@ -250,7 +307,19 @@ def _collect_eventbridge_metrics_batch(
 
 
 def analyze_rules(rules: list[RuleInfo], account_id: str, account_name: str, region: str) -> EventBridgeAnalysisResult:
-    """EventBridge 규칙 분석"""
+    """수집된 EventBridge 규칙을 분석한다.
+
+    비활성화, 타겟 미설정, 미사용(트리거 없음), 정상으로 분류한다.
+
+    Args:
+        rules: 수집된 RuleInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        분석 결과를 담은 EventBridgeAnalysisResult 객체.
+    """
     result = EventBridgeAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -308,7 +377,17 @@ def analyze_rules(rules: list[RuleInfo], account_id: str, account_name: str, reg
 
 
 def generate_report(results: list[EventBridgeAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """EventBridge 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계)와 Rules(비정상 규칙 상세) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 EventBridge 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -398,7 +477,17 @@ def generate_report(results: list[EventBridgeAnalysisResult], output_dir: str) -
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EventBridgeAnalysisResult | None:
-    """단일 계정/리전의 EventBridge 규칙 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 EventBridge 규칙을 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        EventBridge 분석 결과. 규칙이 없으면 None.
+    """
     rules = collect_rules(session, account_id, account_name, region)
     if not rules:
         return None
@@ -406,7 +495,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """EventBridge 미사용 규칙 분석"""
+    """EventBridge 미사용 규칙 분석 도구의 메인 실행 함수.
+
+    비활성화/타겟 미설정/미사용 EventBridge 규칙을 탐지한다.
+    최근 7일간 CloudWatch 메트릭(TriggeredRules, Invocations)으로 미사용을 판단한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]EventBridge 규칙 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="events")

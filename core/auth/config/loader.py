@@ -1,11 +1,15 @@
-# internal/auth/config/loader.py
+# core/auth/config/loader.py
 """
-AWS 설정 파일 로더
+core/auth/config/loader.py - AWS 설정 파일 로더
 
-- ~/.aws/config 파일 파싱
-- ~/.aws/credentials 파일 파싱
-- SSO 세션 및 프로파일 감지
-- Provider 타입 자동 감지
+~/.aws/config와 ~/.aws/credentials 파일을 파싱하여 SSO 세션, 프로파일 정보를
+추출하고 각 프로파일의 Provider 타입을 자동 감지합니다.
+
+주요 기능:
+    - ~/.aws/config 파일 파싱 (sso-session, profile 섹션)
+    - ~/.aws/credentials 파일 파싱 및 프로파일 병합
+    - Provider 타입 자동 감지 (SSO_SESSION, SSO_PROFILE, STATIC_CREDENTIALS)
+    - Legacy SSO 설정 사용 시 마이그레이션 경고 표시
 """
 
 import configparser
@@ -104,6 +108,11 @@ class AWSSession:
     registration_scopes: str | None = None
 
     def __post_init__(self):
+        """필수 필드(start_url, region) 유효성을 검사합니다.
+
+        Raises:
+            ConfigurationError: start_url 또는 region이 비어있는 경우
+        """
         if not self.start_url:
             raise ConfigurationError(
                 f"SSO 세션 '{self.name}'에 sso_start_url이 필요합니다",
@@ -247,7 +256,14 @@ class Loader:
         return result
 
     def _parse_config_file(self, result: ParsedConfig) -> None:
-        """~/.aws/config 파일 파싱"""
+        """~/.aws/config 파일을 파싱하여 세션과 프로파일 정보를 추출합니다.
+
+        Args:
+            result: 파싱 결과를 저장할 ParsedConfig 객체 (in-place 수정)
+
+        Raises:
+            ConfigurationError: 설정 파일 파싱 실패 시
+        """
         config = configparser.ConfigParser()
         config.optionxform = str  # type: ignore[assignment,method-assign]  # 대소문자 유지
 
@@ -289,7 +305,16 @@ class Loader:
         section: str,
         profile_name: str,
     ) -> AWSProfile:
-        """프로파일 섹션 파싱"""
+        """단일 프로파일 섹션을 파싱하여 AWSProfile 객체를 생성합니다.
+
+        Args:
+            config: configparser 인스턴스
+            section: 섹션 이름 (예: "profile my-profile")
+            profile_name: 프로파일 이름 (예: "my-profile")
+
+        Returns:
+            AWSProfile 객체
+        """
         duration = config.get(section, "duration_seconds", fallback=None)
 
         return AWSProfile(
@@ -310,7 +335,17 @@ class Loader:
         )
 
     def _parse_credentials_file(self, result: ParsedConfig) -> None:
-        """~/.aws/credentials 파일 파싱 및 프로파일에 병합"""
+        """~/.aws/credentials 파일을 파싱하여 기존 프로파일에 자격증명을 병합합니다.
+
+        config 파일에 이미 존재하는 프로파일에는 credentials를 병합하고,
+        존재하지 않는 프로파일은 새로 생성합니다.
+
+        Args:
+            result: 파싱 결과를 저장할 ParsedConfig 객체 (in-place 수정)
+
+        Raises:
+            ConfigurationError: credentials 파일 파싱 실패 시
+        """
         config = configparser.ConfigParser()
         config.optionxform = str  # type: ignore[assignment,method-assign]  # 대소문자 유지
 
@@ -422,7 +457,14 @@ def load_config(
 
 
 def detect_provider_type(profile: AWSProfile) -> ProviderType | None:
-    """Provider 타입 감지 (편의 함수)"""
+    """프로파일에서 Provider 타입을 감지합니다 (편의 함수).
+
+    Args:
+        profile: AWSProfile 객체
+
+    Returns:
+        ProviderType enum 값 또는 None (지원하지 않는 타입)
+    """
     return Loader.detect_provider_type(profile)
 
 
@@ -430,7 +472,15 @@ def list_profiles(
     config_path: str | None = None,
     credentials_path: str | None = None,
 ) -> list[str]:
-    """프로파일 목록 반환 (편의 함수)"""
+    """프로파일 이름 목록을 반환합니다 (편의 함수).
+
+    Args:
+        config_path: config 파일 경로 (기본: ~/.aws/config)
+        credentials_path: credentials 파일 경로 (기본: ~/.aws/credentials)
+
+    Returns:
+        프로파일 이름 리스트
+    """
     loader = Loader(config_path, credentials_path)
     return loader.list_profiles()
 
@@ -439,6 +489,14 @@ def list_sso_sessions(
     config_path: str | None = None,
     credentials_path: str | None = None,
 ) -> list[str]:
-    """SSO 세션 목록 반환 (편의 함수)"""
+    """SSO 세션 이름 목록을 반환합니다 (편의 함수).
+
+    Args:
+        config_path: config 파일 경로 (기본: ~/.aws/config)
+        credentials_path: credentials 파일 경로 (기본: ~/.aws/credentials)
+
+    Returns:
+        SSO 세션 이름 리스트
+    """
     loader = Loader(config_path, credentials_path)
     return loader.list_sso_sessions()

@@ -1,8 +1,9 @@
-"""
-plugins/vpc/ip_search/private_ip/cache.py - Multi-Profile ENI Cache Management
+"""functions/reports/ip_search/private_ip/cache.py - 멀티 프로파일 ENI 캐시 관리.
 
-Cache file naming: {profile_name}_{account_id}_eni.msgpack
-Supports searching across multiple cache files.
+msgpack 직렬화 기반의 ENI 캐시를 관리합니다.
+캐시 파일 명명 규칙: {profile_name}_{account_id}_eni.msgpack
+단일 캐시(ENICache) 및 멀티 캐시 검색(MultiCacheSearch)을 지원하며,
+IP 정렬 배열(bisect)과 보조 인덱스(region, VPC)로 고속 검색을 제공합니다.
 """
 
 from __future__ import annotations
@@ -32,7 +33,17 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CacheInfo:
-    """Information about a cache file."""
+    """ENI 캐시 파일의 메타데이터.
+
+    Attributes:
+        filepath: 캐시 파일 절대 경로.
+        profile_name: AWS 프로파일 이름.
+        account_id: AWS 계정 ID.
+        eni_count: 캐시에 저장된 IP 엔트리 수.
+        created_at: 캐시 파일 생성 시각.
+        is_valid: 캐시 만료 여부 (기본 24시간).
+        regions: 캐시에 포함된 리전 목록.
+    """
 
     filepath: str
     profile_name: str
@@ -45,7 +56,29 @@ class CacheInfo:
 
 @dataclass
 class PrivateIPResult:
-    """Private IP search result."""
+    """Private IP 검색 결과 단일 항목.
+
+    Attributes:
+        ip_address: 검색된 IP 주소.
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        region: AWS 리전 코드.
+        eni_id: ENI(Elastic Network Interface) ID.
+        vpc_id: VPC ID.
+        subnet_id: Subnet ID.
+        availability_zone: 가용 영역.
+        private_ip: 기본 Private IP 주소.
+        public_ip: 연결된 Public IP 주소 (없으면 빈 문자열).
+        interface_type: ENI 인터페이스 타입.
+        status: ENI 상태 ("in-use", "available" 등).
+        description: ENI Description 필드.
+        security_groups: 연결된 Security Group 이름 목록.
+        name: ENI Name 태그 값.
+        is_managed: AWS 관리형 ENI 여부.
+        managed_by: ENI 관리 주체 ("User", "ELB", "RDS", "Lambda" 등).
+        mapped_resource: ENI Description에서 파싱된 리소스 정보 문자열.
+        profile_name: 이 결과가 속한 캐시의 프로파일 이름.
+    """
 
     ip_address: str
     account_id: str
@@ -220,10 +253,11 @@ def delete_all_caches() -> int:
 
 
 class ENICache:
-    """
-    ENI Cache for a single profile/account.
+    """단일 프로파일/계정의 ENI 캐시.
 
-    Cache file: {profile}_{account}_eni.msgpack
+    msgpack 파일로 IP-ENI 매핑을 저장하고, 정렬된 IP 배열과
+    보조 인덱스(region, VPC)를 구축하여 고속 검색을 지원합니다.
+    캐시 파일: {profile}_{account}_eni.msgpack
     """
 
     DEFAULT_EXPIRY_HOURS = 24
@@ -438,7 +472,11 @@ class ENICache:
 
 
 class MultiCacheSearch:
-    """Search across multiple ENI caches."""
+    """복수의 ENI 캐시를 대상으로 통합 검색을 수행합니다.
+
+    IP, CIDR, VPC ID, 텍스트 검색을 모든 등록된 캐시에 대해 실행하고
+    결과를 PrivateIPResult 리스트로 통합합니다.
+    """
 
     def __init__(self, caches: list[ENICache]):
         self.caches = caches
@@ -503,7 +541,16 @@ class MultiCacheSearch:
 
 
 def _eni_to_result(ip: str, eni: dict[str, Any], profile_name: str) -> PrivateIPResult:
-    """Convert ENI data to PrivateIPResult."""
+    """ENI 딕셔너리 데이터를 PrivateIPResult 객체로 변환합니다.
+
+    Args:
+        ip: 검색된 IP 주소 문자열.
+        eni: AWS describe_network_interfaces 응답의 ENI 딕셔너리.
+        profile_name: 이 ENI가 속한 캐시의 프로파일 이름.
+
+    Returns:
+        변환된 PrivateIPResult 객체.
+    """
     from ..parser import parse_eni_to_display_string
 
     name = ""
@@ -554,7 +601,12 @@ def _eni_to_result(ip: str, eni: dict[str, Any], profile_name: str) -> PrivateIP
 
 @dataclass
 class ENIFetchResult:
-    """Result of fetching ENIs from an account"""
+    """계정에서 ENI를 가져온 결과.
+
+    Attributes:
+        interfaces: 수집된 ENI 딕셔너리 리스트.
+        errors: 수집 중 발생한 에러를 담은 ErrorCollector.
+    """
 
     interfaces: list[dict[str, Any]]
     errors: ErrorCollector

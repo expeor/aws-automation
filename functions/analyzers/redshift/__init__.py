@@ -1,7 +1,11 @@
 """
-plugins/redshift - Redshift Cluster Analysis Tools
+functions/analyzers/redshift - Redshift 클러스터 관리 및 최적화 도구
 
-Redshift data warehouse cluster management and optimization
+Redshift 데이터 웨어하우스 클러스터의 사용량을 CloudWatch 지표
+기반으로 분석하고 유휴/저사용 클러스터를 탐지합니다.
+
+도구 목록:
+    - unused: 유휴/저사용 Redshift 클러스터 탐지 (CloudWatch 지표 기반)
 """
 
 CATEGORY = {

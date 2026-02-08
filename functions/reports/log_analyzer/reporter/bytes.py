@@ -1,4 +1,7 @@
-"""Bytes analysis sheet writer."""
+"""functions/reports/log_analyzer/reporter/bytes.py - 데이터 전송량 분석 시트 Writer.
+
+요청별 수신/송신/총 데이터 전송량을 분석하여 Top N 시트를 생성합니다.
+"""
 
 from __future__ import annotations
 

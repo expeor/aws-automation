@@ -1,9 +1,10 @@
 """
 core/auth/datadog_client.py - Datadog API 클라이언트 관리
 
-Datadog API 클라이언트의 초기화, 검증, 캐싱을 담당합니다.
+여러 환경의 Datadog API 클라이언트를 초기화, 검증, 캐싱합니다.
+API 키 유효성 검사, SSL 설정(certifi), 환경별 클라이언트 관리를 담당합니다.
 
-Usage:
+Example:
     from core.auth.datadog_client import DatadogClientManager, get_datadog_clients
 
     API_KEYS = {
@@ -48,13 +49,29 @@ class DatadogClientManager:
     """
 
     def __init__(self, api_keys: dict[str, dict[str, str]]) -> None:
+        """DatadogClientManager 초기화
+
+        Args:
+            api_keys: 환경별 API 키 딕셔너리
+                {"env_name": {"api_key": "...", "app_key": "..."}, ...}
+        """
         self._api_keys = api_keys
         self._api_clients: dict[str, ApiClient] = {}
         self._validated_envs: set[str] = set()
         self._invalid_envs: set[str] = set()
 
     def _create_configuration(self, api_key: str, app_key: str):
-        """Datadog API Configuration 생성"""
+        """Datadog API Configuration 객체를 생성합니다.
+
+        macOS SSL 인증서 문제를 해결하기 위해 certifi CA 번들을 설정합니다.
+
+        Args:
+            api_key: Datadog API 키
+            app_key: Datadog Application 키
+
+        Returns:
+            datadog_api_client.Configuration 인스턴스
+        """
         from datadog_api_client import Configuration
 
         configuration = Configuration()
@@ -74,7 +91,18 @@ class DatadogClientManager:
         return configuration
 
     def _validate_and_create_client(self, env: str, keys: dict[str, str]) -> ApiClient | None:
-        """API 키 유효성 검사 후 클라이언트 생성"""
+        """API 키 유효성을 검사하고 클라이언트를 생성합니다.
+
+        이미 검증된 클라이언트는 캐시에서 반환하고,
+        유효하지 않은 환경은 None을 반환합니다.
+
+        Args:
+            env: 환경명 (예: "prod_app")
+            keys: {"api_key": "...", "app_key": "..."} 딕셔너리
+
+        Returns:
+            ApiClient 인스턴스 또는 None (유효성 검사 실패 시)
+        """
         from datadog_api_client import ApiClient
         from datadog_api_client.v1.api.authentication_api import AuthenticationApi
 
@@ -201,7 +229,10 @@ class DatadogClientManager:
         return self._invalid_envs.copy()
 
     def reset(self) -> None:
-        """캐시 초기화 (테스트용)"""
+        """모든 내부 캐시(클라이언트, 검증 결과)를 초기화합니다.
+
+        주로 테스트에서 사용합니다.
+        """
         self._api_clients.clear()
         self._validated_envs.clear()
         self._invalid_envs.clear()

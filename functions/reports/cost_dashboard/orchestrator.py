@@ -1,7 +1,8 @@
-"""
-plugins/cost/unused_all/orchestrator.py - 병렬 수집 오케스트레이션
+"""functions/reports/cost_dashboard/orchestrator.py - 병렬 수집 오케스트레이션.
 
-세션별 병렬 수집 및 결과 집계 로직
+세션별 병렬 수집 및 결과 집계 로직을 담당합니다.
+parallel_collect를 통해 멀티 계정/멀티 리전 환경에서 미사용 리소스를 수집하고,
+ThreadPoolExecutor로 세션 내 리소스별 병렬 수집을 수행합니다.
 """
 
 from __future__ import annotations
@@ -54,14 +55,24 @@ _global_collected: set = set()
 
 
 def _reset_global_tracking() -> None:
-    """전역 서비스 추적 초기화 (새 실행 시 호출)"""
+    """전역 서비스 추적 상태를 초기화합니다.
+
+    새 실행 시 호출하여 Route53, S3 등 글로벌 서비스의 계정별 수집 완료 추적을 리셋합니다.
+    """
     global _global_collected
     with _global_lock:
         _global_collected = set()
 
 
 def _should_collect_global(account_id: str) -> bool:
-    """해당 계정의 전역 서비스를 수집해야 하는지 확인 (thread-safe)"""
+    """해당 계정의 전역 서비스를 수집해야 하는지 확인합니다 (thread-safe).
+
+    Args:
+        account_id: AWS 계정 ID.
+
+    Returns:
+        True이면 해당 계정의 글로벌 서비스를 처음 수집하는 경우.
+    """
     with _global_lock:
         if account_id in _global_collected:
             return False
@@ -80,7 +91,17 @@ def _apply_result(
     resource_type: str,
     data: dict[str, Any],
 ) -> None:
-    """리소스 결과를 요약 및 세션 결과에 적용 (매핑 기반)"""
+    """리소스 수집 결과를 요약 및 세션 결과에 적용합니다.
+
+    RESOURCE_FIELD_MAP 매핑을 기반으로 summary의 총계/미사용/낭비 필드와
+    session_result의 상세 데이터 필드를 설정합니다.
+
+    Args:
+        summary: 계정/리전별 요약 데이터 객체.
+        session_result: 세션 수집 결과 객체.
+        resource_type: 리소스 타입 키 ("nat", "ebs", "eip" 등).
+        data: 수집 함수의 반환 딕셔너리 (total, unused, waste, findings 등).
+    """
     if "error" in data:
         session_result.errors.append(data["error"])
         return
@@ -102,13 +123,38 @@ def _apply_result(
 
 
 def _run_collector_quiet(collector, session, account_id, account_name, region, quiet):
-    """워커 스레드에서 quiet 상태를 설정하고 collector 실행"""
+    """워커 스레드에서 quiet 상태를 설정하고 collector를 실행합니다.
+
+    Args:
+        collector: 리소스 수집 함수 (collect_nat, collect_ebs 등).
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        region: AWS 리전 코드.
+        quiet: quiet 모드 활성화 여부.
+
+    Returns:
+        collector 함수의 반환값 (dict[str, Any]).
+    """
     set_quiet(quiet)
     return collector(session, account_id, account_name, region)
 
 
 def _run_global_collector_quiet(collector, session, account_id, account_name, quiet):
-    """워커 스레드에서 quiet 상태를 설정하고 글로벌 collector 실행"""
+    """워커 스레드에서 quiet 상태를 설정하고 글로벌 collector를 실행합니다.
+
+    Route53, S3 등 리전에 종속되지 않는 글로벌 서비스 수집에 사용됩니다.
+
+    Args:
+        collector: 글로벌 리소스 수집 함수 (collect_route53, collect_s3).
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        quiet: quiet 모드 활성화 여부.
+
+    Returns:
+        collector 함수의 반환값 (dict[str, Any]).
+    """
     set_quiet(quiet)
     return collector(session, account_id, account_name)
 
@@ -217,7 +263,15 @@ def collect_session_resources(
 
 
 def _merge_session_result(final: UnusedAllResult, session_result: SessionCollectionResult) -> None:
-    """세션 결과를 최종 결과에 병합 (매핑 기반)"""
+    """세션 수집 결과를 최종 결과 객체에 병합합니다.
+
+    RESOURCE_FIELD_MAP을 기반으로 각 리소스 타입의 세션 결과를
+    UnusedAllResult의 해당 리스트에 추가합니다.
+
+    Args:
+        final: 전체 결과를 집계하는 UnusedAllResult 객체.
+        session_result: 단일 세션(계정/리전)의 수집 결과.
+    """
     final.summaries.append(session_result.summary)
 
     for cfg in RESOURCE_FIELD_MAP.values():
@@ -401,7 +455,14 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
 
 
 def _print_error_summary(errors: list[str]) -> None:
-    """오류 요약 출력 (유형별 그룹화)"""
+    """오류 목록을 유형별로 그룹화하여 요약 출력합니다.
+
+    오류 메시지에서 에러 코드(AccessDenied, ThrottlingException 등)와
+    리전을 추출하여 그룹화된 요약을 콘솔에 출력합니다.
+
+    Args:
+        errors: 에러 메시지 문자열 리스트.
+    """
     # 오류 코드별로 그룹화
     # 형식: "{profile}/{region}: {resource}: {message}"
     error_groups: dict[str, list[str]] = defaultdict(list)
@@ -445,7 +506,15 @@ def _print_summary(
     unused_attr: str,
     waste_attr: str | None,
 ) -> None:
-    """요약 출력 헬퍼"""
+    """단일 리소스 타입의 요약 정보를 콘솔에 출력합니다.
+
+    Args:
+        name: 리소스 표시 이름 ("NAT Gateway", "EBS" 등).
+        summaries: UnusedResourceSummary 객체 리스트.
+        total_attr: 총 리소스 수 속성명.
+        unused_attr: 미사용 리소스 수 속성명.
+        waste_attr: 월간 낭비 금액 속성명 (None이면 비용 미표시).
+    """
     total = sum(getattr(s, total_attr, 0) for s in summaries)
     unused = sum(getattr(s, unused_attr, 0) for s in summaries)
     waste = sum(getattr(s, waste_attr, 0) for s in summaries) if waste_attr else 0

@@ -1,5 +1,5 @@
 """
-plugins/cloudwatch/common/batch_metrics.py - CloudWatch Batch Metrics Utility
+functions/analyzers/cloudwatch/common/batch_metrics.py - CloudWatch Batch Metrics Utility
 
 GetMetricData API를 사용한 배치 메트릭 조회 (85% API 호출 감소)
 
@@ -197,7 +197,7 @@ def batch_get_metrics_with_stats(
 
 
 def _chunks(lst: list, n: int):
-    """리스트를 n개씩 분할"""
+    """리스트를 n개 단위로 분할하여 순회하는 제너레이터."""
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
 
@@ -243,14 +243,17 @@ def build_lambda_metric_queries(
     function_names: list[str],
     metrics: list[str] | None = None,
 ) -> list[MetricQuery]:
-    """Lambda 함수용 메트릭 쿼리 생성
+    """Lambda 함수용 MetricQuery 목록을 생성한다.
+
+    Duration은 Average/Maximum/Minimum 3개 통계를, ConcurrentExecutions는
+    Maximum을, 나머지는 Sum 통계로 쿼리한다.
 
     Args:
-        function_names: Lambda 함수 이름 목록
-        metrics: 조회할 메트릭 목록 (기본: 모든 메트릭)
+        function_names: Lambda 함수 이름 목록.
+        metrics: 조회할 메트릭 목록 (기본: Invocations, Errors, Throttles, Duration, ConcurrentExecutions).
 
     Returns:
-        MetricQuery 목록
+        MetricQuery 목록.
     """
     if metrics is None:
         metrics = ["Invocations", "Errors", "Throttles", "Duration", "ConcurrentExecutions"]
@@ -303,14 +306,14 @@ def build_rds_metric_queries(
     instance_ids: list[str],
     metrics: list[str] | None = None,
 ) -> list[MetricQuery]:
-    """RDS 인스턴스용 메트릭 쿼리 생성
+    """RDS 인스턴스용 MetricQuery 목록을 생성한다. 모든 메트릭은 Average 통계.
 
     Args:
-        instance_ids: RDS 인스턴스 ID 목록
-        metrics: 조회할 메트릭 목록
+        instance_ids: RDS 인스턴스 ID 목록.
+        metrics: 조회할 메트릭 목록 (기본: DatabaseConnections, CPUUtilization, ReadIOPS, WriteIOPS).
 
     Returns:
-        MetricQuery 목록
+        MetricQuery 목록.
     """
     if metrics is None:
         metrics = ["DatabaseConnections", "CPUUtilization", "ReadIOPS", "WriteIOPS"]
@@ -340,15 +343,15 @@ def build_elasticache_metric_queries(
     dimension_name: str = "ReplicationGroupId",
     metrics: list[str] | None = None,
 ) -> list[MetricQuery]:
-    """ElastiCache 클러스터용 메트릭 쿼리 생성
+    """ElastiCache 클러스터용 MetricQuery 목록을 생성한다. 모든 메트릭은 Average 통계.
 
     Args:
-        cluster_ids: 클러스터 ID 목록
-        dimension_name: 차원 이름 (ReplicationGroupId 또는 CacheClusterId)
-        metrics: 조회할 메트릭 목록
+        cluster_ids: 클러스터 ID 목록.
+        dimension_name: CloudWatch 차원 이름 (``ReplicationGroupId`` 또는 ``CacheClusterId``).
+        metrics: 조회할 메트릭 목록 (기본: CurrConnections, CPUUtilization).
 
     Returns:
-        MetricQuery 목록
+        MetricQuery 목록.
     """
     if metrics is None:
         metrics = ["CurrConnections", "CPUUtilization"]
@@ -377,14 +380,14 @@ def build_nat_metric_queries(
     nat_gateway_ids: list[str],
     metrics: list[str] | None = None,
 ) -> list[MetricQuery]:
-    """NAT Gateway용 메트릭 쿼리 생성
+    """NAT Gateway용 MetricQuery 목록을 생성한다. 모든 메트릭은 Sum 통계.
 
     Args:
-        nat_gateway_ids: NAT Gateway ID 목록
-        metrics: 조회할 메트릭 목록
+        nat_gateway_ids: NAT Gateway ID 목록.
+        metrics: 조회할 메트릭 목록 (기본: BytesOut/In, PacketsOut/In, ActiveConnection, ConnectionAttempt).
 
     Returns:
-        MetricQuery 목록
+        MetricQuery 목록.
     """
     if metrics is None:
         metrics = [
@@ -420,14 +423,16 @@ def build_ec2_metric_queries(
     instance_ids: list[str],
     metrics: list[str] | None = None,
 ) -> list[MetricQuery]:
-    """EC2 인스턴스용 메트릭 쿼리 생성
+    """EC2 인스턴스용 MetricQuery 목록을 생성한다.
+
+    CPUUtilization은 Average + Maximum 두 통계를, Network 메트릭은 Sum 통계로 쿼리한다.
 
     Args:
-        instance_ids: EC2 인스턴스 ID 목록
-        metrics: 조회할 메트릭 목록
+        instance_ids: EC2 인스턴스 ID 목록.
+        metrics: 조회할 메트릭 목록 (기본: CPUUtilization, NetworkIn, NetworkOut).
 
     Returns:
-        MetricQuery 목록
+        MetricQuery 목록.
     """
     if metrics is None:
         metrics = ["CPUUtilization", "NetworkIn", "NetworkOut"]
@@ -470,14 +475,14 @@ def build_sagemaker_endpoint_metric_queries(
     endpoint_names: list[str],
     metrics: list[str] | None = None,
 ) -> list[MetricQuery]:
-    """SageMaker Endpoint용 메트릭 쿼리 생성
+    """SageMaker Endpoint용 MetricQuery 목록을 생성한다. 모든 메트릭은 Sum 통계.
 
     Args:
-        endpoint_names: Endpoint 이름 목록
-        metrics: 조회할 메트릭 목록
+        endpoint_names: SageMaker Endpoint 이름 목록.
+        metrics: 조회할 메트릭 목록 (기본: Invocations, InvocationsPerInstance).
 
     Returns:
-        MetricQuery 목록
+        MetricQuery 목록.
     """
     if metrics is None:
         metrics = ["Invocations", "InvocationsPerInstance"]

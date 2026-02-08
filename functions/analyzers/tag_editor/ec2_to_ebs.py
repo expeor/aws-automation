@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/ec2_to_ebs.py - EC2 태그를 EBS 볼륨에 동기화
+functions/analyzers/tag_editor/ec2_to_ebs.py - EC2 태그를 EBS 볼륨에 동기화
 
 EC2 인스턴스의 태그를 연결된 EBS 볼륨에 일괄 적용합니다.
 
@@ -39,7 +39,16 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class TagSyncResult:
-    """태그 동기화 결과"""
+    """단일 EC2 인스턴스의 태그 동기화 결과.
+
+    Attributes:
+        instance_id: EC2 인스턴스 ID.
+        instance_name: 인스턴스 Name 태그 값.
+        volume_ids: 태그가 적용된 EBS 볼륨 ID 목록.
+        tags_applied: 적용된 태그 목록 (Key/Value 딕셔너리).
+        status: 결과 상태 ("success", "failed", "skipped").
+        error: 실패 또는 건너뜀 사유.
+    """
 
     instance_id: str
     instance_name: str
@@ -49,6 +58,11 @@ class TagSyncResult:
     error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """동기화 결과를 딕셔너리로 변환한다.
+
+        Returns:
+            인스턴스 ID, 볼륨 ID, 태그, 상태 등을 포함한 딕셔너리.
+        """
         return {
             "instance_id": self.instance_id,
             "instance_name": self.instance_name,
@@ -61,7 +75,20 @@ class TagSyncResult:
 
 @dataclass
 class SyncSummary:
-    """동기화 요약"""
+    """계정/리전별 태그 동기화 요약.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+        total_instances: 처리된 EC2 인스턴스 수.
+        total_volumes: 태그가 적용된 EBS 볼륨 수.
+        total_tags_applied: 적용된 태그 수.
+        success_count: 성공한 인스턴스 수.
+        failed_count: 실패한 인스턴스 수.
+        skipped_count: 건너뛴 인스턴스 수.
+        results: 개별 인스턴스 동기화 결과 목록.
+    """
 
     account_id: str = ""
     account_name: str = ""
@@ -76,10 +103,10 @@ class SyncSummary:
 
 
 class EC2ToEBSTagSync:
-    """EC2 태그를 EBS 볼륨에 동기화
+    """EC2 인스턴스 태그를 연결된 EBS 볼륨에 동기화하는 클래스.
 
-    EC2 인스턴스의 모든 태그(aws: 접두사 제외)를
-    연결된 EBS 볼륨에 적용합니다.
+    EC2 인스턴스의 모든 태그 중 aws:/elasticbeanstalk: 접두사를 제외한 태그를
+    연결된 EBS 볼륨에 일괄 적용한다. dry_run 모드로 시뮬레이션 가능하다.
     """
 
     # 동기화 제외 태그 접두사
@@ -145,7 +172,14 @@ class EC2ToEBSTagSync:
         return summary
 
     def _get_instances(self, instance_ids: list[str] | None = None) -> list[dict[str, Any]]:
-        """EC2 인스턴스 목록 조회"""
+        """EC2 인스턴스 목록을 조회한다.
+
+        Args:
+            instance_ids: 특정 인스턴스만 조회 (None이면 전체).
+
+        Returns:
+            인스턴스 정보 딕셔너리 목록.
+        """
         instances = []
 
         try:
@@ -168,7 +202,15 @@ class EC2ToEBSTagSync:
         instance: dict[str, Any],
         tag_keys: list[str] | None = None,
     ) -> TagSyncResult:
-        """단일 인스턴스의 태그를 EBS에 동기화"""
+        """단일 EC2 인스턴스의 태그를 연결된 EBS 볼륨에 동기화한다.
+
+        Args:
+            instance: EC2 인스턴스 정보 딕셔너리.
+            tag_keys: 특정 태그 키만 동기화 (None이면 전체).
+
+        Returns:
+            동기화 결과 객체.
+        """
         instance_id = instance["InstanceId"]
         instance_name = self._get_instance_name(instance)
 
@@ -236,7 +278,18 @@ class EC2ToEBSTagSync:
         tags: list[dict[str, str]],
         tag_keys: list[str] | None = None,
     ) -> list[dict[str, str]]:
-        """동기화할 태그 필터링"""
+        """동기화 대상 태그를 필터링한다.
+
+        aws:/elasticbeanstalk: 접두사 태그를 제외하고, tag_keys가 지정된 경우
+        해당 키만 포함한다.
+
+        Args:
+            tags: 원본 태그 목록 (Key/Value 딕셔너리).
+            tag_keys: 포함할 태그 키 목록 (None이면 전체).
+
+        Returns:
+            필터링된 태그 목록.
+        """
         filtered = []
 
         for tag in tags:
@@ -255,7 +308,14 @@ class EC2ToEBSTagSync:
         return filtered
 
     def _get_instance_name(self, instance: dict[str, Any]) -> str:
-        """인스턴스 Name 태그 추출"""
+        """인스턴스에서 Name 태그 값을 추출한다.
+
+        Args:
+            instance: EC2 인스턴스 정보 딕셔너리.
+
+        Returns:
+            Name 태그 값. 없으면 빈 문자열.
+        """
         for tag in instance.get("Tags", []):
             if tag.get("Key") == "Name":
                 value: str = tag.get("Value", "")
@@ -290,19 +350,22 @@ COLUMNS_ACCOUNT_SUMMARY = [
 
 
 class TagSyncReporter:
-    """태그 동기화 결과 리포터 (멀티 계정 지원)"""
+    """EC2-EBS 태그 동기화 결과를 Excel 보고서로 생성하는 리포터.
+
+    멀티 계정/리전 결과를 집계하여 요약/상세 시트가 포함된 보고서를 생성한다.
+    """
 
     def __init__(self, summaries: list[SyncSummary]):
-        """초기화
+        """리포터를 초기화한다.
 
         Args:
-            summaries: 계정/리전별 동기화 요약 목록
+            summaries: 계정/리전별 동기화 요약 목록.
         """
         self.summaries = summaries
         self._aggregate_totals()
 
     def _aggregate_totals(self) -> None:
-        """전체 합계 계산"""
+        """모든 계정/리전의 동기화 결과를 합산하여 전체 통계를 계산한다."""
         self.total_instances = sum(s.total_instances for s in self.summaries)
         self.total_volumes = sum(s.total_volumes for s in self.summaries)
         self.total_tags_applied = sum(s.total_tags_applied for s in self.summaries)
@@ -317,7 +380,17 @@ class TagSyncReporter:
         output_dir: str,
         file_prefix: str = "ec2_to_ebs_tags",
     ) -> Path:
-        """Excel 리포트 생성"""
+        """EC2-EBS 태그 동기화 결과를 Excel 보고서로 생성한다.
+
+        요약 시트, 계정별 요약 시트(멀티 계정 시), 상세 결과 시트를 포함한다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+            file_prefix: 파일명 접두사.
+
+        Returns:
+            생성된 Excel 파일 경로 (Path 객체).
+        """
         wb = Workbook()
 
         # 요약 시트
@@ -339,7 +412,11 @@ class TagSyncReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """요약 시트"""
+        """동기화 요약 시트를 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         summary_sheet = wb.new_summary_sheet("동기화 요약")
 
         summary_sheet.add_title("EC2 → EBS 태그 동기화 결과")
@@ -376,7 +453,11 @@ class TagSyncReporter:
         summary_sheet.add_item("생성 일시", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_account_summary_sheet(self, wb: Workbook) -> None:
-        """계정별 요약 시트"""
+        """계정별 동기화 요약 시트를 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="계정별 요약", columns=COLUMNS_ACCOUNT_SUMMARY)
 
         for summary in self.summaries:
@@ -394,7 +475,11 @@ class TagSyncReporter:
             sheet.add_row(row)
 
     def _create_results_sheet(self, wb: Workbook) -> None:
-        """결과 상세 시트"""
+        """인스턴스별 동기화 상세 결과 시트를 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="상세 결과", columns=COLUMNS_SYNC_RESULTS)
 
         for summary in self.summaries:
@@ -413,7 +498,7 @@ class TagSyncReporter:
                 sheet.add_row(row)
 
     def print_summary(self) -> None:
-        """콘솔에 요약 출력"""
+        """동기화 결과 요약을 콘솔에 출력한다."""
         print("\n=== EC2 → EBS 태그 동기화 결과 ===")
         if self.total_accounts > 1:
             print(f"처리된 계정: {self.total_accounts}개")
@@ -494,7 +579,16 @@ def _collect_and_sync(
 
 
 def run_sync(ctx) -> dict[str, Any] | None:
-    """EC2 태그를 EBS에 동기화 (CLI 진입점) - 멀티 계정 지원"""
+    """EC2 태그를 EBS에 동기화하는 CLI 진입점 함수.
+
+    멀티 계정/리전 병렬 처리를 수행하고, 결과를 요약 출력 후 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+
+    Returns:
+        동기화 결과 통계 딕셔너리. 처리할 인스턴스가 없으면 해당 메시지를 포함한 딕셔너리.
+    """
     from functools import partial
 
     from core.parallel import parallel_collect

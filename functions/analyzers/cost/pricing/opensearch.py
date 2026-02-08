@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/opensearch.py - Amazon OpenSearch Service 가격 조회
+functions/analyzers/cost/pricing/opensearch.py - Amazon OpenSearch Service 가격 조회
 
 OpenSearch 비용 계산:
 - 인스턴스 시간당 비용 (타입별)
@@ -78,7 +78,20 @@ DEFAULT_STORAGE_PRICE = 0.115
 
 
 def get_opensearch_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 OpenSearch 가격 조회"""
+    """AWS Pricing API를 통해 OpenSearch 인스턴스/스토리지 가격 조회
+
+    AmazonES 서비스 코드로 OnDemand 가격을 조회합니다.
+    인스턴스 타입에 ``.search`` 접미사가 없으면 자동으로 추가합니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: 가격을 조회할 AWS 리전 코드
+
+    Returns:
+        인스턴스 타입별 시간당 가격 딕셔너리 (USD).
+        ``storage_gb`` 키로 EBS 스토리지 가격도 포함될 수 있음.
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -125,7 +138,18 @@ def get_opensearch_prices(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> dict[str, float]:
-    """OpenSearch 가격 조회"""
+    """OpenSearch 인스턴스 타입별 시간당 가격 조회
+
+    API 조회 실패 시 하드코딩된 기본값을 반환합니다.
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        인스턴스 타입별 시간당 가격 (USD) 딕셔너리.
+        예: ``{"r6g.large.search": 0.167}``
+    """
     if session:
         api_prices = get_opensearch_prices_from_api(session, region)
         if api_prices:
@@ -139,7 +163,16 @@ def get_opensearch_instance_price(
     instance_type: str = "m6g.large.search",
     session: boto3.Session | None = None,
 ) -> float:
-    """OpenSearch 인스턴스 시간당 가격"""
+    """OpenSearch 특정 인스턴스 타입의 시간당 가격 조회
+
+    Args:
+        region: AWS 리전 코드
+        instance_type: OpenSearch 인스턴스 타입 (예: r6g.large.search)
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        시간당 가격 (USD). 알 수 없는 타입이면 DEFAULT_INSTANCE_PRICE 반환.
+    """
     prices = get_opensearch_prices(region, session)
     return prices.get(instance_type, DEFAULT_INSTANCE_PRICE)
 
@@ -148,7 +181,15 @@ def get_opensearch_storage_price(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> float:
-    """OpenSearch 스토리지 GB당 월 가격"""
+    """OpenSearch EBS 스토리지 GB당 월간 가격 조회
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        GB당 월간 가격 (USD)
+    """
     if session:
         api_prices = get_opensearch_prices_from_api(session, region)
         if api_prices and "storage_gb" in api_prices:
@@ -164,7 +205,20 @@ def get_opensearch_monthly_cost(
     storage_gb: int = 0,
     session: boto3.Session | None = None,
 ) -> float:
-    """OpenSearch 월간 비용 계산"""
+    """OpenSearch 월간 비용 계산
+
+    인스턴스 비용과 EBS 스토리지 비용(노드당)을 합산합니다.
+
+    Args:
+        region: AWS 리전 코드
+        instance_type: OpenSearch 인스턴스 타입
+        instance_count: 인스턴스 수
+        storage_gb: 노드당 EBS 스토리지 용량 (GB)
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        월간 비용 (USD), 소수점 2자리 반올림
+    """
     instance_hourly = get_opensearch_instance_price(region, instance_type, session)
     storage_monthly = get_opensearch_storage_price(region, session)
 

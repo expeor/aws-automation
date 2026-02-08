@@ -6,6 +6,7 @@ from core.shared.io.excel import ColumnDef, Styles, Workbook
 
 
 def _create_loggroup_sheet(wb: Workbook, results) -> None:
+    """미사용 CloudWatch Log Group 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -40,6 +41,7 @@ def _create_loggroup_sheet(wb: Workbook, results) -> None:
 
 
 def _create_secret_sheet(wb: Workbook, results) -> None:
+    """미사용 Secrets Manager 시크릿 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -71,6 +73,7 @@ def _create_secret_sheet(wb: Workbook, results) -> None:
 
 
 def _create_kms_sheet(wb: Workbook, results) -> None:
+    """미사용 KMS 키 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -103,6 +106,7 @@ def _create_kms_sheet(wb: Workbook, results) -> None:
 
 
 def _create_route53_sheet(wb: Workbook, results) -> None:
+    """미사용 Route 53 호스팅 영역 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Zone ID", width=20, style="data"),

@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/dynamodb.py - DynamoDB 가격 조회
+functions/analyzers/cost/pricing/dynamodb.py - DynamoDB 가격 조회
 
 DynamoDB 비용 구성:
 - On-Demand (PAY_PER_REQUEST):

@@ -1,5 +1,5 @@
 """
-core/pricing/nat.py - NAT Gateway 가격 조회
+functions/analyzers/cost/pricing/nat.py - NAT Gateway 가격 조회
 
 NAT Gateway 비용 계산:
 - 시간당 고정 비용: ~$0.045/hour (리전별 상이)

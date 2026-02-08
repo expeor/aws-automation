@@ -1,5 +1,11 @@
 """
-plugins/eventbridge - EventBridge Rule Management Tools
+functions/analyzers/eventbridge - EventBridge 규칙 관리 도구
+
+EventBridge 규칙의 활성화 상태를 분석하고
+비활성화/미사용 규칙을 탐지합니다.
+
+도구 목록:
+    - unused: 비활성화/미사용 EventBridge 규칙 탐지
 """
 
 CATEGORY = {

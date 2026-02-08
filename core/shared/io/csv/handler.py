@@ -220,7 +220,11 @@ def validate_csv_headers(
 
 
 def get_platform_recommended_encoding() -> str:
-    """현재 플랫폼에서 권장하는 기본 인코딩을 반환합니다."""
+    """현재 플랫폼에서 권장하는 기본 인코딩을 반환합니다.
+
+    Returns:
+        Windows: "utf-8-sig" (Excel BOM 호환), Unix: "utf-8"
+    """
     system = platform.system().lower()
 
     if system == "windows":

@@ -15,7 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class DatePattern(str, Enum):
-    """날짜 패턴"""
+    """날짜 패턴
+
+    출력 경로에 날짜 기반 하위 디렉토리를 추가할 때 사용하는 패턴입니다.
+
+    Attributes:
+        DAILY: 일별 (2025-12-09)
+        MONTHLY: 월별 (2025/12)
+        YEARLY: 연별 (2025)
+        WEEKLY: 주별 (2025/12/12월1주차)
+    """
 
     DAILY = "daily"  # 2025-12-09
     MONTHLY = "monthly"  # 2025/12
@@ -24,7 +33,15 @@ class DatePattern(str, Enum):
 
 
 class OutputResult(NamedTuple):
-    """출력 결과"""
+    """출력 결과
+
+    OutputPath.save_file()의 반환값으로, 저장된 파일 정보를 담습니다.
+
+    Attributes:
+        path: 파일 전체 경로
+        directory: 디렉토리 경로
+        filename: 파일명만
+    """
 
     path: str  # 파일 전체 경로
     directory: str  # 디렉토리 경로
@@ -140,7 +157,14 @@ class OutputPath:
 
     @staticmethod
     def _sanitize(identifier: str) -> str:
-        """파일 시스템 안전한 문자열로 변환"""
+        """파일 시스템 안전한 문자열로 변환
+
+        Args:
+            identifier: 원본 식별자 문자열
+
+        Returns:
+            공백, 슬래시, 백슬래시가 ``_`` 로 치환된 문자열
+        """
         return identifier.replace(" ", "_").replace("/", "_").replace("\\", "_")
 
     @staticmethod
@@ -168,7 +192,14 @@ class OutputPath:
 
     @staticmethod
     def _get_date_parts(pattern: DatePattern) -> list[str]:
-        """날짜 패턴에 따른 경로 세그먼트 반환"""
+        """날짜 패턴에 따른 경로 세그먼트 반환
+
+        Args:
+            pattern: 날짜 패턴 (DAILY, MONTHLY, YEARLY, WEEKLY)
+
+        Returns:
+            경로 세그먼트 리스트 (예: ["2025", "12"] for MONTHLY)
+        """
         now = datetime.now()
 
         if pattern == DatePattern.YEARLY:

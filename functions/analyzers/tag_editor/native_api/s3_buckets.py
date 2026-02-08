@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/native_api/s3_buckets.py - S3 Buckets Native API
+functions/analyzers/tag_editor/native_api/s3_buckets.py - S3 Buckets Native API
 
 S3 버킷의 태그 수집/적용을 위한 Native API 모듈
 
@@ -36,19 +36,28 @@ logger = logging.getLogger(__name__)
 
 
 def _get_bucket_arn(bucket_name: str) -> str:
-    """S3 버킷 ARN 생성"""
+    """S3 버킷 ARN을 생성한다.
+
+    Args:
+        bucket_name: S3 버킷 이름.
+
+    Returns:
+        버킷 ARN 문자열.
+    """
     return f"arn:aws:s3:::{bucket_name}"
 
 
 def _get_bucket_region(s3_client, bucket_name: str) -> str | None:
-    """버킷의 실제 리전 조회
+    """S3 버킷의 실제 리전을 조회한다.
+
+    LocationConstraint가 None이면 us-east-1로 처리한다.
 
     Args:
-        s3_client: S3 클라이언트
-        bucket_name: 버킷 이름
+        s3_client: S3 boto3 클라이언트.
+        bucket_name: S3 버킷 이름.
 
     Returns:
-        리전 문자열 (None이면 us-east-1)
+        리전 문자열. 조회 실패 시 None.
     """
     try:
         response = s3_client.get_bucket_location(Bucket=bucket_name)
@@ -66,21 +75,20 @@ def collect_s3_bucket_tags(
     region: str,
     target_region: str | None = None,
 ) -> list[ResourceTagInfo]:
-    """S3 Native API로 버킷 태그 수집
+    """S3 Native API로 버킷 태그를 수집한다.
+
+    get_bucket_tagging API를 사용하여 각 버킷의 태그를 조회한다.
+    S3는 글로벌 서비스이므로 target_region을 지정하여 특정 리전 버킷만 수집할 수 있다.
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 현재 실행 리전 (버킷 목록 조회용)
-        target_region: 특정 리전의 버킷만 수집할 경우 지정
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 현재 실행 리전 (버킷 목록 조회용).
+        target_region: 특정 리전 버킷만 수집할 경우 지정 (None이면 전체).
 
     Returns:
-        버킷별 태그 정보 목록
-
-    Note:
-        S3는 글로벌 서비스이므로 us-east-1에서 한 번만 실행하는 것이 효율적.
-        target_region을 지정하면 해당 리전의 버킷만 반환합니다.
+        버킷별 태그 정보 목록.
     """
     resources: list[ResourceTagInfo] = []
 
@@ -166,22 +174,22 @@ def apply_s3_bucket_tag(
     tag_value: str,
     dry_run: bool = True,
 ) -> MapTagApplyResult:
-    """S3 버킷에 MAP 태그 적용 (기존 태그 보존!)
+    """S3 버킷에 MAP 태그를 적용한다 (기존 태그 보존).
 
-    중요: put_bucket_tagging은 기존 태그를 모두 덮어쓰므로,
-    반드시 기존 태그를 조회하고 병합한 후 적용해야 합니다.
+    put_bucket_tagging은 기존 태그를 모두 덮어쓰므로, 기존 태그를 조회하고
+    map-migrated 태그를 병합한 뒤 전체 태그 세트를 적용한다.
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전
-        resources: 태그 적용 대상 버킷 목록
-        tag_value: MAP 태그 값 (예: mig12345)
-        dry_run: True면 실제 적용하지 않음
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+        resources: 태그를 적용할 S3 버킷 목록.
+        tag_value: 적용할 map-migrated 태그 값 (예: mig12345).
+        dry_run: True이면 실제 적용하지 않고 시뮬레이션 (기본값: True).
 
     Returns:
-        태그 적용 결과
+        MAP 태그 적용 결과 객체.
     """
     result = MapTagApplyResult(
         account_id=account_id,

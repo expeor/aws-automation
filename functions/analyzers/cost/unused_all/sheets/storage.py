@@ -6,6 +6,7 @@ from core.shared.io.excel import ColumnDef, Styles, Workbook
 
 
 def _create_ecr_sheet(wb: Workbook, results) -> None:
+    """미사용/비효율 ECR 리포지토리 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -83,6 +84,7 @@ def _create_efs_sheet(wb: Workbook, results) -> None:
 
 
 def _create_s3_sheet(wb: Workbook, results) -> None:
+    """미사용/비효율 S3 버킷 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Bucket", width=40, style="data"),

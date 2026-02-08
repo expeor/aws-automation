@@ -1,7 +1,21 @@
 """
-plugins/cost/pricing/fetcher.py - AWS 가격 정보 가져오기
+core/shared/aws/pricing/fetcher.py - AWS Pricing API 클라이언트
 
-AWS Pricing API (get_products)를 사용하여 리전별 가격을 조회합니다.
+AWS Pricing API(``get_products``)를 사용하여 리전별 서비스 가격을 조회한다.
+Pricing API는 us-east-1에서만 사용 가능하며, 서비스별 전용 메서드를 제공한다.
+
+``PricingService`` (utils.py)에서 캐시/재시도 계층을 거쳐 호출되며,
+직접 사용하는 경우는 드물다.
+
+지원 서비스 (15개):
+    EC2, EBS, SageMaker, VPC Endpoint, Secrets Manager, KMS, ECR,
+    Route53, EBS Snapshot, EIP, ELB, RDS Snapshot, CloudWatch, Lambda, DynamoDB
+
+사용법:
+    from core.shared.aws.pricing.fetcher import PricingFetcher
+
+    fetcher = PricingFetcher(session)
+    ec2_prices = fetcher.get_ec2_prices("ap-northeast-2")
 """
 
 from __future__ import annotations
@@ -24,9 +38,14 @@ PRICING_API_REGION = "us-east-1"
 
 
 class PricingFetcher:
-    """AWS 가격 정보 가져오기 (Pricing API)
+    """AWS Pricing API를 사용하여 서비스별 가격을 조회하는 클라이언트.
 
-    get_products API로 리전별 가격을 조회합니다.
+    ``get_products`` API로 리전별 On-Demand 가격을 조회하며,
+    서비스별 전용 메서드(``get_ec2_prices``, ``get_ebs_prices`` 등)를 제공한다.
+    Pricing API 클라이언트는 첫 호출 시 지연 생성(lazy init)된다.
+
+    Attributes:
+        session: boto3 세션 (Pricing API 호출에 사용)
     """
 
     def __init__(self, session: boto3.Session | None = None):
@@ -44,7 +63,13 @@ class PricingFetcher:
 
     @property
     def pricing_client(self):
-        """Pricing API 클라이언트 (지연 생성)"""
+        """Pricing API 클라이언트를 지연 생성(lazy init)하여 반환한다.
+
+        Pricing API는 us-east-1에서만 사용 가능하므로 ``region_name`` 을 고정한다.
+
+        Returns:
+            ``pricing`` 서비스의 boto3 클라이언트
+        """
         if self._pricing_client is None:
             self._pricing_client = get_client(self.session, "pricing", region_name=PRICING_API_REGION)
         return self._pricing_client

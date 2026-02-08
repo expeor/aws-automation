@@ -1,7 +1,12 @@
 """
-plugins/cost/unused_all/orchestrator.py - 병렬 수집 오케스트레이션
+functions/analyzers/cost/unused_all/orchestrator.py - 병렬 수집 오케스트레이션
 
-세션별 병렬 수집 및 결과 집계 로직
+미사용 리소스 종합 분석의 병렬 수집 및 결과 집계 로직을 담당합니다.
+
+병렬 처리 전략:
+    1. 계정/리전 레벨: parallel_collect로 멀티 계정/리전 병렬 처리
+    2. 리소스 타입 레벨: ThreadPoolExecutor로 단일 세션 내 리소스 병렬 수집
+    3. 글로벌 서비스: 계정당 한 번만 수집 (thread-safe 동기화)
 """
 
 from __future__ import annotations
@@ -54,14 +59,27 @@ _global_collected: set = set()
 
 
 def _reset_global_tracking() -> None:
-    """전역 서비스 추적 초기화 (새 실행 시 호출)"""
+    """전역 서비스 추적 초기화 (새 실행 시 호출)
+
+    Route53, S3 등 글로벌 서비스의 중복 수집을 방지하기 위한
+    계정 추적 상태를 초기화합니다.
+    """
     global _global_collected
     with _global_lock:
         _global_collected = set()
 
 
 def _should_collect_global(account_id: str) -> bool:
-    """해당 계정의 전역 서비스를 수집해야 하는지 확인 (thread-safe)"""
+    """해당 계정의 전역 서비스를 수집해야 하는지 확인 (thread-safe)
+
+    최초 호출 시 True를 반환하고, 동일 계정의 후속 호출에는 False를 반환합니다.
+
+    Args:
+        account_id: AWS 계정 ID
+
+    Returns:
+        True이면 수집 필요, False이면 이미 수집됨
+    """
     with _global_lock:
         if account_id in _global_collected:
             return False
@@ -80,7 +98,17 @@ def _apply_result(
     resource_type: str,
     data: dict[str, Any],
 ) -> None:
-    """리소스 결과를 요약 및 세션 결과에 적용 (매핑 기반)"""
+    """리소스 결과를 요약 및 세션 결과에 적용 (매핑 기반)
+
+    RESOURCE_FIELD_MAP을 사용하여 수집 결과를 summary와 session_result의
+    적절한 필드에 동적으로 할당합니다.
+
+    Args:
+        summary: 갱신할 요약 객체
+        session_result: 갱신할 세션 결과 객체
+        resource_type: 리소스 타입 키 (RESOURCE_FIELD_MAP의 키)
+        data: 수집 결과 딕셔너리 (total, unused, waste, result 등)
+    """
     if "error" in data:
         session_result.errors.append(data["error"])
         return
@@ -102,13 +130,30 @@ def _apply_result(
 
 
 def _run_collector_quiet(collector, session, account_id, account_name, region, quiet):
-    """워커 스레드에서 quiet 상태를 설정하고 collector 실행"""
+    """워커 스레드에서 quiet 상태를 설정하고 리전별 collector 실행
+
+    Args:
+        collector: 리소스 수집 함수
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+        quiet: 로그 출력 억제 여부
+    """
     set_quiet(quiet)
     return collector(session, account_id, account_name, region)
 
 
 def _run_global_collector_quiet(collector, session, account_id, account_name, quiet):
-    """워커 스레드에서 quiet 상태를 설정하고 글로벌 collector 실행"""
+    """워커 스레드에서 quiet 상태를 설정하고 글로벌 collector 실행
+
+    Args:
+        collector: 글로벌 리소스 수집 함수 (region 파라미터 없음)
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        quiet: 로그 출력 억제 여부
+    """
     set_quiet(quiet)
     return collector(session, account_id, account_name)
 
@@ -210,7 +255,15 @@ def collect_session_resources(
 
 
 def _merge_session_result(final: UnusedAllResult, session_result: SessionCollectionResult) -> None:
-    """세션 결과를 최종 결과에 병합 (매핑 기반)"""
+    """세션 결과를 최종 결과에 병합 (매핑 기반)
+
+    RESOURCE_FIELD_MAP을 사용하여 각 세션의 결과를 최종 결과의
+    적절한 리스트 필드에 추가합니다.
+
+    Args:
+        final: 병합 대상 최종 결과 객체
+        session_result: 병합할 세션 결과 객체
+    """
     final.summaries.append(session_result.summary)
 
     for cfg in RESOURCE_FIELD_MAP.values():
@@ -396,7 +449,14 @@ def run(ctx: ExecutionContext, resources: list[str] | None = None) -> None:
 
 
 def _print_error_summary(errors: list[str]) -> None:
-    """오류 요약 출력 (유형별 그룹화)"""
+    """오류 요약 출력 (유형별 그룹화)
+
+    오류 메시지에서 AWS 오류 코드와 리전을 추출하여
+    유형별로 그룹화한 요약을 콘솔에 출력합니다.
+
+    Args:
+        errors: 오류 메시지 목록 (형식: ``{profile}/{region}: {resource}: {message}``)
+    """
     # 오류 코드별로 그룹화
     # 형식: "{profile}/{region}: {resource}: {message}"
     error_groups: dict[str, list[str]] = defaultdict(list)
@@ -440,7 +500,15 @@ def _print_summary(
     unused_attr: str,
     waste_attr: str | None,
 ) -> None:
-    """요약 출력 헬퍼"""
+    """리소스 타입별 요약을 콘솔에 출력하는 헬퍼
+
+    Args:
+        name: 리소스 표시 이름
+        summaries: UnusedResourceSummary 목록
+        total_attr: 전체 수 속성명
+        unused_attr: 미사용 수 속성명
+        waste_attr: 월간 낭비 비용 속성명 (None이면 비용 미표시)
+    """
     total = sum(getattr(s, total_attr, 0) for s in summaries)
     unused = sum(getattr(s, unused_attr, 0) for s in summaries)
     waste = sum(getattr(s, waste_attr, 0) for s in summaries) if waste_attr else 0

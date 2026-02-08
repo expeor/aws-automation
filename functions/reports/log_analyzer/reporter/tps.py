@@ -1,4 +1,7 @@
-"""TPS (Throughput) analysis sheet writer."""
+"""functions/reports/log_analyzer/reporter/tps.py - TPS(초당 트랜잭션) 분석 시트 Writer.
+
+시간대별 TPS(Transactions Per Second)를 분석하여 트래픽 패턴 시트를 생성합니다.
+"""
 
 from __future__ import annotations
 

@@ -1,7 +1,8 @@
-"""
-reports/scheduled/history.py - 정기 작업 실행 이력 관리
+"""functions/reports/scheduled/history.py - 정기 작업 실행 이력 관리.
 
-실행 이력을 JSON 파일로 저장하고 조회하는 기능 제공
+실행 이력을 JSON 파일로 저장하고 조회하는 기능을 제공합니다.
+ScheduledRunRecord로 개별 실행 기록을 관리하고,
+ScheduledRunHistory로 이력 파일 CRUD를 수행합니다.
 """
 
 import json
@@ -13,7 +14,17 @@ from typing import Optional
 
 @dataclass
 class ScheduledRunRecord:
-    """정기 작업 실행 기록"""
+    """정기 작업 실행 기록.
+
+    Attributes:
+        task_id: 작업 고유 ID (예: "D-001", "3M-002").
+        task_name: 작업명 (표시용).
+        company: 설정 프로필명.
+        run_at: 실행 시각 (ISO format 문자열).
+        status: 실행 상태 ("success", "failed", "cancelled").
+        duration_sec: 실행 시간 (초).
+        error_msg: 오류 메시지 (실패 시, 기본 빈 문자열).
+    """
 
     task_id: str  # "D-001", "3M-002"
     task_name: str  # 작업명 (표시용)

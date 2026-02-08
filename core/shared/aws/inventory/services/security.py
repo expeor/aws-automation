@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/security.py - Security 리소스 수집
+core/shared/aws/inventory/services/security.py - Security 리소스 수집
 
 KMS Key, Secrets Manager Secret 수집.
 """
@@ -16,7 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 def collect_kms_keys(session, account_id: str, account_name: str, region: str) -> list[KMSKey]:
-    """KMS Key 수집"""
+    """KMS Key 리소스를 수집합니다.
+
+    먼저 Alias 매핑을 구성한 후, Key 목록을 조회하여 각 키의 상세 정보
+    (상태, 용도, Spec, Origin, Key Manager 등)와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        KMSKey 데이터 클래스 목록
+    """
     kms = get_client(session, "kms", region_name=region)
     keys = []
 
@@ -81,7 +94,20 @@ def collect_kms_keys(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_secrets(session, account_id: str, account_name: str, region: str) -> list[Secret]:
-    """Secrets Manager Secret 수집"""
+    """Secrets Manager Secret 리소스를 수집합니다.
+
+    Secret 목록 조회 후 각 시크릿의 KMS 암호화 키, Rotation 설정,
+    마지막 접근/회전 일시 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        Secret 데이터 클래스 목록
+    """
     sm = get_client(session, "secretsmanager", region_name=region)
     secrets = []
 

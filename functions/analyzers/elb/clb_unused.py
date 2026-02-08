@@ -1,5 +1,5 @@
 """
-plugins/elb/clb_unused.py - CLB 미사용 분석
+functions/analyzers/elb/clb_unused.py - CLB 미사용 분석
 
 타겟이 없거나 비정상인 Classic Load Balancer 탐지
 
@@ -46,7 +46,17 @@ REQUIRED_PERMISSIONS = {
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LBAnalysisResult | None:
-    """단일 계정/리전의 CLB 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 CLB 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        CLB 분석 결과. CLB가 없으면 None.
+    """
     clbs = collect_classic_load_balancers(session, account_id, account_name, region)
     if not clbs:
         return None
@@ -54,7 +64,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """CLB 미사용 분석 실행"""
+    """CLB 미사용 분석 실행
+
+    멀티 계정/리전에서 Classic Load Balancer를 병렬 수집하고,
+    미사용 CLB를 식별하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]CLB 미사용 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석

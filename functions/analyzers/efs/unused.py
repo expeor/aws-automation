@@ -1,5 +1,5 @@
 """
-plugins/efs/unused.py - EFS 미사용 파일시스템 분석
+functions/analyzers/efs/unused.py - EFS 미사용 파일시스템 분석
 
 유휴/미사용 EFS 파일시스템 탐지 (마운트 타겟 및 CloudWatch 지표 기반)
 
@@ -55,7 +55,11 @@ REQUIRED_PERMISSIONS = {
 
 
 class FileSystemStatus(Enum):
-    """파일시스템 상태"""
+    """EFS 파일시스템 사용 상태 분류
+
+    마운트 타겟, I/O 활동, 파일 크기를 기준으로
+    정상, 마운트 없음, I/O 없음, 빈 파일시스템으로 구분합니다.
+    """
 
     NORMAL = "normal"
     NO_MOUNT_TARGET = "no_mount_target"
@@ -65,7 +69,25 @@ class FileSystemStatus(Enum):
 
 @dataclass
 class EFSInfo:
-    """EFS 파일시스템 정보"""
+    """EFS 파일시스템 정보
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        file_system_id: EFS 파일시스템 ID
+        name: Name 태그 값
+        lifecycle_state: 라이프사이클 상태 (available, creating 등)
+        performance_mode: 성능 모드 (generalPurpose, maxIO)
+        throughput_mode: 처리량 모드 (bursting, provisioned, elastic)
+        size_bytes: 파일시스템 크기 (바이트)
+        mount_target_count: 마운트 타겟 수
+        created_at: 생성 시각
+        avg_client_connections: 분석 기간 평균 클라이언트 연결 수
+        metered_io_bytes: 분석 기간 과금 대상 I/O 바이트 합계
+        data_read_bytes: 분석 기간 읽기 I/O 바이트 합계
+        data_write_bytes: 분석 기간 쓰기 I/O 바이트 합계
+    """
 
     account_id: str
     account_name: str
@@ -86,23 +108,45 @@ class EFSInfo:
 
     @property
     def size_gb(self) -> float:
+        """파일시스템 크기를 GB 단위로 반환
+
+        Returns:
+            파일시스템 크기 (GB)
+        """
         return self.size_bytes / (1024**3)
 
     def get_estimated_monthly_cost(self, session=None) -> float:
-        """월간 비용 추정 (Pricing API 사용)"""
+        """월간 비용 추정 (Pricing API 사용)
+
+        Args:
+            session: boto3 Session 객체. None이면 기본 세션 사용.
+
+        Returns:
+            추정 월간 비용 (USD)
+        """
         from functions.analyzers.cost.pricing.efs import get_efs_monthly_cost
 
         return get_efs_monthly_cost(self.region, self.size_gb, session=session)
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (후방 호환용)"""
+        """월간 비용 추정 (후방 호환용)
+
+        Returns:
+            추정 월간 비용 (USD)
+        """
         return self.get_estimated_monthly_cost()
 
 
 @dataclass
 class EFSFinding:
-    """EFS 분석 결과"""
+    """EFS 개별 분석 결과
+
+    Attributes:
+        efs: 분석 대상 EFS 파일시스템 정보
+        status: 분석된 사용 상태
+        recommendation: 권장 조치 사항
+    """
 
     efs: EFSInfo
     status: FileSystemStatus
@@ -111,7 +155,20 @@ class EFSFinding:
 
 @dataclass
 class EFSAnalysisResult:
-    """EFS 분석 결과 집계"""
+    """EFS 분석 결과 집계
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        total_filesystems: 전체 EFS 파일시스템 수
+        no_mount_target: 마운트 타겟 없는 파일시스템 수
+        no_io: I/O 활동 없는 파일시스템 수
+        empty: 빈 파일시스템 수 (1MB 미만)
+        normal: 정상 파일시스템 수
+        unused_monthly_cost: 미사용 파일시스템 합산 월간 비용 (USD)
+        findings: 개별 분석 결과 목록
+    """
 
     account_id: str
     account_name: str
@@ -128,8 +185,20 @@ class EFSAnalysisResult:
 def collect_efs_filesystems(session, account_id: str, account_name: str, region: str) -> list[EFSInfo]:
     """EFS 파일시스템 수집 (배치 메트릭 최적화)
 
+    파일시스템 목록과 마운트 타겟 수를 수집한 후,
+    CloudWatch 메트릭을 배치로 조회합니다.
+
     최적화:
-    - 기존: 파일시스템당 4 API 호출 → 최적화: 전체 1-2 API 호출
+    - 기존: 파일시스템당 4 API 호출 -> 최적화: 전체 1-2 API 호출
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        CloudWatch 메트릭이 포함된 EFS 파일시스템 정보 목록
     """
     from botocore.exceptions import ClientError
 
@@ -199,13 +268,17 @@ def _collect_efs_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """EFS 메트릭 배치 수집 (내부 함수)
+    """EFS CloudWatch 메트릭 배치 수집
 
-    최적화:
-    - ClientConnections (Average)
-    - MeteredIOBytes (Sum)
-    - DataReadIOBytes (Sum)
-    - DataWriteIOBytes (Sum)
+    파일시스템별 ClientConnections, MeteredIOBytes, DataReadIOBytes,
+    DataWriteIOBytes를 batch_get_metrics로 일괄 조회하여
+    각 EFSInfo 객체에 in-place 업데이트합니다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트
+        filesystems: 메트릭을 채울 EFS 정보 목록 (in-place 업데이트)
+        start_time: 메트릭 조회 시작 시각
+        end_time: 메트릭 조회 종료 시각
     """
     from botocore.exceptions import ClientError
 
@@ -276,7 +349,20 @@ def _collect_efs_metrics_batch(
 def analyze_filesystems(
     filesystems: list[EFSInfo], account_id: str, account_name: str, region: str
 ) -> EFSAnalysisResult:
-    """EFS 파일시스템 분석"""
+    """EFS 파일시스템 사용 상태 분석
+
+    마운트 타겟 존재 여부, 파일 크기, I/O 활동을 기준으로
+    각 파일시스템의 사용 상태를 판별하고 미사용 비용을 합산합니다.
+
+    Args:
+        filesystems: 분석 대상 EFS 파일시스템 정보 목록
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        상태별 카운트, 미사용 비용, 개별 분석 결과가 포함된 집계 결과
+    """
     result = EFSAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -336,7 +422,18 @@ def analyze_filesystems(
 
 
 def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보고서 생성
+
+    Summary(계정/리전별 상태 카운트 및 비용)와 FileSystems(미사용 FS 상세)
+    2개 시트로 구성된 보고서를 생성합니다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        저장된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -427,7 +524,17 @@ def generate_report(results: list[EFSAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> EFSAnalysisResult | None:
-    """단일 계정/리전의 EFS 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 EFS 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        EFS 분석 결과. 파일시스템이 없으면 None.
+    """
     filesystems = collect_efs_filesystems(session, account_id, account_name, region)
     if not filesystems:
         return None
@@ -435,7 +542,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """EFS 미사용 파일시스템 분석"""
+    """EFS 미사용 파일시스템 분석
+
+    멀티 계정/리전에서 EFS 파일시스템을 병렬 수집하고,
+    마운트 타겟 없음, I/O 없음, 빈 파일시스템을 식별하여
+    Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]EFS 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="efs")

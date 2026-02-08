@@ -1,21 +1,24 @@
 """
-plugins/cost/pricing/rds.py - Amazon RDS 인스턴스 가격 조회
+core/shared/aws/pricing/rds.py - Amazon RDS 인스턴스 가격 조회
 
-RDS 비용 계산:
-- 인스턴스 시간당 비용 (타입/엔진별)
-- 스토리지 비용 (GB당)
-- Multi-AZ 배포 시 2배
+RDS 인스턴스 클래스별/엔진별 시간당 비용과 스토리지 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격(MySQL 기준)으로 fallback한다.
+
+비용 구조:
+    - 인스턴스: 클래스/엔진별 시간당 비용
+    - 스토리지: 타입별 GB당 월간 비용 (gp2, gp3, io1, magnetic)
+    - Multi-AZ: 인스턴스 + 스토리지 비용 2배
 
 사용법:
-    from functions.analyzers.cost.pricing.rds import get_rds_monthly_cost
+    from core.shared.aws.pricing.rds import get_rds_monthly_cost
 
-    # 월간 비용
+    # MySQL db.r6g.large Multi-AZ + 100GB gp3 월간 비용
     monthly = get_rds_monthly_cost(
         "ap-northeast-2",
         instance_class="db.r6g.large",
         engine="mysql",
         storage_gb=100,
-        multi_az=True
+        multi_az=True,
     )
 """
 
@@ -81,7 +84,19 @@ DEFAULT_STORAGE_PRICES = {"gp2": 0.115, "gp3": 0.095, "io1": 0.125, "magnetic": 
 
 
 def get_rds_prices_from_api(session: boto3.Session, region: str, engine: str = "mysql") -> dict[str, float]:
-    """Pricing API를 통해 RDS 가격 조회"""
+    """AWS Pricing API를 통해 RDS 인스턴스 클래스별 가격을 조회한다.
+
+    엔진 이름을 Pricing API 필터값으로 변환한다 (postgres -> PostgreSQL 등).
+    ``db.`` 접두사가 없는 인스턴스 타입에는 자동으로 추가한다.
+
+    Args:
+        session: boto3 세션
+        region: 대상 AWS 리전 코드
+        engine: DB 엔진 (``"mysql"``, ``"postgres"``, ``"oracle"``, ``"sqlserver"``)
+
+    Returns:
+        ``{instance_class: hourly_price}`` 딕셔너리. 조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
 
@@ -145,7 +160,19 @@ def get_rds_prices(
     engine: str = "mysql",
     session: boto3.Session | None = None,
 ) -> dict[str, float]:
-    """RDS 가격 조회"""
+    """RDS 인스턴스 클래스별 가격을 조회한다.
+
+    ``session`` 이 제공되면 Pricing API를 우선 호출하고,
+    실패 시 하드코딩된 ``RDS_INSTANCE_PRICES`` 에서 fallback한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        engine: DB 엔진 (기본: ``"mysql"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        ``{instance_class: hourly_price}`` 딕셔너리
+    """
     if session:
         api_prices = get_rds_prices_from_api(session, region, engine)
         if api_prices:
@@ -160,7 +187,17 @@ def get_rds_instance_price(
     engine: str = "mysql",
     session: boto3.Session | None = None,
 ) -> float:
-    """RDS 인스턴스 시간당 가격"""
+    """RDS 인스턴스의 시간당 On-Demand 가격을 반환한다 (Single-AZ 기준).
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        instance_class: 인스턴스 클래스 (예: ``"db.t3.medium"``, ``"db.r6g.large"``)
+        engine: DB 엔진 (기본: ``"mysql"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        시간당 USD (알 수 없는 클래스이면 기본값 ``0.20``)
+    """
     prices = get_rds_prices(region, engine, session)
     return prices.get(instance_class, DEFAULT_INSTANCE_PRICE)
 
@@ -169,7 +206,15 @@ def get_rds_storage_price(
     region: str = "ap-northeast-2",
     storage_type: str = "gp3",
 ) -> float:
-    """RDS 스토리지 GB당 월 가격"""
+    """RDS 스토리지 타입의 GB당 월간 가격을 반환한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        storage_type: 스토리지 타입 (``"gp2"``, ``"gp3"``, ``"io1"``, ``"magnetic"``)
+
+    Returns:
+        GB당 월간 USD (gp3 기본: ``0.095``)
+    """
     storage_prices = RDS_STORAGE_PRICES.get(region, DEFAULT_STORAGE_PRICES)
     return storage_prices.get(storage_type, 0.095)
 
@@ -183,7 +228,22 @@ def get_rds_monthly_cost(
     multi_az: bool = False,
     session: boto3.Session | None = None,
 ) -> float:
-    """RDS 월간 비용 계산"""
+    """RDS 인스턴스 + 스토리지의 월간 총 비용을 계산한다.
+
+    Multi-AZ 배포 시 인스턴스와 스토리지 비용이 모두 2배가 된다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        instance_class: 인스턴스 클래스 (기본: ``"db.t3.medium"``)
+        engine: DB 엔진 (기본: ``"mysql"``)
+        storage_gb: 스토리지 크기 (GB, 기본: ``20``)
+        storage_type: 스토리지 타입 (기본: ``"gp3"``)
+        multi_az: Multi-AZ 배포 여부 (기본: ``False``, ``True`` 이면 2배)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        월간 USD 비용 (소수점 2자리 반올림)
+    """
     instance_hourly = get_rds_instance_price(region, instance_class, engine, session)
     storage_monthly = get_rds_storage_price(region, storage_type)
 

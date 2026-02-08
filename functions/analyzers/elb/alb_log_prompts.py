@@ -179,7 +179,17 @@ def _get_bucket_input_with_options(session, ctx) -> str | None:
 
 
 def _get_lb_and_build_path(session, ctx) -> str | None:
-    """자동 탐색으로 S3 경로 생성"""
+    """ALB를 선택하고 액세스 로그 S3 경로를 자동 생성한다.
+
+    ALB 목록 조회 -> 사용자 선택 -> 로그 설정 확인 -> S3 경로 조합.
+
+    Args:
+        session: boto3 session.
+        ctx: ExecutionContext.
+
+    Returns:
+        자동 생성된 S3 경로 또는 None (실패 시 수동 입력으로 전환).
+    """
     from botocore.exceptions import ClientError
 
     elbv2_client = get_client(session, "elbv2")

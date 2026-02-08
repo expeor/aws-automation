@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/lambda_.py - Lambda 가격 조회
+functions/analyzers/cost/pricing/lambda_.py - Lambda 가격 조회
 
 Lambda 비용 계산:
 - Request: 100만 요청당 $0.20

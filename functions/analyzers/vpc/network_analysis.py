@@ -1,5 +1,5 @@
 """
-plugins/vpc/network_analysis.py - Consolidated Network Resource Analysis
+functions/analyzers/vpc/network_analysis.py - Consolidated Network Resource Analysis
 
 Analyzes unused/underutilized network resources:
 - NAT Gateways (unused/low-usage)
@@ -49,7 +49,24 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class NetworkAnalysisSummary:
-    """Combined network analysis summary"""
+    """계정/리전별 네트워크 리소스 분석 요약
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        nat_total: NAT Gateway 전체 수
+        nat_unused: 미사용 NAT Gateway 수
+        nat_low_usage: 저사용 NAT Gateway 수
+        nat_monthly_waste: NAT Gateway 월간 낭비 비용 (USD)
+        endpoint_total: VPC Endpoint 전체 수
+        endpoint_interface: Interface Endpoint 수
+        endpoint_unused: 미사용 Endpoint 수
+        endpoint_monthly_waste: Endpoint 월간 낭비 비용 (USD)
+        eni_total: ENI 전체 수
+        eni_unused: 미사용 ENI 수
+        eni_pending: 확인 필요 ENI 수
+    """
 
     account_id: str
     account_name: str
@@ -75,7 +92,16 @@ class NetworkAnalysisSummary:
 
 @dataclass
 class NetworkAnalysisResult:
-    """Combined network analysis result"""
+    """통합 네트워크 리소스 분석 결과
+
+    Attributes:
+        summaries: 계정/리전별 분석 요약 리스트
+        nat_results: NAT Gateway 상세 분석 결과 리스트
+        nat_stats: NAT Gateway 통계 딕셔너리 리스트
+        endpoint_results: VPC Endpoint 분석 결과 리스트
+        eni_results: ENI 분석 결과 리스트
+        errors: 수집/분석 중 발생한 에러 메시지 리스트
+    """
 
     summaries: list[NetworkAnalysisSummary] = field(default_factory=list)
 
@@ -90,7 +116,17 @@ class NetworkAnalysisResult:
 
 
 def _collect_nat(session, account_id: str, account_name: str, region: str) -> tuple[Any, dict[str, Any]] | None:
-    """Collect and analyze NAT Gateways"""
+    """NAT Gateway 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        (분석 결과, 통계 딕셔너리) 튜플. NAT Gateway가 없으면 None.
+    """
     collector = NATCollector()
     audit_data = collector.collect(session, account_id, account_name, region)
 
@@ -105,7 +141,17 @@ def _collect_nat(session, account_id: str, account_name: str, region: str) -> tu
 
 
 def _collect_endpoint(session, account_id: str, account_name: str, region: str) -> EndpointAnalysisResult | None:
-    """Collect and analyze VPC Endpoints"""
+    """VPC Endpoint 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        분석 결과. Endpoint가 없으면 None.
+    """
     endpoints = collect_endpoints(session, account_id, account_name, region)
     if not endpoints:
         return None
@@ -113,13 +159,35 @@ def _collect_endpoint(session, account_id: str, account_name: str, region: str) 
 
 
 def _collect_eni(session, account_id: str, account_name: str, region: str) -> ENIAnalysisResult:
-    """Collect and analyze ENIs"""
+    """ENI 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        ENI 분석 결과
+    """
     enis = collect_enis(session, account_id, account_name, region)
     return analyze_enis(enis, account_id, account_name, region)
 
 
 def _collect_all(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Collect all network resources for a single account/region"""
+    """단일 계정/리전의 모든 네트워크 리소스 수집 (parallel_collect 콜백)
+
+    NAT Gateway, VPC Endpoint, ENI를 순차적으로 수집 및 분석합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        리소스 유형별 분석 결과를 담은 딕셔너리
+    """
     return {
         "nat": _collect_nat(session, account_id, account_name, region),
         "endpoint": _collect_endpoint(session, account_id, account_name, region),
@@ -131,7 +199,17 @@ def _collect_all(session, account_id: str, account_name: str, region: str) -> di
 
 
 def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> str:
-    """Generate combined Excel report for all network resources"""
+    """네트워크 리소스 통합 Excel 보고서 생성
+
+    Summary 시트와 리전별 미사용 현황 시트를 포함합니다.
+
+    Args:
+        result: 통합 분석 결과
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from core.shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
@@ -197,7 +275,14 @@ def generate_combined_report(result: NetworkAnalysisResult, output_dir: str) -> 
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Run consolidated network resource analysis"""
+    """통합 네트워크 리소스 분석 실행
+
+    멀티 계정/리전에서 NAT Gateway, VPC Endpoint, ENI를 병렬 수집하고,
+    미사용 리소스를 식별하여 통합 + 개별 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]Network Resource Analysis (NAT/Endpoint/ENI)[/bold]\n")
 
     # Parallel collection
@@ -294,7 +379,11 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _print_summary(result: NetworkAnalysisResult) -> None:
-    """Print analysis summary"""
+    """분석 결과 요약 콘솔 출력
+
+    Args:
+        result: 통합 분석 결과
+    """
     # NAT Gateway
     total_nat = sum(s.nat_total for s in result.summaries)
     unused_nat = sum(s.nat_unused for s in result.summaries)

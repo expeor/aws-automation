@@ -1,4 +1,8 @@
-"""URL statistics sheet writer."""
+"""functions/reports/log_analyzer/reporter/url.py - URL 통계 시트 Writer.
+
+요청 URL별 통계(요청 수, 고유 IP 수, 평균 응답 시간, 에러율)를 분석하여
+Top N 시트를 생성합니다.
+"""
 
 from __future__ import annotations
 

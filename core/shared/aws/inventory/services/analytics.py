@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/analytics.py - Analytics 리소스 수집
+core/shared/aws/inventory/services/analytics.py - Analytics 리소스 수집
 
 Kinesis Stream, Kinesis Firehose, Glue Database 수집.
 """
@@ -16,7 +16,19 @@ logger = logging.getLogger(__name__)
 
 
 def collect_kinesis_streams(session, account_id: str, account_name: str, region: str) -> list[KinesisStream]:
-    """Kinesis Data Stream 수집"""
+    """Kinesis Data Stream 리소스를 수집합니다.
+
+    스트림 목록 조회 후 각 스트림의 상세 정보(샤드 수, 보존 기간, 암호화 등)와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        KinesisStream 데이터 클래스 목록
+    """
     kinesis = get_client(session, "kinesis", region_name=region)
     streams = []
 
@@ -65,7 +77,20 @@ def collect_kinesis_streams(session, account_id: str, account_name: str, region:
 
 
 def collect_kinesis_firehoses(session, account_id: str, account_name: str, region: str) -> list[KinesisFirehose]:
-    """Kinesis Firehose Delivery Stream 수집"""
+    """Kinesis Firehose Delivery Stream을 수집합니다.
+
+    Delivery Stream 목록 조회 후 각 스트림의 상세 정보(소스/대상 타입 등)와 태그를 함께 수집합니다.
+    list_delivery_streams에는 paginator가 없으므로 수동 페이지네이션을 사용합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        KinesisFirehose 데이터 클래스 목록
+    """
     firehose = get_client(session, "firehose", region_name=region)
     delivery_streams = []
 
@@ -156,7 +181,20 @@ def collect_kinesis_firehoses(session, account_id: str, account_name: str, regio
 
 
 def collect_glue_databases(session, account_id: str, account_name: str, region: str) -> list[GlueDatabase]:
-    """Glue Database 수집"""
+    """Glue Database 리소스를 수집합니다.
+
+    데이터베이스 목록 조회 후 각 데이터베이스의 테이블 수를 확인합니다.
+    Glue Database는 태그 API가 별도이므로 태그는 빈 딕셔너리로 설정됩니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        GlueDatabase 데이터 클래스 목록
+    """
     glue = get_client(session, "glue", region_name=region)
     databases = []
 

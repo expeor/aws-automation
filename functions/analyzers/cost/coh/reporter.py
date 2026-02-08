@@ -1,5 +1,5 @@
 """
-plugins/cost/coh/reporter.py - Cost Optimization Hub 리포트 생성기
+functions/analyzers/cost/coh/reporter.py - Cost Optimization Hub 리포트 생성기
 
 수집된 권장사항을 Excel 형식으로 출력합니다.
 프로젝트의 shared.io.excel 모듈을 사용합니다.
@@ -105,7 +105,14 @@ class CostOptimizationReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """분석 요약 시트 생성"""
+        """분석 요약 시트 생성
+
+        절약 가능액, 조치 유형별 절약액, 구현 난이도별 절약액,
+        서비스별 Top 5, 리포트 정보 섹션을 포함합니다.
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         summary = wb.new_summary_sheet("분석 요약")
 
         summary.add_title("AWS Cost Optimization Hub 분석 결과")
@@ -213,7 +220,14 @@ class CostOptimizationReporter:
         summary.add_item("데이터 소스", "AWS Cost Optimization Hub")
 
     def _get_service_display_name(self, resource_type: str) -> str:
-        """리소스 타입을 읽기 쉬운 서비스 이름으로 변환"""
+        """리소스 타입을 읽기 쉬운 서비스 이름으로 변환
+
+        Args:
+            resource_type: API 리소스 타입 (예: Ec2Instance)
+
+        Returns:
+            표시용 이름 (예: EC2 인스턴스). 매핑에 없으면 원본 반환.
+        """
         name_map = {
             "Ec2Instance": "EC2 인스턴스",
             "Ec2AutoScalingGroup": "EC2 Auto Scaling",
@@ -237,7 +251,14 @@ class CostOptimizationReporter:
         return name_map.get(resource_type, resource_type)
 
     def _create_recommendations_sheets(self, wb: Workbook) -> None:
-        """권장사항 시트 생성 (액션 타입별)"""
+        """권장사항 시트 생성 (액션 타입별)
+
+        각 액션 타입별로 별도 시트를 생성하고, 2개 이상의 타입이 있으면
+        전체 권장사항을 포함하는 All Recommendations 시트도 추가합니다.
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         grouped = self.result.get_by_action_type()
 
         # 액션 타입별로 시트 생성
@@ -317,7 +338,14 @@ class CostOptimizationReporter:
             )
 
     def _recommendation_to_row(self, rec: Recommendation) -> list[Any]:
-        """Recommendation을 행 데이터로 변환"""
+        """Recommendation을 Excel 행 데이터로 변환
+
+        Args:
+            rec: 변환할 Recommendation 인스턴스
+
+        Returns:
+            COLUMNS_RECOMMENDATIONS 순서에 맞는 셀 값 리스트
+        """
         resource_name = rec.tags.get("Name", rec.resource_id)
         account_name = self.account_names.get(rec.account_id, "")
 
@@ -342,7 +370,17 @@ class CostOptimizationReporter:
         ]
 
     def _get_row_style(self, rec: Recommendation) -> dict | None:
-        """권장사항에 따른 행 스타일 결정"""
+        """권장사항에 따른 행 스타일 결정
+
+        절약액 $100 이상이면 success 스타일, 구현 난이도가 High/VeryHigh이면
+        warning 스타일을 반환합니다.
+
+        Args:
+            rec: 스타일을 결정할 Recommendation 인스턴스
+
+        Returns:
+            Styles 딕셔너리 또는 None (기본 스타일)
+        """
         # 높은 절약액 강조
         if rec.estimated_monthly_savings >= 100:
             return Styles.success()
@@ -352,7 +390,14 @@ class CostOptimizationReporter:
         return None
 
     def _get_sheet_name(self, action_type: str) -> str:
-        """액션 타입을 시트 이름으로 변환"""
+        """액션 타입을 시트 이름으로 변환
+
+        Args:
+            action_type: API 액션 타입 (예: Rightsize)
+
+        Returns:
+            시트 이름 (예: Rightsizing). 매핑에 없으면 원본 반환.
+        """
         name_map = {
             "Rightsize": "Rightsizing",
             "Stop": "Stop (Idle)",
@@ -376,7 +421,13 @@ class CostOptimizationReporter:
             self._print_plain_summary()
 
     def _print_rich_summary(self, console) -> None:
-        """Rich 라이브러리를 사용한 요약 출력"""
+        """Rich 라이브러리를 사용한 요약 출력
+
+        액션 타입별 요약 테이블과 리소스 타입별 Top 10 테이블을 출력합니다.
+
+        Args:
+            console: rich.console.Console 인스턴스
+        """
         from rich.table import Table
 
         console.print("\n[bold cyan]Cost Optimization Hub 권장사항 요약[/bold cyan]")
@@ -434,7 +485,11 @@ class CostOptimizationReporter:
         console.print(res_table)
 
     def _print_plain_summary(self) -> None:
-        """일반 텍스트 요약 출력"""
+        """일반 텍스트 요약 출력
+
+        Rich 라이브러리가 없는 환경에서 print()를 사용하여
+        액션 타입별 요약을 출력합니다.
+        """
         print("\n=== Cost Optimization Hub 권장사항 요약 ===")
         print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"전체 권장사항: {self.result.total_count:,}개 → 필터링 후: {self.result.filtered_count:,}개")

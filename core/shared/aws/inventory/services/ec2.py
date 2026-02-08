@@ -12,7 +12,20 @@ from .helpers import count_rules, has_public_access_rule, parse_tags
 
 
 def collect_ec2_instances(session, account_id: str, account_name: str, region: str) -> list[EC2Instance]:
-    """EC2 인스턴스 수집 (상세 정보 포함)"""
+    """EC2 Instance 리소스를 수집합니다.
+
+    인스턴스 목록 조회 후 태그, EBS Volume ID, Security Group ID, IAM Role 등
+    상세 정보를 함께 수집합니다. IAM Role은 Instance Profile ARN에서 역할 이름을 추출합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        EC2Instance 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     instances = []
 
@@ -71,11 +84,22 @@ def collect_ec2_instances(session, account_id: str, account_name: str, region: s
 def collect_security_groups(
     session, account_id: str, account_name: str, region: str, populate_attachments: bool = True
 ) -> list[SecurityGroup]:
-    """
-    Security Group 수집 (상세 정보 포함)
+    """Security Group 리소스를 수집합니다.
+
+    Security Group 목록 조회 후 인바운드/아웃바운드 규칙 수, 퍼블릭 접근 여부 등을 분석합니다.
+    populate_attachments가 True이면 ENI 조회를 통해 연결된 리소스(EC2, ELB, Lambda 등)를
+    식별합니다.
 
     Args:
-        populate_attachments: True면 연결된 리소스 조회 (추가 API 호출 발생)
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+        populate_attachments: True면 ENI 조회로 연결된 리소스를 식별합니다.
+            추가 API 호출이 발생하므로 대규모 환경에서는 False로 설정할 수 있습니다.
+
+    Returns:
+        SecurityGroup 데이터 클래스 목록
     """
     ec2 = get_client(session, "ec2", region_name=region)
     security_groups = []
@@ -117,10 +141,16 @@ def collect_security_groups(
 
 
 def _populate_sg_attachments(ec2, security_groups: list[SecurityGroup]) -> None:
-    """
-    Security Group에 연결된 리소스 조회.
+    """Security Group에 연결된 리소스를 조회하여 in-place로 업데이트합니다.
 
-    ENI describe API를 사용하여 연결된 리소스 식별.
+    모든 ENI를 조회하여 각 ENI에 연결된 Security Group을 확인하고,
+    ENI Description을 파싱하여 연결된 리소스 타입과 ID를 식별합니다.
+    결과는 SecurityGroup 객체의 attached_enis, attached_resource_ids,
+    attached_resource_types 필드에 직접 반영됩니다.
+
+    Args:
+        ec2: Rate limiting이 적용된 EC2 클라이언트
+        security_groups: 연결 정보를 채울 SecurityGroup 목록
     """
     # SG ID -> SecurityGroup 객체 매핑
     sg_map: dict[str, SecurityGroup] = {sg.group_id: sg for sg in security_groups}

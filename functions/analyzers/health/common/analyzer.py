@@ -1,5 +1,5 @@
 """
-plugins/health/analyzer.py - AWS Personal Health Dashboard 분석기
+functions/analyzers/health/common/analyzer.py - AWS Personal Health Dashboard 분석기
 
 AWS Health API를 호출하여 계정별 Health 이벤트를 조회합니다.
 - scheduledChange: 예정된 유지보수, 패치
@@ -45,7 +45,20 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class EventFilter:
-    """AWS Health 이벤트 필터"""
+    """AWS Health API 이벤트 조회 필터.
+
+    Attributes:
+        event_type_categories: 이벤트 카테고리 목록 (scheduledChange, accountNotification, issue, investigation).
+        services: AWS 서비스명 목록 (EC2, RDS 등).
+        regions: 리전 목록.
+        availability_zones: 가용 영역 목록.
+        event_type_codes: 이벤트 유형 코드 목록.
+        event_status_codes: 상태 코드 목록 (open, upcoming, closed).
+        start_time_from: 시작 시간 필터 (from).
+        start_time_to: 시작 시간 필터 (to).
+        end_time_from: 종료 시간 필터 (from).
+        end_time_to: 종료 시간 필터 (to).
+    """
 
     event_type_categories: list[str] = field(default_factory=list)
     services: list[str] = field(default_factory=list)
@@ -74,7 +87,11 @@ class EventFilter:
     ]
 
     def to_api_filter(self) -> dict[str, Any]:
-        """AWS API 필터 형식으로 변환"""
+        """AWS Health API의 describe_events 필터 형식으로 변환한다.
+
+        Returns:
+            AWS Health API filter 파라미터 딕셔너리.
+        """
         api_filter: dict[str, Any] = {}
 
         if self.event_type_categories:
@@ -116,7 +133,16 @@ class EventFilter:
 
 @dataclass
 class AffectedEntity:
-    """영향받는 리소스 정보"""
+    """Health 이벤트에 영향받는 AWS 리소스 정보.
+
+    Attributes:
+        entity_value: 리소스 ID (예: i-1234567890abcdef0).
+        aws_account_id: 리소스가 속한 AWS 계정 ID.
+        entity_url: 리소스 콘솔 URL.
+        status_code: 리소스 영향 상태 (PENDING, RESOLVED 등).
+        last_updated_time: 마지막 업데이트 시각.
+        tags: 리소스 태그 딕셔너리.
+    """
 
     entity_value: str  # 리소스 ID (예: i-1234567890abcdef0)
     aws_account_id: str
@@ -127,7 +153,14 @@ class AffectedEntity:
 
     @classmethod
     def from_api_response(cls, item: dict[str, Any]) -> AffectedEntity:
-        """API 응답에서 AffectedEntity 객체 생성"""
+        """AWS Health API 응답에서 AffectedEntity 객체를 생성한다.
+
+        Args:
+            item: describe_affected_entities 응답의 개별 엔티티 딕셔너리.
+
+        Returns:
+            AffectedEntity 인스턴스.
+        """
         tags_list = item.get("tags", {})
         tags_dict = tags_list if isinstance(tags_list, dict) else {}
 
@@ -143,7 +176,25 @@ class AffectedEntity:
 
 @dataclass
 class HealthEvent:
-    """AWS Health 이벤트"""
+    """AWS Health 이벤트 상세 정보.
+
+    Attributes:
+        arn: 이벤트 ARN.
+        service: AWS 서비스명 (EC2, RDS 등).
+        event_type_code: 이벤트 유형 코드 (AWS_EC2_PERSISTENT_INSTANCE_RETIREMENT 등).
+        event_type_category: 이벤트 카테고리 (scheduledChange, issue, accountNotification).
+        region: 이벤트 발생 리전.
+        availability_zone: 영향받는 가용 영역.
+        start_time: 이벤트 시작 시각.
+        end_time: 이벤트 종료 시각.
+        last_updated_time: 마지막 업데이트 시각.
+        status_code: 이벤트 상태 (open, upcoming, closed).
+        event_scope_code: 이벤트 범위 (ACCOUNT_SPECIFIC, PUBLIC 등).
+        description: 이벤트 상세 설명.
+        affected_entities: 영향받는 리소스 목록.
+        account_id: AWS 계정 ID (멀티 계정 지원용).
+        account_name: AWS 계정 이름 (멀티 계정 지원용).
+    """
 
     arn: str
     service: str
@@ -164,27 +215,47 @@ class HealthEvent:
 
     @property
     def is_scheduled_change(self) -> bool:
-        """예정된 변경인지 확인"""
+        """예정된 변경(scheduledChange) 이벤트인지 여부.
+
+        Returns:
+            scheduledChange 카테고리이면 True.
+        """
         return self.event_type_category == "scheduledChange"
 
     @property
     def is_issue(self) -> bool:
-        """서비스 장애인지 확인"""
+        """서비스 장애(issue) 이벤트인지 여부.
+
+        Returns:
+            issue 카테고리이면 True.
+        """
         return self.event_type_category == "issue"
 
     @property
     def is_upcoming(self) -> bool:
-        """예정된 이벤트인지 확인"""
+        """예정된(upcoming) 이벤트인지 여부.
+
+        Returns:
+            상태가 upcoming이면 True.
+        """
         return self.status_code == "upcoming"
 
     @property
     def is_open(self) -> bool:
-        """진행 중인 이벤트인지 확인"""
+        """진행 중인(open) 이벤트인지 여부.
+
+        Returns:
+            상태가 open이면 True.
+        """
         return self.status_code == "open"
 
     @property
     def days_until_start(self) -> int | None:
-        """시작까지 남은 일수"""
+        """이벤트 시작까지 남은 일수.
+
+        Returns:
+            남은 일수. start_time이 없으면 None, 이미 시작된 경우 0.
+        """
         if not self.start_time:
             return None
         now = datetime.now(timezone.utc)
@@ -193,7 +264,13 @@ class HealthEvent:
 
     @property
     def urgency(self) -> str:
-        """긴급도 판단 (critical, high, medium, low)"""
+        """이벤트 시작일까지 남은 일수 기반 긴급도 판단.
+
+        3일 이내: critical, 7일 이내: high, 14일 이내: medium, 그 외: low.
+
+        Returns:
+            긴급도 문자열 (critical, high, medium, low).
+        """
         days = self.days_until_start
 
         if days is None:
@@ -212,7 +289,15 @@ class HealthEvent:
         event_item: dict[str, Any],
         detail_item: dict[str, Any] | None = None,
     ) -> HealthEvent:
-        """API 응답에서 HealthEvent 객체 생성"""
+        """AWS Health API 응답에서 HealthEvent 객체를 생성한다.
+
+        Args:
+            event_item: describe_events 응답의 개별 이벤트 딕셔너리.
+            detail_item: describe_event_details 응답의 상세 정보 (선택).
+
+        Returns:
+            HealthEvent 인스턴스.
+        """
         description = ""
         if detail_item:
             desc_list = detail_item.get("eventDescription", {}).get("latestDescription", "")
@@ -234,7 +319,11 @@ class HealthEvent:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """딕셔너리로 변환 (리포트용)"""
+        """이벤트 정보를 딕셔너리로 변환한다 (리포트 출력용).
+
+        Returns:
+            이벤트 정보 딕셔너리.
+        """
         return {
             "arn": self.arn,
             "service": self.service,
@@ -366,7 +455,15 @@ class HealthAnalyzer:
         event_filter: EventFilter,
         page_size: int,
     ) -> Iterator[dict[str, Any]]:
-        """이벤트 페이지네이션 처리"""
+        """describe_events API의 페이지네이션을 처리하여 이벤트를 순회한다.
+
+        Args:
+            event_filter: 이벤트 필터.
+            page_size: 페이지당 항목 수.
+
+        Yields:
+            개별 이벤트 딕셔너리.
+        """
         try:
             paginator = self.client.get_paginator("describe_events")
 
@@ -394,7 +491,16 @@ class HealthAnalyzer:
             raise
 
     def _get_event_details(self, event_arns: list[str]) -> dict[str, str]:
-        """이벤트 상세 설명 조회"""
+        """이벤트 ARN 목록에 대한 상세 설명을 조회한다.
+
+        API는 한 번에 최대 10개까지 조회 가능하므로 배치 처리한다.
+
+        Args:
+            event_arns: 조회할 이벤트 ARN 목록.
+
+        Returns:
+            이벤트 ARN을 키로, 상세 설명을 값으로 하는 딕셔너리.
+        """
         details = {}
 
         # API는 한 번에 최대 10개까지 조회 가능
@@ -413,7 +519,14 @@ class HealthAnalyzer:
         return details
 
     def _get_affected_entities(self, event_arns: list[str]) -> dict[str, list[AffectedEntity]]:
-        """영향받는 리소스 조회"""
+        """이벤트별로 영향받는 리소스를 조회한다.
+
+        Args:
+            event_arns: 조회할 이벤트 ARN 목록.
+
+        Returns:
+            이벤트 ARN을 키로, AffectedEntity 목록을 값으로 하는 딕셔너리.
+        """
         affected = {}
 
         for arn in event_arns:

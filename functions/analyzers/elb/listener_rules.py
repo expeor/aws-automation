@@ -1,5 +1,5 @@
 """
-plugins/elb/listener_rules.py - ALB Listener Rules Analyzer
+functions/analyzers/elb/listener_rules.py - ALB Listener Rules Analyzer
 
 ALB 리스너 규칙을 분석하여 복잡도, 우선순위 문제, 최적화 기회를 탐지합니다.
 
@@ -43,7 +43,7 @@ REQUIRED_PERMISSIONS = {
 
 
 class FindingSeverity(str, Enum):
-    """발견 항목 심각도"""
+    """리스너 규칙 분석 발견 항목의 심각도 수준"""
 
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"
@@ -53,7 +53,7 @@ class FindingSeverity(str, Enum):
 
 
 class FindingCategory(str, Enum):
-    """발견 항목 카테고리"""
+    """발견 항목의 분류 카테고리"""
 
     COMPLEXITY = "복잡도"
     PRIORITY = "우선순위"
@@ -64,7 +64,17 @@ class FindingCategory(str, Enum):
 
 @dataclass
 class RuleFinding:
-    """규칙 분석 발견 항목"""
+    """규칙 분석 발견 항목
+
+    Attributes:
+        severity: 심각도 수준
+        category: 발견 항목 카테고리
+        title: 발견 항목 제목
+        description: 상세 설명
+        rule_arn: 관련 규칙 ARN
+        rule_priority: 규칙 우선순위
+        recommendation: 권장 조치 사항
+    """
 
     severity: FindingSeverity
     category: FindingCategory
@@ -77,7 +87,26 @@ class RuleFinding:
 
 @dataclass
 class RuleAnalysis:
-    """단일 규칙 분석 결과"""
+    """단일 리스너 규칙 분석 결과
+
+    Attributes:
+        rule_arn: 규칙 ARN
+        priority: 우선순위 (default 규칙은 99999)
+        conditions: 원본 조건 리스트
+        actions: 원본 액션 리스트
+        is_default: 기본 규칙 여부
+        condition_count: 조건 수
+        action_count: 액션 수
+        condition_types: 조건 타입 리스트
+        action_types: 액션 타입 리스트
+        complexity_score: 복잡도 점수
+        host_headers: Host 헤더 조건 값 리스트
+        path_patterns: 경로 패턴 조건 값 리스트
+        http_methods: HTTP 메서드 조건 값 리스트
+        source_ips: 소스 IP 조건 값 리스트
+        query_strings: 쿼리 스트링 조건 리스트
+        headers: HTTP 헤더 조건 리스트
+    """
 
     rule_arn: str
     priority: int
@@ -103,7 +132,21 @@ class RuleAnalysis:
 
 @dataclass
 class ListenerAnalysis:
-    """리스너 분석 결과"""
+    """리스너 분석 결과
+
+    Attributes:
+        listener_arn: 리스너 ARN
+        lb_arn: Load Balancer ARN
+        lb_name: Load Balancer 이름
+        protocol: 리스너 프로토콜
+        port: 리스너 포트
+        rules: 규칙별 분석 결과 리스트
+        findings: 발견 항목 리스트
+        total_rules: 전체 규칙 수
+        default_rule_exists: 기본 규칙 존재 여부
+        avg_complexity: 평균 복잡도 점수
+        max_complexity: 최대 복잡도 점수
+    """
 
     listener_arn: str
     lb_arn: str
@@ -153,13 +196,23 @@ COMPLEXITY_THRESHOLDS = {
 
 
 class ListenerRulesAnalyzer:
-    """ALB Listener Rules 분석기"""
+    """ALB Listener Rules 분석기
+
+    리스너 규칙의 복잡도, 우선순위 문제, 최적화 기회를 분석합니다.
+    """
 
     def __init__(self, elbv2_client):
         self.elbv2 = elbv2_client
 
     def analyze_load_balancer(self, lb: dict[str, Any]) -> list[ListenerAnalysis]:
-        """로드밸런서의 모든 리스너 분석"""
+        """로드밸런서의 모든 리스너 분석
+
+        Args:
+            lb: DescribeLoadBalancers 응답의 개별 LB 딕셔너리
+
+        Returns:
+            리스너별 분석 결과 리스트
+        """
         lb_arn = lb["LoadBalancerArn"]
         lb_name = lb["LoadBalancerName"]
         results: list[ListenerAnalysis] = []
@@ -180,7 +233,15 @@ class ListenerRulesAnalyzer:
         return results
 
     def _analyze_listener(self, listener: dict[str, Any], lb_name: str) -> ListenerAnalysis | None:
-        """단일 리스너 분석"""
+        """단일 리스너의 규칙 분석
+
+        Args:
+            listener: DescribeListeners 응답의 개별 리스너 딕셔너리
+            lb_name: Load Balancer 이름
+
+        Returns:
+            리스너 분석 결과. 규칙이 없으면 None.
+        """
         listener_arn = listener["ListenerArn"]
         lb_arn = listener["LoadBalancerArn"]
         protocol = listener.get("Protocol", "")
@@ -229,7 +290,14 @@ class ListenerRulesAnalyzer:
         )
 
     def _analyze_rule(self, rule: dict[str, Any]) -> RuleAnalysis:
-        """단일 규칙 분석"""
+        """단일 규칙의 조건/액션 분석 및 복잡도 계산
+
+        Args:
+            rule: DescribeRules 응답의 개별 규칙 딕셔너리
+
+        Returns:
+            규칙 분석 결과 (조건/액션 세부 정보, 복잡도 포함)
+        """
         rule_arn = rule.get("RuleArn", "")
         priority_str = rule.get("Priority", "default")
         is_default = priority_str == "default"
@@ -260,7 +328,12 @@ class ListenerRulesAnalyzer:
         return analysis
 
     def _analyze_conditions(self, analysis: RuleAnalysis, conditions: list[dict]) -> None:
-        """조건 세부 분석"""
+        """조건 세부 분석 및 값 추출
+
+        Args:
+            analysis: 규칙 분석 결과 객체 (in-place 수정)
+            conditions: 규칙 조건 리스트
+        """
         for cond in conditions:
             field_type = cond.get("Field", "")
             analysis.condition_types.append(field_type)
@@ -287,13 +360,27 @@ class ListenerRulesAnalyzer:
                 analysis.query_strings.extend(qs_config.get("Values", []))
 
     def _analyze_actions(self, analysis: RuleAnalysis, actions: list[dict]) -> None:
-        """액션 세부 분석"""
+        """액션 타입 추출
+
+        Args:
+            analysis: 규칙 분석 결과 객체 (in-place 수정)
+            actions: 규칙 액션 리스트
+        """
         for action in actions:
             action_type = action.get("Type", "")
             analysis.action_types.append(action_type)
 
     def _calculate_complexity(self, analysis: RuleAnalysis) -> float:
-        """규칙 복잡도 점수 계산"""
+        """규칙 복잡도 점수 계산
+
+        조건 타입 가중치, 다중 값 보정, 액션 타입 가중치를 합산합니다.
+
+        Args:
+            analysis: 규칙 분석 결과
+
+        Returns:
+            복잡도 점수 (소수점 2자리)
+        """
         if analysis.is_default:
             return 0.0
 
@@ -324,7 +411,17 @@ class ListenerRulesAnalyzer:
         return round(score, 2)
 
     def _generate_findings(self, rules: list[RuleAnalysis], listener_arn: str) -> list[RuleFinding]:
-        """분석 결과로부터 발견 항목 생성"""
+        """분석 결과로부터 발견 항목 생성
+
+        복잡도, 우선순위, 최적화, 베스트 프랙티스 검사를 수행합니다.
+
+        Args:
+            rules: 규칙 분석 결과 리스트
+            listener_arn: 리스너 ARN
+
+        Returns:
+            발견 항목 리스트
+        """
         findings = []
 
         # 1. 복잡도 분석
@@ -701,6 +798,10 @@ class ToolRunner(BaseToolRunner):
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Entry point"""
+    """ALB Listener Rules 분석 실행
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     runner = ToolRunner(ctx=ctx)
     runner._run_analysis()

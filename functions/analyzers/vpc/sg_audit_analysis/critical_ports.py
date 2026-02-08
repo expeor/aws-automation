@@ -19,7 +19,18 @@ from dataclasses import dataclass
 
 @dataclass
 class CriticalPort:
-    """Critical Port 정의"""
+    """보안상 중요한 포트 정의.
+
+    AWS Trusted Advisor, CIS Benchmark, NIST 기준의 위험 포트 정보를 담는다.
+
+    Attributes:
+        port: 포트 번호.
+        name: 포트 이름 (예: SSH, MySQL, RDP).
+        protocol: 프로토콜 (``tcp``, ``udp``, ``both``).
+        category: 분류 (database, remote_access, file_transfer, windows, unix, web).
+        description: 포트 설명.
+        sources: 참조 기준 목록 (AWS Trusted Advisor, CIS, NIST 등).
+    """
 
     port: int
     name: str
@@ -305,32 +316,32 @@ PORT_INFO: dict[int, CriticalPort] = {
 
 
 def is_trusted_advisor_red(port: int) -> bool:
-    """AWS Trusted Advisor RED 포트 여부"""
+    """지정된 포트가 AWS Trusted Advisor RED 등급 포트인지 확인한다."""
     return port in TRUSTED_ADVISOR_RED_PORTS
 
 
 def is_web_port(port: int) -> bool:
-    """웹 포트 (일반적으로 허용) 여부"""
+    """지정된 포트가 웹 서비스 포트 (Trusted Advisor GREEN)인지 확인한다."""
     return port in WEB_PORTS
 
 
 def is_risky_port(port: int) -> bool:
-    """위험 포트 (Trusted Advisor RED + 추가) 여부"""
+    """지정된 포트가 위험 포트 (Trusted Advisor RED + 추가 위험 포트)인지 확인한다."""
     return port in ALL_RISKY_PORTS
 
 
 def get_port_info(port: int) -> CriticalPort | None:
-    """포트 정보 조회"""
+    """포트 번호에 해당하는 CriticalPort 정보를 조회한다. 미등록이면 None."""
     return PORT_INFO.get(port)
 
 
 def check_port_range(from_port: int, to_port: int) -> list[CriticalPort]:
-    """포트 범위 내 위험 포트 조회 (웹 포트 제외)"""
+    """포트 범위 내에 포함된 위험 포트를 조회한다 (웹 포트 제외)."""
     return [info for port, info in PORT_INFO.items() if from_port <= port <= to_port and port in ALL_RISKY_PORTS]
 
 
 def check_port_range_all(from_port: int, to_port: int) -> list[CriticalPort]:
-    """포트 범위 내 모든 정의된 포트 조회 (웹 포트 포함)"""
+    """포트 범위 내에 포함된 모든 정의된 포트를 조회한다 (웹 포트 포함)."""
     return [info for port, info in PORT_INFO.items() if from_port <= port <= to_port]
 
 

@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/map_audit.py - MAP 태그 현황 분석
+functions/analyzers/tag_editor/map_audit.py - MAP 태그 현황 분석
 
 AWS 리소스의 map-migrated 태그 현황을 분석하고 리포트 생성
 
@@ -62,9 +62,15 @@ console = Console()
 
 
 def _parse_arn(arn: str) -> dict[str, str]:
-    """ARN 파싱하여 리소스 정보 추출
+    """ARN을 파싱하여 서비스, 리전, 계정 ID, 리소스 정보를 추출한다.
 
-    ARN format: arn:partition:service:region:account-id:resource-type/resource-id
+    ARN 형식: arn:partition:service:region:account-id:resource-type/resource-id
+
+    Args:
+        arn: AWS 리소스 ARN 문자열.
+
+    Returns:
+        service, region, account_id, resource_type, resource_id를 포함한 딕셔너리.
     """
     parts = arn.split(":")
     if len(parts) < 6:
@@ -100,7 +106,14 @@ def _parse_arn(arn: str) -> dict[str, str]:
 
 
 def _get_resource_name(tags: dict[str, str]) -> str:
-    """태그에서 Name 추출"""
+    """태그 딕셔너리에서 Name 값을 추출한다.
+
+    Args:
+        tags: 태그 키-값 딕셔너리.
+
+    Returns:
+        Name 태그 값. 없으면 빈 문자열.
+    """
     return tags.get("Name", tags.get("name", ""))
 
 
@@ -111,7 +124,21 @@ def collect_resources_with_tags(
     region: str,
     resource_types: list[str] | None = None,
 ) -> MapTagAnalysisResult:
-    """ResourceGroupsTaggingAPI로 리소스 수집 및 태그 분석"""
+    """ResourceGroupsTaggingAPI로 리소스를 수집하고 MAP 태그 현황을 분석한다.
+
+    모든 리소스의 태그를 조회하여 map-migrated 태그 유무를 확인하고,
+    리소스 타입별 통계를 집계한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+        resource_types: 조회할 리소스 타입 필터 (None이면 전체).
+
+    Returns:
+        MAP 태그 분석 결과 객체.
+    """
     result = MapTagAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -209,7 +236,13 @@ def collect_resources_with_tags(
 
 
 def _aggregate_stats(result: MapTagAnalysisResult) -> None:
-    """리소스 목록에서 통계 재계산"""
+    """리소스 목록을 기반으로 MAP 태그 통계를 재계산한다.
+
+    Native API로 추가 수집한 리소스가 있을 때 전체 통계를 갱신하기 위해 사용한다.
+
+    Args:
+        result: 통계를 재계산할 분석 결과 객체 (리소스 목록은 이미 채워진 상태).
+    """
     # 기존 통계 초기화
     result.total_resources = 0
     result.tagged_resources = 0
@@ -249,14 +282,22 @@ def _aggregate_stats(result: MapTagAnalysisResult) -> None:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> MapTagAnalysisResult:
-    """단일 계정/리전의 MAP 태그 분석 (병렬 실행용)
+    """단일 계정/리전의 MAP 태그 현황을 수집하고 분석한다.
 
-    하이브리드 수집 전략:
+    하이브리드 수집 전략을 사용한다:
     1. ResourceGroupsTaggingAPI로 일반 리소스 수집
     2. CloudWatch Logs Native API로 로그 그룹 태그 수집
-    3. S3 Native API로 버킷 태그 수집 (us-east-1에서만)
+    3. S3 Native API로 해당 리전 버킷 태그 수집
+    Native API 수집 결과는 Tagging API 결과를 대체하여 중복을 방지한다.
 
-    Native API 수집 결과는 Tagging API 결과를 대체합니다.
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        MAP 태그 분석 결과 객체.
     """
     # 1. Tagging API로 기본 수집
     result = collect_resources_with_tags(session, account_id, account_name, region)
@@ -287,7 +328,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def _print_summary_table(results: list[MapTagAnalysisResult]) -> None:
-    """콘솔에 요약 테이블 출력"""
+    """MAP 태그 분석 결과를 콘솔에 요약 테이블로 출력한다.
+
+    전체 태그 적용률과 리소스 타입별 현황(상위 15개)을 표시한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+    """
     # 전체 통계
     total_resources = sum(r.total_resources for r in results)
     total_tagged = sum(r.tagged_resources for r in results)
@@ -349,7 +396,13 @@ def _print_summary_table(results: list[MapTagAnalysisResult]) -> None:
 
 
 def collect_options(ctx: ExecutionContext) -> None:
-    """MAP 태그 분석 옵션 수집"""
+    """MAP 태그 분석 실행 전 사용자 옵션을 수집한다.
+
+    미태그 리소스만 리포트에 포함할지 여부를 확인한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (options 딕셔너리에 설정값이 저장됨).
+    """
     from rich.prompt import Confirm
 
     console.print("\n[bold cyan]MAP 태그 분석 설정[/bold cyan]")
@@ -367,7 +420,14 @@ def collect_options(ctx: ExecutionContext) -> None:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """MAP 태그 분석 실행"""
+    """MAP 태그 현황 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, 요약을 콘솔에 출력한 뒤
+    Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]MAP 태그 분석 시작...[/bold]\n")
     console.print(f"[dim]분석 태그: {MAP_TAG_KEY}[/dim]\n")
 

@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/sagemaker.py - SageMaker 가격 조회
+functions/analyzers/cost/pricing/sagemaker.py - SageMaker 가격 조회
 
 SageMaker Endpoint 인스턴스 시간당/월간 비용을 조회합니다.
 PricingService를 사용하여 캐시와 API를 통합 관리합니다.

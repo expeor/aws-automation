@@ -1,5 +1,5 @@
 """
-plugins/elb/migration_advisor.py - CLB Migration Advisor
+functions/analyzers/elb/migration_advisor.py - CLB Migration Advisor
 
 Classic Load Balancer(CLB)를 ALB/NLB로 마이그레이션 분석 및 추천
 
@@ -59,7 +59,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class RecommendedTarget(Enum):
-    """추천 마이그레이션 타겟"""
+    """CLB 마이그레이션 추천 타겟 유형
+
+    리스너 프로토콜 분석을 기반으로 결정됩니다.
+    """
 
     ALB = "ALB"  # Application Load Balancer
     NLB = "NLB"  # Network Load Balancer
@@ -68,7 +71,10 @@ class RecommendedTarget(Enum):
 
 
 class MigrationComplexity(Enum):
-    """마이그레이션 복잡도"""
+    """마이그레이션 복잡도
+
+    호환성 이슈, 리스너 수, 인스턴스 수를 기반으로 결정됩니다.
+    """
 
     SIMPLE = "simple"  # 단순 마이그레이션
     MODERATE = "moderate"  # 중간 복잡도
@@ -76,7 +82,7 @@ class MigrationComplexity(Enum):
 
 
 class CompatibilityStatus(Enum):
-    """호환성 상태"""
+    """CLB 기능의 ALB/NLB 호환성 상태"""
 
     COMPATIBLE = "compatible"  # 완전 호환
     PARTIAL = "partial"  # 부분 호환 (조정 필요)
@@ -85,7 +91,15 @@ class CompatibilityStatus(Enum):
 
 @dataclass
 class ListenerConfig:
-    """리스너 설정"""
+    """CLB 리스너 설정
+
+    Attributes:
+        protocol: 프론트엔드 프로토콜 (HTTP, HTTPS, TCP, SSL)
+        port: 프론트엔드 포트
+        instance_protocol: 백엔드 프로토콜
+        instance_port: 백엔드 포트
+        ssl_certificate_id: SSL 인증서 ARN
+    """
 
     protocol: str  # HTTP, HTTPS, TCP, SSL
     port: int
@@ -96,7 +110,15 @@ class ListenerConfig:
 
 @dataclass
 class HealthCheckConfig:
-    """헬스체크 설정"""
+    """CLB 헬스체크 설정
+
+    Attributes:
+        target: 헬스체크 대상 (TCP:80, HTTP:80/path)
+        interval: 체크 간격 (초)
+        timeout: 타임아웃 (초)
+        unhealthy_threshold: 비정상 판정 임계값
+        healthy_threshold: 정상 판정 임계값
+    """
 
     target: str  # TCP:80, HTTP:80/path
     interval: int
@@ -107,7 +129,31 @@ class HealthCheckConfig:
 
 @dataclass
 class CLBInfo:
-    """Classic Load Balancer 정보"""
+    """Classic Load Balancer 상세 정보
+
+    Attributes:
+        name: CLB 이름
+        dns_name: DNS 이름
+        scheme: 스킴 (internet-facing, internal)
+        vpc_id: VPC ID
+        availability_zones: 가용 영역 리스트
+        subnets: 서브넷 리스트
+        security_groups: Security Group 리스트
+        listeners: 리스너 설정 리스트
+        health_check: 헬스체크 설정
+        instances: 등록된 인스턴스 ID 리스트
+        created_time: 생성 시간
+        policies: 정책 이름-타입 매핑 딕셔너리
+        backend_policies: 백엔드 정책 이름 리스트
+        cross_zone_enabled: Cross-Zone Load Balancing 활성화 여부
+        connection_draining_enabled: Connection Draining 활성화 여부
+        connection_draining_timeout: Connection Draining 타임아웃 (초)
+        idle_timeout: Idle 타임아웃 (초)
+        access_log_enabled: 액세스 로그 활성화 여부
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+    """
 
     name: str
     dns_name: str
@@ -139,20 +185,42 @@ class CLBInfo:
 
     @property
     def has_http_listeners(self) -> bool:
+        """HTTP/HTTPS 리스너 존재 여부
+
+        Returns:
+            HTTP 또는 HTTPS 프로토콜 리스너가 있으면 True
+        """
         return any(listener.protocol in ("HTTP", "HTTPS") for listener in self.listeners)
 
     @property
     def has_tcp_listeners(self) -> bool:
+        """TCP/SSL 리스너 존재 여부
+
+        Returns:
+            TCP 또는 SSL 프로토콜 리스너가 있으면 True
+        """
         return any(listener.protocol in ("TCP", "SSL") for listener in self.listeners)
 
     @property
     def is_vpc_based(self) -> bool:
+        """VPC 기반 CLB 여부
+
+        Returns:
+            VPC ID가 설정되어 있으면 True
+        """
         return bool(self.vpc_id)
 
 
 @dataclass
 class CompatibilityIssue:
-    """호환성 이슈"""
+    """CLB 기능의 ALB/NLB 호환성 이슈
+
+    Attributes:
+        feature: 기능 이름
+        status: 호환성 상태
+        description: 이슈 설명
+        workaround: 해결 방법
+    """
 
     feature: str
     status: CompatibilityStatus
@@ -162,7 +230,20 @@ class CompatibilityIssue:
 
 @dataclass
 class MigrationRecommendation:
-    """마이그레이션 추천"""
+    """개별 CLB 마이그레이션 추천 결과
+
+    Attributes:
+        clb: 분석 대상 CLB 정보
+        target: 추천 마이그레이션 타겟
+        complexity: 마이그레이션 복잡도
+        compatibility_issues: 호환성 이슈 리스트
+        current_monthly_cost: 현재 CLB 월간 비용 (USD)
+        estimated_monthly_cost: 마이그레이션 후 예상 월간 비용 (USD)
+        cost_difference: 비용 차이 (양수: 증가, 음수: 절감)
+        checklist: 마이그레이션 체크리스트 항목 리스트
+        warnings: 경고 사항 리스트
+        summary: 마이그레이션 요약 문자열
+    """
 
     clb: CLBInfo
     target: RecommendedTarget
@@ -185,11 +266,21 @@ class MigrationRecommendation:
 
     @property
     def is_cost_saving(self) -> bool:
+        """비용 절감 여부
+
+        Returns:
+            마이그레이션 후 비용이 감소하면 True
+        """
         return self.cost_difference < 0
 
     @property
     def overall_status(self) -> CompatibilityStatus:
-        """전체 호환성 상태"""
+        """전체 호환성 상태
+
+        Returns:
+            INCOMPATIBLE 이슈가 있으면 INCOMPATIBLE,
+            PARTIAL 이슈가 있으면 PARTIAL, 그 외 COMPATIBLE
+        """
         if any(i.status == CompatibilityStatus.INCOMPATIBLE for i in self.compatibility_issues):
             return CompatibilityStatus.INCOMPATIBLE
         if any(i.status == CompatibilityStatus.PARTIAL for i in self.compatibility_issues):
@@ -199,7 +290,21 @@ class MigrationRecommendation:
 
 @dataclass
 class MigrationAnalysisResult:
-    """분석 결과"""
+    """CLB 마이그레이션 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        recommendations: 개별 CLB 마이그레이션 추천 리스트
+        total_clbs: 전체 CLB 수
+        alb_recommended: ALB 추천 수
+        nlb_recommended: NLB 추천 수
+        split_recommended: ALB+NLB 분리 추천 수
+        keep_recommended: CLB 유지 추천 수
+        total_current_cost: 현재 전체 월간 비용 (USD)
+        total_estimated_cost: 마이그레이션 후 예상 전체 월간 비용 (USD)
+    """
 
     account_id: str
     account_name: str
@@ -224,7 +329,19 @@ class MigrationAnalysisResult:
 
 
 def collect_clb_details(session, account_id: str, account_name: str, region: str) -> list[CLBInfo]:
-    """CLB 상세 정보 수집"""
+    """CLB 상세 정보 수집
+
+    리스너, 헬스체크, 속성, 정책 정보를 포함하여 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        CLB 상세 정보 리스트
+    """
     from botocore.exceptions import ClientError
 
     clbs = []
@@ -324,7 +441,17 @@ def collect_clb_details(session, account_id: str, account_name: str, region: str
 
 
 def analyze_migration(clb: CLBInfo, region: str) -> MigrationRecommendation:
-    """개별 CLB 마이그레이션 분석"""
+    """개별 CLB 마이그레이션 분석
+
+    타겟 결정, 호환성 분석, 복잡도 판정, 비용 비교, 체크리스트를 생성합니다.
+
+    Args:
+        clb: CLB 상세 정보
+        region: AWS 리전
+
+    Returns:
+        마이그레이션 추천 결과
+    """
 
     # 추천 타겟 결정
     target = _determine_target(clb)
@@ -367,7 +494,14 @@ def analyze_migration(clb: CLBInfo, region: str) -> MigrationRecommendation:
 
 
 def _determine_target(clb: CLBInfo) -> RecommendedTarget:
-    """추천 마이그레이션 타겟 결정"""
+    """리스너 프로토콜 기반 추천 마이그레이션 타겟 결정
+
+    Args:
+        clb: CLB 상세 정보
+
+    Returns:
+        추천 타겟 (ALB, NLB, SPLIT, KEEP)
+    """
 
     has_http = clb.has_http_listeners
     has_tcp = clb.has_tcp_listeners
@@ -389,7 +523,15 @@ def _determine_target(clb: CLBInfo) -> RecommendedTarget:
 
 
 def _analyze_compatibility(clb: CLBInfo, target: RecommendedTarget) -> list[CompatibilityIssue]:
-    """호환성 분석"""
+    """CLB 기능의 ALB/NLB 호환성 분석
+
+    Args:
+        clb: CLB 상세 정보
+        target: 추천 마이그레이션 타겟
+
+    Returns:
+        호환성 이슈 리스트
+    """
     issues = []
 
     # 1. VPC 기반 여부
@@ -586,7 +728,17 @@ def _generate_summary(clb: CLBInfo, target: RecommendedTarget, complexity: Migra
 
 
 def analyze_all(clbs: list[CLBInfo], region: str, account_id: str, account_name: str) -> MigrationAnalysisResult:
-    """전체 CLB 마이그레이션 분석"""
+    """전체 CLB 마이그레이션 분석
+
+    Args:
+        clbs: CLB 상세 정보 리스트
+        region: AWS 리전
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+
+    Returns:
+        계정/리전별 마이그레이션 분석 결과
+    """
     result = MigrationAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -620,7 +772,17 @@ def analyze_all(clbs: list[CLBInfo], region: str, account_id: str, account_name:
 
 
 def generate_report(results: list[MigrationAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """CLB 마이그레이션 분석 Excel 보고서 생성
+
+    Summary, Recommendations, Checklists 3개 시트를 포함합니다.
+
+    Args:
+        results: 계정/리전별 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from openpyxl.styles import Font, PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -754,7 +916,17 @@ def generate_report(results: list[MigrationAnalysisResult], output_dir: str) -> 
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> MigrationAnalysisResult | None:
-    """단일 계정/리전의 CLB 수집 및 마이그레이션 분석 (병렬 실행용)"""
+    """단일 계정/리전의 CLB 수집 및 마이그레이션 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        마이그레이션 분석 결과. CLB가 없으면 None.
+    """
     clbs = collect_clb_details(session, account_id, account_name, region)
     if not clbs:
         return None
@@ -762,7 +934,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """CLB Migration Advisor 실행"""
+    """CLB Migration Advisor 실행
+
+    멀티 계정/리전에서 CLB를 병렬 수집하고,
+    ALB/NLB 마이그레이션 적합성을 분석하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]CLB Migration Advisor 시작...[/bold]")
     console.print("[dim]Classic Load Balancer → ALB/NLB 마이그레이션 분석[/dim]\n")
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""
-🚀 DuckDB 기반 ALB 로그 분석기
+"""functions/reports/log_analyzer/alb_log_analyzer.py - DuckDB 기반 ALB 로그 분석기.
 
 기존 파싱 로직을 DuckDB SQL로 교체하여 초고속 분석을 제공합니다.
-기존 인터페이스와 완전 호환성을 유지합니다.
+ALB 액세스 로그 파일을 DuckDB로 로드하고, SQL MACRO와 쿼리를 통해
+요약 통계, 상태 코드 분석, 응답 시간 분석, TPS, URL 분석,
+국가별 통계, SSL 보안 분석, SLA 분석 등을 수행합니다.
 """
 
 from __future__ import annotations

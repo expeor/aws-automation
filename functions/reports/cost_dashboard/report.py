@@ -1,7 +1,8 @@
-"""
-plugins/cost/unused_all/report.py - Excel 보고서 생성
+"""functions/reports/cost_dashboard/report.py - Excel 보고서 생성.
 
-미사용 리소스 종합 분석 Excel 보고서 생성
+미사용 리소스 종합 분석 결과를 Excel 보고서로 생성합니다.
+Summary 시트에 전체 현황을 요약하고, 리소스 타입별 상세 시트
+(NAT, ENI, EBS, EIP, ELB, Snapshot, AMI, RDS, Lambda 등 35개+)를 생성합니다.
 """
 
 from __future__ import annotations
@@ -14,7 +15,18 @@ from .types import UnusedAllResult
 
 
 def generate_report(result: UnusedAllResult, output_dir: str) -> str:
-    """종합 Excel 보고서 생성"""
+    """미사용 리소스 종합 Excel 보고서를 생성합니다.
+
+    Summary 시트에 전체 리소스 현황과 총 월간 절감 가능 금액을 요약하고,
+    35개+ 리소스 타입별 상세 시트를 생성합니다.
+
+    Args:
+        result: 전체 수집 결과를 담은 UnusedAllResult 객체.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일의 절대 경로.
+    """
     wb = Workbook()
 
     # ===== Summary =====

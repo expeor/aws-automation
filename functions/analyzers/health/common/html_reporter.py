@@ -1,5 +1,5 @@
 """
-plugins/health/html_reporter.py - AWS Health 대시보드 HTML 리포터
+functions/analyzers/health/common/html_reporter.py - AWS Health 대시보드 HTML 리포터
 
 AWS Health 이벤트를 CloudScape UI 스타일의 HTML 대시보드로 생성합니다.
 - 요약 카드: 긴급도별 현황
@@ -47,7 +47,11 @@ COLORS = {
 
 
 class HealthDashboard:
-    """AWS Health 대시보드 HTML 생성기"""
+    """AWS Health 대시보드 HTML 생성기.
+
+    CollectionResult를 CloudScape UI 스타일의 HTML 대시보드로 변환한다.
+    요약 카드, 서비스별 분포 차트, 월별 캘린더, 이벤트 상세 테이블을 포함한다.
+    """
 
     def __init__(self, result: CollectionResult):
         """초기화
@@ -98,7 +102,11 @@ class HealthDashboard:
             logger.warning(f"브라우저 열기 실패: {e}")
 
     def _build_html(self) -> str:
-        """HTML 문서 생성"""
+        """전체 HTML 문서를 생성한다.
+
+        Returns:
+            완성된 HTML 문자열.
+        """
         return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -590,7 +598,11 @@ class HealthDashboard:
         """
 
     def _build_summary_section(self) -> str:
-        """요약 카드 섹션"""
+        """긴급도별 요약 카드 HTML 섹션을 생성한다.
+
+        Returns:
+            요약 카드 HTML 문자열.
+        """
         urgency_data = self.result.summary_by_urgency
         total = self.result.patch_count
         affected = self.result.affected_resource_count
@@ -634,7 +646,11 @@ class HealthDashboard:
         """
 
     def _build_charts_section(self) -> str:
-        """차트 섹션"""
+        """ECharts 차트 컨테이너 HTML 섹션을 생성한다.
+
+        Returns:
+            차트 컨테이너 HTML 문자열.
+        """
         return """
         <div class="cs-container">
             <div class="cs-container-header">
@@ -664,7 +680,11 @@ class HealthDashboard:
         """
 
     def _build_calendar_section(self) -> str:
-        """캘린더 섹션"""
+        """월별 패치 일정 캘린더 HTML 섹션을 생성한다.
+
+        Returns:
+            캘린더 HTML 문자열. 최대 3개월까지 탭으로 전환 가능.
+        """
         months = sorted([k for k in self.result.summary_by_month if k != "미정"])[:3]
 
         if not months:
@@ -707,7 +727,14 @@ class HealthDashboard:
         """
 
     def _build_month_calendar(self, month_key: str) -> str:
-        """월별 캘린더 생성"""
+        """특정 월의 캘린더 그리드 HTML을 생성한다.
+
+        Args:
+            month_key: 월 키 (YYYY-MM 형식).
+
+        Returns:
+            캘린더 그리드 HTML 문자열.
+        """
         try:
             year, month = map(int, month_key.split("-"))
         except ValueError:
@@ -757,7 +784,13 @@ class HealthDashboard:
         return html
 
     def _build_events_section(self) -> str:
-        """이벤트 테이블 섹션"""
+        """패치 목록 테이블 HTML 섹션을 생성한다.
+
+        검색/필터 기능을 포함하며 긴급도에 따라 행 스타일이 달라진다.
+
+        Returns:
+            이벤트 테이블 HTML 문자열.
+        """
         if not self.result.patches:
             return """
             <div class="cs-container">

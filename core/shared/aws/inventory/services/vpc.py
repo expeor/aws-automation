@@ -12,7 +12,20 @@ from .helpers import parse_tags
 
 
 def collect_vpcs(session, account_id: str, account_name: str, region: str) -> list[VPC]:
-    """VPC 수집"""
+    """VPC 리소스를 수집합니다.
+
+    VPC 목록 조회 후 각 VPC의 CIDR Block, 상태, Default 여부,
+    Instance Tenancy, DHCP Options 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        VPC 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     vpcs = []
 
@@ -40,7 +53,20 @@ def collect_vpcs(session, account_id: str, account_name: str, region: str) -> li
 
 
 def collect_subnets(session, account_id: str, account_name: str, region: str) -> list[Subnet]:
-    """Subnet 수집"""
+    """Subnet 리소스를 수집합니다.
+
+    Subnet 목록 조회 후 각 Subnet의 CIDR Block, Availability Zone,
+    사용 가능 IP 수, Public IP 자동 할당 여부 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        Subnet 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     subnets = []
 
@@ -70,7 +96,20 @@ def collect_subnets(session, account_id: str, account_name: str, region: str) ->
 
 
 def collect_route_tables(session, account_id: str, account_name: str, region: str) -> list[RouteTable]:
-    """Route Table 수집"""
+    """Route Table 리소스를 수집합니다.
+
+    Route Table 목록 조회 후 각 테이블의 Main 여부, 경로 수,
+    연결된 Subnet 목록 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        RouteTable 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     route_tables = []
 
@@ -102,7 +141,20 @@ def collect_route_tables(session, account_id: str, account_name: str, region: st
 
 
 def collect_internet_gateways(session, account_id: str, account_name: str, region: str) -> list[InternetGateway]:
-    """Internet Gateway 수집"""
+    """Internet Gateway 리소스를 수집합니다.
+
+    Internet Gateway 목록 조회 후 각 게이트웨이의 연결된 VPC,
+    Attachment 상태 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        InternetGateway 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     igws = []
 
@@ -131,7 +183,20 @@ def collect_internet_gateways(session, account_id: str, account_name: str, regio
 
 
 def collect_elastic_ips(session, account_id: str, account_name: str, region: str) -> list[ElasticIP]:
-    """Elastic IP 수집"""
+    """Elastic IP 리소스를 수집합니다.
+
+    Elastic IP 목록 조회 후 각 EIP의 Public/Private IP, 연결된 인스턴스,
+    ENI, Association 상태 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        ElasticIP 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     eips = []
 
@@ -160,7 +225,21 @@ def collect_elastic_ips(session, account_id: str, account_name: str, region: str
 
 
 def collect_enis(session, account_id: str, account_name: str, region: str) -> list[ENI]:
-    """ENI 수집 (상세 정보 포함)"""
+    """ENI (Elastic Network Interface) 리소스를 수집합니다.
+
+    ENI 목록 조회 후 각 인터페이스의 Public/Private IP, Security Group,
+    Attachment 정보, 연결된 리소스 타입/ID 등과 태그를 함께 수집합니다.
+    연결된 리소스는 ENI Description을 파싱하여 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        ENI 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     enis = []
 
@@ -227,7 +306,20 @@ def collect_enis(session, account_id: str, account_name: str, region: str) -> li
 
 
 def collect_nat_gateways(session, account_id: str, account_name: str, region: str) -> list[NATGateway]:
-    """NAT Gateway 수집 (상세 정보 포함)"""
+    """NAT Gateway 리소스를 수집합니다.
+
+    NAT Gateway 목록 조회 후 각 게이트웨이의 Public/Private IP,
+    Connectivity Type, EIP Allocation ID, VPC/Subnet 정보 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        NATGateway 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     nat_gateways = []
 
@@ -274,7 +366,21 @@ def collect_nat_gateways(session, account_id: str, account_name: str, region: st
 
 
 def collect_vpc_endpoints(session, account_id: str, account_name: str, region: str) -> list[VPCEndpoint]:
-    """VPC Endpoint 수집 (상세 정보 포함)"""
+    """VPC Endpoint 리소스를 수집합니다.
+
+    VPC Endpoint 목록 조회 후 각 Endpoint의 타입(Gateway/Interface),
+    서비스 이름, Private DNS 설정, Route Table/Subnet/ENI 연결 정보,
+    Policy Document 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        VPCEndpoint 데이터 클래스 목록
+    """
     ec2 = get_client(session, "ec2", region_name=region)
     endpoints = []
 

@@ -1,7 +1,7 @@
-"""
-core/tools/history/recent.py - 최근 사용 도구 관리
+"""최근 사용 도구 관리.
 
-LRU 기반으로 최근 사용한 도구 이력 관리
+LRU(Least Recently Used) 기반으로 최근 사용한 도구 이력을 관리합니다.
+싱글톤 패턴으로 구현되며, JSON 파일 기반 영속성과 원자적 저장을 지원합니다.
 """
 
 from __future__ import annotations
@@ -19,16 +19,31 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RecentItem:
-    """최근 사용 항목"""
+    """최근 사용 항목.
+
+    도구 사용 이력의 개별 항목을 나타냅니다.
+
+    Attributes:
+        category: 카테고리 이름 (예: "ec2", "vpc").
+        tool_name: 도구 표시 이름 (예: "미사용 볼륨").
+        tool_module: 도구 모듈 이름 (예: "unused").
+        last_used: 마지막 사용 일시 (ISO format).
+        use_count: 누적 사용 횟수 (기본값: 1).
+    """
 
     category: str
     tool_name: str
     tool_module: str
-    last_used: str  # ISO format
+    last_used: str
     use_count: int = 1
 
     def get_display_time(self) -> str:
-        """상대 시간 표시 (예: '2분 전', '1시간 전')"""
+        """마지막 사용 시각을 상대 시간 문자열로 반환합니다.
+
+        Returns:
+            상대 시간 표시 문자열 (예: "방금 전", "2분 전", "1시간 전",
+            "3일 전", "01/15"). 파싱 실패 시 빈 문자열.
+        """
         try:
             last = datetime.fromisoformat(self.last_used)
             now = datetime.now()
@@ -58,7 +73,16 @@ _RECENT_FIELDS = {f.name for f in fields(RecentItem)}
 
 
 class RecentHistory:
-    """최근 사용 이력 관리 (LRU 기반)"""
+    """최근 사용 이력 관리 (LRU 기반).
+
+    도구 사용 이력을 LRU 방식으로 관리합니다. 동일 도구 재사용 시
+    사용 횟수가 증가하고 목록 맨 앞으로 이동합니다.
+    싱글톤 패턴(double-check locking)으로 구현되어 애플리케이션 전체에서
+    하나의 인스턴스만 사용됩니다.
+
+    Attributes:
+        MAX_ITEMS: 최대 이력 항목 수 (50개).
+    """
 
     MAX_ITEMS = 50
     _instance: RecentHistory | None = None
@@ -66,7 +90,11 @@ class RecentHistory:
     _initialized: bool
 
     def __new__(cls) -> RecentHistory:
-        """싱글톤 패턴 (double-check locking)"""
+        """싱글톤 인스턴스를 반환합니다 (double-check locking).
+
+        Returns:
+            RecentHistory 싱글톤 인스턴스.
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -75,6 +103,11 @@ class RecentHistory:
         return cls._instance
 
     def __init__(self) -> None:
+        """RecentHistory를 초기화합니다.
+
+        이미 초기화된 경우 재초기화를 건너뜁니다 (싱글톤).
+        이력 파일에서 기존 데이터를 로드합니다.
+        """
         if self._initialized:
             return
         self._path = self._get_history_path()
@@ -83,7 +116,11 @@ class RecentHistory:
         self._initialized = True
 
     def _get_history_path(self) -> Path:
-        """이력 파일 경로"""
+        """이력 JSON 파일 경로를 반환합니다.
+
+        Returns:
+            이력 파일의 Path 객체 (``temp/history/recent.json``).
+        """
         from core.tools.cache import get_cache_path
 
         return Path(get_cache_path("history", "recent.json"))
@@ -162,19 +199,30 @@ class RecentHistory:
         return sorted_items[:limit]
 
     def get_all(self) -> list[RecentItem]:
-        """전체 이력"""
+        """전체 사용 이력을 반환합니다.
+
+        Returns:
+            RecentItem 리스트의 복사본 (최근 사용순).
+        """
         return self._items.copy()
 
     def clear(self) -> None:
-        """이력 초기화"""
+        """전체 사용 이력을 초기화합니다.
+
+        모든 항목을 삭제하고 파일에 빈 목록을 저장합니다.
+        """
         self._items.clear()
         self._save()
 
     def remove(self, category: str, tool_module: str) -> bool:
-        """특정 항목 삭제
+        """특정 이력 항목을 삭제합니다.
+
+        Args:
+            category: 카테고리 이름.
+            tool_module: 도구 모듈 이름.
 
         Returns:
-            삭제 성공 여부
+            삭제 성공 여부 (존재하지 않으면 False).
         """
         for i, item in enumerate(self._items):
             if item.category == category and item.tool_module == tool_module:
@@ -215,7 +263,11 @@ class RecentHistory:
             self._items = []
 
     def _save(self) -> None:
-        """파일에 원자적으로 저장 (write-to-temp-then-rename)"""
+        """파일에 원자적으로 저장합니다 (write-to-temp-then-rename).
+
+        임시 파일에 먼저 기록한 후 rename하여 데이터 손실을 방지합니다.
+        원자적 쓰기 실패 시 직접 쓰기로 fallback합니다.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = [asdict(item) for item in self._items]
         content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -233,5 +285,8 @@ class RecentHistory:
             self._path.write_text(content, encoding="utf-8")
 
     def reload(self) -> None:
-        """파일에서 다시 로드 (외부 변경 반영)"""
+        """파일에서 이력 데이터를 다시 로드합니다.
+
+        외부에서 파일이 변경된 경우 최신 상태를 반영할 때 사용합니다.
+        """
         self._load()

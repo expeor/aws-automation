@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/transfer.py - AWS Transfer Family 가격 조회
+functions/analyzers/cost/pricing/transfer.py - AWS Transfer Family 가격 조회
 
 Transfer Family 비용 계산:
 - 프로토콜 엔드포인트 시간당 비용: $0.30/hour (SFTP, FTPS, FTP, AS2)

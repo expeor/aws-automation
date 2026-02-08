@@ -1,10 +1,10 @@
 """
-plugins/cloudwatch/common - Backwards Compatibility Shim
+functions/analyzers/cloudwatch/common - CloudWatch 메트릭 하위 호환 shim (DEPRECATED)
 
-DEPRECATED: 이 모듈은 shared.aws.metrics로 이동되었습니다.
-새 코드에서는 shared.aws.metrics를 직접 import하세요.
+DEPRECATED: 이 모듈은 core.shared.aws.metrics로 이동되었습니다.
+새 코드에서는 core.shared.aws.metrics를 직접 import하세요.
 
-Usage (NEW):
+사용 예시 (신규 코드):
     from core.shared.aws.metrics import (
         MetricQuery,
         batch_get_metrics,

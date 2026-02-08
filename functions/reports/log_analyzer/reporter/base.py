@@ -1,4 +1,9 @@
-"""Base sheet writer with performance optimizations."""
+"""functions/reports/log_analyzer/reporter/base.py - 시트 Writer 기본 클래스.
+
+모든 시트별 Writer가 상속하는 BaseSheetWriter를 정의합니다.
+Excel 셀 스타일 적용, 헤더 생성, 데이터 행 추가, Excel 크기 제한 검증 등
+공통 기능을 제공합니다.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/iam.py - IAM/Security 리소스 수집
+core/shared/aws/inventory/services/iam.py - IAM/Security 리소스 수집
 
 IAM Role, IAM User, IAM Policy, ACM Certificate, WAF WebACL 수집.
 """
@@ -16,7 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 def collect_iam_roles(session, account_id: str, account_name: str, region: str) -> list[IAMRole]:
-    """IAM Role 수집 (글로벌 - us-east-1에서만)"""
+    """IAM Role 리소스를 수집합니다 (글로벌 서비스).
+
+    IAM은 글로벌 서비스이므로 us-east-1에서만 수집합니다. Role 목록 조회 후
+    각 Role의 마지막 사용 일시/리전, 연결된 정책 수(Attached/Inline) 등
+    상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드 (us-east-1이 아니면 빈 목록 반환)
+
+    Returns:
+        IAMRole 데이터 클래스 목록
+    """
     if region != "us-east-1":
         return []
 
@@ -82,7 +96,21 @@ def collect_iam_roles(session, account_id: str, account_name: str, region: str) 
 
 
 def collect_iam_users(session, account_id: str, account_name: str, region: str) -> list[IAMUser]:
-    """IAM User 수집 (글로벌 - us-east-1에서만)"""
+    """IAM User 리소스를 수집합니다 (글로벌 서비스).
+
+    IAM은 글로벌 서비스이므로 us-east-1에서만 수집합니다. User 목록 조회 후
+    각 User의 Access Key, MFA, Console Access, 그룹, 정책 수 등
+    상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드 (us-east-1이 아니면 빈 목록 반환)
+
+    Returns:
+        IAMUser 데이터 클래스 목록
+    """
     if region != "us-east-1":
         return []
 
@@ -173,7 +201,21 @@ def collect_iam_users(session, account_id: str, account_name: str, region: str) 
 
 
 def collect_iam_policies(session, account_id: str, account_name: str, region: str) -> list[IAMPolicy]:
-    """IAM Policy (Customer Managed) 수집 (글로벌 - us-east-1에서만)"""
+    """IAM Policy (Customer Managed) 리소스를 수집합니다 (글로벌 서비스).
+
+    IAM은 글로벌 서비스이므로 us-east-1에서만 수집합니다.
+    AWS Managed Policy는 제외하고 Customer Managed Policy만 수집합니다.
+    각 Policy의 연결 수, 버전, Permissions Boundary 사용 수 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드 (us-east-1이 아니면 빈 목록 반환)
+
+    Returns:
+        IAMPolicy 데이터 클래스 목록
+    """
     if region != "us-east-1":
         return []
 
@@ -217,7 +259,20 @@ def collect_iam_policies(session, account_id: str, account_name: str, region: st
 
 
 def collect_acm_certificates(session, account_id: str, account_name: str, region: str) -> list[ACMCertificate]:
-    """ACM Certificate 수집"""
+    """ACM Certificate 리소스를 수집합니다.
+
+    Certificate 목록 조회 후 각 인증서의 상세 정보(도메인, 상태, 만료일,
+    사용 중인 리소스, 갱신 적격 여부 등)와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        ACMCertificate 데이터 클래스 목록
+    """
     acm = get_client(session, "acm", region_name=region)
     certificates = []
 
@@ -269,7 +324,21 @@ def collect_acm_certificates(session, account_id: str, account_name: str, region
 
 
 def collect_waf_web_acls(session, account_id: str, account_name: str, region: str) -> list[WAFWebACL]:
-    """WAF WebACL 수집"""
+    """WAF WebACL 리소스를 수집합니다.
+
+    Regional Scope의 WebACL을 수집하고, us-east-1 리전에서는 CloudFront Scope의
+    WebACL도 함께 수집합니다. 각 WebACL의 규칙 수, 용량, 기본 Action 등
+    상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        WAFWebACL 데이터 클래스 목록
+    """
     wafv2 = get_client(session, "wafv2", region_name=region)
     web_acls = []
 

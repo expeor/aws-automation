@@ -1,3 +1,10 @@
+"""functions/reports/log_analyzer/alb_log_downloader.py - S3 ALB 로그 다운로더.
+
+S3에 저장된 ALB 액세스 로그를 병렬 다운로드하고 .gz 압축을 해제합니다.
+스마트 필터링(S3 prefix 기반 시간 범위 필터)으로 불필요한 파일 다운로드를 방지하며,
+배치 처리와 메모리 효율적인 스트리밍 압축 해제를 지원합니다.
+"""
+
 from __future__ import annotations
 
 import bisect
@@ -64,13 +71,20 @@ def _create_report_directory(prefix: str, session_name: str = "") -> str:
 
 
 class LogDownloadError(Exception):
-    """로그 다운로드 중 발생하는 오류"""
-
-    pass
+    """로그 다운로드 중 발생하는 오류."""
 
 
 # 경량화된 S3 객체 정보 (캐시 제거)
 class S3LogFile(NamedTuple):
+    """S3 로그 파일 메타데이터.
+
+    Attributes:
+        key: S3 객체 키.
+        last_modified: S3 객체의 마지막 수정 시각.
+        size: 파일 크기 (바이트).
+        timestamp: 로그 파일명에서 추출한 타임스탬프 (파싱 실패 시 None).
+    """
+
     key: str
     last_modified: datetime
     size: int

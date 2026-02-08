@@ -1,13 +1,14 @@
-"""reports - 종합 리포트 모듈
+"""functions/reports/__init__.py - 종합 리포트 모듈.
 
 여러 AWS 서비스를 취합하는 종합 보고서를 제공합니다.
+개별 서비스 분석 도구(analyzers)와 달리, 멀티 서비스 관점의 종합 데이터를 수집하고 분석합니다.
 
 하위 모듈:
-- cost_dashboard: 미사용 리소스 종합 보고서
-- inventory: AWS 리소스 인벤토리
-- ip_search: IP 검색기 (Public/Private)
-- log_analyzer: ALB 로그 분석
-- scheduled: 정기 작업 (일간/월간/분기/반기/연간)
+    - cost_dashboard: 미사용 리소스 종합 보고서 (NAT, ENI, EBS, EIP, ELB, Snapshot 등)
+    - inventory: AWS 리소스 인벤토리 (EC2, VPC, ELB 등 주요 리소스 현황)
+    - ip_search: IP 검색기 (Public IP - 클라우드 대역 검색, Private IP - ENI 캐시 기반)
+    - log_analyzer: ALB 로그 분석 (DuckDB 기반 초고속 분석, Excel 리포트 생성)
+    - scheduled: 정기 작업 관리 (일간/주간/월간/분기/반기/연간 스케줄링)
 """
 
 CATEGORY = {

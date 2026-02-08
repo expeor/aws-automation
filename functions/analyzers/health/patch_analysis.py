@@ -1,5 +1,5 @@
 """
-plugins/health/patch_analysis.py - 필수 패치 분석
+functions/analyzers/health/patch_analysis.py - 필수 패치 분석
 
 예정된 패치/유지보수 이벤트 분석 보고서 (월별 일정표 포함)
 HTML 대시보드 + Excel 보고서 생성
@@ -33,16 +33,19 @@ console = Console()
 
 
 def _collect_patches(session, account_id: str, account_name: str, region: str) -> CollectionResult | None:
-    """단일 계정의 패치 이벤트 수집 (병렬 실행용)
+    """parallel_collect 콜백: 단일 계정의 예정된 패치/유지보수 이벤트를 수집한다.
+
+    HealthCollector를 사용하여 향후 90일간의 scheduledChange 이벤트를
+    수집한다. Business/Enterprise Support 플랜이 필요하다.
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전 (Health API는 항상 us-east-1 사용)
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전 (Health API는 항상 us-east-1에서 동작).
 
     Returns:
-        CollectionResult 또는 None
+        수집 결과 CollectionResult. 패치가 없으면 None.
     """
     try:
         collector = HealthCollector(session, account_id, account_name)
@@ -61,7 +64,14 @@ def _collect_patches(session, account_id: str, account_name: str, region: str) -
 
 
 def run(ctx: ExecutionContext) -> None:
-    """필수 패치 분석 보고서 생성"""
+    """필수 패치 분석 도구의 메인 실행 함수.
+
+    예정된 패치/유지보수 이벤트를 분석하여 긴급도별로 분류하고,
+    Excel 보고서(월별 캘린더 포함)와 HTML 대시보드를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]필수 패치 분석 시작...[/bold]\n")
 
     # 병렬 수집

@@ -22,7 +22,14 @@ from .analyzer import NATAnalysisResult, Severity, UsageStatus
 
 
 class NATExcelReporter:
-    """NAT Gateway Excel 보고서 생성기"""
+    """NAT Gateway 감사 결과를 Excel 보고서로 출력하는 생성기.
+
+    Summary, Findings, All NAT Gateways 시트를 생성한다.
+
+    Args:
+        results: 계정/리전별 NATAnalysisResult 목록.
+        stats_list: 계정/리전별 요약 통계 딕셔너리 목록.
+    """
 
     def __init__(
         self,
@@ -33,7 +40,11 @@ class NATExcelReporter:
         self.stats_list = stats_list
 
     def build_workbook(self) -> Workbook:
-        """Excel Workbook 빌더 (저장하지 않고 반환)"""
+        """Excel Workbook을 구성하여 반환한다 (파일 저장은 하지 않음).
+
+        Returns:
+            Summary, Findings, All NAT Gateways 시트가 포함된 Workbook.
+        """
         wb = Workbook()
 
         # 시트 생성
@@ -44,12 +55,19 @@ class NATExcelReporter:
         return wb
 
     def generate(self, output_dir: str) -> str:
-        """Excel 보고서 생성 (후방 호환용)"""
+        """Excel 보고서를 생성하고 파일로 저장한다 (후방 호환용).
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+
+        Returns:
+            저장된 Excel 파일의 절대 경로.
+        """
         wb = self.build_workbook()
         return str(wb.save_as(output_dir, "NAT_Gateway_Audit"))
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """Summary 시트 생성"""
+        """Summary 시트를 생성한다. 핵심 지표, 비용 분석, 계정/리전별 현황을 포함."""
         summary = wb.new_summary_sheet("Summary")
 
         # 제목
@@ -129,7 +147,7 @@ class NATExcelReporter:
             )
 
     def _create_findings_sheet(self, wb: Workbook) -> None:
-        """Findings 시트 - 조치 필요한 항목만"""
+        """Findings 시트를 생성한다. 정상 사용이 아닌 항목만 심각도 순으로 표시."""
         columns = [
             ColumnDef(header="Account", width=25, style="data"),
             ColumnDef(header="Region", width=15, style="data"),
@@ -193,7 +211,7 @@ class NATExcelReporter:
             )
 
     def _create_all_nat_sheet(self, wb: Workbook) -> None:
-        """All NAT Gateways 시트 - 전체 목록"""
+        """All NAT Gateways 시트를 생성한다. 전체 NAT Gateway 목록과 상세 정보 표시."""
         columns = [
             ColumnDef(header="Account", width=25, style="data"),
             ColumnDef(header="Region", width=15, style="data"),

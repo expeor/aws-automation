@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/secretsmanager.py - Secrets Manager 가격 조회
+functions/analyzers/cost/pricing/secretsmanager.py - Secrets Manager 가격 조회
 
 Secrets Manager 비용 계산:
 - Secret당 월 비용: ~$0.40 (리전별 상이)

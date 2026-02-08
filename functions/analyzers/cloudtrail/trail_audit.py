@@ -1,5 +1,5 @@
 """
-plugins/cloudtrail/trail_audit.py - CloudTrail 전체 계정 보고서
+functions/analyzers/cloudtrail/trail_audit.py - CloudTrail 전체 계정 보고서
 
 전체 계정의 CloudTrail을 조회하고 분석합니다:
 - Trail 목록 및 상세 정보
@@ -41,7 +41,26 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class TrailInfo:
-    """CloudTrail 정보"""
+    """CloudTrail Trail 정보.
+
+    Trail의 설정, 상태, 이벤트 선택기 정보를 보관한다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        trail_name: Trail 이름.
+        trail_arn: Trail ARN.
+        is_logging: 로깅 활성화 여부.
+        management_events_enabled: Management Event 기록 활성화 여부.
+        data_events_enabled: Data Event 기록 활성화 여부.
+        is_multi_region: Multi-Region Trail 여부.
+        include_global_events: Global Service Events 포함 여부.
+        s3_bucket: 로그 저장 S3 버킷 이름.
+        s3_prefix: S3 키 접두사.
+        kms_key_id: 로그 암호화 KMS 키 ID.
+        error: 조회 중 발생한 오류 메시지.
+    """
 
     account_id: str
     account_name: str
@@ -59,6 +78,11 @@ class TrailInfo:
     error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """인스턴스를 딕셔너리로 변환한다.
+
+        Returns:
+            모든 필드를 포함하는 딕셔너리.
+        """
         return {
             "account_id": self.account_id,
             "account_name": self.account_name,
@@ -79,7 +103,19 @@ class TrailInfo:
 
 @dataclass
 class TrailAuditResult:
-    """CloudTrail 감사 결과"""
+    """계정/리전별 CloudTrail 감사 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        trails: 수집된 TrailInfo 목록.
+        total_count: 총 Trail 수.
+        logging_enabled_count: 로깅 활성화된 Trail 수.
+        management_events_count: Management Event 활성화된 Trail 수.
+        data_events_count: Data Event 활성화된 Trail 수.
+        multi_region_count: Multi-Region Trail 수.
+    """
 
     account_id: str
     account_name: str
@@ -93,7 +129,20 @@ class TrailAuditResult:
 
 
 def collect_trails(session, account_id: str, account_name: str, region: str) -> list[TrailInfo]:
-    """CloudTrail 정보 수집"""
+    """CloudTrail Trail 목록과 상세 정보를 수집한다.
+
+    각 Trail에 대해 describe_trails, get_event_selectors, get_trail_status API를 호출하여
+    설정/상태 정보를 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 TrailInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     cloudtrail = get_client(session, "cloudtrail", region_name=region)
@@ -177,7 +226,19 @@ def collect_trails(session, account_id: str, account_name: str, region: str) -> 
 
 
 def analyze_trails(trails: list[TrailInfo], account_id: str, account_name: str, region: str) -> TrailAuditResult:
-    """CloudTrail 분석"""
+    """수집된 CloudTrail Trail을 분석하고 통계를 집계한다.
+
+    로깅 활성화, Management/Data Event, Multi-Region 설정 현황을 카운팅한다.
+
+    Args:
+        trails: 수집된 TrailInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        감사 결과를 담은 TrailAuditResult 객체.
+    """
     result = TrailAuditResult(
         account_id=account_id,
         account_name=account_name,
@@ -215,9 +276,17 @@ COLUMNS_TRAILS = [
 
 
 class TrailAuditReporter:
-    """CloudTrail 감사 결과 리포터"""
+    """CloudTrail 감사 결과 리포터.
+
+    TrailAuditResult를 콘솔 요약 또는 Excel 보고서로 출력한다.
+    """
 
     def __init__(self, results: list[TrailAuditResult]):
+        """TrailAuditReporter를 초기화한다.
+
+        Args:
+            results: 계정/리전별 감사 결과 목록.
+        """
         self.results = results
 
     def generate_report(
@@ -225,7 +294,17 @@ class TrailAuditReporter:
         output_dir: str,
         file_prefix: str = "cloudtrail_audit",
     ) -> Path:
-        """Excel 리포트 생성"""
+        """감사 결과를 Excel 보고서로 생성한다.
+
+        감사 요약과 Trail Details 시트를 포함한다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+            file_prefix: 파일명 접두사.
+
+        Returns:
+            생성된 Excel 파일 경로.
+        """
         wb = Workbook()
 
         # 요약 시트
@@ -243,7 +322,13 @@ class TrailAuditReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """요약 시트"""
+        """CloudTrail 감사 요약 시트를 생성한다.
+
+        전체 현황(Trail 수, 로깅/이벤트 활성화 현황)과 계정별 현황을 포함한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         summary = wb.new_summary_sheet("CloudTrail 감사 요약")
 
         summary.add_title("CloudTrail 전체 계정 보고서")
@@ -277,7 +362,13 @@ class TrailAuditReporter:
         summary.add_item("생성 일시", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_detail_sheet(self, wb: Workbook) -> None:
-        """상세 시트"""
+        """Trail 상세 정보 시트를 생성한다.
+
+        각 Trail의 로깅/이벤트/Multi-Region/S3/KMS 설정을 표시한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="Trail Details", columns=COLUMNS_TRAILS)
 
         for result in self.results:
@@ -297,7 +388,10 @@ class TrailAuditReporter:
                 sheet.add_row(row)
 
     def print_summary(self) -> None:
-        """콘솔에 요약 출력"""
+        """감사 결과 요약을 콘솔에 출력한다.
+
+        총 Trail 수, 로깅 활성화 수, 계정별 현황을 표시한다.
+        """
         total_trails = sum(r.total_count for r in self.results)
         total_logging = sum(r.logging_enabled_count for r in self.results)
 
@@ -313,7 +407,17 @@ class TrailAuditReporter:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> TrailAuditResult | None:
-    """단일 계정/리전의 CloudTrail 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 CloudTrail을 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        감사 결과를 담은 TrailAuditResult. Trail이 없으면 None.
+    """
     trails = collect_trails(session, account_id, account_name, region)
     if not trails:
         return None
@@ -321,7 +425,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """CloudTrail 전체 계정 보고서 생성"""
+    """CloudTrail 전체 계정 보고서 도구의 메인 실행 함수.
+
+    모든 계정/리전의 CloudTrail을 수집하고 로깅/이벤트 설정 현황을 분석한다.
+    결과를 콘솔에 출력하고 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     from rich.console import Console
 
     from core.shared.io.output import OutputPath, open_in_explorer

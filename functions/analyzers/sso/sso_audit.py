@@ -1,5 +1,5 @@
 """
-plugins/sso/sso_audit.py - IAM Identity Center 종합 점검 도구
+functions/analyzers/sso/sso_audit.py - IAM Identity Center 종합 점검 도구
 
 IAM Identity Center(SSO) 보안 감사:
 - Permission Set: 위험 정책 분석, Admin 권한 현황
@@ -48,7 +48,15 @@ REQUIRED_PERMISSIONS = {
 
 
 def run(ctx: ExecutionContext) -> None:
-    """IAM Identity Center 종합 점검 실행"""
+    """IAM Identity Center 종합 점검 도구의 메인 실행 함수.
+
+    SSO 데이터를 수집(Permission Set, Users, Groups, Account Assignments)하고
+    보안 분석을 수행한 뒤, 결과를 콘솔에 요약 출력하고 Excel 보고서를 생성한다.
+    SSO는 글로벌 서비스이므로 Identity Center 관리 계정에서 한 번만 수집한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]IAM Identity Center 종합 점검 시작...[/bold]")
 
     # 1. 데이터 수집
@@ -157,7 +165,14 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _print_summary(stats_list: list[dict[str, Any]]) -> None:
-    """분석 결과 요약 출력"""
+    """SSO 분석 결과를 콘솔에 요약 출력한다.
+
+    Critical/High 이슈, Permission Set 통계(Admin/위험 정책),
+    User 통계(Admin 권한/미할당), Group 통계(빈 그룹)를 표시한다.
+
+    Args:
+        stats_list: 계정별 분석 통계 딕셔너리 목록.
+    """
     # 전체 통계 계산
     totals = {
         "total_users": sum(s.get("total_users", 0) for s in stats_list),
@@ -201,7 +216,14 @@ def _print_summary(stats_list: list[dict[str, Any]]) -> None:
 
 
 def _create_output_directory(ctx) -> str:
-    """출력 디렉토리 생성"""
+    """SSO 보고서 출력 디렉토리 경로를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트.
+
+    Returns:
+        날짜가 포함된 출력 디렉토리 경로 문자열.
+    """
     # identifier 결정
     identifier = get_context_identifier(ctx)
 

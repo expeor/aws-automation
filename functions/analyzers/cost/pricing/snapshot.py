@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/snapshot.py - EBS Snapshot 가격 조회
+functions/analyzers/cost/pricing/snapshot.py - EBS Snapshot 가격 조회
 
 EBS Snapshot 비용 계산:
 - Storage: ~$0.05/GB/월 (리전별 상이)

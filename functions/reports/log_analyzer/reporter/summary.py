@@ -1,4 +1,8 @@
-"""Summary sheet writer for ALB log analysis report."""
+"""functions/reports/log_analyzer/reporter/summary.py - 분석 요약 시트 Writer.
+
+ALB 로그 분석 결과의 종합 요약 시트를 생성합니다. 분석 기간, 총 요청 수,
+상태 코드 분포, Top URL, Top 국가 등의 요약 정보를 포함합니다.
+"""
 
 from __future__ import annotations
 

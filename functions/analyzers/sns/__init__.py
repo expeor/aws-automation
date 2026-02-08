@@ -1,5 +1,11 @@
 """
-plugins/sns - SNS Topic Management Tools
+functions/analyzers/sns - SNS 토픽 관리 도구
+
+SNS 토픽의 사용 현황을 분석하고
+유휴/미사용 토픽을 탐지합니다.
+
+도구 목록:
+    - unused: 유휴/미사용 SNS 토픽 탐지
 """
 
 CATEGORY = {

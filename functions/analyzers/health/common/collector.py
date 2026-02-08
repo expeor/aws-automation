@@ -1,5 +1,5 @@
 """
-plugins/health/collector.py - AWS Health 이벤트 수집기
+functions/analyzers/health/common/collector.py - AWS Health 이벤트 수집기
 
 Health 이벤트를 수집하고 패치/유지보수 중심으로 분류합니다.
 - 긴급도별 분류 (critical, high, medium, low)
@@ -27,7 +27,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PatchItem:
-    """패치/유지보수 항목"""
+    """패치/유지보수 분석 항목.
+
+    HealthEvent를 패치 분석에 필요한 형태로 가공한 데이터 객체.
+
+    Attributes:
+        event: 원본 HealthEvent 객체.
+        service: AWS 서비스명.
+        event_type: 이벤트 유형 코드.
+        urgency: 긴급도 (critical, high, medium, low).
+        scheduled_date: 예정 시작일.
+        deadline: 마감일 (종료 시각).
+        affected_resources: 영향받는 리소스 ID 목록.
+        action_required: 필요한 조치 (재부팅 필요, 인스턴스 교체 필요 등).
+        description_summary: 이벤트 설명 요약 (최대 200자).
+    """
 
     event: HealthEvent
     service: str
@@ -41,7 +55,16 @@ class PatchItem:
 
     @classmethod
     def from_event(cls, event: HealthEvent) -> PatchItem:
-        """HealthEvent에서 PatchItem 생성"""
+        """HealthEvent에서 PatchItem을 생성한다.
+
+        이벤트 설명 요약, 영향 리소스 목록, 필요 조치를 자동 판별한다.
+
+        Args:
+            event: 원본 HealthEvent 객체.
+
+        Returns:
+            PatchItem 인스턴스.
+        """
         # 설명에서 요약 추출 (첫 200자)
         summary = event.description[:200] + "..." if len(event.description) > 200 else event.description
         summary = summary.replace("\n", " ").strip()
@@ -66,7 +89,14 @@ class PatchItem:
 
     @staticmethod
     def _determine_action(event: HealthEvent) -> str:
-        """필요한 조치 판단"""
+        """이벤트 유형 코드로 필요한 조치를 판단한다.
+
+        Args:
+            event: HealthEvent 객체.
+
+        Returns:
+            조치 설명 문자열 (재부팅 필요, 인스턴스 교체 필요, 보안 패치 적용 등).
+        """
         code = event.event_type_code.lower()
 
         if "reboot" in code or "restart" in code:
@@ -89,7 +119,17 @@ class PatchItem:
 
 @dataclass
 class CollectionResult:
-    """수집 결과"""
+    """Health 이벤트 수집 결과.
+
+    수집된 이벤트와 패치 항목, 긴급도/서비스/월별 요약을 포함한다.
+
+    Attributes:
+        events: 수집된 전체 HealthEvent 목록.
+        patches: scheduledChange 이벤트를 가공한 PatchItem 목록.
+        summary_by_urgency: 긴급도별 요약 딕셔너리 (count, services, affected_resources).
+        summary_by_service: 서비스별 요약 딕셔너리 (count, critical, high, medium, low, affected_resources).
+        summary_by_month: 월별(YYYY-MM) PatchItem 목록 딕셔너리.
+    """
 
     events: list[HealthEvent]
     patches: list[PatchItem]
@@ -99,37 +139,71 @@ class CollectionResult:
 
     @property
     def total_count(self) -> int:
-        """전체 이벤트 수"""
+        """수집된 전체 이벤트 수.
+
+        Returns:
+            이벤트 수.
+        """
         return len(self.events)
 
     @property
     def patch_count(self) -> int:
-        """패치 항목 수"""
+        """패치 항목 수.
+
+        Returns:
+            패치 수.
+        """
         return len(self.patches)
 
     @property
     def critical_count(self) -> int:
-        """긴급 패치 수"""
+        """긴급(critical) 패치 수.
+
+        Returns:
+            긴급 패치 수.
+        """
         count: int = self.summary_by_urgency.get("critical", {}).get("count", 0)
         return count
 
     @property
     def high_count(self) -> int:
-        """높은 우선순위 패치 수"""
+        """높은 우선순위(high) 패치 수.
+
+        Returns:
+            높은 우선순위 패치 수.
+        """
         count: int = self.summary_by_urgency.get("high", {}).get("count", 0)
         return count
 
     @property
     def affected_resource_count(self) -> int:
-        """영향받는 리소스 총 수"""
+        """모든 패치에서 영향받는 리소스 총 수.
+
+        Returns:
+            영향받는 리소스 수 합계.
+        """
         return sum(len(p.affected_resources) for p in self.patches)
 
     def get_patches_by_urgency(self, urgency: str) -> list[PatchItem]:
-        """긴급도별 패치 목록"""
+        """특정 긴급도의 패치 목록을 반환한다.
+
+        Args:
+            urgency: 긴급도 (critical, high, medium, low).
+
+        Returns:
+            해당 긴급도의 PatchItem 목록.
+        """
         return [p for p in self.patches if p.urgency == urgency]
 
     def get_patches_by_service(self, service: str) -> list[PatchItem]:
-        """서비스별 패치 목록"""
+        """특정 서비스의 패치 목록을 반환한다.
+
+        Args:
+            service: AWS 서비스명 (EC2, RDS 등).
+
+        Returns:
+            해당 서비스의 PatchItem 목록.
+        """
         return [p for p in self.patches if p.service == service]
 
     @classmethod
@@ -186,7 +260,14 @@ class CollectionResult:
 
 
 def _summarize_by_urgency(patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
-    """긴급도별 요약 (helper)"""
+    """패치 목록을 긴급도별로 요약한다.
+
+    Args:
+        patches: PatchItem 목록.
+
+    Returns:
+        긴급도를 키로, count/services/affected_resources를 값으로 하는 딕셔너리.
+    """
     summary: dict[str, dict[str, Any]] = {}
 
     for patch in patches:
@@ -210,7 +291,14 @@ def _summarize_by_urgency(patches: list[PatchItem]) -> dict[str, dict[str, Any]]
 
 
 def _summarize_by_service(patches: list[PatchItem]) -> dict[str, dict[str, Any]]:
-    """서비스별 요약 (helper)"""
+    """패치 목록을 서비스별로 요약한다.
+
+    Args:
+        patches: PatchItem 목록.
+
+    Returns:
+        서비스명을 키로, count/긴급도별 수/affected_resources를 값으로 하는 딕셔너리.
+    """
     summary: dict[str, dict[str, Any]] = {}
 
     for patch in patches:
@@ -233,7 +321,14 @@ def _summarize_by_service(patches: list[PatchItem]) -> dict[str, dict[str, Any]]
 
 
 def _group_by_month(patches: list[PatchItem]) -> dict[str, list[PatchItem]]:
-    """월별 그룹화 (helper)"""
+    """패치 목록을 예정일 월별(YYYY-MM)로 그룹화한다.
+
+    Args:
+        patches: PatchItem 목록.
+
+    Returns:
+        월 키(YYYY-MM 또는 '미정')를 키로, PatchItem 목록을 값으로 하는 딕셔너리.
+    """
     grouped: dict[str, list[PatchItem]] = {}
 
     for patch in patches:

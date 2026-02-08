@@ -1,7 +1,7 @@
-"""
-reports/scheduled/schedule.py - 다음 실행 예정일 계산
+"""functions/reports/scheduled/schedule.py - 다음 실행 예정일 계산.
 
-주기별 권장 실행일 계산 로직
+TaskCycle(일간/주간/월간/분기/반기/연간)에 따라 다음 권장 실행일을 계산합니다.
+분기/반기/연간은 각각 1/4/7/10월, 1/7월, 1월 첫째 주 월요일을 기준으로 합니다.
 """
 
 from datetime import date, datetime, timedelta

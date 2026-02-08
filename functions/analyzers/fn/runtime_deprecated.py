@@ -51,7 +51,14 @@ EOL_STATUS_LABELS: dict[str, str] = {
 
 
 def _eol_label(status_value: str) -> str:
-    """EOLStatus value를 사람이 읽기 쉬운 라벨로 변환"""
+    """EOLStatus value를 사람이 읽기 쉬운 라벨로 변환한다.
+
+    Args:
+        status_value: EOLStatus의 value 문자열.
+
+    Returns:
+        한글 설명이 포함된 라벨 문자열. 매핑되지 않으면 원본 반환.
+    """
     return EOL_STATUS_LABELS.get(status_value, status_value)
 
 
@@ -72,7 +79,14 @@ REQUIRED_PERMISSIONS = {
 
 
 class DeprecationCategory(Enum):
-    """런타임 지원 종료 분류"""
+    """Lambda 런타임 지원 종료 상태 분류.
+
+    Attributes:
+        DEPRECATED: 이미 지원이 종료된 런타임.
+        SOON: SOON_THRESHOLD_DAYS(365)일 이내 종료 예정인 런타임.
+        SAFE: 365일 이상 남았거나 종료일이 미정인 런타임.
+        CONTAINER: 컨테이너 이미지 기반 함수 (런타임 해당 없음).
+    """
 
     DEPRECATED = "deprecated"  # 이미 지원 종료
     SOON = "soon"  # 365일 이내 종료 예정
@@ -82,7 +96,18 @@ class DeprecationCategory(Enum):
 
 @dataclass
 class RuntimeDeprecationFinding:
-    """개별 함수 분석 결과"""
+    """개별 Lambda 함수의 런타임 지원 종료 분석 결과.
+
+    Attributes:
+        function: Lambda 함수 기본 정보.
+        category: 분류 결과 (DEPRECATED, SOON, SAFE, CONTAINER).
+        runtime_name: 런타임 표시 이름.
+        os_version: Amazon Linux 버전 (AL1, AL2, AL2023).
+        deprecation_date: 지원 종료 예정일.
+        days_remaining: 종료까지 남은 일수 (음수면 이미 종료).
+        recommended_upgrade: 권장 업그레이드 대상 런타임.
+        eol_status: 세분화된 EOL 상태 (deprecated, critical, high, medium, low, supported).
+    """
 
     function: LambdaFunctionInfo
     category: DeprecationCategory
@@ -96,7 +121,19 @@ class RuntimeDeprecationFinding:
 
 @dataclass
 class RuntimeDeprecationResult:
-    """리전별 분석 결과 집계"""
+    """단일 계정/리전의 런타임 지원 종료 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        total_functions: 전체 Lambda 함수 수.
+        deprecated_count: 이미 지원 종료된 함수 수.
+        soon_count: 곧 종료 예정인 함수 수.
+        safe_count: 안전한 함수 수.
+        container_count: 컨테이너 이미지 함수 수.
+        findings: 개별 함수별 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -115,7 +152,17 @@ class RuntimeDeprecationResult:
 
 
 def _classify_function(func: LambdaFunctionInfo) -> RuntimeDeprecationFinding:
-    """Lambda 함수의 런타임 지원 종료 상태 분류"""
+    """Lambda 함수의 런타임 지원 종료 상태를 분류한다.
+
+    컨테이너 이미지 함수는 CONTAINER, 알 수 없는 런타임은 SAFE(보수적)로 분류하며,
+    나머지는 runtime_eol 데이터를 기반으로 DEPRECATED/SOON/SAFE로 판별한다.
+
+    Args:
+        func: Lambda 함수 기본 정보.
+
+    Returns:
+        런타임 지원 종료 분석 결과.
+    """
     runtime = func.runtime
 
     # 컨테이너 이미지 함수 (PackageType=Image -> Runtime="unknown")
@@ -194,7 +241,17 @@ def _analyze_region(
     account_name: str,
     region: str,
 ) -> RuntimeDeprecationResult:
-    """리전의 모든 함수 분석"""
+    """리전의 모든 Lambda 함수를 분류하고 카테고리별 카운트를 집계한다.
+
+    Args:
+        functions: 해당 리전의 Lambda 함수 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        리전별 분석 결과 집계.
+    """
     result = RuntimeDeprecationResult(
         account_id=account_id,
         account_name=account_name,
@@ -226,7 +283,17 @@ def _analyze_region(
 def _build_runtime_distribution(
     results: list[RuntimeDeprecationResult],
 ) -> list[dict]:
-    """런타임 분포 데이터 생성"""
+    """런타임별 함수 수 분포 데이터를 생성한다.
+
+    전체 결과에서 런타임별 함수 수를 카운트하고, 각 런타임의 EOL 정보를
+    딕셔너리로 구성한다. 빈도순으로 정렬된다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+
+    Returns:
+        런타임별 분포 딕셔너리 목록 (runtime, count, status, os_version 등).
+    """
     runtime_counter: Counter[str] = Counter()
     for r in results:
         for f in r.findings:
@@ -282,7 +349,18 @@ def _build_runtime_distribution(
 
 
 def generate_excel_report(results: list[RuntimeDeprecationResult], output_dir: str) -> str:
-    """Excel 보고서 생성 (6 시트)"""
+    """Excel 보고서를 생성한다 (6 시트).
+
+    Summary, Summary Data, Deprecated, Deprecated Soon, Safe, Runtime Distribution
+    시트로 구성된다. 각 시트에 상태별 색상 하이라이트가 적용된다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Workbook
@@ -481,7 +559,18 @@ def generate_html_report(
     results: list[RuntimeDeprecationResult],
     output_dir: str,
 ) -> str:
-    """HTML 보고서 생성"""
+    """HTML 보고서를 생성한다.
+
+    ECharts 기반 시각화 포함: 카테고리 도넛 차트, 런타임 분포 바 차트,
+    OS 버전 도넛 차트, 월별 종료 예정 타임라인, 조치 필요 함수 테이블.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 HTML 파일 경로.
+    """
     from core.shared.io.html import HTMLReport
 
     total_functions = sum(r.total_functions for r in results)
@@ -622,7 +711,11 @@ def generate_html_report(
 
 
 def _print_console_summary(results: list[RuntimeDeprecationResult]) -> None:
-    """콘솔에 요약 출력"""
+    """콘솔에 종합 결과 요약과 조치 필요 런타임 테이블을 출력한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+    """
     total_functions = sum(r.total_functions for r in results)
     total_deprecated = sum(r.deprecated_count for r in results)
     total_soon = sum(r.soon_count for r in results)
@@ -681,13 +774,30 @@ def _print_console_summary(results: list[RuntimeDeprecationResult]) -> None:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> RuntimeDeprecationResult:
-    """단일 계정/리전의 Lambda 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 Lambda 함수를 수집하고 런타임 EOL 상태를 분석한다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+
+    Returns:
+        리전별 런타임 지원 종료 분석 결과.
+    """
     functions = collect_functions(session, account_id, account_name, region)
     return _analyze_region(functions, account_id, account_name, region)
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Lambda 런타임 지원 종료 분석 실행"""
+    """도구의 메인 실행 함수.
+
+    모든 계정/리전에서 Lambda 함수를 병렬 수집하고 런타임 지원 종료 상태를
+    분석한다. 콘솔에 요약을 출력하고 Excel 및 HTML 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. 계정/리전 정보와 옵션을 포함한다.
+    """
     # 병렬 수집 및 분석
     # timeline이 ctx에 있으면 parallel_collect가 자동으로 프로그레스 연결
     with quiet_mode():

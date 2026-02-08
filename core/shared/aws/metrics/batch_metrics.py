@@ -270,24 +270,44 @@ def batch_get_metrics_with_stats(
 
 
 def _chunks(lst: list, n: int):
-    """리스트를 n개씩 분할"""
+    """리스트를 n개씩 분할하여 반환하는 제너레이터
+
+    Args:
+        lst: 분할할 리스트
+        n: 청크 크기
+
+    Yields:
+        n개씩 분할된 리스트 슬라이스
+    """
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
 
 
 def sanitize_metric_id(name: str) -> str:
-    """AWS MetricDataQuery ID 규칙에 맞게 변환
+    """AWS MetricDataQuery ID 규칙에 맞게 문자열을 변환
 
-    AWS 제약:
-    - 영문자로 시작
-    - 영숫자, `_`만 허용
-    - `-`, `.` 등 특수문자 불가
-    - 대소문자 구분
-    - 최대 255자
+    AWS GetMetricData API의 Id 필드 규칙에 맞도록 특수문자를 제거하고
+    안전한 식별자로 변환합니다. 최대 200자로 제한 (접미사 공간 확보).
+
+    Args:
+        name: 변환할 원본 문자열 (Lambda 함수명, RDS 인스턴스 ID 등)
+
+    Returns:
+        AWS MetricDataQuery Id 규칙에 맞는 안전한 문자열
+
+    Note:
+        AWS 제약 사항:
+        - 영문자로 시작해야 함
+        - 영숫자, ``_`` 만 허용
+        - ``-``, ``.`` 등 특수문자 불가
+        - 대소문자 구분
+        - 최대 255자
 
     Example:
-        sanitize_metric_id("my-lambda-func.prod")  # "my_lambda_func_prod"
-        sanitize_metric_id("123-func")             # "m_123_func"
+        >>> sanitize_metric_id("my-lambda-func.prod")
+        "my_lambda_func_prod"
+        >>> sanitize_metric_id("123-func")
+        "m_123_func"
     """
     # 특수문자를 _로 변환
     sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", name)

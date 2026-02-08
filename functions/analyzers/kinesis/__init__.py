@@ -1,7 +1,11 @@
 """
-plugins/kinesis - Kinesis Stream Analysis Tools
+functions/analyzers/kinesis - Kinesis 스트림 관리 및 최적화 도구
 
-Kinesis Data Streams management and optimization
+Kinesis Data Streams의 사용량을 CloudWatch 지표 기반으로 분석하고
+유휴/저사용 스트림을 탐지합니다.
+
+도구 목록:
+    - unused: 유휴/저사용 Kinesis 스트림 탐지 (CloudWatch 지표 기반)
 """
 
 CATEGORY = {

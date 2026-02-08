@@ -1,7 +1,14 @@
 """
-plugins/vpc - VPC Analysis Tools
+functions/analyzers/vpc - VPC 및 네트워크 리소스 분석 도구
 
-Security Group, VPC, Subnet, NAT Gateway and network resource analysis
+Security Group, NAT Gateway, VPC Endpoint, ENI 등 네트워크 리소스를
+분석합니다. 보안 점검, 미사용 리소스 탐지, 인벤토리 기능을 제공합니다.
+
+도구 목록:
+    - sg_audit: 위험한 인바운드 규칙, 미사용 SG/규칙 탐지
+    - sg_inventory: 모든 Security Group의 인바운드/아웃바운드 규칙 전체 목록 추출
+    - network_analysis: 미사용 NAT Gateway, VPC Endpoint, ENI 통합 탐지
+    - inventory: ENI, NAT Gateway, VPC Endpoint 현황 조회
 """
 
 CATEGORY = {

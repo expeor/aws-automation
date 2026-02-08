@@ -1,5 +1,5 @@
 """
-plugins/cost/coh/collector.py - Cost Optimization Hub 권장사항 수집기
+functions/analyzers/cost/coh/collector.py - Cost Optimization Hub 권장사항 수집기
 
 Cost Optimization Hub에서 권장사항을 수집하고 필터링합니다.
 - 모든 권장사항 유형 지원 (Rightsizing, Idle, Commitment 등)
@@ -36,7 +36,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AccountFilter:
-    """계정 필터링 설정"""
+    """계정 필터링 설정
+
+    환경변수 또는 직접 지정으로 계정을 제외/포함할 수 있습니다.
+
+    Attributes:
+        exclude_ids: 제외할 계정 ID 집합
+        exclude_names: 제외할 계정 이름 집합 (대소문자 무시)
+        exclude_name_patterns: 제외할 계정 이름 정규식 패턴 목록
+        include_ids: 포함할 계정 ID 집합 (비어있으면 전체 포함)
+    """
 
     exclude_ids: set[str] = field(default_factory=set)
     exclude_names: set[str] = field(default_factory=set)
@@ -45,7 +54,16 @@ class AccountFilter:
 
     @classmethod
     def from_env(cls) -> AccountFilter:
-        """환경변수에서 AccountFilter 생성"""
+        """환경변수에서 AccountFilter 생성
+
+        지원 환경변수:
+            - AA_COH_EXCLUDE_ACCOUNT_IDS: 제외할 계정 ID (쉼표/파이프 구분)
+            - AA_COH_EXCLUDE_ACCOUNT_NAMES: 제외할 계정 이름 (쉼표/파이프 구분)
+            - AA_COH_EXCLUDE_ACCOUNT_NAME_REGEX: 제외할 계정 이름 정규식 (쉼표/파이프 구분)
+
+        Returns:
+            환경변수 기반 AccountFilter 인스턴스
+        """
         exclude_ids = set()
         exclude_names = set()
         exclude_patterns = []
@@ -73,7 +91,18 @@ class AccountFilter:
         account_id: str,
         account_name: str | None = None,
     ) -> bool:
-        """계정을 제외해야 하는지 확인"""
+        """계정을 제외해야 하는지 확인
+
+        include_ids가 설정된 경우, 해당 집합에 없으면 제외합니다.
+        exclude_ids, exclude_names, exclude_name_patterns 순서로 확인합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+            account_name: 계정 이름 (None이면 이름 기반 필터 건너뜀)
+
+        Returns:
+            True이면 제외, False이면 포함
+        """
         if self.include_ids and account_id not in self.include_ids:
             return True
 
@@ -94,7 +123,19 @@ class AccountFilter:
 
 @dataclass
 class CollectionResult:
-    """권장사항 수집 결과"""
+    """권장사항 수집 결과
+
+    CostOptimizationCollector.collect()의 반환 타입으로,
+    필터링된 권장사항과 요약 통계를 포함합니다.
+
+    Attributes:
+        recommendations: 필터링된 권장사항 목록
+        total_count: 필터링 전 전체 권장사항 수
+        filtered_count: 필터링 후 권장사항 수
+        excluded_accounts: 제외된 계정 ID 집합
+        summary_by_resource: 리소스 타입별 요약 통계
+        summary_by_action: 액션 타입별 요약 통계
+    """
 
     recommendations: list[Recommendation]
     total_count: int
@@ -105,16 +146,28 @@ class CollectionResult:
 
     @property
     def total_savings(self) -> float:
-        """총 잠재적 월간 절약액"""
+        """총 잠재적 월간 절약액
+
+        Returns:
+            필터링된 권장사항의 월간 절약액 합계 (USD), 소수점 2자리
+        """
         return round(sum(r.estimated_monthly_savings for r in self.recommendations), 2)
 
     @property
     def total_cost(self) -> float:
-        """총 월간 비용"""
+        """총 월간 비용
+
+        Returns:
+            필터링된 권장사항의 월간 비용 합계 (USD), 소수점 2자리
+        """
         return round(sum(r.estimated_monthly_cost for r in self.recommendations), 2)
 
     def get_by_action_type(self) -> dict[str, list[Recommendation]]:
-        """액션 타입별 권장사항 그룹화"""
+        """액션 타입별 권장사항 그룹화
+
+        Returns:
+            액션 타입을 키로, 해당 권장사항 목록을 값으로 하는 딕셔너리
+        """
         grouped: dict[str, list[Recommendation]] = {}
         for rec in self.recommendations:
             if rec.action_type not in grouped:
@@ -123,7 +176,11 @@ class CollectionResult:
         return grouped
 
     def get_by_resource_type(self) -> dict[str, list[Recommendation]]:
-        """리소스 타입별 권장사항 그룹화"""
+        """리소스 타입별 권장사항 그룹화
+
+        Returns:
+            리소스 타입을 키로, 해당 권장사항 목록을 값으로 하는 딕셔너리
+        """
         grouped: dict[str, list[Recommendation]] = {}
         for rec in self.recommendations:
             if rec.current_resource_type not in grouped:
@@ -132,7 +189,11 @@ class CollectionResult:
         return grouped
 
     def get_by_account(self) -> dict[str, list[Recommendation]]:
-        """계정별 권장사항 그룹화"""
+        """계정별 권장사항 그룹화
+
+        Returns:
+            계정 ID를 키로, 해당 권장사항 목록을 값으로 하는 딕셔너리
+        """
         grouped: dict[str, list[Recommendation]] = {}
         for rec in self.recommendations:
             if rec.account_id not in grouped:
@@ -247,7 +308,14 @@ class CostOptimizationCollector:
         self,
         exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
-        """모든 권장사항 수집 (편의 메서드)"""
+        """모든 권장사항 수집 (편의 메서드)
+
+        Args:
+            exclude_account_ids: 제외할 계정 ID 목록
+
+        Returns:
+            모든 유형의 권장사항이 포함된 CollectionResult
+        """
         return self.collect(exclude_account_ids=exclude_account_ids)
 
     def collect_rightsizing(
@@ -255,7 +323,17 @@ class CostOptimizationCollector:
         resource_types: list[str] | None = None,
         exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
-        """라이트사이징 권장사항만 수집"""
+        """라이트사이징 권장사항만 수집
+
+        기본 대상: Ec2Instance, RdsDbInstance, LambdaFunction, EcsService, EbsVolume
+
+        Args:
+            resource_types: 대상 리소스 타입 (None이면 기본값 사용)
+            exclude_account_ids: 제외할 계정 ID 목록
+
+        Returns:
+            Rightsize 액션의 권장사항이 포함된 CollectionResult
+        """
         default_resource_types = [
             "Ec2Instance",
             "RdsDbInstance",
@@ -273,7 +351,14 @@ class CostOptimizationCollector:
         self,
         exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
-        """유휴 리소스 권장사항 수집 (Stop, Delete)"""
+        """유휴 리소스 권장사항 수집 (Stop, Delete)
+
+        Args:
+            exclude_account_ids: 제외할 계정 ID 목록
+
+        Returns:
+            Stop, Delete 액션의 권장사항이 포함된 CollectionResult
+        """
         return self.collect(
             action_types=["Stop", "Delete"],
             exclude_account_ids=exclude_account_ids,
@@ -283,7 +368,14 @@ class CostOptimizationCollector:
         self,
         exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
-        """Savings Plans/Reserved Instances 권장사항 수집"""
+        """Savings Plans/Reserved Instances 권장사항 수집
+
+        Args:
+            exclude_account_ids: 제외할 계정 ID 목록
+
+        Returns:
+            PurchaseSavingsPlans, PurchaseReservedInstances 액션의 CollectionResult
+        """
         return self.collect(
             action_types=["PurchaseSavingsPlans", "PurchaseReservedInstances"],
             exclude_account_ids=exclude_account_ids,
@@ -293,7 +385,14 @@ class CostOptimizationCollector:
         self,
         exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
-        """Graviton 마이그레이션 권장사항 수집"""
+        """Graviton 마이그레이션 권장사항 수집
+
+        Args:
+            exclude_account_ids: 제외할 계정 ID 목록
+
+        Returns:
+            MigrateToGraviton 액션의 CollectionResult
+        """
         return self.collect(
             action_types=["MigrateToGraviton"],
             exclude_account_ids=exclude_account_ids,
@@ -303,14 +402,31 @@ class CostOptimizationCollector:
         self,
         exclude_account_ids: list[str] | None = None,
     ) -> CollectionResult:
-        """업그레이드 권장사항 수집"""
+        """업그레이드 권장사항 수집
+
+        Args:
+            exclude_account_ids: 제외할 계정 ID 목록
+
+        Returns:
+            Upgrade 액션의 CollectionResult
+        """
         return self.collect(
             action_types=["Upgrade"],
             exclude_account_ids=exclude_account_ids,
         )
 
     def _resolve_account_name(self, account_id: str) -> str | None:
-        """계정 ID에서 이름 조회 (캐시 사용)"""
+        """계정 ID에서 이름 조회 (캐시 사용)
+
+        캐시에 없으면 account_name_resolver를 호출하여 이름을 조회하고
+        캐시에 저장합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+
+        Returns:
+            계정 이름 또는 None (resolver가 없거나 이름을 찾지 못한 경우)
+        """
         if account_id in self._account_name_cache:
             return self._account_name_cache[account_id]
 
@@ -323,5 +439,11 @@ class CostOptimizationCollector:
         return None
 
     def set_account_names(self, account_map: dict[str, str]) -> None:
-        """계정 ID → 이름 매핑 설정"""
+        """계정 ID에서 이름으로의 매핑을 일괄 설정
+
+        기존 캐시에 병합됩니다.
+
+        Args:
+            account_map: 계정 ID를 키로, 이름을 값으로 하는 딕셔너리
+        """
         self._account_name_cache.update(account_map)

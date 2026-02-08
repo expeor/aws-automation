@@ -1,4 +1,8 @@
-"""Security events (Classification) sheet writer."""
+"""functions/reports/log_analyzer/reporter/security_events.py - 보안 이벤트 분석 시트 Writer.
+
+Classification 필드를 기반으로 보안 이벤트(WAF Block, Rate Limit 등)를
+분류하고 시트로 생성합니다.
+"""
 
 from __future__ import annotations
 

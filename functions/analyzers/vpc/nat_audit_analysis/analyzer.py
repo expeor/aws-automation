@@ -18,36 +18,74 @@ from .collector import NATAuditData, NATGateway
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """NAT Gateway의 사용 상태를 분류하는 열거형.
 
-    UNUSED = "unused"  # 확실히 미사용 (트래픽 0)
-    LOW_USAGE = "low_usage"  # 저사용 (일평균 < 1GB)
-    NORMAL = "normal"  # 정상 사용
-    PENDING = "pending"  # 생성 중/보류 중
-    UNKNOWN = "unknown"  # 메트릭 없음
+    CloudWatch 트래픽 메트릭 기반으로 판별한 사용 상태를 나타낸다.
+
+    Attributes:
+        UNUSED: 분석 기간 동안 아웃바운드 트래픽이 없는 NAT Gateway.
+        LOW_USAGE: 일평균 트래픽이 임계치(1GB) 미만인 저사용 NAT Gateway.
+        NORMAL: 정상 사용 중인 NAT Gateway.
+        PENDING: 생성 직후이거나 상태가 안정화되지 않은 NAT Gateway.
+        UNKNOWN: 메트릭 데이터를 수집할 수 없는 NAT Gateway.
+    """
+
+    UNUSED = "unused"
+    LOW_USAGE = "low_usage"
+    NORMAL = "normal"
+    PENDING = "pending"
+    UNKNOWN = "unknown"
 
 
 class Confidence(Enum):
-    """판단 신뢰도"""
+    """분석 결과의 판단 신뢰도를 나타내는 열거형.
 
-    HIGH = "high"  # 확실함 - 바로 조치 가능
-    MEDIUM = "medium"  # 검토 필요
-    LOW = "low"  # 판단 불가
+    Attributes:
+        HIGH: 확실한 판단으로 즉시 조치 가능.
+        MEDIUM: 추가 검토가 필요한 수준.
+        LOW: 데이터 부족으로 판단이 어려운 수준.
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도를 나타내는 열거형.
 
-    CRITICAL = "critical"  # 즉시 조치 (미사용 + 고비용)
-    HIGH = "high"  # 빠른 조치 권장
-    MEDIUM = "medium"  # 검토 필요
-    LOW = "low"  # 참고
-    INFO = "info"  # 정보성
+    Attributes:
+        CRITICAL: 즉시 조치 필요 (미사용 + 고비용).
+        HIGH: 빠른 조치 권장.
+        MEDIUM: 검토 필요.
+        LOW: 참고 수준.
+        INFO: 정보 제공 목적.
+    """
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
 
 
 @dataclass
 class NATFinding:
-    """NAT Gateway 분석 결과"""
+    """개별 NAT Gateway에 대한 분석 결과.
+
+    사용 상태, 신뢰도, 심각도, 비용 낭비 추정치 등을 포함한다.
+
+    Attributes:
+        nat: 분석 대상 NATGateway 인스턴스.
+        usage_status: 판별된 사용 상태.
+        confidence: 판단 신뢰도.
+        severity: 심각도 등급.
+        description: 분석 결과 설명 (한글).
+        recommendation: 권장 조치 사항 (한글).
+        monthly_waste: 월간 낭비 비용 추정 (USD).
+        annual_savings: 연간 절감 가능 금액 (USD).
+        details: 분석 세부 데이터 (바이트, 일수 등).
+    """
 
     nat: NATGateway
     usage_status: UsageStatus
@@ -66,7 +104,22 @@ class NATFinding:
 
 @dataclass
 class NATAnalysisResult:
-    """전체 분석 결과"""
+    """계정/리전 단위 NAT Gateway 분석 결과 전체.
+
+    개별 finding 목록과 함께 요약 통계(카운트, 비용)를 집계한다.
+
+    Attributes:
+        audit_data: 원본 감사 데이터.
+        findings: 개별 NAT Gateway 분석 결과 목록.
+        total_nat_count: 전체 NAT Gateway 수.
+        unused_count: 미사용 NAT Gateway 수.
+        low_usage_count: 저사용 NAT Gateway 수.
+        normal_count: 정상 사용 NAT Gateway 수.
+        pending_count: 대기 중 NAT Gateway 수.
+        total_monthly_cost: 전체 월간 비용 합계 (USD).
+        total_monthly_waste: 월간 낭비 비용 합계 (USD).
+        total_annual_savings: 연간 절감 가능 금액 합계 (USD).
+    """
 
     audit_data: NATAuditData
     findings: list[NATFinding] = field(default_factory=list)
@@ -85,7 +138,14 @@ class NATAnalysisResult:
 
 
 class NATAnalyzer:
-    """NAT Gateway 분석기"""
+    """NAT Gateway 미사용/저사용 분석기.
+
+    CloudWatch 트래픽 메트릭과 NAT Gateway 메타데이터를 기반으로
+    미사용/저사용 여부를 판별하고 비용 절감 기회를 식별한다.
+
+    Args:
+        audit_data: NATCollector가 수집한 감사 데이터.
+    """
 
     # 저사용 기준: 일평균 1GB 미만
     LOW_USAGE_THRESHOLD_GB_PER_DAY = 1.0
@@ -97,7 +157,11 @@ class NATAnalyzer:
         self.audit_data = audit_data
 
     def analyze(self) -> NATAnalysisResult:
-        """전체 분석 수행"""
+        """모든 NAT Gateway에 대해 미사용/저사용 분석을 수행한다.
+
+        Returns:
+            통계 요약과 개별 Finding을 포함하는 NATAnalysisResult.
+        """
         result = NATAnalysisResult(audit_data=self.audit_data)
 
         for nat in self.audit_data.nat_gateways:
@@ -123,7 +187,14 @@ class NATAnalyzer:
         return result
 
     def _analyze_nat(self, nat: NATGateway) -> NATFinding:
-        """개별 NAT Gateway 분석"""
+        """개별 NAT Gateway의 사용 상태를 분석한다.
+
+        Args:
+            nat: 분석할 NAT Gateway 정보.
+
+        Returns:
+            사용 상태, 신뢰도, 심각도, 비용 절감 추정을 포함하는 NATFinding.
+        """
 
         # 상태가 available이 아니면 PENDING
         if nat.state != "available":
@@ -227,7 +298,11 @@ class NATAnalyzer:
         )
 
     def get_summary_stats(self) -> dict[str, Any]:
-        """요약 통계 반환"""
+        """계정/리전별 요약 통계를 딕셔너리로 반환한다.
+
+        Returns:
+            계정명, 리전, NAT 수, 미사용 수, 비용 정보 등을 포함하는 딕셔너리.
+        """
         result = self.analyze()
 
         return {

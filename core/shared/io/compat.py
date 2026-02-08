@@ -113,7 +113,14 @@ def generate_reports(
 
 
 def _get_output_config(ctx: ExecutionContext) -> OutputConfig:
-    """컨텍스트에서 출력 설정 가져오기"""
+    """컨텍스트에서 출력 설정 가져오기
+
+    Args:
+        ctx: 실행 컨텍스트
+
+    Returns:
+        ctx.output_config가 있으면 반환, 없으면 기본 OutputConfig 생성
+    """
     from .config import OutputConfig
 
     if hasattr(ctx, "output_config") and ctx.output_config is not None:
@@ -125,7 +132,16 @@ def _get_output_config(ctx: ExecutionContext) -> OutputConfig:
 
 
 def _get_default_output_dir(ctx: ExecutionContext) -> str:
-    """기본 출력 디렉토리 생성"""
+    """기본 출력 디렉토리 생성
+
+    프로파일명, 카테고리, 도구명, 날짜를 조합하여 출력 경로를 자동 생성합니다.
+
+    Args:
+        ctx: 실행 컨텍스트
+
+    Returns:
+        생성된 출력 디렉토리 절대 경로
+    """
     from .output import OutputPath
     from .output.helpers import get_context_identifier
 

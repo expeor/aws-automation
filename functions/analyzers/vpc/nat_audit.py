@@ -1,5 +1,5 @@
 """
-plugins/vpc/nat_audit.py - NAT Gateway 미사용 분석 도구
+functions/analyzers/vpc/nat_audit.py - NAT Gateway 미사용 분석 도구
 
 NAT Gateway 비용 최적화:
 - 미사용 NAT Gateway 탐지 (14일간 트래픽 0)
@@ -38,7 +38,20 @@ REQUIRED_PERMISSIONS = {
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> tuple[Any, dict[str, Any]] | None:
-    """단일 계정/리전의 NAT Gateway 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 NAT Gateway 수집 및 분석 (parallel_collect 콜백)
+
+    NAT Gateway 목록을 수집하고 CloudWatch 트래픽 지표 기반으로
+    미사용/저사용 상태를 분석합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        (분석 결과, 통계 딕셔너리) 튜플. NAT Gateway가 없으면 None.
+    """
     collector = NATCollector()
     audit_data = collector.collect(session, account_id, account_name, region)
 
@@ -53,7 +66,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """NAT Gateway 미사용 분석 실행"""
+    """NAT Gateway 미사용 분석 실행
+
+    멀티 계정/리전에서 NAT Gateway를 병렬 수집하고,
+    CloudWatch 트래픽 지표 기반으로 미사용/저사용을 분석하여
+    Excel + HTML 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]NAT Gateway 미사용 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석
@@ -133,7 +154,11 @@ def run(ctx: ExecutionContext) -> None:
 
 
 def _print_summary(stats_list: list[dict[str, Any]]) -> None:
-    """분석 결과 요약 출력"""
+    """분석 결과 요약 콘솔 출력
+
+    Args:
+        stats_list: 계정/리전별 통계 딕셔너리 리스트
+    """
     # 전체 통계
     totals = {
         "total_nat_count": sum(s.get("total_nat_count", 0) for s in stats_list),

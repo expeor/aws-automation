@@ -40,7 +40,16 @@ COLORS = [
 
 
 def open_in_browser(filepath: str) -> bool:
-    """브라우저에서 HTML 파일 열기"""
+    """브라우저에서 HTML 파일 열기
+
+    플랫폼에 따라 적절한 방법(os.startfile, open, xdg-open)을 선택합니다.
+
+    Args:
+        filepath: 열 HTML 파일의 절대 경로
+
+    Returns:
+        열기 성공 시 True, 실패 시 False
+    """
     try:
         if sys.platform == "win32":
             os.startfile(filepath)  # noqa: S606
@@ -248,7 +257,14 @@ def _determine_chart_size(
 
 
 def _count_treemap_nodes(data: list[dict]) -> int:
-    """트리맵 데이터의 총 노드 수 계산"""
+    """트리맵 데이터의 총 노드 수 재귀적 계산
+
+    Args:
+        data: 트리맵 노드 리스트 (children 포함 가능)
+
+    Returns:
+        전체 노드 수 (자식 노드 포함)
+    """
     count = 0
     for node in data:
         count += 1
@@ -259,7 +275,17 @@ def _count_treemap_nodes(data: list[dict]) -> int:
 
 @dataclass
 class ChartConfig:
-    """차트 설정"""
+    """차트 설정
+
+    HTMLReport 내부에서 차트를 관리하기 위한 설정 데이터 클래스.
+
+    Attributes:
+        chart_id: HTML 요소 ID (예: "chart_1")
+        option: ECharts option 딕셔너리
+        height: 차트 높이 (px)
+        size: 차트 크기 설정 (그리드 레이아웃에 영향)
+        section_title: 이 차트 앞에 표시될 섹션 타이틀 (None이면 미표시)
+    """
 
     chart_id: str
     option: dict[str, Any]
@@ -1038,7 +1064,15 @@ class HTMLReport:
         return self
 
     def save(self, filepath: str | Path, auto_open: bool = True) -> Path:
-        """HTML 파일 저장 및 브라우저 열기"""
+        """HTML 파일 저장 및 브라우저 열기
+
+        Args:
+            filepath: 저장할 파일 경로
+            auto_open: 저장 후 브라우저에서 자동 열기 여부
+
+        Returns:
+            저장된 파일의 Path 객체
+        """
         path = Path(filepath)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -1053,7 +1087,14 @@ class HTMLReport:
         return path
 
     def _generate_html(self) -> str:
-        """HTML 생성"""
+        """HTML 전체 문서 문자열 생성
+
+        ECharts CDN, 스타일시트, 차트/테이블 렌더링 JS를 포함한
+        완전한 HTML 문서를 생성합니다.
+
+        Returns:
+            HTML 문서 문자열
+        """
         charts_json = []
         for chart in self.charts:
             charts_json.append({"id": chart.chart_id, "option": chart.option, "height": chart.height})

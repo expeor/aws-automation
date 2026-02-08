@@ -1,5 +1,11 @@
 """
-plugins/secretsmanager - Secrets Manager Tools
+functions/analyzers/secretsmanager - Secrets Manager 시크릿 관리 도구
+
+Secrets Manager 시크릿의 사용 현황을 분석하고
+미사용 시크릿을 탐지하여 비용 절감 기회를 제공합니다.
+
+도구 목록:
+    - unused: 미사용 시크릿 탐지 및 비용 분석
 """
 
 CATEGORY = {

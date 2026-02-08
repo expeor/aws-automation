@@ -1,7 +1,7 @@
-"""
-core/tools/history/favorites.py - 즐겨찾기 관리
+"""즐겨찾기 관리.
 
-사용자가 직접 등록한 즐겨찾기 도구 관리
+사용자가 직접 등록한 즐겨찾기 도구 및 카테고리를 관리합니다.
+싱글톤 패턴으로 구현되며, JSON 파일 기반 영속성과 원자적 저장을 지원합니다.
 """
 
 from __future__ import annotations
@@ -45,7 +45,15 @@ _FAVORITE_FIELDS = {f.name for f in fields(FavoriteItem)}
 
 
 class FavoritesManager:
-    """즐겨찾기 관리"""
+    """즐겨찾기 관리 매니저.
+
+    사용자가 자주 사용하는 도구나 카테고리를 즐겨찾기로 등록하고 관리합니다.
+    싱글톤 패턴(double-check locking)으로 구현되어 애플리케이션 전체에서
+    하나의 인스턴스만 사용됩니다.
+
+    Attributes:
+        MAX_ITEMS: 최대 즐겨찾기 항목 수 (20개).
+    """
 
     MAX_ITEMS = 20
     _instance: FavoritesManager | None = None
@@ -53,7 +61,11 @@ class FavoritesManager:
     _initialized: bool
 
     def __new__(cls) -> FavoritesManager:
-        """싱글톤 패턴 (double-check locking)"""
+        """싱글톤 인스턴스를 반환합니다 (double-check locking).
+
+        Returns:
+            FavoritesManager 싱글톤 인스턴스.
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -62,6 +74,11 @@ class FavoritesManager:
         return cls._instance
 
     def __init__(self) -> None:
+        """FavoritesManager를 초기화합니다.
+
+        이미 초기화된 경우 재초기화를 건너뜁니다 (싱글톤).
+        즐겨찾기 파일에서 기존 데이터를 로드합니다.
+        """
         if self._initialized:
             return
         self._path = self._get_favorites_path()
@@ -70,7 +87,11 @@ class FavoritesManager:
         self._initialized = True
 
     def _get_favorites_path(self) -> Path:
-        """즐겨찾기 파일 경로"""
+        """즐겨찾기 JSON 파일 경로를 반환합니다.
+
+        Returns:
+            즐겨찾기 파일의 Path 객체 (``temp/history/favorites.json``).
+        """
         from core.tools.cache import get_cache_path
 
         return Path(get_cache_path("history", "favorites.json"))
@@ -141,11 +162,25 @@ class FavoritesManager:
         return self.add(category, display_name, "", item_type="category")
 
     def is_category_favorite(self, category: str) -> bool:
-        """카테고리 즐겨찾기 여부 확인"""
+        """카테고리가 즐겨찾기에 등록되어 있는지 확인합니다.
+
+        Args:
+            category: 카테고리 이름 (예: "ec2", "vpc").
+
+        Returns:
+            즐겨찾기에 등록되어 있으면 True.
+        """
         return any(item.item_type == "category" and item.category == category for item in self._items)
 
     def remove_category(self, category: str) -> bool:
-        """카테고리 즐겨찾기 삭제"""
+        """카테고리 즐겨찾기를 삭제합니다.
+
+        Args:
+            category: 삭제할 카테고리 이름.
+
+        Returns:
+            삭제 성공 여부 (존재하지 않으면 False).
+        """
         for i, item in enumerate(self._items):
             if item.item_type == "category" and item.category == category:
                 self._items.pop(i)
@@ -154,10 +189,14 @@ class FavoritesManager:
         return False
 
     def remove(self, category: str, tool_module: str) -> bool:
-        """도구 즐겨찾기 삭제
+        """도구 즐겨찾기를 삭제합니다.
+
+        Args:
+            category: 카테고리 이름.
+            tool_module: 도구 모듈 이름.
 
         Returns:
-            삭제 성공 여부
+            삭제 성공 여부 (존재하지 않으면 False).
         """
         for i, item in enumerate(self._items):
             if item.item_type == "tool" and item.category == category and item.tool_module == tool_module:
@@ -172,10 +211,15 @@ class FavoritesManager:
         tool_name: str,
         tool_module: str,
     ) -> bool:
-        """즐겨찾기 토글 (있으면 삭제, 없으면 추가)
+        """즐겨찾기를 토글합니다 (있으면 삭제, 없으면 추가).
+
+        Args:
+            category: 카테고리 이름.
+            tool_name: 도구 표시 이름.
+            tool_module: 도구 모듈 이름.
 
         Returns:
-            토글 후 즐겨찾기 상태 (True: 추가됨, False: 삭제됨)
+            토글 후 즐겨찾기 상태 (True: 추가됨, False: 삭제됨).
         """
         if self.is_favorite(category, tool_module):
             self.remove(category, tool_module)
@@ -185,18 +229,38 @@ class FavoritesManager:
             return True
 
     def is_favorite(self, category: str, tool_module: str) -> bool:
-        """도구 즐겨찾기 여부 확인"""
+        """도구가 즐겨찾기에 등록되어 있는지 확인합니다.
+
+        Args:
+            category: 카테고리 이름.
+            tool_module: 도구 모듈 이름.
+
+        Returns:
+            즐겨찾기에 등록되어 있으면 True.
+        """
         return any(
             item.item_type == "tool" and item.category == category and item.tool_module == tool_module
             for item in self._items
         )
 
     def get_all(self) -> list[FavoriteItem]:
-        """전체 즐겨찾기 목록 (순서대로)"""
+        """전체 즐겨찾기 목록을 순서대로 반환합니다.
+
+        Returns:
+            order 필드 기준 오름차순 정렬된 FavoriteItem 리스트.
+        """
         return sorted(self._items, key=lambda x: x.order)
 
     def move_up(self, category: str, tool_module: str) -> bool:
-        """순서 올리기"""
+        """즐겨찾기 항목의 순서를 한 단계 올립니다.
+
+        Args:
+            category: 카테고리 이름.
+            tool_module: 도구 모듈 이름.
+
+        Returns:
+            이동 성공 여부 (이미 최상위이거나 항목이 없으면 False).
+        """
         items = self.get_all()
         for i, item in enumerate(items):
             if item.category == category and item.tool_module == tool_module:
@@ -213,7 +277,15 @@ class FavoritesManager:
         return False
 
     def move_down(self, category: str, tool_module: str) -> bool:
-        """순서 내리기"""
+        """즐겨찾기 항목의 순서를 한 단계 내립니다.
+
+        Args:
+            category: 카테고리 이름.
+            tool_module: 도구 모듈 이름.
+
+        Returns:
+            이동 성공 여부 (이미 최하위이거나 항목이 없으면 False).
+        """
         items = self.get_all()
         for i, item in enumerate(items):
             if item.category == category and item.tool_module == tool_module:
@@ -230,7 +302,10 @@ class FavoritesManager:
         return False
 
     def clear(self) -> None:
-        """전체 초기화"""
+        """전체 즐겨찾기를 초기화합니다.
+
+        모든 항목을 삭제하고 파일에 빈 목록을 저장합니다.
+        """
         self._items.clear()
         self._save()
 
@@ -266,7 +341,11 @@ class FavoritesManager:
             self._items = []
 
     def _save(self) -> None:
-        """파일에 원자적으로 저장 (write-to-temp-then-rename)"""
+        """파일에 원자적으로 저장합니다 (write-to-temp-then-rename).
+
+        임시 파일에 먼저 기록한 후 rename하여 데이터 손실을 방지합니다.
+        원자적 쓰기 실패 시 직접 쓰기로 fallback합니다.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = [asdict(item) for item in self._items]
         content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -284,7 +363,10 @@ class FavoritesManager:
             self._path.write_text(content, encoding="utf-8")
 
     def reload(self) -> None:
-        """파일에서 다시 로드"""
+        """파일에서 즐겨찾기 데이터를 다시 로드합니다.
+
+        외부에서 파일이 변경된 경우 최신 상태를 반영할 때 사용합니다.
+        """
         self._load()
 
     def get_by_index(self, index: int) -> FavoriteItem | None:

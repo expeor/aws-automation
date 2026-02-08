@@ -1,5 +1,5 @@
 """
-plugins/glue/unused.py - Glue 미사용 작업 분석
+functions/analyzers/glue/unused.py - Glue 미사용 작업 분석
 
 미사용/실패 AWS Glue 작업 탐지 (실행 기록 기반)
 
@@ -51,7 +51,15 @@ REQUIRED_PERMISSIONS = {
 
 
 class JobStatus(Enum):
-    """작업 상태"""
+    """Glue 작업 분석 상태.
+
+    작업의 사용/미사용/실패 상태를 분류한다.
+
+    Attributes:
+        NORMAL: 정상 동작 중인 작업.
+        UNUSED: 최근 90일간 실행 기록이 없는 미사용 작업.
+        FAILED: 최근 5회 실행이 모두 실패(FAILED/TIMEOUT/ERROR)인 작업.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -60,7 +68,31 @@ class JobStatus(Enum):
 
 @dataclass
 class GlueJobInfo:
-    """Glue 작업 정보"""
+    """Glue 작업 상세 정보.
+
+    작업 설정과 실행 기록 분석 결과를 보관한다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        job_name: 작업 이름.
+        job_type: 작업 타입 (glueetl, pythonshell, gluestreaming).
+        glue_version: Glue 버전.
+        max_capacity: DPU 할당량 (워커 타입/수 기반 계산값).
+        worker_type: 워커 타입 (G.1X, G.2X 등).
+        num_workers: 워커 수.
+        created_at: 작업 생성 일시.
+        last_modified: 마지막 수정 일시.
+        last_run_time: 마지막 실행 시작 시간.
+        last_run_status: 마지막 실행 상태.
+        run_count_30d: 최근 30일 실행 횟수.
+        run_count_90d: 최근 90일 실행 횟수.
+        failure_count_5: 최근 5회 중 실패 횟수.
+        success_count_5: 최근 5회 중 성공 횟수.
+        avg_execution_time_sec: 평균 실행 시간 (초).
+        avg_dpu_used: 평균 DPU 사용량 (DPU-hour).
+    """
 
     account_id: str
     account_name: str
@@ -85,7 +117,11 @@ class GlueJobInfo:
 
     @property
     def days_since_last_run(self) -> int | None:
-        """마지막 실행 이후 일수"""
+        """마지막 실행 이후 경과 일수.
+
+        Returns:
+            경과 일수. 실행 기록이 없으면 None.
+        """
         if not self.last_run_time:
             return None
         now = datetime.now(timezone.utc)
@@ -94,7 +130,13 @@ class GlueJobInfo:
 
 @dataclass
 class GlueJobFinding:
-    """작업 분석 결과"""
+    """개별 Glue 작업에 대한 분석 결과.
+
+    Attributes:
+        job: 분석 대상 작업 정보.
+        status: 분석된 작업 상태 (NORMAL, UNUSED, FAILED).
+        recommendation: 권장 조치 메시지.
+    """
 
     job: GlueJobInfo
     status: JobStatus
@@ -103,7 +145,18 @@ class GlueJobFinding:
 
 @dataclass
 class GlueAnalysisResult:
-    """Glue 분석 결과 집계"""
+    """계정/리전별 Glue 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_jobs: 전체 작업 수.
+        unused_jobs: 미사용 작업 수 (90일간 실행 없음).
+        failed_jobs: 연속 실패 작업 수 (최근 5회 모두 실패).
+        normal_jobs: 정상 작업 수.
+        findings: 개별 작업 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -116,7 +169,21 @@ class GlueAnalysisResult:
 
 
 def collect_glue_jobs(session, account_id: str, account_name: str, region: str) -> list[GlueJobInfo]:
-    """Glue 작업 수집 및 실행 기록 분석"""
+    """Glue 작업을 수집하고 실행 기록을 분석한다.
+
+    1단계에서 get_jobs Paginator로 작업 목록을 수집하고,
+    2단계에서 각 작업의 get_job_runs로 실행 기록을 분석한다.
+    워커 타입/수에 따라 DPU 할당량을 계산한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 GlueJobInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     glue = get_client(session, "glue", region_name=region)
@@ -171,7 +238,15 @@ def collect_glue_jobs(session, account_id: str, account_name: str, region: str) 
 
 
 def _analyze_job_runs(glue, job: GlueJobInfo, now: datetime) -> None:
-    """작업 실행 기록 분석 (내부 함수)"""
+    """작업의 최근 100개 실행 기록을 분석하여 GlueJobInfo에 반영한다.
+
+    30일/90일 실행 횟수, 최근 5회 성공/실패, 평균 실행 시간/DPU를 계산한다.
+
+    Args:
+        glue: Glue boto3 클라이언트.
+        job: 분석 대상 작업 정보 (결과가 직접 업데이트됨).
+        now: 현재 시각 (UTC).
+    """
     from botocore.exceptions import ClientError
 
     try:
@@ -231,7 +306,19 @@ def _analyze_job_runs(glue, job: GlueJobInfo, now: datetime) -> None:
 
 
 def analyze_jobs(jobs: list[GlueJobInfo], account_id: str, account_name: str, region: str) -> GlueAnalysisResult:
-    """Glue 작업 분석"""
+    """수집된 Glue 작업을 분석하여 미사용/실패 항목을 식별한다.
+
+    미사용(90일간 실행 없음), 연속 실패(최근 5회 모두 실패), 정상으로 분류한다.
+
+    Args:
+        jobs: 수집된 GlueJobInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        분석 결과를 담은 GlueAnalysisResult 객체.
+    """
     result = GlueAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -284,7 +371,17 @@ def analyze_jobs(jobs: list[GlueJobInfo], account_id: str, account_name: str, re
 
 
 def generate_report(results: list[GlueAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Glue 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계)와 Jobs(비정상 작업 상세) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 Glue 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -372,7 +469,17 @@ def generate_report(results: list[GlueAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> GlueAnalysisResult | None:
-    """단일 계정/리전의 Glue 작업 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 Glue 작업을 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        Glue 분석 결과. 작업이 없으면 None.
+    """
     jobs = collect_glue_jobs(session, account_id, account_name, region)
     if not jobs:
         return None
@@ -380,7 +487,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Glue 미사용 작업 분석"""
+    """Glue 미사용 작업 분석 도구의 메인 실행 함수.
+
+    미사용(90일간 실행 없음) 및 연속 실패(최근 5회 모두 실패) Glue 작업을 탐지한다.
+    Glue 작업은 실행 시에만 과금되므로 미사용 작업의 직접 비용은 없다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]Glue 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="glue")

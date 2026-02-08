@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/cdn.py - CDN/DNS 리소스 수집
+core/shared/aws/inventory/services/cdn.py - CDN/DNS 리소스 수집
 
 CloudFront Distribution, Route 53 Hosted Zone 수집.
 """
@@ -18,7 +18,20 @@ logger = logging.getLogger(__name__)
 def collect_cloudfront_distributions(
     session, account_id: str, account_name: str, region: str
 ) -> list[CloudFrontDistribution]:
-    """CloudFront Distribution 수집 (글로벌 리소스)"""
+    """CloudFront Distribution 리소스를 수집합니다 (글로벌 서비스).
+
+    CloudFront는 글로벌 서비스이므로 us-east-1에서만 수집합니다.
+    Distribution 목록 조회 후 Alias, Origin 수, 태그 등 상세 정보를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드 (us-east-1이 아니면 빈 목록 반환)
+
+    Returns:
+        CloudFrontDistribution 데이터 클래스 목록
+    """
     # CloudFront는 글로벌 서비스이므로 us-east-1에서만 수집
     if region != "us-east-1":
         return []
@@ -73,7 +86,20 @@ def collect_cloudfront_distributions(
 
 
 def collect_route53_hosted_zones(session, account_id: str, account_name: str, region: str) -> list[Route53HostedZone]:
-    """Route 53 Hosted Zone 수집 (글로벌 리소스)"""
+    """Route 53 Hosted Zone 리소스를 수집합니다 (글로벌 서비스).
+
+    Route 53는 글로벌 서비스이므로 us-east-1에서만 수집합니다.
+    Hosted Zone 목록 조회 후 레코드 수, Private Zone VPC 정보, 태그 등을 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드 (us-east-1이 아니면 빈 목록 반환)
+
+    Returns:
+        Route53HostedZone 데이터 클래스 목록
+    """
     # Route 53는 글로벌 서비스이므로 us-east-1에서만 수집
     if region != "us-east-1":
         return []

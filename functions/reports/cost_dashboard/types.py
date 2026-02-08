@@ -1,7 +1,13 @@
-"""
-plugins/cost/unused_all/types.py - 미사용 리소스 분석 데이터 타입
+"""functions/reports/cost_dashboard/types.py - 미사용 리소스 분석 데이터 타입.
 
-데이터클래스 및 리소스 필드 매핑 정의
+데이터클래스 및 리소스 필드 매핑을 정의합니다.
+
+주요 구성:
+    - RESOURCE_FIELD_MAP: 리소스 유형별 필드 매핑 (display, total/unused/waste 필드명, session/final 키)
+    - WASTE_FIELDS: 비용 추정 가능한 리소스의 waste 필드 목록
+    - UnusedResourceSummary: 계정/리전별 미사용 리소스 수량 및 비용 요약
+    - SessionCollectionResult: 단일 세션(계정/리전)의 타입별 분석 결과 집합
+    - UnusedAllResult: 모든 세션의 결과를 통합한 최종 종합 결과
 """
 
 from __future__ import annotations
@@ -474,7 +480,36 @@ WASTE_FIELDS = [cfg["waste"] for cfg in RESOURCE_FIELD_MAP.values() if cfg.get("
 
 @dataclass
 class UnusedResourceSummary:
-    """미사용 리소스 종합 요약"""
+    """미사용 리소스 종합 요약 데이터.
+
+    단일 계정/리전 조합에 대한 전체 리소스 유형별 수량(total/unused) 및
+    월간 예상 낭비 비용(monthly_waste)을 집계합니다.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 표시명.
+        region: AWS 리전 코드.
+        ami_total: AMI 전체 수.
+        ami_unused: 미사용 AMI 수.
+        ami_monthly_waste: AMI 월간 예상 낭비 비용 (USD).
+        ebs_total: EBS 볼륨 전체 수.
+        ebs_unused: 미사용 EBS 볼륨 수.
+        ebs_monthly_waste: EBS 월간 예상 낭비 비용 (USD).
+        snap_total: EBS Snapshot 전체 수.
+        snap_unused: 미사용 Snapshot 수.
+        snap_monthly_waste: Snapshot 월간 예상 낭비 비용 (USD).
+        eip_total: EIP 전체 수.
+        eip_unused: 미사용 EIP 수.
+        eip_monthly_waste: EIP 월간 예상 낭비 비용 (USD).
+        eni_total: ENI 전체 수.
+        eni_unused: 미사용 ENI 수.
+        nat_total: NAT Gateway 전체 수.
+        nat_unused: 미사용 NAT Gateway 수.
+        nat_monthly_waste: NAT Gateway 월간 예상 낭비 비용 (USD).
+        elb_total: ELB 전체 수.
+        elb_unused: 미사용 ELB 수.
+        elb_monthly_waste: ELB 월간 예상 낭비 비용 (USD).
+    """
 
     account_id: str
     account_name: str
@@ -630,7 +665,26 @@ class UnusedResourceSummary:
 
 @dataclass
 class SessionCollectionResult:
-    """단일 세션(계정/리전)의 수집 결과"""
+    """단일 세션(계정/리전)의 수집 결과.
+
+    ``collect_session_resources``에서 한 계정/리전의 모든 리소스 유형을
+    수집한 결과를 담습니다. 각 필드는 해당 분석 도구의 AnalysisResult 타입이며,
+    수집 실패 시 None입니다.
+
+    Attributes:
+        summary: 해당 세션의 리소스 수량/비용 요약 (UnusedResourceSummary).
+        ami_result: AMI 감사 분석 결과.
+        ebs_result: EBS 볼륨 감사 분석 결과.
+        snap_result: EBS Snapshot 감사 분석 결과.
+        eip_result: EIP 감사 분석 결과.
+        eni_result: ENI 감사 분석 결과.
+        ec2_instance_result: EC2 Instance 미사용 분석 결과.
+        nat_findings: NAT Gateway 미사용 항목 목록.
+        endpoint_result: VPC Endpoint 감사 분석 결과.
+        elb_result: ELB 미사용 분석 결과.
+        tg_result: Target Group 감사 분석 결과.
+        errors: 수집 중 발생한 에러 메시지 목록.
+    """
 
     summary: UnusedResourceSummary
 
@@ -704,7 +758,21 @@ class SessionCollectionResult:
 
 @dataclass
 class UnusedAllResult:
-    """종합 분석 결과"""
+    """모든 세션의 결과를 통합한 최종 종합 분석 결과.
+
+    여러 계정/리전의 SessionCollectionResult를 병합하여
+    전체 조직 차원의 미사용 리소스 현황을 제공합니다.
+
+    Attributes:
+        summaries: 계정/리전별 미사용 리소스 요약 목록.
+        ami_results: 전체 AMI 감사 결과 목록.
+        ebs_results: 전체 EBS 볼륨 감사 결과 목록.
+        snap_results: 전체 EBS Snapshot 감사 결과 목록.
+        eip_results: 전체 EIP 감사 결과 목록.
+        eni_results: 전체 ENI 감사 결과 목록.
+        nat_findings: 전체 NAT Gateway 미사용 항목 목록.
+        elb_results: 전체 ELB 미사용 분석 결과 목록.
+    """
 
     summaries: list[UnusedResourceSummary] = field(default_factory=list)
 

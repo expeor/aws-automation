@@ -1,15 +1,17 @@
 """
-plugins/cost/pricing/elasticache.py - Amazon ElastiCache 가격 조회
+core/shared/aws/pricing/elasticache.py - Amazon ElastiCache 가격 조회
 
-ElastiCache 비용 계산:
-- 노드 시간당 비용 (인스턴스 타입별)
-- Redis/Memcached 동일 가격
+ElastiCache 노드 타입별 시간당/월간 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격으로 fallback한다.
+Redis와 Memcached는 동일 노드 타입이면 동일 가격이다.
 
 사용법:
-    from functions.analyzers.cost.pricing.elasticache import get_elasticache_monthly_cost
+    from core.shared.aws.pricing.elasticache import get_elasticache_monthly_cost
 
-    # 월간 비용
-    monthly = get_elasticache_monthly_cost("ap-northeast-2", "cache.r6g.large", num_nodes=2)
+    # cache.r6g.large 2노드 월간 비용
+    monthly = get_elasticache_monthly_cost(
+        "ap-northeast-2", "cache.r6g.large", num_nodes=2
+    )
 """
 
 from __future__ import annotations
@@ -65,7 +67,17 @@ DEFAULT_NODE_PRICE = 0.20  # 알 수 없는 노드 타입용 기본값
 
 
 def get_elasticache_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 ElastiCache 가격 조회"""
+    """AWS Pricing API를 통해 ElastiCache 노드 타입별 가격을 조회한다.
+
+    ``cache.`` 접두사가 없는 인스턴스 타입에는 자동으로 추가한다.
+
+    Args:
+        session: boto3 세션
+        region: 대상 AWS 리전 코드
+
+    Returns:
+        ``{node_type: hourly_price}`` 딕셔너리. 조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -110,7 +122,18 @@ def get_elasticache_prices_from_api(session: boto3.Session, region: str) -> dict
 
 
 def get_elasticache_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
-    """ElastiCache 가격 조회"""
+    """ElastiCache 노드 타입별 가격을 조회한다.
+
+    ``session`` 이 제공되면 Pricing API를 우선 호출하고,
+    실패 시 하드코딩된 ``ELASTICACHE_PRICES`` 에서 fallback한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        ``{node_type: hourly_price}`` 딕셔너리 (예: ``{"cache.r6g.large": 0.207}``)
+    """
     if session:
         api_prices = get_elasticache_prices_from_api(session, region)
         if api_prices:
@@ -124,7 +147,16 @@ def get_elasticache_hourly_price(
     node_type: str = "cache.t3.medium",
     session: boto3.Session | None = None,
 ) -> float:
-    """ElastiCache 노드 시간당 가격"""
+    """ElastiCache 노드의 시간당 가격을 반환한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        node_type: 노드 타입 (예: ``"cache.t3.medium"``, ``"cache.r6g.large"``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        시간당 USD (알 수 없는 노드 타입이면 기본값 ``0.20``)
+    """
     prices = get_elasticache_prices(region, session)
     return prices.get(node_type, DEFAULT_NODE_PRICE)
 
@@ -135,6 +167,18 @@ def get_elasticache_monthly_cost(
     num_nodes: int = 1,
     session: boto3.Session | None = None,
 ) -> float:
-    """ElastiCache 월간 비용 계산"""
+    """ElastiCache 클러스터의 월간 비용을 계산한다.
+
+    ``hourly_price * 730시간 * num_nodes`` 로 산출한다.
+
+    Args:
+        region: AWS 리전 코드 (기본: ``"ap-northeast-2"``)
+        node_type: 노드 타입 (예: ``"cache.r6g.large"``)
+        num_nodes: 노드 수 (기본: ``1``)
+        session: boto3 세션 (API 조회용, 선택 사항)
+
+    Returns:
+        월간 USD 비용 (소수점 2자리 반올림)
+    """
     hourly_price = get_elasticache_hourly_price(region, node_type, session)
     return round(hourly_price * HOURS_PER_MONTH * num_nodes, 2)

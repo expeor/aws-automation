@@ -1,5 +1,5 @@
 """
-plugins/sqs/unused.py - SQS 미사용 큐 분석
+functions/analyzers/sqs/unused.py - SQS 미사용 큐 분석
 
 유휴/미사용 SQS 큐 탐지 (CloudWatch 지표 기반)
 
@@ -46,7 +46,16 @@ REQUIRED_PERMISSIONS = {
 
 
 class QueueStatus(Enum):
-    """큐 상태"""
+    """SQS 큐 분석 상태.
+
+    CloudWatch 메시지 활동 지표 및 DLQ 여부 기반으로 분류한다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 큐.
+        UNUSED: 분석 기간 동안 메시지 활동이 없는 미사용 큐.
+        LOW_USAGE: 일 평균 메시지 수가 기준치 미만인 저사용 큐.
+        EMPTY_DLQ: 메시지가 없고 활동도 없는 빈 Dead Letter Queue.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -56,7 +65,25 @@ class QueueStatus(Enum):
 
 @dataclass
 class SQSQueueInfo:
-    """SQS 큐 정보"""
+    """SQS 큐 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 큐가 위치한 리전.
+        queue_name: 큐 이름.
+        queue_url: 큐 URL.
+        queue_arn: 큐 ARN.
+        is_fifo: FIFO 큐 여부.
+        is_dlq: Dead Letter Queue 여부.
+        approximate_messages: 현재 대기 중인 메시지 수 (근사값).
+        approximate_messages_delayed: 지연 전달 중인 메시지 수 (근사값).
+        approximate_messages_not_visible: 처리 중(invisible) 메시지 수 (근사값).
+        created_timestamp: 큐 생성 시각.
+        messages_sent: 분석 기간 동안 전송된 메시지 수 (CloudWatch Sum).
+        messages_received: 분석 기간 동안 수신된 메시지 수 (CloudWatch Sum).
+        messages_deleted: 분석 기간 동안 삭제된 메시지 수 (CloudWatch Sum).
+    """
 
     account_id: str
     account_name: str
@@ -78,7 +105,13 @@ class SQSQueueInfo:
 
 @dataclass
 class QueueFinding:
-    """큐 분석 결과"""
+    """개별 SQS 큐에 대한 분석 결과.
+
+    Attributes:
+        queue: 분석 대상 큐 정보.
+        status: 분석 결과 상태.
+        recommendation: 권장 조치 사항 (한글).
+    """
 
     queue: SQSQueueInfo
     status: QueueStatus
@@ -87,7 +120,19 @@ class QueueFinding:
 
 @dataclass
 class SQSAnalysisResult:
-    """SQS 분석 결과 집계"""
+    """단일 계정/리전의 SQS 큐 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        total_queues: 전체 큐 수.
+        unused_queues: 미사용 큐 수.
+        low_usage_queues: 저사용 큐 수.
+        empty_dlqs: 빈 DLQ 수.
+        normal_queues: 정상 큐 수.
+        findings: 개별 큐 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -101,10 +146,20 @@ class SQSAnalysisResult:
 
 
 def collect_sqs_queues(session, account_id: str, account_name: str, region: str) -> list[SQSQueueInfo]:
-    """SQS 큐 수집 (배치 메트릭 최적화)
+    """지정된 계정/리전의 SQS 큐를 수집하고 CloudWatch 메트릭을 조회한다.
 
-    최적화:
-    - 기존: 큐당 3 API 호출 → 최적화: 전체 1-2 API 호출
+    1단계에서 큐 목록과 속성(메시지 수, FIFO 여부, DLQ 여부)을 수집하고,
+    2단계에서 batch_get_metrics를 통해 메시지 전송/수신/삭제 지표를 배치 조회한다.
+    기존 큐당 3 API 호출을 전체 1-2 호출로 최적화했다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 SQS 큐 정보 목록. CloudWatch 메트릭이 포함된다.
     """
     from botocore.exceptions import ClientError
 
@@ -180,12 +235,16 @@ def _collect_sqs_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """SQS 메트릭 배치 수집 (내부 함수)
+    """SQS 큐의 CloudWatch 메트릭을 배치로 수집하여 큐 객체에 반영한다.
 
-    메트릭:
-    - NumberOfMessagesSent (Sum)
-    - NumberOfMessagesReceived (Sum)
-    - NumberOfMessagesDeleted (Sum)
+    NumberOfMessagesSent, NumberOfMessagesReceived, NumberOfMessagesDeleted
+    세 가지 메트릭의 Sum 값을 일별(86400초) 기간으로 조회한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        queues: 메트릭을 수집할 SQS 큐 목록 (결과가 각 객체에 직접 반영됨).
+        start_time: 메트릭 조회 시작 시각 (UTC).
+        end_time: 메트릭 조회 종료 시각 (UTC).
     """
     from botocore.exceptions import ClientError
 
@@ -244,7 +303,20 @@ def _collect_sqs_metrics_batch(
 
 
 def analyze_queues(queues: list[SQSQueueInfo], account_id: str, account_name: str, region: str) -> SQSAnalysisResult:
-    """SQS 큐 분석"""
+    """수집된 SQS 큐를 분석하여 미사용/저사용 큐를 식별한다.
+
+    메시지 활동(전송+수신+삭제) 합계, DLQ 여부, 일 평균 메시지 수를 기반으로
+    EMPTY_DLQ, UNUSED, LOW_USAGE, NORMAL 상태로 분류한다.
+
+    Args:
+        queues: 분석 대상 SQS 큐 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+
+    Returns:
+        SQS 큐 분석 결과 집계 객체.
+    """
     result = SQSAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -305,7 +377,17 @@ def analyze_queues(queues: list[SQSQueueInfo], account_id: str, account_name: st
 
 
 def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """SQS 미사용 큐 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary 시트(계정/리전별 통계)와 Queues 시트(비정상 큐 상세)를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Workbook
@@ -387,7 +469,19 @@ def generate_report(results: list[SQSAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SQSAnalysisResult | None:
-    """단일 계정/리전의 SQS 큐 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 SQS 큐를 수집하고 분석한다.
+
+    parallel_collect 콜백으로 사용되며, 큐가 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        분석 결과 객체. 큐가 없으면 None.
+    """
     queues = collect_sqs_queues(session, account_id, account_name, region)
     if not queues:
         return None
@@ -395,7 +489,13 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """SQS 미사용 큐 분석"""
+    """SQS 미사용 큐 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]SQS 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="sqs")

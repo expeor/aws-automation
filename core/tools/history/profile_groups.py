@@ -1,7 +1,8 @@
-"""
-core/tools/history/profile_groups.py - 프로파일 그룹 관리
+"""프로파일 그룹 관리.
 
-자주 사용하는 프로파일 조합을 그룹으로 저장하여 빠르게 선택
+자주 사용하는 프로파일 조합을 그룹으로 저장하여 빠르게 선택할 수 있게 합니다.
+같은 인증 타입(SSO Profile 또는 Static Credentials)끼리만 그룹화 가능합니다.
+싱글톤 패턴으로 구현되며, JSON 파일 기반 영속성과 원자적 저장을 지원합니다.
 """
 
 from __future__ import annotations
@@ -19,15 +20,26 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProfileGroup:
-    """프로파일 그룹 항목"""
+    """프로파일 그룹 항목.
 
-    name: str  # 그룹 이름 (예: "개발 환경")
-    kind: str  # "sso_profile" 또는 "static" (ProviderKind.value)
-    profiles: list[str] = field(default_factory=list)  # 프로파일 이름 목록
-    added_at: str = ""  # ISO format
-    order: int = 0  # 정렬 순서 (낮을수록 상위)
+    자주 사용하는 AWS 프로파일 조합을 하나의 그룹으로 정의합니다.
+
+    Attributes:
+        name: 그룹 이름 (예: "개발 환경", "운영 서버").
+        kind: 인증 타입 ("sso_profile" 또는 "static"). ProviderKind.value 기준.
+        profiles: 그룹에 속한 프로파일 이름 목록.
+        added_at: 그룹 생성 일시 (ISO format). 미지정 시 자동 설정.
+        order: 정렬 순서 (낮을수록 상위에 표시).
+    """
+
+    name: str
+    kind: str
+    profiles: list[str] = field(default_factory=list)
+    added_at: str = ""
+    order: int = 0
 
     def __post_init__(self) -> None:
+        """added_at이 미지정인 경우 현재 시각으로 자동 설정합니다."""
         if not self.added_at:
             self.added_at = datetime.now().isoformat()
 
@@ -37,10 +49,16 @@ _PROFILE_GROUP_FIELDS = {f.name for f in fields(ProfileGroup)}
 
 
 class ProfileGroupsManager:
-    """프로파일 그룹 관리
+    """프로파일 그룹 관리 매니저.
 
     사용자가 자주 쓰는 프로파일 조합을 그룹으로 저장하고 관리합니다.
     같은 타입(SSO 프로파일 또는 Access Key)끼리만 그룹화 가능합니다.
+    싱글톤 패턴(double-check locking)으로 구현되어 애플리케이션 전체에서
+    하나의 인스턴스만 사용됩니다.
+
+    Attributes:
+        MAX_GROUPS: 최대 그룹 수 (20개).
+        MAX_PROFILES_PER_GROUP: 그룹당 최대 프로파일 수 (20개).
     """
 
     MAX_GROUPS = 20
@@ -50,7 +68,11 @@ class ProfileGroupsManager:
     _initialized: bool
 
     def __new__(cls) -> ProfileGroupsManager:
-        """싱글톤 패턴 (double-check locking)"""
+        """싱글톤 인스턴스를 반환합니다 (double-check locking).
+
+        Returns:
+            ProfileGroupsManager 싱글톤 인스턴스.
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -59,6 +81,11 @@ class ProfileGroupsManager:
         return cls._instance
 
     def __init__(self) -> None:
+        """ProfileGroupsManager를 초기화합니다.
+
+        이미 초기화된 경우 재초기화를 건너뜁니다 (싱글톤).
+        그룹 파일에서 기존 데이터를 로드합니다.
+        """
         if self._initialized:
             return
         self._path = self._get_path()
@@ -67,7 +94,11 @@ class ProfileGroupsManager:
         self._initialized = True
 
     def _get_path(self) -> Path:
-        """그룹 파일 경로"""
+        """프로파일 그룹 JSON 파일 경로를 반환합니다.
+
+        Returns:
+            그룹 파일의 Path 객체 (``temp/history/profile_groups.json``).
+        """
         from core.tools.cache import get_cache_path
 
         return Path(get_cache_path("history", "profile_groups.json"))
@@ -153,10 +184,13 @@ class ProfileGroupsManager:
         return True
 
     def remove(self, name: str) -> bool:
-        """그룹 삭제
+        """그룹을 삭제합니다.
+
+        Args:
+            name: 삭제할 그룹 이름.
 
         Returns:
-            삭제 성공 여부
+            삭제 성공 여부 (존재하지 않으면 False).
         """
         for i, group in enumerate(self._groups):
             if group.name == name:
@@ -166,22 +200,47 @@ class ProfileGroupsManager:
         return False
 
     def get_by_name(self, name: str) -> ProfileGroup | None:
-        """이름으로 그룹 찾기"""
+        """이름으로 그룹을 찾습니다.
+
+        Args:
+            name: 검색할 그룹 이름.
+
+        Returns:
+            매칭되는 ProfileGroup 또는 None.
+        """
         for group in self._groups:
             if group.name == name:
                 return group
         return None
 
     def get_all(self) -> list[ProfileGroup]:
-        """전체 그룹 목록 (순서대로)"""
+        """전체 그룹 목록을 순서대로 반환합니다.
+
+        Returns:
+            order 필드 기준 오름차순 정렬된 ProfileGroup 리스트.
+        """
         return sorted(self._groups, key=lambda x: x.order)
 
     def get_by_kind(self, kind: str) -> list[ProfileGroup]:
-        """특정 타입의 그룹만 반환"""
+        """특정 인증 타입의 그룹만 반환합니다.
+
+        Args:
+            kind: 인증 타입 ("sso_profile" 또는 "static").
+
+        Returns:
+            해당 타입의 ProfileGroup 리스트 (순서대로).
+        """
         return [g for g in self.get_all() if g.kind == kind]
 
     def move_up(self, name: str) -> bool:
-        """순서 올리기"""
+        """그룹의 순서를 한 단계 올립니다.
+
+        Args:
+            name: 이동할 그룹 이름.
+
+        Returns:
+            이동 성공 여부 (이미 최상위이거나 그룹이 없으면 False).
+        """
         groups = self.get_all()
         for i, group in enumerate(groups):
             if group.name == name:
@@ -197,7 +256,14 @@ class ProfileGroupsManager:
         return False
 
     def move_down(self, name: str) -> bool:
-        """순서 내리기"""
+        """그룹의 순서를 한 단계 내립니다.
+
+        Args:
+            name: 이동할 그룹 이름.
+
+        Returns:
+            이동 성공 여부 (이미 최하위이거나 그룹이 없으면 False).
+        """
         groups = self.get_all()
         for i, group in enumerate(groups):
             if group.name == name:
@@ -213,7 +279,10 @@ class ProfileGroupsManager:
         return False
 
     def clear(self) -> None:
-        """전체 초기화"""
+        """전체 프로파일 그룹을 초기화합니다.
+
+        모든 그룹을 삭제하고 파일에 빈 목록을 저장합니다.
+        """
         self._groups.clear()
         self._save()
 
@@ -249,7 +318,11 @@ class ProfileGroupsManager:
             self._groups = []
 
     def _save(self) -> None:
-        """파일에 원자적으로 저장 (write-to-temp-then-rename)"""
+        """파일에 원자적으로 저장합니다 (write-to-temp-then-rename).
+
+        임시 파일에 먼저 기록한 후 rename하여 데이터 손실을 방지합니다.
+        원자적 쓰기 실패 시 직접 쓰기로 fallback합니다.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = [asdict(group) for group in self._groups]
         content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -267,5 +340,8 @@ class ProfileGroupsManager:
             self._path.write_text(content, encoding="utf-8")
 
     def reload(self) -> None:
-        """파일에서 다시 로드"""
+        """파일에서 프로파일 그룹 데이터를 다시 로드합니다.
+
+        외부에서 파일이 변경된 경우 최신 상태를 반영할 때 사용합니다.
+        """
         self._load()

@@ -1,8 +1,14 @@
 """
-AWS 계정 정보 유틸리티
+core/auth/account.py - AWS 계정 정보 유틸리티
 
 Account Alias, Account ID, Account Name 조회 및 표시용 식별자 생성.
-모든 도구에서 공통으로 사용.
+모든 도구에서 공통으로 사용하는 계정 정보 조회 함수를 제공합니다.
+
+Example:
+    from core.auth.account import get_account_display_name, format_account_identifier
+
+    name = get_account_display_name(session)
+    identifier = format_account_identifier(session, format="both")
 """
 
 import logging

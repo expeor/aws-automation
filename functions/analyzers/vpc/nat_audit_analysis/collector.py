@@ -28,7 +28,38 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class NATGateway:
-    """NAT Gateway 정보"""
+    """NAT Gateway 리소스의 상세 정보를 담는 데이터 클래스.
+
+    EC2 API에서 조회한 기본 정보와 CloudWatch 메트릭, 비용 정보를 통합하여
+    미사용/저사용 분석에 필요한 데이터를 제공한다.
+
+    Attributes:
+        nat_gateway_id: NAT Gateway 식별자 (예: ``nat-0123456789abcdef0``).
+        vpc_id: NAT Gateway가 속한 VPC ID.
+        subnet_id: NAT Gateway가 배치된 서브넷 ID.
+        state: NAT Gateway 상태 (``available``, ``pending``, ``deleting`` 등).
+        region: AWS 리전 코드.
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        public_ip: 퍼블릭 Elastic IP 주소.
+        private_ip: 프라이빗 IP 주소.
+        connectivity_type: 연결 유형 (``public`` 또는 ``private``).
+        create_time: 생성 시각 (UTC).
+        age_days: 생성 후 경과 일수.
+        bytes_out_total: 분석 기간 동안 BytesOutToDestination 합계.
+        bytes_in_total: 분석 기간 동안 BytesInFromSource 합계.
+        packets_out_total: 분석 기간 동안 PacketsOutToDestination 합계.
+        packets_in_total: 분석 기간 동안 PacketsInFromSource 합계.
+        active_connection_count: 분석 기간 동안 ActiveConnectionCount 합계.
+        connection_attempt_count: 분석 기간 동안 ConnectionAttemptCount 합계.
+        daily_bytes_out: 일별 아웃바운드 바이트 리스트 (트렌드 분석용).
+        days_with_traffic: 분석 기간 중 트래픽이 발생한 날 수.
+        tags: AWS 태그 딕셔너리 (``aws:`` 접두사 태그 제외).
+        name: Name 태그 값.
+        monthly_fixed_cost: NAT Gateway 월간 고정 비용 (USD).
+        monthly_data_cost: 데이터 처리 기반 월간 비용 추정 (USD).
+        total_monthly_cost: 월간 총 비용 추정 (고정 + 데이터, USD).
+    """
 
     nat_gateway_id: str
     vpc_id: str
@@ -69,7 +100,16 @@ class NATGateway:
 
 @dataclass
 class NATAuditData:
-    """NAT Gateway 감사 전체 데이터"""
+    """단일 계정/리전에서 수집한 NAT Gateway 감사 데이터 컨테이너.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        region: AWS 리전 코드.
+        nat_gateways: 수집된 NAT Gateway 목록.
+        collected_at: 데이터 수집 시각 (UTC).
+        metric_period_days: CloudWatch 메트릭 수집 기간 (일).
+    """
 
     account_id: str
     account_name: str
@@ -80,7 +120,11 @@ class NATAuditData:
 
 
 class NATCollector:
-    """NAT Gateway 데이터 수집기"""
+    """NAT Gateway 데이터 수집기.
+
+    EC2 API로 NAT Gateway 목록을 조회하고, CloudWatch GetMetricData API를
+    배치 호출하여 트래픽 메트릭을 수집한다. 배치 조회로 API 호출을 최소화한다.
+    """
 
     # 메트릭 수집 기간 (일)
     METRIC_PERIOD_DAYS = 14
@@ -145,7 +189,19 @@ class NATCollector:
         account_name: str,
         region: str,
     ) -> list[NATGateway]:
-        """NAT Gateway 목록 수집"""
+        """EC2 API로 NAT Gateway 목록을 수집한다.
+
+        ``deleted``, ``deleting``, ``failed`` 상태의 NAT Gateway는 제외한다.
+
+        Args:
+            ec2: boto3 EC2 client (rate limiting 적용).
+            account_id: AWS 계정 ID.
+            account_name: 계정 표시 이름.
+            region: AWS 리전 코드.
+
+        Returns:
+            수집된 NATGateway 목록.
+        """
         nat_gateways = []
         now = datetime.now(timezone.utc)
 
@@ -197,7 +253,7 @@ class NATCollector:
         return nat_gateways
 
     def _parse_tags(self, tags: list[dict[str, str]]) -> dict[str, str]:
-        """태그 파싱"""
+        """AWS 태그 리스트를 딕셔너리로 변환한다. ``aws:`` 접두사 태그는 제외."""
         return {tag.get("Key", ""): tag.get("Value", "") for tag in tags if not tag.get("Key", "").startswith("aws:")}
 
     def _collect_metrics_batch(self, cloudwatch, nat_gateways: list[NATGateway]) -> None:
@@ -282,7 +338,7 @@ class NATCollector:
         end_time: datetime,
         metrics_to_fetch: list[tuple[str, str]],
     ) -> None:
-        """단일 NAT의 메트릭 수집 (폴백용)"""
+        """단일 NAT Gateway의 메트릭을 개별 API 호출로 수집한다 (배치 실패 시 폴백)."""
         dimensions = [{"Name": "NatGatewayId", "Value": nat.nat_gateway_id}]
 
         for metric_name, attr_name in metrics_to_fetch:
@@ -315,7 +371,7 @@ class NATCollector:
         self._calculate_costs(nat)
 
     def _calculate_costs(self, nat: NATGateway) -> None:
-        """비용 계산"""
+        """NAT Gateway의 월간 고정 비용과 데이터 처리 비용을 계산한다."""
         from core.shared.aws.pricing import get_nat_data_price, get_nat_monthly_fixed_cost
 
         # 월간 고정 비용

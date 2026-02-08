@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/cloudwatch.py - CloudWatch Logs 가격 조회
+functions/analyzers/cost/pricing/cloudwatch.py - CloudWatch Logs 가격 조회
 
 CloudWatch Logs 비용 계산:
 - Storage: ~$0.03/GB/월 (리전별 상이)

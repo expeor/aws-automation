@@ -61,7 +61,22 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class AMICleanupOperationLog:
-    """개별 AMI 정리 작업 로그"""
+    """개별 AMI 정리 작업의 실행 로그.
+
+    Attributes:
+        ami_id: AMI ID.
+        ami_name: AMI 이름.
+        total_size_gb: AMI 연관 스냅샷 총 용량 (GB).
+        monthly_cost: 월 예상 비용 (USD).
+        operation: 수행한 작업 (deregister, delete_snapshot 또는 dry-run 변형).
+        result: 작업 결과 (SUCCESS, FAILED, SKIPPED).
+        snapshot_ids_deleted: 삭제 성공한 스냅샷 ID 목록.
+        snapshot_ids_failed: 삭제 실패한 스냅샷 ID 목록.
+        error_message: 실패 시 에러 메시지.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+    """
 
     ami_id: str
     ami_name: str
@@ -79,7 +94,21 @@ class AMICleanupOperationLog:
 
 @dataclass
 class AMICleanupResult:
-    """계정/리전별 AMI 정리 결과"""
+    """단일 계정/리전의 AMI 정리 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        total_targeted: 정리 대상 AMI 수.
+        deregistered_count: AMI 삭제(deregister) 성공 수.
+        snapshots_deleted_count: 스냅샷 삭제 성공 수.
+        failed_count: 실패 수.
+        skipped_count: 스킵 수 (dry-run).
+        total_size_freed_gb: 해제된 총 용량 (GB).
+        total_cost_saved: 절감 예상 월 비용 (USD).
+        operation_logs: 개별 작업 로그 목록.
+    """
 
     account_id: str
     account_name: str
@@ -100,7 +129,14 @@ class AMICleanupResult:
 
 
 def collect_options(ctx: ExecutionContext) -> None:
-    """사용자 입력 수집 (timeline 밖에서 실행)"""
+    """사용자 입력을 수집하여 ctx.options에 저장한다.
+
+    최소 경과일, 연관 스냅샷 삭제 여부, dry-run 모드를 대화형으로 입력받는다.
+    dry-run을 해제하면 이중 확인을 요구하며, 거부 시 자동으로 dry-run 모드로 전환한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. options 딕셔너리에 설정이 저장된다.
+    """
     console.print("\n[bold cyan]미사용 AMI 정리 설정[/bold cyan]")
 
     # 1. 최소 경과일
@@ -142,7 +178,17 @@ def collect_options(ctx: ExecutionContext) -> None:
 
 
 def _generate_report(results: list[AMICleanupResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보고서를 생성한다.
+
+    Summary 시트(정리 결과 통계)와 Operation Logs 시트(개별 작업 로그)로 구성된다.
+
+    Args:
+        results: 계정/리전별 정리 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from core.shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
@@ -227,7 +273,15 @@ def _generate_report(results: list[AMICleanupResult], output_dir: str) -> str:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """미사용 AMI 정리 실행"""
+    """도구의 메인 실행 함수.
+
+    미사용 AMI를 병렬 수집하고, 설정에 따라 deregister 및 연관 스냅샷 삭제를
+    수행한다. dry-run 모드에서는 실제 삭제 없이 대상만 식별한다.
+    콘솔에 결과 요약을 출력하고 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. options에 age_threshold, delete_snapshots, dry_run 포함.
+    """
     age_threshold = ctx.options.get("age_threshold", 14)
     delete_snapshots = ctx.options.get("delete_snapshots", True)
     dry_run = ctx.options.get("dry_run", True)
@@ -317,7 +371,24 @@ def _collect_and_cleanup(
     delete_snapshots: bool,
     dry_run: bool,
 ) -> AMICleanupResult | None:
-    """단일 계정/리전의 AMI 수집 및 정리 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 미사용 AMI를 수집하고 정리한다.
+
+    ami_audit.py의 분석 로직을 재사용하여 미사용 AMI를 식별하고,
+    age_threshold 기준을 충족하는 AMI에 대해 deregister 및 스냅샷 삭제를 수행한다.
+    deregister 실패 시 해당 AMI의 스냅샷 삭제는 시도하지 않는다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        age_threshold: 최소 경과일 (이보다 오래된 AMI만 대상).
+        delete_snapshots: 연관 스냅샷 삭제 여부.
+        dry_run: dry-run 모드 여부.
+
+    Returns:
+        정리 결과 집계 객체. 대상이 없으면 None.
+    """
     from botocore.exceptions import ClientError
 
     # 1. 기존 분석 로직 재사용

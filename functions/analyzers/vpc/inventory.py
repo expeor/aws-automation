@@ -1,5 +1,5 @@
 """
-plugins/vpc/inventory.py - VPC 리소스 인벤토리 조회 (스트리밍 방식)
+functions/analyzers/vpc/inventory.py - VPC 리소스 인벤토리 조회 (스트리밍 방식)
 
 ENI, NAT Gateway, VPC Endpoint 현황 조회.
 메모리 효율적인 스트리밍 처리 - 수집 → 쓰기 → 해제 순환.
@@ -29,7 +29,15 @@ console = Console()
 
 @dataclass
 class ResourceDef:
-    """리소스 수집 정의"""
+    """스트리밍 수집 대상 리소스 정의
+
+    Attributes:
+        name: 리소스 표시 이름 (콘솔 출력용)
+        sheet_name: Excel 시트 이름
+        method: InventoryCollector의 수집 메서드 이름
+        columns: Excel 컬럼 정의 리스트
+        row_mapper: 수집 항목을 Excel 행 데이터로 변환하는 함수
+    """
 
     name: str
     sheet_name: str
@@ -40,7 +48,13 @@ class ResourceDef:
 
 @dataclass
 class Stats:
-    """수집 통계"""
+    """수집 통계
+
+    Attributes:
+        counts: 리소스 유형별 수집 수량
+        status_counts: ENI 상태별 수량
+        warnings: 경고 메시지 리스트
+    """
 
     counts: dict[str, int] = field(default_factory=dict)
     status_counts: dict[str, int] = field(default_factory=dict)
@@ -48,7 +62,14 @@ class Stats:
 
 
 def run(ctx: ExecutionContext) -> None:
-    """VPC 리소스 인벤토리 조회 (스트리밍 방식)"""
+    """VPC 리소스 인벤토리 조회 (스트리밍 방식)
+
+    ENI, NAT Gateway, VPC Endpoint를 순차적으로 수집하고,
+    수집 즉시 Excel에 기록 후 메모리에서 해제합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("\n[bold]VPC 리소스 인벤토리[/bold]\n")
 
     collector = InventoryCollector(ctx)

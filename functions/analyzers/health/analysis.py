@@ -1,5 +1,5 @@
 """
-plugins/health/analysis.py - PHD 전체 이벤트 분석
+functions/analyzers/health/analysis.py - PHD 전체 이벤트 분석
 
 AWS Personal Health Dashboard 전체 이벤트 분석 및 보고서 생성
 멀티 계정 지원: parallel_collect 패턴 사용
@@ -30,16 +30,19 @@ console = Console()
 
 
 def _collect_health_events(session, account_id: str, account_name: str, region: str) -> CollectionResult | None:
-    """단일 계정의 Health 이벤트 수집 (병렬 실행용)
+    """parallel_collect 콜백: 단일 계정의 AWS Health 이벤트를 수집한다.
+
+    HealthCollector를 사용하여 open/upcoming 상태의 모든 Health 이벤트를
+    수집한다. Business/Enterprise Support 플랜이 필요하다.
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전 (Health API는 항상 us-east-1 사용)
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전 (Health API는 항상 us-east-1에서 동작).
 
     Returns:
-        CollectionResult 또는 None
+        수집 결과 CollectionResult. 이벤트가 없으면 None.
     """
     try:
         collector = HealthCollector(session, account_id, account_name)
@@ -58,7 +61,14 @@ def _collect_health_events(session, account_id: str, account_name: str, region: 
 
 
 def run(ctx: ExecutionContext) -> None:
-    """PHD 전체 이벤트 분석 및 보고서 생성"""
+    """PHD 전체 이벤트 분석 도구의 메인 실행 함수.
+
+    AWS Personal Health Dashboard의 모든 이벤트(패치, 알림, 장애)를
+    수집하여 분석 요약을 출력하고 Excel 보고서를 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]AWS Health 이벤트 분석 시작...[/bold]\n")
 
     # 병렬 수집 (Health API는 us-east-1에서만 동작하지만 리전 파라미터는 그대로 전달)

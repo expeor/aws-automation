@@ -1,5 +1,5 @@
 """
-plugins/elb/target_group_audit.py - Target Group 미사용 분석
+functions/analyzers/elb/target_group_audit.py - Target Group 미사용 분석
 
 ELB에 연결되지 않은 Target Group 탐지
 
@@ -33,7 +33,11 @@ REQUIRED_PERMISSIONS = {
 
 
 class TargetGroupStatus(Enum):
-    """Target Group 상태"""
+    """Target Group 사용 상태 분류
+
+    정상, LB 미연결, 타겟 없음, 전체 비정상 4가지로 구분하여
+    미사용 또는 문제 있는 Target Group을 식별합니다.
+    """
 
     NORMAL = "normal"
     UNATTACHED = "unattached"  # LB에 연결 안 됨
@@ -43,7 +47,23 @@ class TargetGroupStatus(Enum):
 
 @dataclass
 class TargetGroupInfo:
-    """Target Group 정보"""
+    """Target Group 정보
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        arn: Target Group ARN
+        name: Target Group 이름
+        protocol: 프로토콜 (HTTP, HTTPS, TCP 등). Lambda 타입은 None.
+        port: 포트 번호. Lambda 타입은 None.
+        target_type: 타겟 유형 (instance, ip, lambda, alb)
+        vpc_id: VPC ID. Lambda 타입은 None.
+        load_balancer_arns: 연결된 로드밸런서 ARN 목록
+        total_targets: 등록된 전체 타겟 수
+        healthy_targets: 정상(healthy) 타겟 수
+        unhealthy_targets: 비정상 타겟 수
+    """
 
     account_id: str
     account_name: str
@@ -61,12 +81,23 @@ class TargetGroupInfo:
 
     @property
     def is_attached(self) -> bool:
+        """로드밸런서 연결 여부 확인
+
+        Returns:
+            하나 이상의 LB에 연결되어 있으면 True
+        """
         return len(self.load_balancer_arns) > 0
 
 
 @dataclass
 class TargetGroupFinding:
-    """Target Group 분석 결과"""
+    """Target Group 개별 분석 결과
+
+    Attributes:
+        tg: 분석 대상 Target Group 정보
+        status: 분석된 사용 상태
+        recommendation: 권장 조치 사항
+    """
 
     tg: TargetGroupInfo
     status: TargetGroupStatus
@@ -75,7 +106,19 @@ class TargetGroupFinding:
 
 @dataclass
 class TargetGroupAnalysisResult:
-    """Target Group 분석 결과 집계"""
+    """Target Group 분석 결과 집계
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        total_count: 전체 Target Group 수
+        unattached_count: LB 미연결 Target Group 수
+        no_targets_count: 타겟 미등록 Target Group 수
+        unhealthy_count: 전체 타겟 비정상 Target Group 수
+        normal_count: 정상 Target Group 수
+        findings: 개별 분석 결과 목록
+    """
 
     account_id: str
     account_name: str
@@ -94,7 +137,20 @@ class TargetGroupAnalysisResult:
 
 
 def collect_target_groups(session, account_id: str, account_name: str, region: str) -> list[TargetGroupInfo]:
-    """Target Groups 수집"""
+    """Target Group 목록 및 타겟 헬스 정보 수집
+
+    ELBv2 API로 Target Group 목록을 페이지네이션으로 수집하고,
+    각 Target Group의 타겟 헬스 상태를 조회합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        Target Group 정보 목록
+    """
     from botocore.exceptions import ClientError
 
     elbv2 = get_client(session, "elbv2", region_name=region)
@@ -142,7 +198,20 @@ def analyze_target_groups(
     account_name: str,
     region: str,
 ) -> TargetGroupAnalysisResult:
-    """Target Group 분석"""
+    """Target Group 사용 상태 분석
+
+    LB 연결 여부, 타겟 등록 여부, 타겟 헬스 상태를 기준으로
+    각 Target Group의 사용 상태를 판별하고 카운트를 집계합니다.
+
+    Args:
+        target_groups: 분석 대상 Target Group 정보 목록
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        상태별 카운트 및 개별 분석 결과가 포함된 집계 결과
+    """
     result = TargetGroupAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -205,7 +274,18 @@ def analyze_target_groups(
 
 
 def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보고서 생성
+
+    Summary(계정/리전별 상태 카운트)와 Target Groups(비정상 TG 상세) 2개 시트로
+    구성된 보고서를 생성합니다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        저장된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -303,7 +383,17 @@ def generate_report(results: list[TargetGroupAnalysisResult], output_dir: str) -
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> TargetGroupAnalysisResult | None:
-    """단일 계정/리전의 Target Group 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 Target Group 수집 및 분석 (parallel_collect 콜백)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        Target Group 분석 결과. Target Group이 없으면 None.
+    """
     target_groups = collect_target_groups(session, account_id, account_name, region)
     if not target_groups:
         return None
@@ -311,7 +401,15 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """Target Group 미사용 분석"""
+    """Target Group 미사용 분석
+
+    멀티 계정/리전에서 Target Group을 병렬 수집하고,
+    LB 미연결, 타겟 미등록, 전체 비정상 상태를 식별하여
+    Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]Target Group 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="elbv2")

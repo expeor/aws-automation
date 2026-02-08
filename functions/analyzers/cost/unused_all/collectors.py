@@ -1,7 +1,15 @@
 """
-plugins/cost/unused_all/collectors.py - 개별 리소스 수집/분석 함수
+functions/analyzers/cost/unused_all/collectors.py - 개별 리소스 수집/분석 함수
 
-각 AWS 리소스 타입별 수집 및 분석 함수 정의
+각 AWS 리소스 타입별 수집 및 분석 함수를 정의합니다.
+
+모든 collect_* 함수는 동일한 시그니처를 따릅니다:
+    - 리전별: ``(session, account_id, account_name, region) -> dict``
+    - 글로벌: ``(session, account_id, account_name) -> dict``
+
+반환 딕셔너리 형식:
+    - 성공: ``{"total": int, "unused": int, "waste": float, "result": AnalysisResult}``
+    - 실패: ``{"error": str}``
 """
 
 from __future__ import annotations
@@ -183,7 +191,18 @@ from functions.analyzers.vpc.sg_audit_analysis import SGAnalyzer, SGCollector, S
 
 
 def collect_nat(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """NAT Gateway 수집 및 분석"""
+    """NAT Gateway 수집 및 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, findings 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         collector = NATCollector()
         nat_data = collector.collect(session, account_id, account_name, region)
@@ -205,7 +224,18 @@ def collect_nat(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_eni(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """ENI 수집 및 분석"""
+    """ENI 수집 및 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         enis = collect_enis(session, account_id, account_name, region)
         if not enis:
@@ -222,7 +252,18 @@ def collect_eni(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_ebs_volumes(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """EBS 수집 및 분석"""
+    """EBS 볼륨 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         volumes = collect_ebs(session, account_id, account_name, region)
         if not volumes:
@@ -240,7 +281,18 @@ def collect_ebs_volumes(session, account_id: str, account_name: str, region: str
 
 
 def collect_eip_addresses(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """EIP 수집 및 분석"""
+    """Elastic IP 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         eips = collect_eips(session, account_id, account_name, region)
         if not eips:
@@ -258,7 +310,20 @@ def collect_eip_addresses(session, account_id: str, account_name: str, region: s
 
 
 def collect_elb(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """ELB 수집 및 분석"""
+    """ELB (v2 + Classic) 수집 및 미사용 분석
+
+    ALB/NLB/GLB와 Classic LB를 모두 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
         classic_lbs = collect_classic_load_balancers(session, account_id, account_name, region)
@@ -278,7 +343,20 @@ def collect_elb(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_snapshot(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """EBS Snapshot 수집 및 분석"""
+    """EBS Snapshot 수집 및 미사용 분석
+
+    AMI 매핑을 조회하여 고아/오래된 스냅샷을 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         snapshots = collect_snapshots(session, account_id, account_name, region)
         if not snapshots:
@@ -297,7 +375,20 @@ def collect_snapshot(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_ami(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """AMI 수집 및 분석"""
+    """AMI 수집 및 미사용 분석
+
+    실행 중인 인스턴스가 사용하는 AMI를 제외하여 미사용 AMI를 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         amis = collect_amis(session, account_id, account_name, region)
         if not amis:
@@ -316,7 +407,18 @@ def collect_ami(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_rds_snapshot(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """RDS Snapshot 수집 및 분석"""
+    """RDS Snapshot 수집 및 오래된 스냅샷 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, old, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         rds_snaps = collect_rds_snapshots(session, account_id, account_name, region)
         if not rds_snaps:
@@ -334,7 +436,20 @@ def collect_rds_snapshot(session, account_id: str, account_name: str, region: st
 
 
 def collect_loggroup(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """CloudWatch Log Group 수집 및 분석"""
+    """CloudWatch Log Group 수집 및 분석
+
+    빈 로그 그룹과 오래된 로그 그룹을 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, issue, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         log_groups = collect_log_groups(session, account_id, account_name, region)
         if not log_groups:
@@ -352,7 +467,20 @@ def collect_loggroup(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_target_group(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Target Group 수집 및 분석"""
+    """Target Group 수집 및 문제 분석
+
+    미연결 또는 타겟이 없는 Target Group을 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, issue, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         tgs = collect_target_groups(session, account_id, account_name, region)
         if not tgs:
@@ -369,7 +497,18 @@ def collect_target_group(session, account_id: str, account_name: str, region: st
 
 
 def collect_endpoint(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """VPC Endpoint 수집 및 분석"""
+    """VPC Endpoint 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         endpoints = collect_endpoints(session, account_id, account_name, region)
         if not endpoints:
@@ -387,7 +526,18 @@ def collect_endpoint(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_secret(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Secrets Manager 수집 및 분석"""
+    """Secrets Manager 시크릿 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         secrets = collect_secrets(session, account_id, account_name, region)
         if not secrets:
@@ -405,7 +555,20 @@ def collect_secret(session, account_id: str, account_name: str, region: str) -> 
 
 
 def collect_kms(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """KMS 수집 및 분석"""
+    """KMS 키 수집 및 미사용 분석
+
+    비활성화 및 삭제 예정 키를 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         kms_keys = collect_kms_keys(session, account_id, account_name, region)
         if not kms_keys:
@@ -423,7 +586,20 @@ def collect_kms(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_ecr(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """ECR 수집 및 분석"""
+    """ECR 리포지토리 수집 및 분석
+
+    빈 리포지토리 및 오래된 이미지가 있는 리포지토리를 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, issue, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         repos = collect_ecr_repos(session, account_id, account_name, region)
         if not repos:
@@ -441,7 +617,20 @@ def collect_ecr(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_lambda(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Lambda 수집 및 분석"""
+    """Lambda 함수 수집 및 미사용 분석
+
+    CloudWatch 메트릭을 포함하여 함수를 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         functions = collect_functions_with_metrics(session, account_id, account_name, region)
         if not functions:
@@ -459,7 +648,18 @@ def collect_lambda(session, account_id: str, account_name: str, region: str) -> 
 
 
 def collect_elasticache(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """ElastiCache 수집 및 분석"""
+    """ElastiCache 클러스터 수집 및 미사용/저사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         clusters = collect_elasticache_clusters(session, account_id, account_name, region)
         if not clusters:
@@ -477,7 +677,18 @@ def collect_elasticache(session, account_id: str, account_name: str, region: str
 
 
 def collect_rds_instance(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """RDS Instance 수집 및 분석"""
+    """RDS 인스턴스 수집 및 미사용/저사용/중지 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         instances = collect_rds_instances(session, account_id, account_name, region)
         if not instances:
@@ -495,7 +706,20 @@ def collect_rds_instance(session, account_id: str, account_name: str, region: st
 
 
 def collect_efs(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """EFS 수집 및 분석"""
+    """EFS 파일시스템 수집 및 미사용 분석
+
+    마운트 타겟 없음, I/O 없음, 빈 파일시스템을 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         filesystems = collect_efs_filesystems(session, account_id, account_name, region)
         if not filesystems:
@@ -513,7 +737,18 @@ def collect_efs(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_sqs(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """SQS 수집 및 분석"""
+    """SQS 큐 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         queues = collect_sqs_queues(session, account_id, account_name, region)
         if not queues:
@@ -530,7 +765,18 @@ def collect_sqs(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_sns(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """SNS 수집 및 분석"""
+    """SNS 토픽 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         topics = collect_sns_topics(session, account_id, account_name, region)
         if not topics:
@@ -547,7 +793,18 @@ def collect_sns(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_acm(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """ACM 수집 및 분석"""
+    """ACM 인증서 수집 및 미사용/만료 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         certs = collect_acm_certificates(session, account_id, account_name, region)
         if not certs:
@@ -564,7 +821,18 @@ def collect_acm(session, account_id: str, account_name: str, region: str) -> dic
 
 
 def collect_apigateway(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """API Gateway 수집 및 분석"""
+    """API Gateway 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         apis = collect_apigateway_apis(session, account_id, account_name, region)
         if not apis:
@@ -581,7 +849,20 @@ def collect_apigateway(session, account_id: str, account_name: str, region: str)
 
 
 def collect_eventbridge(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """EventBridge 수집 및 분석"""
+    """EventBridge 규칙 수집 및 미사용 분석
+
+    비활성화, 타겟 없음, 미사용 규칙을 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         rules = collect_eventbridge_rules(session, account_id, account_name, region)
         if not rules:
@@ -598,7 +879,20 @@ def collect_eventbridge(session, account_id: str, account_name: str, region: str
 
 
 def collect_cw_alarm(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """CloudWatch Alarm 수집 및 분석"""
+    """CloudWatch Alarm 수집 및 고아 알람 분석
+
+    고아 알람(대상 리소스 없음)과 무동작 알람을 식별합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, orphan, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         alarms = collect_cw_alarms(session, account_id, account_name, region)
         if not alarms:
@@ -615,7 +909,18 @@ def collect_cw_alarm(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_dynamodb(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """DynamoDB 수집 및 분석"""
+    """DynamoDB 테이블 수집 및 미사용/저사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         tables = collect_dynamodb_tables(session, account_id, account_name, region)
         if not tables:
@@ -633,7 +938,18 @@ def collect_dynamodb(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_codecommit(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """CodeCommit 수집 및 분석"""
+    """CodeCommit 리포지토리 수집 및 빈 리포 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         repos = collect_codecommit_repos(session, account_id, account_name, region)
         if not repos:
@@ -651,7 +967,18 @@ def collect_codecommit(session, account_id: str, account_name: str, region: str)
 
 
 def collect_ec2_instance(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """EC2 Instance 수집 및 분석"""
+    """EC2 인스턴스 수집 및 미사용/저사용/중지 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         instances = collect_ec2_instances(session, account_id, account_name, region)
         if not instances:
@@ -669,7 +996,18 @@ def collect_ec2_instance(session, account_id: str, account_name: str, region: st
 
 
 def collect_sagemaker_endpoint(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """SageMaker Endpoint 수집 및 분석"""
+    """SageMaker Endpoint 수집 및 미사용/저사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         endpoints = collect_sagemaker_endpoints(session, account_id, account_name, region)
         if not endpoints:
@@ -687,7 +1025,17 @@ def collect_sagemaker_endpoint(session, account_id: str, account_name: str, regi
 
 
 def collect_route53(session, account_id: str, account_name: str) -> dict[str, Any]:
-    """Route53 수집 및 분석 (글로벌 서비스)"""
+    """Route53 Hosted Zone 수집 및 빈 Zone 분석 (글로벌 서비스)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+
+    Returns:
+        total, empty, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         zones = collect_hosted_zones(session, account_id, account_name)
         if not zones:
@@ -705,7 +1053,17 @@ def collect_route53(session, account_id: str, account_name: str) -> dict[str, An
 
 
 def collect_s3(session, account_id: str, account_name: str) -> dict[str, Any]:
-    """S3 수집 및 분석 (글로벌 서비스)"""
+    """S3 버킷 수집 및 빈 버킷 분석 (글로벌 서비스)
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+
+    Returns:
+        total, empty, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         buckets = collect_buckets(session, account_id, account_name)
         if not buckets:
@@ -722,7 +1080,18 @@ def collect_s3(session, account_id: str, account_name: str) -> dict[str, Any]:
 
 
 def collect_redshift(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Redshift 클러스터 수집 및 분석"""
+    """Redshift 클러스터 수집 및 미사용/저사용/일시 중지 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         clusters = collect_redshift_clusters(session, account_id, account_name, region)
         if not clusters:
@@ -740,7 +1109,18 @@ def collect_redshift(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_opensearch(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """OpenSearch 도메인 수집 및 분석"""
+    """OpenSearch 도메인 수집 및 미사용/저사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         domains = collect_opensearch_domains(session, account_id, account_name, region)
         if not domains:
@@ -758,7 +1138,18 @@ def collect_opensearch(session, account_id: str, account_name: str, region: str)
 
 
 def collect_kinesis(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Kinesis 스트림 수집 및 분석"""
+    """Kinesis Data Streams 수집 및 미사용/저사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         streams = collect_kinesis_streams(session, account_id, account_name, region)
         if not streams:
@@ -776,7 +1167,18 @@ def collect_kinesis(session, account_id: str, account_name: str, region: str) ->
 
 
 def collect_glue(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Glue 작업 수집 및 분석"""
+    """Glue 작업 수집 및 미사용/실패 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         jobs = collect_glue_jobs(session, account_id, account_name, region)
         if not jobs:
@@ -793,7 +1195,18 @@ def collect_glue(session, account_id: str, account_name: str, region: str) -> di
 
 
 def collect_security_group(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Security Group 수집 및 분석"""
+    """Security Group 수집 및 미사용 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         collector = SGCollector()
         sgs = collector.collect(session, account_id, account_name, region)
@@ -816,7 +1229,18 @@ def collect_security_group(session, account_id: str, account_name: str, region: 
 
 
 def collect_transfer(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """Transfer Family 서버 수집 및 분석"""
+    """Transfer Family 서버 수집 및 미사용/유휴 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         servers = collect_transfer_servers(session, account_id, account_name, region)
         if not servers:
@@ -834,7 +1258,18 @@ def collect_transfer(session, account_id: str, account_name: str, region: str) -
 
 
 def collect_fsx(session, account_id: str, account_name: str, region: str) -> dict[str, Any]:
-    """FSx 파일 시스템 수집 및 분석"""
+    """FSx 파일시스템 수집 및 미사용/유휴 분석
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        total, unused, waste, result 키를 포함하는 딕셔너리.
+        오류 시 error 키를 포함하는 딕셔너리.
+    """
     try:
         filesystems = collect_fsx_filesystems(session, account_id, account_name, region)
         if not filesystems:

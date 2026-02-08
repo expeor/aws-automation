@@ -1,5 +1,5 @@
 """
-plugins/cloudwatch/loggroup_audit.py - CloudWatch Log Group 미사용 분석
+functions/analyzers/cloudwatch/loggroup_audit.py - CloudWatch Log Group 미사용 분석
 
 빈 로그 그룹 및 오래된 로그 탐지
 
@@ -39,7 +39,16 @@ OLD_DAYS_THRESHOLD = 90
 
 
 class LogGroupStatus(Enum):
-    """로그 그룹 상태"""
+    """CloudWatch Log Group 분석 상태.
+
+    로그 그룹의 사용 상태를 분류한다.
+
+    Attributes:
+        NORMAL: 정상 사용 중인 로그 그룹.
+        EMPTY: 저장된 로그가 없는 빈 로그 그룹 (0 bytes).
+        NO_RETENTION: 보존 기간 미설정으로 무기한 저장 중인 로그 그룹.
+        OLD: 90일 이상 새 로그 ingestion이 없는 오래된 로그 그룹.
+    """
 
     NORMAL = "normal"
     EMPTY = "empty"  # 로그 없음
@@ -49,7 +58,20 @@ class LogGroupStatus(Enum):
 
 @dataclass
 class LogGroupInfo:
-    """CloudWatch Log Group 정보"""
+    """CloudWatch Log Group 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        name: 로그 그룹 이름.
+        arn: 로그 그룹 ARN.
+        creation_time: 생성 시간 (UTC).
+        stored_bytes: 저장된 바이트 수.
+        retention_days: 보존 기간 (일). None이면 무기한.
+        last_ingestion_time: 마지막 로그 ingestion 시간 (UTC).
+        log_stream_count: 로그 스트림 수 (최소 존재 여부 확인).
+    """
 
     account_id: str
     account_name: str
@@ -64,18 +86,40 @@ class LogGroupInfo:
 
     @property
     def stored_gb(self) -> float:
+        """저장 용량 (GB).
+
+        Returns:
+            바이트를 GB로 변환한 값.
+        """
         return self.stored_bytes / (1024**3)
 
     @property
     def monthly_cost(self) -> float:
+        """월간 저장 비용 (USD).
+
+        $0.03/GB/월 기준으로 계산한다.
+
+        Returns:
+            월간 예상 저장 비용.
+        """
         return self.stored_gb * COST_PER_GB_MONTH
 
     @property
     def age_days(self) -> int:
+        """로그 그룹 생성 후 경과 일수.
+
+        Returns:
+            생성 시점부터 현재까지의 일수.
+        """
         return (datetime.now(timezone.utc) - self.creation_time).days
 
     @property
     def days_since_ingestion(self) -> int | None:
+        """마지막 ingestion 이후 경과 일수.
+
+        Returns:
+            경과 일수. ingestion 기록이 없으면 None.
+        """
         if self.last_ingestion_time:
             return (datetime.now(timezone.utc) - self.last_ingestion_time).days
         return None
@@ -83,7 +127,13 @@ class LogGroupInfo:
 
 @dataclass
 class LogGroupFinding:
-    """Log Group 분석 결과"""
+    """개별 Log Group에 대한 분석 결과.
+
+    Attributes:
+        log_group: 분석 대상 로그 그룹 정보.
+        status: 분석된 상태 (NORMAL, EMPTY, NO_RETENTION, OLD).
+        recommendation: 권장 조치 메시지.
+    """
 
     log_group: LogGroupInfo
     status: LogGroupStatus
@@ -92,7 +142,22 @@ class LogGroupFinding:
 
 @dataclass
 class LogGroupAnalysisResult:
-    """Log Group 분석 결과 집계"""
+    """계정/리전별 Log Group 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_count: 전체 로그 그룹 수.
+        empty_count: 빈 로그 그룹 수.
+        no_retention_count: 보존 기간 미설정 로그 그룹 수.
+        old_count: 오래된 로그 그룹 수 (90일 이상 ingestion 없음).
+        normal_count: 정상 로그 그룹 수.
+        total_stored_gb: 전체 저장 용량 (GB).
+        empty_monthly_cost: 빈 로그 그룹의 월간 비용 (USD).
+        old_monthly_cost: 오래된 로그 그룹의 월간 비용 (USD).
+        findings: 개별 로그 그룹 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -114,7 +179,20 @@ class LogGroupAnalysisResult:
 
 
 def collect_log_groups(session, account_id: str, account_name: str, region: str) -> list[LogGroupInfo]:
-    """CloudWatch Log Groups 수집"""
+    """CloudWatch Log Group을 수집하고 마지막 ingestion 시간을 확인한다.
+
+    describe_log_groups Paginator로 전체 목록을 조회한 뒤, 각 로그 그룹의
+    로그 스트림을 조회하여 마지막 ingestion 시간을 갱신한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 LogGroupInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     logs = get_client(session, "logs", region_name=region)
@@ -181,7 +259,20 @@ def collect_log_groups(session, account_id: str, account_name: str, region: str)
 def analyze_log_groups(
     log_groups: list[LogGroupInfo], account_id: str, account_name: str, region: str
 ) -> LogGroupAnalysisResult:
-    """Log Group 분석"""
+    """수집된 Log Group을 분석하여 미사용/비최적 항목을 식별한다.
+
+    빈 로그 그룹, 오래된 로그 그룹(90일 이상 ingestion 없음),
+    보존 기간 미설정 로그 그룹을 분류하고 비용을 계산한다.
+
+    Args:
+        log_groups: 수집된 LogGroupInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        분석 결과를 담은 LogGroupAnalysisResult 객체.
+    """
     result = LogGroupAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -248,7 +339,17 @@ def analyze_log_groups(
 
 
 def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Log Group 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계)와 Log Groups(비정상 로그 그룹 상세) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 로그 그룹 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -335,7 +436,17 @@ def generate_report(results: list[LogGroupAnalysisResult], output_dir: str) -> s
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LogGroupAnalysisResult | None:
-    """단일 계정/리전의 Log Group 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 Log Group을 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        로그 그룹 분석 결과. 로그 그룹이 없으면 None.
+    """
     log_groups = collect_log_groups(session, account_id, account_name, region)
     if not log_groups:
         return None
@@ -343,7 +454,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """CloudWatch Log Group 미사용 분석"""
+    """CloudWatch Log Group 미사용 분석 도구의 메인 실행 함수.
+
+    빈 로그 그룹, 오래된 로그 그룹, 보존 기간 미설정 로그 그룹을 탐지하고
+    절감 가능 비용을 계산한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]CloudWatch Log Group 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="logs")

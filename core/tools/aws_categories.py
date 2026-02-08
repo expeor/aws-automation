@@ -1,8 +1,16 @@
-"""
-core/tools/aws_categories.py - AWS 서비스 카테고리 매핑
+"""AWS 서비스 카테고리 매핑.
 
-AWS 공식 문서 기반 서비스 그룹 분류
+AWS 공식 문서 기반 서비스 그룹 분류 체계를 정의합니다.
+Compute, Storage, Database 등 AWS 공식 카테고리로 서비스를 그룹핑하며,
+서비스 이름과 카테고리 간 역매핑, 글로벌 서비스 목록 등을 제공합니다.
+
 참조: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/
+
+Attributes:
+    AWS_SERVICE_CATEGORIES: AWS 서비스 카테고리 정의 딕셔너리.
+        키는 카테고리 slug (예: "compute"), 값은 name, name_ko, services 포함 딕셔너리.
+    SERVICE_TO_CATEGORY: 서비스명 -> 카테고리 키 역매핑 딕셔너리.
+    GLOBAL_SERVICES: 리전 선택이 불필요한 글로벌 서비스 이름 집합.
 """
 
 # AWS 서비스 카테고리 정의 (AWS 공식 분류 기준)

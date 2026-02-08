@@ -22,7 +22,25 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SGRule:
-    """Security Group Rule"""
+    """Security Group 개별 규칙 정보.
+
+    인바운드 또는 아웃바운드 방향의 단일 규칙을 나타내며,
+    IP CIDR, SG 참조, Prefix List 등 다양한 소스/대상 유형을 포함한다.
+
+    Attributes:
+        rule_id: 규칙 고유 식별자 (방향-프로토콜-포트-소스 조합).
+        direction: 규칙 방향 (``inbound`` 또는 ``outbound``).
+        protocol: 프로토콜 (``tcp``, ``udp``, ``ALL`` 등).
+        port_range: 포트 범위 (``22``, ``80-443``, ``ALL`` 등).
+        source_dest: 소스/대상 (IP CIDR, SG ID, 또는 Prefix List ID).
+        source_dest_type: 소스/대상 유형 (``ip``, ``sg``, ``prefix-list``).
+        referenced_sg_id: 참조된 Security Group ID (SG 참조인 경우).
+        description: 규칙 설명.
+        is_self_reference: 자기 자신 SG 참조 여부.
+        is_cross_account: 다른 계정의 SG 참조 여부.
+        referenced_account_id: 참조된 SG의 계정 ID (cross-account인 경우).
+        is_ipv6: IPv6 규칙 여부.
+    """
 
     rule_id: str
     direction: str  # inbound / outbound
@@ -41,9 +59,19 @@ class SGRule:
 
 @dataclass
 class AttachedResource:
-    """SG에 연결된 리소스 정보"""
+    """Security Group에 연결된 AWS 리소스 정보.
 
-    resource_type: str  # EC2, RDS, Lambda, ELB, ElastiCache, ECS, etc.
+    ENI를 통해 파악된 리소스의 유형과 식별 정보를 담는다.
+
+    Attributes:
+        resource_type: 리소스 유형 (EC2, RDS, Lambda, ELB, ElastiCache, ECS 등).
+        resource_id: 리소스 식별자.
+        resource_name: 리소스 표시 이름 (Name 태그 또는 ID).
+        eni_id: 연결된 ENI ID.
+        private_ip: ENI의 프라이빗 IP 주소.
+    """
+
+    resource_type: str
     resource_id: str  # 리소스 ID
     resource_name: str  # 리소스 이름 (태그 Name 또는 ID)
     eni_id: str  # ENI ID
@@ -52,7 +80,28 @@ class AttachedResource:
 
 @dataclass
 class SecurityGroup:
-    """Security Group 정보"""
+    """Security Group 상세 정보.
+
+    기본 메타데이터, 인바운드/아웃바운드 규칙, ENI 연결 정보,
+    연결된 리소스 목록, 다른 SG에서의 참조 관계를 포함한다.
+
+    Attributes:
+        sg_id: Security Group ID (예: ``sg-0123456789abcdef0``).
+        sg_name: Security Group 이름.
+        description: Security Group 설명.
+        vpc_id: 소속 VPC ID.
+        account_id: AWS 계정 ID.
+        account_name: 계정 표시 이름.
+        region: AWS 리전 코드.
+        is_default_sg: VPC 기본 Security Group 여부.
+        is_default_vpc: Default VPC에 속하는지 여부.
+        inbound_rules: 인바운드 규칙 목록.
+        outbound_rules: 아웃바운드 규칙 목록.
+        eni_count: 연결된 ENI 수.
+        eni_descriptions: 연결된 ENI 설명 목록.
+        attached_resources: ENI를 통해 파악된 연결 리소스 목록.
+        referenced_by_sgs: 이 SG를 규칙에서 참조하는 다른 SG ID 집합.
+    """
 
     sg_id: str
     sg_name: str
@@ -82,7 +131,11 @@ class SecurityGroup:
 
 
 class SGCollector:
-    """Security Group 데이터 수집기"""
+    """Security Group 데이터 수집기.
+
+    EC2 API를 사용하여 Security Group, VPC, ENI 정보를 수집하고
+    SG 간 참조 관계와 ENI 연결 리소스를 분석한다.
+    """
 
     def __init__(self):
         self.security_groups: dict[str, SecurityGroup] = {}  # sg_id -> SG
@@ -90,7 +143,20 @@ class SGCollector:
         self.errors: list[str] = []
 
     def collect(self, session, account_id: str, account_name: str, region: str) -> list[SecurityGroup]:
-        """단일 계정/리전에서 SG 데이터 수집"""
+        """단일 계정/리전에서 Security Group 데이터를 수집한다.
+
+        VPC 정보, SG 목록, ENI 연결 정보를 순서대로 수집하고
+        SG 간 참조 관계를 분석한다.
+
+        Args:
+            session: boto3 session.
+            account_id: AWS 계정 ID.
+            account_name: 계정 표시 이름.
+            region: AWS 리전 코드.
+
+        Returns:
+            수집된 SecurityGroup 목록.
+        """
         # 이전 수집 데이터 초기화 (중복 방지)
         self.security_groups.clear()
         self.vpc_default_map.clear()
@@ -124,7 +190,7 @@ class SGCollector:
             return []
 
     def _collect_vpcs(self, ec2, account_id: str, region: str) -> None:
-        """VPC 정보 수집"""
+        """VPC 목록을 수집하여 Default VPC 여부를 매핑한다."""
         try:
             paginator = ec2.get_paginator("describe_vpcs")
             for page in paginator.paginate():
@@ -137,7 +203,7 @@ class SGCollector:
             logger.warning(f"VPC 수집 실패: {e}")
 
     def _collect_security_groups(self, ec2, account_id: str, account_name: str, region: str) -> None:
-        """Security Groups 수집"""
+        """Security Group 목록을 수집하고 인바운드/아웃바운드 규칙을 파싱한다."""
         paginator = ec2.get_paginator("describe_security_groups")
 
         for page in paginator.paginate():
@@ -168,7 +234,19 @@ class SGCollector:
                 self.security_groups[sg_id] = security_group
 
     def _parse_rules(self, rule: dict[str, Any], direction: str, sg_id: str, account_id: str) -> list[SGRule]:
-        """규칙 파싱"""
+        """EC2 API 응답의 IpPermission을 SGRule 목록으로 파싱한다.
+
+        IPv4, IPv6, SG 참조, Prefix List 등 모든 소스/대상 유형을 처리한다.
+
+        Args:
+            rule: EC2 IpPermission 딕셔너리.
+            direction: 규칙 방향 (``inbound`` 또는 ``outbound``).
+            sg_id: 소속 Security Group ID.
+            account_id: 현재 계정 ID (cross-account 판별용).
+
+        Returns:
+            파싱된 SGRule 목록.
+        """
         rules = []
 
         protocol = rule.get("IpProtocol", "-1")
@@ -263,7 +341,7 @@ class SGCollector:
         return rules
 
     def _collect_enis(self, ec2, account_id: str, region: str) -> None:
-        """ENI 정보 수집 및 SG 연결"""
+        """ENI 목록을 수집하고 각 SG에 연결된 리소스 정보를 매핑한다."""
         try:
             paginator = ec2.get_paginator("describe_network_interfaces")
 
@@ -377,7 +455,7 @@ class SGCollector:
         return "", "", ""
 
     def _analyze_sg_references(self) -> None:
-        """SG 간 참조 관계 분석"""
+        """SG 간 참조 관계를 분석하여 ``referenced_by_sgs`` 필드를 갱신한다."""
         for sg in self.security_groups.values():
             all_rules = sg.inbound_rules + sg.outbound_rules
 

@@ -21,7 +21,19 @@ if TYPE_CHECKING:
 
 @dataclass
 class RoleStats:
-    """계정별 Role 통계"""
+    """계정별 IAM Role 통계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        total_roles: 전체 Role 수.
+        service_linked_roles: Service-linked Role 수 (분석 제외).
+        aws_managed_roles: AWS 관리형 Role 수.
+        custom_roles: 사용자 정의 Role 수.
+        unused_roles: 미사용 Role 수.
+        admin_roles: Admin 권한 보유 Role 수.
+        config_enabled: AWS Config 활성화 여부.
+    """
 
     account_id: str
     account_name: str
@@ -36,7 +48,25 @@ class RoleStats:
 
 @dataclass
 class UnusedRole:
-    """미사용 Role 정보"""
+    """미사용 IAM Role의 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        role_name: Role 이름.
+        role_arn: Role ARN.
+        description: Role 설명.
+        create_date: 생성일 문자열 (YYYY-MM-DD).
+        age_days: 생성 후 경과일.
+        last_used_date: 마지막 사용일 문자열.
+        days_since_last_use: 마지막 사용 후 경과일 (-1이면 미사용).
+        last_used_region: 마지막 사용 리전.
+        trusted_entities: Trust Policy의 신뢰 엔티티 (줄바꿈 구분).
+        attached_policies: 연결된 정책 이름 (쉼표 구분).
+        connected_resources: 연결된 리소스 목록 (줄바꿈 구분, 최대 5개).
+        has_admin_access: Admin 권한 보유 여부.
+        path: Role path.
+    """
 
     account_id: str
     account_name: str
@@ -57,14 +87,27 @@ class UnusedRole:
 
 @dataclass
 class UnusedRolesAnalysis:
-    """분석 결과"""
+    """미사용 Role 분석 결과.
+
+    Attributes:
+        role_stats: 계정별 Role 통계 목록.
+        unused_roles: 미사용 Role 상세 정보 목록.
+    """
 
     role_stats: list[RoleStats] = field(default_factory=list)
     unused_roles: list[UnusedRole] = field(default_factory=list)
 
 
 class UnusedRolesReporter:
-    """미사용 IAM Role 보고서 생성기"""
+    """미사용 IAM Role Excel 보고서 생성기.
+
+    IAM 데이터를 분석하여 threshold_days 이상 미사용된 Role을 식별하고,
+    Summary와 Unused Roles 시트가 포함된 Excel 보고서를 생성한다.
+
+    Args:
+        iam_data_list: 계정별 IAM 데이터 목록.
+        threshold_days: 미사용 판정 기준 일수 (기본 365일).
+    """
 
     def __init__(self, iam_data_list: list[IAMData], threshold_days: int = 365):
         self.iam_data_list = iam_data_list
@@ -72,7 +115,14 @@ class UnusedRolesReporter:
         self.analysis = self._analyze()
 
     def _analyze(self) -> UnusedRolesAnalysis:
-        """IAM 데이터 분석"""
+        """IAM 데이터를 분석하여 계정별 통계와 미사용 Role 목록을 생성한다.
+
+        Service-linked Role은 분석에서 제외하며, 미사용 판정 조건은
+        (미사용 기록 OR threshold_days 이상 미사용) AND 생성 후 threshold_days 이상 경과.
+
+        Returns:
+            미사용 Role 분석 결과.
+        """
         analysis = UnusedRolesAnalysis()
 
         for iam_data in self.iam_data_list:
@@ -149,7 +199,16 @@ class UnusedRolesReporter:
         return analysis
 
     def generate(self, output_dir: str) -> str:
-        """Excel 보고서 생성"""
+        """Excel 보고서를 생성한다.
+
+        Summary 시트(전체/계정별 통계)와 Unused Roles 시트(미사용 Role 상세)로 구성된다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+
+        Returns:
+            생성된 Excel 파일 경로.
+        """
         wb = Workbook()
 
         # 1. Summary 시트
@@ -167,7 +226,13 @@ class UnusedRolesReporter:
         return str(filepath)
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """Summary 시트 생성"""
+        """Summary 시트를 생성한다.
+
+        전체 요약(총 Role, Service-linked, 미사용)과 계정별 상세 통계를 포함한다.
+
+        Args:
+            wb: Workbook 인스턴스.
+        """
         summary = wb.new_summary_sheet()
 
         # 전체 통계 계산
@@ -210,7 +275,14 @@ class UnusedRolesReporter:
                 summary.add_item("  Admin 권한 Role", stats.admin_roles)
 
     def _create_unused_roles_sheet(self, wb: Workbook) -> None:
-        """Unused Roles 시트 생성"""
+        """Unused Roles 시트를 생성한다.
+
+        미사용 기간 내림차순(미사용 기록 없는 Role이 먼저)으로 정렬하여
+        Trust Policy, 연결 리소스, Admin 권한 등 상세 정보를 포함한다.
+
+        Args:
+            wb: Workbook 인스턴스.
+        """
         columns = [
             ColumnDef("계정 ID", width=15),
             ColumnDef("계정명", width=20),

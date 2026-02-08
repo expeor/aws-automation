@@ -1,5 +1,5 @@
 """
-plugins/health/reporter.py - AWS Health 패치 보고서 생성기
+functions/analyzers/health/common/reporter.py - AWS Health 패치 보고서 생성기
 
 수집된 패치/유지보수 이벤트를 Excel 형식으로 출력합니다.
 - 요약 시트: 긴급도별, 서비스별 현황
@@ -112,7 +112,13 @@ class PatchReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """요약 시트 생성"""
+        """분석 요약 시트를 생성한다.
+
+        전체 현황, 긴급도별 현황, 서비스별 현황, 월별 현황, 리포트 정보를 포함한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         summary = wb.new_summary_sheet("분석 요약")
 
         summary.add_title("AWS 필수 패치 분석 보고서")
@@ -231,7 +237,11 @@ class PatchReporter:
         summary.add_item("데이터 소스", "AWS Personal Health Dashboard")
 
     def _create_urgent_patches_sheet(self, wb: Workbook) -> None:
-        """긴급 패치 시트 생성"""
+        """긴급(critical + high) 패치만 별도 시트로 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         urgent_patches = [p for p in self.result.patches if p.urgency in ["critical", "high"]]
 
         if not urgent_patches:
@@ -261,7 +271,11 @@ class PatchReporter:
         )
 
     def _create_all_patches_sheet(self, wb: Workbook) -> None:
-        """전체 패치 목록 시트"""
+        """전체 패치 목록 시트를 생성한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         sheet = wb.new_sheet(name="전체 패치", columns=COLUMNS_PATCHES)
 
         for patch in self.result.patches:
@@ -286,7 +300,13 @@ class PatchReporter:
         )
 
     def _create_affected_resources_sheet(self, wb: Workbook) -> None:
-        """영향받는 리소스 시트"""
+        """영향받는 리소스 시트를 생성한다.
+
+        패치별 영향 리소스를 개별 행으로 펼쳐서 출력한다.
+
+        Args:
+            wb: Workbook 객체.
+        """
         # 영향받는 리소스가 있는 패치만
         patches_with_resources = [p for p in self.result.patches if p.affected_resources]
 
@@ -310,7 +330,11 @@ class PatchReporter:
                 sheet.add_row(row, style=style)
 
     def _create_calendar_sheets(self, wb: Workbook) -> None:
-        """월별 일정표 시트 생성"""
+        """월별 일정표 시트를 생성한다 (최대 3개월).
+
+        Args:
+            wb: Workbook 객체.
+        """
         if not self.result.summary_by_month:
             return
 
@@ -327,7 +351,15 @@ class PatchReporter:
         month_key: str,
         patches: list[PatchItem],
     ) -> None:
-        """개별 월 캘린더 시트 생성"""
+        """특정 월의 캘린더 시트를 생성한다.
+
+        7일(일~토) 그리드로 일자별 패치를 표시한다.
+
+        Args:
+            wb: Workbook 객체.
+            month_key: 월 키 (YYYY-MM 형식).
+            patches: 해당 월의 PatchItem 목록.
+        """
         # 월 파싱
         try:
             year, month = map(int, month_key.split("-"))
@@ -390,7 +422,14 @@ class PatchReporter:
             sheet.add_row(row)
 
     def _patch_to_row(self, patch: PatchItem) -> list[Any]:
-        """PatchItem을 행 데이터로 변환"""
+        """PatchItem을 Excel 행 데이터 리스트로 변환한다.
+
+        Args:
+            patch: 변환할 PatchItem.
+
+        Returns:
+            컬럼 순서에 맞는 셀 값 리스트.
+        """
         days_until = patch.event.days_until_start
         d_day = f"D-{days_until}" if days_until is not None else "-"
 
@@ -409,7 +448,14 @@ class PatchReporter:
         ]
 
     def _urgency_display(self, urgency: str) -> str:
-        """긴급도 표시"""
+        """긴급도 영문 코드를 한글 표시명으로 변환한다.
+
+        Args:
+            urgency: 긴급도 코드 (critical, high, medium, low).
+
+        Returns:
+            한글 표시명 (긴급, 높음, 중간, 낮음).
+        """
         return {
             "critical": "긴급",
             "high": "높음",
@@ -418,7 +464,14 @@ class PatchReporter:
         }.get(urgency, urgency)
 
     def _get_row_style(self, patch: PatchItem) -> dict | None:
-        """패치에 따른 행 스타일 결정"""
+        """패치 긴급도에 따른 Excel 행 스타일을 결정한다.
+
+        Args:
+            patch: 스타일을 결정할 PatchItem.
+
+        Returns:
+            critical이면 danger 스타일, high이면 warning 스타일, 그 외 None.
+        """
         if patch.urgency == "critical":
             return Styles.danger()
         if patch.urgency == "high":
@@ -426,7 +479,10 @@ class PatchReporter:
         return None
 
     def print_summary(self) -> None:
-        """콘솔에 요약 정보 출력"""
+        """콘솔에 패치 분석 요약을 출력한다.
+
+        Rich 라이브러리 사용 가능 시 테이블 형식으로, 아니면 일반 텍스트로 출력한다.
+        """
         try:
             from rich.console import Console
 

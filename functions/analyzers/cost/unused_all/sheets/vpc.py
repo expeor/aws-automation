@@ -6,6 +6,7 @@ from core.shared.io.excel import ColumnDef, Styles, Workbook
 
 
 def _create_nat_sheet(wb: Workbook, findings) -> None:
+    """미사용/저사용 NAT Gateway 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -35,6 +36,7 @@ def _create_nat_sheet(wb: Workbook, findings) -> None:
 
 
 def _create_eni_sheet(wb: Workbook, results) -> None:
+    """미사용 ENI 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),
@@ -64,6 +66,7 @@ def _create_eni_sheet(wb: Workbook, results) -> None:
 
 
 def _create_endpoint_sheet(wb: Workbook, results) -> None:
+    """미사용 VPC Endpoint 상세 시트를 생성한다."""
     columns = [
         ColumnDef(header="Account", width=25, style="data"),
         ColumnDef(header="Region", width=15, style="data"),

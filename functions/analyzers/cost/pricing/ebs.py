@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/ebs.py - EBS 가격 조회
+functions/analyzers/cost/pricing/ebs.py - EBS 가격 조회
 
 EBS 볼륨 GB당 월간 비용을 조회합니다.
 PricingService를 사용하여 캐시와 API를 통합 관리합니다.

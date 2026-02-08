@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/native_api/cloudwatch_logs.py - CloudWatch Logs Native API
+functions/analyzers/tag_editor/native_api/cloudwatch_logs.py - CloudWatch Logs Native API
 
 CloudWatch Logs의 태그 수집/적용을 위한 Native API 모듈
 
@@ -35,7 +35,16 @@ logger = logging.getLogger(__name__)
 
 
 def _get_log_group_arn(account_id: str, region: str, log_group_name: str) -> str:
-    """로그 그룹 ARN 생성"""
+    """CloudWatch Logs 로그 그룹 ARN을 생성한다.
+
+    Args:
+        account_id: AWS 계정 ID.
+        region: 리전.
+        log_group_name: 로그 그룹 이름.
+
+    Returns:
+        로그 그룹 ARN 문자열.
+    """
     return f"arn:aws:logs:{region}:{account_id}:log-group:{log_group_name}"
 
 
@@ -45,16 +54,19 @@ def collect_log_group_tags(
     account_name: str,
     region: str,
 ) -> list[ResourceTagInfo]:
-    """CloudWatch Logs Native API로 로그 그룹 태그 수집
+    """CloudWatch Logs Native API로 로그 그룹 태그를 수집한다.
+
+    ResourceGroupsTaggingAPI가 CloudWatch Logs 태그를 불완전하게 반환하므로,
+    list_tags_for_resource API를 직접 사용하여 정확한 태그 정보를 수집한다.
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
 
     Returns:
-        로그 그룹별 태그 정보 목록
+        로그 그룹별 태그 정보 목록.
     """
     resources: list[ResourceTagInfo] = []
 
@@ -128,19 +140,22 @@ def apply_log_group_tag(
     tag_value: str,
     dry_run: bool = True,
 ) -> MapTagApplyResult:
-    """CloudWatch Logs에 MAP 태그 적용
+    """CloudWatch Logs 로그 그룹에 MAP 태그를 적용한다.
+
+    tag_resource API를 사용하여 개별 로그 그룹에 map-migrated 태그를 적용한다.
+    기존 태그는 보존된다 (tag_resource는 병합 방식).
 
     Args:
-        session: boto3 Session
-        account_id: AWS 계정 ID
-        account_name: 계정 이름
-        region: 리전
-        resources: 태그 적용 대상 로그 그룹 목록
-        tag_value: MAP 태그 값 (예: mig12345)
-        dry_run: True면 실제 적용하지 않음
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+        resources: 태그를 적용할 로그 그룹 목록.
+        tag_value: 적용할 map-migrated 태그 값 (예: mig12345).
+        dry_run: True이면 실제 적용하지 않고 시뮬레이션 (기본값: True).
 
     Returns:
-        태그 적용 결과
+        MAP 태그 적용 결과 객체.
     """
     result = MapTagApplyResult(
         account_id=account_id,

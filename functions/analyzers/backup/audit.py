@@ -1,5 +1,5 @@
 """
-plugins/backup/audit.py - AWS Backup 현황 분석
+functions/analyzers/backup/audit.py - AWS Backup 현황 분석
 
 Backup Vault, Plan, 최근 작업 현황을 분석합니다.
 
@@ -39,7 +39,15 @@ REQUIRED_PERMISSIONS = {
 
 
 class JobStatus(Enum):
-    """백업 작업 상태"""
+    """Backup 작업 상태.
+
+    Attributes:
+        COMPLETED: 정상 완료.
+        FAILED: 실패.
+        RUNNING: 실행 중.
+        ABORTED: 중단됨.
+        PARTIAL: 부분 성공.
+    """
 
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -50,7 +58,20 @@ class JobStatus(Enum):
 
 @dataclass
 class VaultInfo:
-    """Backup Vault 정보"""
+    """AWS Backup Vault 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: Vault가 위치한 리전.
+        vault_name: Vault 이름.
+        vault_arn: Vault ARN.
+        creation_date: Vault 생성일.
+        encryption_key_arn: 암호화 KMS 키 ARN.
+        recovery_point_count: 복구 지점 수.
+        total_size_bytes: 전체 백업 크기 (바이트).
+        locked: Vault 잠금 여부.
+    """
 
     account_id: str
     account_name: str
@@ -65,16 +86,38 @@ class VaultInfo:
 
     @property
     def size_gb(self) -> float:
+        """전체 백업 크기 (GB).
+
+        Returns:
+            바이트를 GB로 변환한 값.
+        """
         return self.total_size_bytes / (1024**3)
 
     @property
     def is_encrypted(self) -> bool:
+        """Vault 암호화 여부.
+
+        Returns:
+            KMS 키가 설정되어 있으면 True.
+        """
         return bool(self.encryption_key_arn)
 
 
 @dataclass
 class PlanInfo:
-    """Backup Plan 정보"""
+    """AWS Backup Plan 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: Plan이 위치한 리전.
+        plan_id: Backup Plan ID.
+        plan_name: Plan 이름.
+        version_id: Plan 버전 ID.
+        creation_date: Plan 생성일.
+        rule_count: 백업 규칙 수.
+        resource_count: 리소스 선택 수.
+    """
 
     account_id: str
     account_name: str
@@ -89,7 +132,22 @@ class PlanInfo:
 
 @dataclass
 class JobInfo:
-    """Backup Job 정보"""
+    """AWS Backup Job 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 작업이 실행된 리전.
+        job_id: Backup Job ID.
+        vault_name: 백업 대상 Vault 이름.
+        resource_arn: 백업 대상 리소스 ARN.
+        resource_type: 리소스 타입.
+        status: 작업 상태.
+        status_message: 상태 메시지.
+        creation_date: 작업 생성일.
+        completion_date: 작업 완료일.
+        backup_size_bytes: 백업 크기 (바이트).
+    """
 
     account_id: str
     account_name: str
@@ -111,7 +169,16 @@ class JobInfo:
 
 @dataclass
 class BackupAnalysisResult:
-    """Backup 분석 결과"""
+    """단일 계정/리전의 AWS Backup 분석 결과.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 분석 대상 리전.
+        vaults: Backup Vault 목록.
+        plans: Backup Plan 목록.
+        jobs: 최근 Backup Job 목록.
+    """
 
     account_id: str
     account_name: str
@@ -142,7 +209,19 @@ class BackupAnalysisResult:
 
 
 def _collect_backup_data(session, account_id: str, account_name: str, region: str) -> BackupAnalysisResult | None:
-    """단일 계정/리전의 Backup 데이터 수집"""
+    """단일 계정/리전의 Backup Vault, Plan, 최근 Job을 수집한다.
+
+    parallel_collect 콜백으로 사용되며, 데이터가 없으면 None을 반환한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 대상 리전.
+
+    Returns:
+        Backup 분석 결과 객체. 데이터가 없으면 None.
+    """
     from botocore.exceptions import ClientError
 
     backup = get_client(session, "backup", region_name=region)
@@ -265,7 +344,17 @@ def _collect_backup_data(session, account_id: str, account_name: str, region: st
 
 
 def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """AWS Backup 현황 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary, Vaults, Plans, Failed Jobs 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -397,7 +486,13 @@ def generate_report(results: list[BackupAnalysisResult], output_dir: str) -> str
 
 
 def run(ctx: ExecutionContext) -> None:
-    """AWS Backup 현황 분석"""
+    """AWS Backup 현황 분석 도구의 메인 실행 함수.
+
+    멀티 계정/리전 병렬 수집 후 결과를 집계하고, Excel 보고서를 생성하여 출력 디렉토리에 저장한다.
+
+    Args:
+        ctx: 실행 컨텍스트 (인증 정보, 계정/리전 목록, 옵션 등 포함).
+    """
     console.print("[bold]AWS Backup 현황 분석 시작...[/bold]\n")
     console.print(f"[dim]최근 {JOB_DAYS}일 작업 현황 포함[/dim]\n")
 

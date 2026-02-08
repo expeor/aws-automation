@@ -1,19 +1,22 @@
 """
-plugins/cost/pricing/fsx.py - Amazon FSx 가격 조회
+core/shared/aws/pricing/fsx.py - Amazon FSx 파일시스템 가격 조회
 
-FSx 비용 계산:
-- Windows File Server: GB당 월 $0.013 (SSD)
-- Lustre: GB당 월 $0.14 (Persistent SSD)
-- ONTAP: GB당 월 $0.024 (Primary storage)
-- OpenZFS: GB당 월 $0.09 (SSD)
+FSx 파일시스템 타입별 GB당 월간 스토리지 비용을 조회한다.
+Pricing API 직접 호출 후, 실패 시 하드코딩 가격으로 fallback한다.
+
+지원 파일시스템 타입 및 가격 (ap-northeast-2 기준):
+    - Windows File Server: SSD $0.013, HDD $0.006 /GB/월
+    - Lustre: SSD $0.14, HDD $0.012 /GB/월
+    - NetApp ONTAP: SSD $0.024, Capacity Pool $0.0125 /GB/월
+    - OpenZFS: SSD $0.09 /GB/월
 
 사용법:
-    from functions.analyzers.cost.pricing.fsx import get_fsx_gb_price, get_fsx_monthly_cost
+    from core.shared.aws.pricing.fsx import get_fsx_gb_price, get_fsx_monthly_cost
 
-    # GB당 월 가격
+    # Windows FSx SSD GB당 가격
     price = get_fsx_gb_price("ap-northeast-2", "WINDOWS")
 
-    # 월간 비용
+    # 1TB Windows FSx 월간 비용
     monthly = get_fsx_monthly_cost("ap-northeast-2", "WINDOWS", storage_gb=1000)
 """
 

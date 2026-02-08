@@ -1,7 +1,8 @@
-"""ALB Excel Reporter - High-Performance Report Generator
+"""functions/reports/log_analyzer/alb_excel_reporter.py - ALB Excel 보고서 생성기.
 
-Performance-optimized Excel report generator for ALB logs.
-Designed for large-scale data processing with memory efficiency.
+ALB 로그 분석 결과를 Excel 보고서로 생성합니다.
+openpyxl 기반으로 대용량 데이터 처리에 최적화되어 있으며,
+reporter/ 하위 모듈의 시트별 Writer를 조합하여 종합 보고서를 생성합니다.
 """
 
 from __future__ import annotations

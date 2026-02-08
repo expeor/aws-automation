@@ -43,7 +43,12 @@ DEFAULT_CACHE_TTL = 300  # 5분
 
 
 class QuotaStatus(Enum):
-    """쿼터 상태"""
+    """쿼터 사용률 상태
+
+    사용률 임계치에 따라 자동 분류됩니다:
+    OK(80% 미만), WARNING(80%~), CRITICAL(90%~), EXCEEDED(100%~).
+    사용량을 확인할 수 없는 경우 UNKNOWN입니다.
+    """
 
     OK = "ok"  # 정상 (80% 미만)
     WARNING = "warning"  # 경고 (80% 이상)
@@ -81,7 +86,11 @@ class ServiceQuotaInfo:
     status: QuotaStatus = QuotaStatus.UNKNOWN
 
     def __post_init__(self):
-        """사용률 기반 상태 계산"""
+        """사용률 기반 상태 자동 계산
+
+        usage_value와 value가 유효하면 사용률(%)을 계산하고
+        임계치에 따라 QuotaStatus를 자동 설정합니다.
+        """
         if self.usage_value is not None and self.value > 0:
             self.usage_percent = (self.usage_value / self.value) * 100
             if self.usage_percent >= 100:
@@ -94,7 +103,7 @@ class ServiceQuotaInfo:
                 self.status = QuotaStatus.OK
 
     def to_dict(self) -> dict[str, Any]:
-        """딕셔너리로 변환"""
+        """딕셔너리로 변환 (로깅/직렬화용)"""
         return {
             "service_code": self.service_code,
             "quota_code": self.quota_code,
@@ -111,13 +120,22 @@ class ServiceQuotaInfo:
 
 @dataclass
 class _CacheEntry:
-    """캐시 엔트리"""
+    """내부 캐시 엔트리
+
+    TTL(Time To Live) 기반으로 캐시 유효성을 관리합니다.
+
+    Attributes:
+        data: 캐시된 데이터
+        timestamp: 캐시 저장 시각 (monotonic)
+        ttl: 캐시 유효 시간 (초)
+    """
 
     data: Any
     timestamp: float
     ttl: float
 
     def is_expired(self) -> bool:
+        """캐시가 만료되었는지 확인"""
         return time.monotonic() - self.timestamp > self.ttl
 
 
@@ -126,6 +144,12 @@ class ServiceQuotaChecker:
     """서비스 쿼터 확인 클래스
 
     AWS Service Quotas API를 사용하여 서비스 한도를 확인합니다.
+    내부 캐시를 사용하여 반복 조회 시 API 호출을 최소화합니다.
+
+    Attributes:
+        session: boto3 Session
+        region: AWS 리전
+        cache_ttl: 캐시 TTL 초 (기본: 300초/5분)
 
     Example:
         checker = ServiceQuotaChecker(session, region="ap-northeast-2")
@@ -147,19 +171,34 @@ class ServiceQuotaChecker:
     _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def _get_client(self):
-        """Service Quotas 클라이언트 생성"""
+        """Service Quotas API 클라이언트 생성
+
+        Returns:
+            boto3 service-quotas client (retry 설정 적용)
+        """
         from .client import get_client
 
         return get_client(self.session, "service-quotas", region_name=self.region)
 
     def _get_cloudwatch_client(self):
-        """CloudWatch 클라이언트 생성 (사용량 확인용)"""
+        """CloudWatch 클라이언트 생성 (쿼터 사용량 메트릭 조회용)
+
+        Returns:
+            boto3 cloudwatch client (retry 설정 적용)
+        """
         from .client import get_client
 
         return get_client(self.session, "cloudwatch", region_name=self.region)
 
     def _get_cached(self, key: str) -> Any | None:
-        """캐시에서 값 조회"""
+        """캐시에서 값 조회 (스레드 세이프)
+
+        Args:
+            key: 캐시 키
+
+        Returns:
+            캐시된 데이터 또는 None (미존재/만료 시)
+        """
         with self._lock:
             entry = self._cache.get(key)
             if entry and not entry.is_expired():
@@ -167,7 +206,12 @@ class ServiceQuotaChecker:
             return None
 
     def _set_cached(self, key: str, data: Any) -> None:
-        """캐시에 값 저장"""
+        """캐시에 값 저장 (스레드 세이프)
+
+        Args:
+            key: 캐시 키
+            data: 저장할 데이터
+        """
         with self._lock:
             self._cache[key] = _CacheEntry(data=data, timestamp=time.monotonic(), ttl=self.cache_ttl)
 
@@ -214,7 +258,16 @@ class ServiceQuotaChecker:
         return quotas
 
     def _get_default_quotas(self, service_code: str) -> list[ServiceQuotaInfo]:
-        """AWS 기본 쿼터 조회 (계정 미조정 값)"""
+        """AWS 기본 쿼터 조회 (계정에서 조정하지 않은 기본값)
+
+        get_service_quotas() 실패 시 폴백으로 사용됩니다.
+
+        Args:
+            service_code: AWS 서비스 코드
+
+        Returns:
+            기본 쿼터 ServiceQuotaInfo 리스트
+        """
         quotas: list[ServiceQuotaInfo] = []
 
         try:
@@ -326,7 +379,16 @@ class ServiceQuotaChecker:
         metric_name: str,
         dimensions: list[dict[str, str]] | None = None,
     ) -> float | None:
-        """CloudWatch 메트릭 현재 값 조회"""
+        """CloudWatch 메트릭에서 최근 1시간 내 최대값 조회
+
+        Args:
+            namespace: CloudWatch 메트릭 네임스페이스
+            metric_name: 메트릭 이름
+            dimensions: 메트릭 디멘션 (선택사항)
+
+        Returns:
+            최근 최대값 또는 None (데이터 없음/조회 실패 시)
+        """
         from datetime import datetime, timedelta, timezone
 
         try:
@@ -393,7 +455,7 @@ class ServiceQuotaChecker:
         return ok_quotas, warn_quotas, unknown_quotas
 
     def clear_cache(self) -> None:
-        """캐시 초기화"""
+        """내부 쿼터 캐시 전체 초기화"""
         with self._lock:
             self._cache.clear()
 
@@ -470,7 +532,10 @@ def get_quota_checker(
 
 
 def reset_quota_checkers() -> None:
-    """모든 쿼터 체커 초기화"""
+    """모든 싱글톤 쿼터 체커 인스턴스 초기화
+
+    테스트 또는 장시간 실행 후 리셋이 필요할 때 사용합니다.
+    """
     global _checkers
     with _checker_lock:
         _checkers = {}

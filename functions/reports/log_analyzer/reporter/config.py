@@ -1,4 +1,8 @@
-"""Configuration constants for ALB Excel Reporter."""
+"""functions/reports/log_analyzer/reporter/config.py - ALB Excel Reporter 설정 상수.
+
+시트별 설정(SheetConfig), 시트 이름(SheetNames), 헤더 정의(Headers),
+컬럼 스타일/너비 매핑, 상태 코드 타입 등의 상수를 정의합니다.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,25 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SheetConfig:
-    """Sheet-level configuration constants."""
+    """시트 레벨 설정 상수.
+
+    Attributes:
+        EXCEL_MAX_ROWS: Excel 2007+ 최대 행 수 (1,048,576).
+        EXCEL_MAX_COLS: Excel 2007+ 최대 열 수 (16,384).
+        ZOOM_SCALE: 기본 확대/축소 비율 (85%).
+        HEADER_ROW_HEIGHT: 헤더 행 높이 (픽셀).
+        DATA_ROW_HEIGHT: 데이터 행 높이 (픽셀).
+        DEFAULT_COLUMN_WIDTH: 기본 컬럼 너비.
+        MAX_ROWS_PER_SHEET: 시트당 최대 데이터 행 수.
+        BATCH_SIZE: 배치 처리 단위 행 수.
+        TOP_URL_LIMIT: URL Top N 제한.
+        TOP_COUNTRY_LIMIT: 국가별 Top N 제한.
+        TOP_RESPONSE_TIME_LIMIT: 응답 시간 Top N 제한.
+        TOP_BYTES_LIMIT: 데이터 전송량 Top N 제한.
+        TOP_CLIENT_LIMIT: 클라이언트 Top N 제한.
+        SUMMARY_TOP_ITEMS: 요약 시트 Top N 항목 수.
+        SECURITY_EVENTS_LIMIT: 보안 이벤트 최대 행 수.
+    """
 
     # Excel 2007+ (.xlsx) limits: 1,048,576 rows, 16,384 columns
     # Excel 97-2003 (.xls) limits: 65,536 rows, 256 columns
@@ -119,7 +141,19 @@ WRAP_TEXT_COLUMNS: dict[str, str] = {
 
 @dataclass(frozen=True)
 class SheetNames:
-    """Sheet names."""
+    """Excel 보고서 시트 이름 상수.
+
+    Attributes:
+        SUMMARY: 분석 요약 시트 이름.
+        COUNTRY_STATS: 국가별 통계 시트 이름.
+        URL_TOP100: 요청 URL Top 100 시트 이름.
+        CLIENT_STATUS: Client 상태코드 통계 시트 이름.
+        TARGET_STATUS: Target 상태코드 통계 시트 이름.
+        RESPONSE_TIME: 응답 시간 Top 100 시트 이름.
+        BYTES_ANALYSIS: 데이터 전송량 Top 100 시트 이름.
+        ABUSE_IP_LIST: 악성 IP 목록 시트 이름.
+        ABUSE_REQUESTS: 보안 이벤트 시트 이름.
+    """
 
     SUMMARY: str = "분석 요약"
     COUNTRY_STATS: str = "국가별 통계"
@@ -147,7 +181,20 @@ SHEET_NAMES = SheetNames()
 
 @dataclass(frozen=True)
 class Headers:
-    """Header configurations."""
+    """시트별 헤더 컬럼 정의.
+
+    Attributes:
+        ABUSE_IP: 악성 IP 목록 시트 헤더.
+        ABUSE_REQUESTS: 보안 이벤트 시트 헤더.
+        RESPONSE_TIME: 응답 시간 시트 헤더.
+        BYTES_ANALYSIS: 데이터 전송량 시트 헤더.
+        STATUS_COUNT_BASE: 상태코드 Count 시트 기본 헤더.
+        STATUS_COUNT_3XX: 3xx 상태코드 시트 헤더 (Redirect URL 포함).
+        STATUS_TIMESTAMP: 상태코드 Timestamp 시트 헤더.
+        COUNTRY_STATS: 국가별 통계 시트 헤더.
+        URL_DETAILED: URL 상세 분석 시트 헤더.
+        URL_SIMPLE: URL 간략 시트 헤더.
+    """
 
     ABUSE_IP: tuple[str, ...] = ("Count", "IP", "Country", "ASN", "ISP")
 

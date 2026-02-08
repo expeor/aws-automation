@@ -1,9 +1,14 @@
 """
-core/parallel/client.py - boto3 client 생성 헬퍼
+core/parallel/client.py - boto3 client/resource 생성 헬퍼
 
-Retry + Rate Limiting이 적용된 boto3 client를 생성합니다.
+Retry(adaptive 모드) + 타임아웃 + 연결 풀이 설정된
+boto3 client/resource를 생성합니다.
 
-Usage:
+주요 구성 요소:
+- get_client: retry 설정이 적용된 boto3 client 생성
+- get_resource: retry 설정이 적용된 boto3 resource 생성
+
+Example:
     from core.parallel.client import get_client
 
     # 기본 설정 (adaptive retry, max 5회)

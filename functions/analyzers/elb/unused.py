@@ -1,5 +1,5 @@
 """
-plugins/elb/unused.py - 미사용 ELB 분석
+functions/analyzers/elb/unused.py - 미사용 ELB 분석
 
 타겟이 없거나 비정상인 Load Balancer 탐지
 
@@ -63,7 +63,10 @@ REQUIRED_PERMISSIONS = {
 
 
 class UsageStatus(Enum):
-    """사용 상태"""
+    """Load Balancer의 사용 상태 분류
+
+    타겟 등록 여부, 헬스체크 상태, CloudWatch 트래픽 지표로 판별됩니다.
+    """
 
     UNUSED = "unused"  # 미사용 (타겟 없음)
     IDLE = "idle"  # 유휴 (타겟 있으나 트래픽 없음)
@@ -72,7 +75,7 @@ class UsageStatus(Enum):
 
 
 class Severity(Enum):
-    """심각도"""
+    """분석 결과의 심각도 수준"""
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -82,7 +85,16 @@ class Severity(Enum):
 
 @dataclass
 class TargetGroupInfo:
-    """타겟 그룹 정보"""
+    """타겟 그룹 정보
+
+    Attributes:
+        arn: Target Group ARN
+        name: Target Group 이름
+        target_type: 타겟 유형 (instance, ip, lambda, alb)
+        total_targets: 전체 타겟 수
+        healthy_targets: 정상 타겟 수
+        unhealthy_targets: 비정상 타겟 수
+    """
 
     arn: str
     name: str
@@ -94,7 +106,29 @@ class TargetGroupInfo:
 
 @dataclass
 class LoadBalancerInfo:
-    """Load Balancer 정보"""
+    """Load Balancer 정보
+
+    Attributes:
+        arn: Load Balancer ARN
+        name: Load Balancer 이름
+        dns_name: DNS 이름
+        lb_type: LB 유형 (application, network, gateway, classic)
+        scheme: 스킴 (internet-facing, internal)
+        state: LB 상태 (active 등)
+        vpc_id: VPC ID
+        availability_zones: 가용 영역 리스트
+        created_time: 생성 시간
+        tags: 사용자 태그 딕셔너리
+        target_groups: 연결된 타겟 그룹 리스트 (ALB/NLB/GWLB)
+        registered_instances: 등록된 인스턴스 수 (CLB 전용)
+        healthy_instances: 정상 인스턴스 수 (CLB 전용)
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        monthly_cost: 추정 월간 고정 비용 (USD)
+        request_count: CloudWatch 요청 수 또는 처리 바이트 (분석 기간 합계)
+        avg_requests_per_day: 일평균 요청 수
+    """
 
     arn: str
     name: str
@@ -128,14 +162,22 @@ class LoadBalancerInfo:
 
     @property
     def total_targets(self) -> int:
-        """전체 타겟 수"""
+        """전체 타겟 수
+
+        Returns:
+            CLB는 등록 인스턴스 수, ALB/NLB/GWLB는 타겟 그룹별 합계
+        """
         if self.lb_type == "classic":
             return self.registered_instances
         return sum(tg.total_targets for tg in self.target_groups)
 
     @property
     def healthy_targets(self) -> int:
-        """정상 타겟 수"""
+        """정상 타겟 수
+
+        Returns:
+            CLB는 InService 인스턴스 수, ALB/NLB/GWLB는 healthy 타겟 합계
+        """
         if self.lb_type == "classic":
             return self.healthy_instances
         return sum(tg.healthy_targets for tg in self.target_groups)
@@ -143,7 +185,15 @@ class LoadBalancerInfo:
 
 @dataclass
 class LBFinding:
-    """LB 분석 결과"""
+    """개별 Load Balancer 분석 결과
+
+    Attributes:
+        lb: 분석 대상 Load Balancer 정보
+        usage_status: 분석으로 판별된 사용 상태
+        severity: 심각도 수준
+        description: 상태 설명
+        recommendation: 권장 조치 사항
+    """
 
     lb: LoadBalancerInfo
     usage_status: UsageStatus
@@ -154,7 +204,21 @@ class LBFinding:
 
 @dataclass
 class LBAnalysisResult:
-    """분석 결과"""
+    """Load Balancer 분석 결과 집계 (계정/리전별)
+
+    Attributes:
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+        findings: 개별 LB 분석 결과 리스트
+        total_count: 전체 LB 수
+        unused_count: 미사용 LB 수
+        idle_count: 유휴 LB 수
+        unhealthy_count: 전체 타겟 비정상 LB 수
+        normal_count: 정상 LB 수
+        unused_monthly_cost: 미사용 LB 추정 월간 비용 (USD)
+        idle_monthly_cost: 유휴 LB 추정 월간 비용 (USD)
+    """
 
     account_id: str
     account_name: str
@@ -181,8 +245,17 @@ class LBAnalysisResult:
 def collect_v2_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
     """ALB/NLB/GWLB 목록 수집 (배치 메트릭 최적화)
 
-    최적화:
-    - 기존: LB당 1 API 호출 → 최적화: 전체 1-2 API 호출
+    DescribeLoadBalancers API로 LB를 수집하고, 타겟 그룹과
+    CloudWatch 메트릭을 배치 조회합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        ALB/NLB/GWLB 정보 리스트 (메트릭 포함)
     """
     from datetime import timedelta, timezone
 
@@ -263,11 +336,16 @@ def _collect_elb_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """ELB 메트릭 배치 수집 (내부 함수)
+    """ELB CloudWatch 메트릭 배치 수집
 
-    최적화:
-    - 기존: LB당 1 API 호출
-    - 최적화: 전체 LB 1-2 API 호출 (500개 단위 자동 분할)
+    ALB는 RequestCount, NLB는 ProcessedBytes를 배치 조회하여
+    각 LB의 request_count 및 avg_requests_per_day를 설정합니다.
+
+    Args:
+        cloudwatch: CloudWatch 클라이언트
+        load_balancers: 메트릭을 수집할 LB 리스트
+        start_time: 조회 시작 시간
+        end_time: 조회 종료 시간
     """
     from botocore.exceptions import ClientError
 
@@ -333,7 +411,15 @@ def _collect_elb_metrics_batch(
 
 
 def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
-    """LB에 연결된 타겟 그룹 조회"""
+    """LB에 연결된 타겟 그룹 및 헬스 상태 조회
+
+    Args:
+        elbv2: ELBv2 클라이언트
+        lb_arn: Load Balancer ARN
+
+    Returns:
+        타겟 그룹 정보 리스트 (헬스 상태 포함)
+    """
     from botocore.exceptions import ClientError
 
     target_groups = []
@@ -388,7 +474,17 @@ def _get_target_groups(elbv2, lb_arn: str) -> list[TargetGroupInfo]:
 
 
 def collect_classic_load_balancers(session, account_id: str, account_name: str, region: str) -> list[LoadBalancerInfo]:
-    """Classic Load Balancer 목록 수집"""
+    """Classic Load Balancer 목록 수집
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        CLB 정보 리스트 (인스턴스 헬스 포함)
+    """
     from botocore.exceptions import ClientError
 
     load_balancers = []
@@ -478,7 +574,20 @@ def analyze_load_balancers(
     account_name: str,
     region: str,
 ) -> LBAnalysisResult:
-    """Load Balancer 미사용 분석"""
+    """Load Balancer 미사용/유휴 분석
+
+    각 LB의 타겟 등록 상태, 헬스체크 결과, 트래픽 지표를 기반으로
+    미사용/유휴/unhealthy/정상으로 분류합니다.
+
+    Args:
+        load_balancers: 수집된 LB 정보 리스트
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        계정/리전별 분석 결과 (상태별 LB 수, 비용 포함)
+    """
     result = LBAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -506,7 +615,16 @@ def analyze_load_balancers(
 
 
 def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
-    """개별 LB 분석"""
+    """개별 Load Balancer 사용 상태 분석
+
+    타겟 등록 여부, 헬스체크 상태, 트래픽 지표를 기반으로 판별합니다.
+
+    Args:
+        lb: 분석 대상 Load Balancer 정보
+
+    Returns:
+        LB 분석 결과 (상태, 심각도, 권장 조치 포함)
+    """
 
     # 비활성 상태
     if lb.state not in ("active", ""):
@@ -588,7 +706,17 @@ def _analyze_single_lb(lb: LoadBalancerInfo) -> LBFinding:
 
 
 def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """미사용 ELB 분석 Excel 보고서 생성
+
+    Summary 시트와 미사용/유휴/unhealthy LB Findings 시트를 포함합니다.
+
+    Args:
+        results: 계정/리전별 분석 결과 리스트
+        output_dir: 출력 디렉토리 경로
+
+    Returns:
+        생성된 Excel 파일 경로
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -697,7 +825,19 @@ def generate_report(results: list[LBAnalysisResult], output_dir: str) -> str:
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> LBAnalysisResult:
-    """단일 계정/리전의 ELB 수집 및 분석 (병렬 실행용)"""
+    """단일 계정/리전의 ELB 수집 및 분석 (parallel_collect 콜백)
+
+    ALB/NLB/GWLB와 CLB를 모두 수집하고 미사용 분석합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전
+
+    Returns:
+        LB 분석 결과 (전체 유형 통합)
+    """
     v2_lbs = collect_v2_load_balancers(session, account_id, account_name, region)
     classic_lbs = collect_classic_load_balancers(session, account_id, account_name, region)
     all_lbs = v2_lbs + classic_lbs
@@ -705,7 +845,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """미사용 ELB 분석 실행"""
+    """미사용 ELB 분석 실행
+
+    멀티 계정/리전에서 모든 유형의 Load Balancer를 병렬 수집하고,
+    미사용/유휴 LB를 식별하여 Excel 보고서를 생성합니다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트 (인증, 계정/리전 선택, 출력 설정 포함)
+    """
     console.print("[bold]미사용 ELB 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석

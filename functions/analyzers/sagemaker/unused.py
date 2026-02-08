@@ -1,5 +1,5 @@
 """
-plugins/sagemaker/unused.py - SageMaker Endpoint 미사용 분석
+functions/analyzers/sagemaker/unused.py - SageMaker Endpoint 미사용 분석
 
 유휴/미사용 SageMaker Endpoint 탐지 (CloudWatch 지표 기반)
 
@@ -59,7 +59,16 @@ REQUIRED_PERMISSIONS = {
 
 
 class EndpointStatus(Enum):
-    """Endpoint 상태"""
+    """SageMaker Endpoint 사용 상태 분류.
+
+    CloudWatch 지표 기반으로 Endpoint의 활용도를 분류한다.
+
+    Attributes:
+        NORMAL: 정상적으로 호출되고 리소스가 활용되는 Endpoint.
+        UNUSED: 7일간 Invocations가 0인 미사용 Endpoint.
+        IDLE: 호출은 있으나 CPU 사용률이 5% 미만인 유휴 Endpoint.
+        LOW_USAGE: 일평균 호출 10회 미만인 저사용 Endpoint.
+    """
 
     NORMAL = "normal"
     UNUSED = "unused"
@@ -69,7 +78,25 @@ class EndpointStatus(Enum):
 
 @dataclass
 class SageMakerEndpointInfo:
-    """SageMaker Endpoint 정보"""
+    """SageMaker Endpoint 상세 정보.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        endpoint_name: Endpoint 이름.
+        endpoint_arn: Endpoint ARN.
+        status: Endpoint 상태 (InService, Creating, Updating, Failed 등).
+        creation_time: Endpoint 생성 시각.
+        instance_type: 인스턴스 유형 (ml.m5.large 등).
+        instance_count: 인스턴스 수.
+        variant_name: Production Variant 이름.
+        total_invocations: 분석 기간 중 총 호출 수 (CloudWatch Invocations Sum).
+        avg_invocations_per_day: 일평균 호출 수.
+        model_latency_avg_ms: 평균 모델 레이턴시 (밀리초).
+        cpu_utilization_avg: 평균 CPU 사용률 (%).
+        memory_utilization_avg: 평균 메모리 사용률 (%).
+    """
 
     account_id: str
     account_name: str
@@ -91,12 +118,20 @@ class SageMakerEndpointInfo:
 
     @property
     def estimated_monthly_cost(self) -> float:
-        """월간 비용 추정 (AWS Pricing API 동적 조회)"""
+        """AWS Pricing API 기반 추정 월간 비용 (USD).
+
+        Returns:
+            추정 월간 비용 (USD).
+        """
         return get_sagemaker_monthly_cost(self.instance_type, self.region, self.instance_count)
 
     @property
     def age_days(self) -> int:
-        """Endpoint 생성 후 경과 일수"""
+        """Endpoint 생성 후 경과 일수.
+
+        Returns:
+            경과 일수. creation_time이 없으면 0.
+        """
         if not self.creation_time:
             return 0
         now = datetime.now(timezone.utc)
@@ -105,7 +140,13 @@ class SageMakerEndpointInfo:
 
 @dataclass
 class EndpointFinding:
-    """Endpoint 분석 결과"""
+    """개별 SageMaker Endpoint에 대한 분석 결과.
+
+    Attributes:
+        endpoint: 분석 대상 Endpoint 정보.
+        status: 분석된 Endpoint 상태 (NORMAL, UNUSED, IDLE, LOW_USAGE).
+        recommendation: 권장 조치 메시지.
+    """
 
     endpoint: SageMakerEndpointInfo
     status: EndpointStatus
@@ -114,7 +155,22 @@ class EndpointFinding:
 
 @dataclass
 class SageMakerAnalysisResult:
-    """SageMaker 분석 결과 집계"""
+    """계정/리전별 SageMaker Endpoint 분석 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+        total_endpoints: 전체 Endpoint 수.
+        unused_endpoints: 미사용 Endpoint 수 (호출 0회).
+        idle_endpoints: 유휴 Endpoint 수 (CPU < 5%).
+        low_usage_endpoints: 저사용 Endpoint 수 (일평균 호출 < 10회).
+        normal_endpoints: 정상 Endpoint 수.
+        unused_monthly_cost: 미사용 Endpoint 합산 월간 추정 비용 (USD).
+        idle_monthly_cost: 유휴 Endpoint 합산 월간 추정 비용 (USD).
+        low_usage_monthly_cost: 저사용 Endpoint 합산 월간 추정 비용 (USD).
+        findings: 개별 Endpoint 분석 결과 목록.
+    """
 
     account_id: str
     account_name: str
@@ -133,7 +189,20 @@ class SageMakerAnalysisResult:
 def collect_sagemaker_endpoints(
     session, account_id: str, account_name: str, region: str
 ) -> list[SageMakerEndpointInfo]:
-    """SageMaker Endpoint 수집 (배치 메트릭 최적화)"""
+    """SageMaker InService Endpoint를 수집하고 CloudWatch 지표를 배치 조회한다.
+
+    Endpoint 목록 조회 후 describe_endpoint로 상세 정보(인스턴스 유형, 수)를
+    수집하고 배치 메트릭으로 Invocations, Latency, CPU, Memory 지표를 수집한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        수집된 SageMakerEndpointInfo 목록.
+    """
     from botocore.exceptions import ClientError
 
     sagemaker = get_client(session, "sagemaker", region_name=region)
@@ -214,7 +283,17 @@ def _collect_sagemaker_metrics_batch(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """SageMaker Endpoint 메트릭 배치 수집 (내부 함수)"""
+    """CloudWatch GetMetricData API로 SageMaker Endpoint 지표를 배치 수집한다.
+
+    Invocations(Sum), ModelLatency(Average), CPUUtilization(Average),
+    MemoryUtilization(Average) 네 가지 지표를 배치 조회하여 각 Endpoint에 설정한다.
+
+    Args:
+        cloudwatch: CloudWatch boto3 클라이언트.
+        endpoints: 지표를 수집할 SageMakerEndpointInfo 목록.
+        start_time: 지표 조회 시작 시각.
+        end_time: 지표 조회 종료 시각.
+    """
     from botocore.exceptions import ClientError
 
     # 쿼리 생성
@@ -306,7 +385,20 @@ def _collect_sagemaker_metrics_batch(
 def analyze_endpoints(
     endpoints: list[SageMakerEndpointInfo], account_id: str, account_name: str, region: str
 ) -> SageMakerAnalysisResult:
-    """SageMaker Endpoint 분석"""
+    """수집된 SageMaker Endpoint를 분석하여 미사용/유휴/저사용을 판별한다.
+
+    미사용(Invocations 0), 유휴(CPU < 5%), 저사용(일평균 호출 < 10회),
+    정상으로 분류하고 각 카테고리별 비용을 합산한다.
+
+    Args:
+        endpoints: 수집된 SageMakerEndpointInfo 목록.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 리전.
+
+    Returns:
+        분석 결과를 담은 SageMakerAnalysisResult 객체.
+    """
     result = SageMakerAnalysisResult(
         account_id=account_id,
         account_name=account_name,
@@ -367,7 +459,17 @@ def analyze_endpoints(
 
 
 def generate_report(results: list[SageMakerAnalysisResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """SageMaker Endpoint 미사용 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary(계정별 통계)와 Endpoints(비정상 Endpoint 상세) 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 SageMaker 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from openpyxl.styles import PatternFill
 
     from core.shared.io.excel import ColumnDef, Styles, Workbook
@@ -456,7 +558,17 @@ def generate_report(results: list[SageMakerAnalysisResult], output_dir: str) -> 
 
 
 def _collect_and_analyze(session, account_id: str, account_name: str, region: str) -> SageMakerAnalysisResult | None:
-    """단일 계정/리전의 SageMaker Endpoint 수집 및 분석 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 SageMaker Endpoint를 수집 및 분석한다.
+
+    Args:
+        session: boto3 Session 객체.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 이름.
+        region: 조회 대상 리전.
+
+    Returns:
+        SageMaker 분석 결과. Endpoint가 없으면 None.
+    """
     endpoints = collect_sagemaker_endpoints(session, account_id, account_name, region)
     if not endpoints:
         return None
@@ -464,7 +576,14 @@ def _collect_and_analyze(session, account_id: str, account_name: str, region: st
 
 
 def run(ctx: ExecutionContext) -> None:
-    """SageMaker Endpoint 미사용 분석"""
+    """SageMaker Endpoint 미사용 분석 도구의 메인 실행 함수.
+
+    CloudWatch 지표 기반으로 7일간 미사용/유휴/저사용 SageMaker Endpoint를
+    탐지하고 비용 절감 기회를 보고서로 생성한다.
+
+    Args:
+        ctx: 실행 컨텍스트. 계정 정보, 리전, 프로파일 등을 포함한다.
+    """
     console.print("[bold]SageMaker Endpoint 미사용 분석 시작...[/bold]\n")
 
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="sagemaker")

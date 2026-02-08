@@ -1,10 +1,25 @@
 """
 core/parallel/errors.py - 에러 수집 및 관리
 
-일관된 에러 핸들링을 위한 유틸리티:
-- 에러 수집 및 컨텍스트 추적
-- 로깅 통합
-- 에러 카테고리 분류
+병렬 실행 중 발생하는 에러를 일관되게 수집하고 관리하는 유틸리티입니다.
+
+주요 구성 요소:
+- ErrorSeverity: 에러 심각도 분류
+- CollectedError: 수집된 에러 상세 정보
+- ErrorCollector: 스레드 세이프 에러 수집기
+- safe_collect: 안전한 에러 수집 헬퍼
+- try_or_default: 실패 시 기본값 반환 헬퍼
+
+Example:
+    collector = ErrorCollector("ec2")
+
+    try:
+        result = client.describe_instances()
+    except ClientError as e:
+        collector.collect(e, account_id, account_name, region, "describe_instances")
+
+    if collector.has_errors:
+        print(collector.get_summary())
 """
 
 from __future__ import annotations
@@ -27,7 +42,10 @@ T = TypeVar("T")
 
 
 class ErrorSeverity(Enum):
-    """에러 심각도"""
+    """에러 심각도 분류
+
+    수집된 에러의 심각도를 나타내며, 로깅 레벨과 보고 여부를 결정합니다.
+    """
 
     CRITICAL = "critical"  # 핵심 기능 실패 - 반드시 보고
     WARNING = "warning"  # 부분 실패 - 보고하되 계속 진행
@@ -37,7 +55,23 @@ class ErrorSeverity(Enum):
 
 @dataclass
 class CollectedError:
-    """수집된 에러 정보"""
+    """수집된 에러 상세 정보
+
+    ErrorCollector에 의해 수집된 개별 에러의 컨텍스트 정보를 담습니다.
+
+    Attributes:
+        timestamp: 에러 발생 시각
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름 또는 프로파일명
+        region: AWS 리전
+        service: AWS 서비스 이름 (예: "ec2", "lambda")
+        operation: API 작업 이름 (예: "describe_instances")
+        error_code: AWS 에러 코드 (예: "AccessDenied")
+        error_message: 에러 메시지
+        severity: 에러 심각도
+        category: 에러 카테고리 (ErrorCategory)
+        resource_id: 관련 리소스 ID (선택사항)
+    """
 
     timestamp: datetime
     account_id: str
@@ -56,6 +90,7 @@ class CollectedError:
         return f"[{self.severity.value.upper()}] {loc} - {self.service}.{self.operation}: {self.error_code}"
 
     def to_dict(self) -> dict[str, str | None]:
+        """딕셔너리로 변환 (로깅/직렬화용)"""
         return {
             "timestamp": self.timestamp.isoformat(),
             "account_id": self.account_id,
@@ -72,7 +107,16 @@ class CollectedError:
 
 
 def categorize_error(error_code: str) -> ErrorCategory:
-    """에러 코드로 카테고리 분류"""
+    """에러 코드 문자열을 기반으로 ErrorCategory 분류
+
+    에러 코드에 포함된 키워드를 분석하여 적절한 카테고리를 반환합니다.
+
+    Args:
+        error_code: AWS 에러 코드 문자열 (예: "AccessDenied", "ThrottlingException")
+
+    Returns:
+        분류된 에러 카테고리. 매칭되는 키워드가 없으면 UNKNOWN 반환.
+    """
     code = error_code.lower()
 
     if any(x in code for x in ["accessdenied", "unauthorized", "forbidden"]):
@@ -94,7 +138,10 @@ def categorize_error(error_code: str) -> ErrorCategory:
 class ErrorCollector:
     """스레드 세이프 에러 수집기
 
-    Usage:
+    병렬 실행 중 여러 스레드에서 발생하는 에러를 안전하게 수집하고
+    심각도별로 분류하여 요약 보고를 제공합니다.
+
+    Example:
         collector = ErrorCollector("lambda")
 
         # 에러 발생 시
@@ -111,6 +158,11 @@ class ErrorCollector:
     """
 
     def __init__(self, service: str):
+        """초기화
+
+        Args:
+            service: AWS 서비스 이름 (수집된 에러에 공통 적용)
+        """
         self.service = service
         self._errors: list[CollectedError] = []
         self._lock = threading.Lock()
@@ -125,7 +177,20 @@ class ErrorCollector:
         severity: ErrorSeverity = ErrorSeverity.WARNING,
         resource_id: str | None = None,
     ) -> None:
-        """ClientError 수집"""
+        """botocore ClientError를 수집하고 로깅
+
+        에러 코드에서 카테고리를 자동 분류하며, ACCESS_DENIED는
+        심각도를 INFO로 자동 다운그레이드합니다.
+
+        Args:
+            error: botocore ClientError 예외
+            account_id: AWS 계정 ID
+            account_name: 계정 이름 또는 프로파일명
+            region: AWS 리전
+            operation: API 작업 이름
+            severity: 에러 심각도 (기본: WARNING)
+            resource_id: 관련 리소스 ID (선택사항)
+        """
         error_info = error.response.get("Error", {})
         error_code = error_info.get("Code", "Unknown")
         error_message = error_info.get("Message", str(error))
@@ -174,7 +239,18 @@ class ErrorCollector:
         severity: ErrorSeverity = ErrorSeverity.WARNING,
         resource_id: str | None = None,
     ) -> None:
-        """일반 에러 수집"""
+        """일반 에러 수집 (ClientError 이외의 에러용)
+
+        Args:
+            error_code: 에러 코드 문자열
+            error_message: 에러 메시지
+            account_id: AWS 계정 ID
+            account_name: 계정 이름 또는 프로파일명
+            region: AWS 리전
+            operation: API 작업 이름
+            severity: 에러 심각도 (기본: WARNING)
+            resource_id: 관련 리소스 ID (선택사항)
+        """
         category = categorize_error(error_code)
 
         collected = CollectedError(
@@ -204,7 +280,7 @@ class ErrorCollector:
 
     @property
     def errors(self) -> list[CollectedError]:
-        """모든 에러"""
+        """수집된 모든 에러의 복사본 반환"""
         with self._lock:
             return list(self._errors)
 
@@ -216,18 +292,22 @@ class ErrorCollector:
 
     @property
     def critical_errors(self) -> list[CollectedError]:
-        """CRITICAL 에러만"""
+        """CRITICAL 심각도 에러만 반환"""
         with self._lock:
             return [e for e in self._errors if e.severity == ErrorSeverity.CRITICAL]
 
     @property
     def warning_errors(self) -> list[CollectedError]:
-        """WARNING 에러만"""
+        """WARNING 심각도 에러만 반환"""
         with self._lock:
             return [e for e in self._errors if e.severity == ErrorSeverity.WARNING]
 
     def get_summary(self) -> str:
-        """에러 요약"""
+        """심각도별 에러 건수를 포함한 요약 문자열 반환
+
+        Returns:
+            포맷팅된 요약 문자열 (예: "에러 3건 (critical: 1건, warning: 2건)")
+        """
         with self._lock:
             if not self._errors:
                 return "에러 없음"
@@ -240,7 +320,11 @@ class ErrorCollector:
             return f"에러 {len(self._errors)}건 ({', '.join(parts)})"
 
     def get_by_account(self) -> dict[str, list[CollectedError]]:
-        """계정별 에러 그룹핑"""
+        """계정별로 에러를 그룹핑하여 반환
+
+        Returns:
+            {"계정이름 (계정ID)": [CollectedError, ...]} 딕셔너리
+        """
         with self._lock:
             result: dict[str, list[CollectedError]] = {}
             for e in self._errors:
@@ -251,7 +335,7 @@ class ErrorCollector:
             return result
 
     def clear(self) -> None:
-        """에러 초기화"""
+        """수집된 에러 전체 초기화"""
         with self._lock:
             self._errors.clear()
 
@@ -266,7 +350,21 @@ def safe_collect(
     severity: ErrorSeverity = ErrorSeverity.WARNING,
     resource_id: str | None = None,
 ) -> None:
-    """안전한 에러 수집 (collector가 None이어도 동작)"""
+    """안전한 에러 수집 (collector가 None이어도 동작)
+
+    collector가 있으면 에러를 수집하고, 없으면 로깅만 수행합니다.
+    collector 유무에 관계없이 안전하게 호출할 수 있습니다.
+
+    Args:
+        collector: ErrorCollector 인스턴스 (None 가능)
+        error: botocore ClientError 예외
+        account_id: AWS 계정 ID
+        account_name: 계정 이름 또는 프로파일명
+        region: AWS 리전
+        operation: API 작업 이름
+        severity: 에러 심각도 (기본: WARNING)
+        resource_id: 관련 리소스 ID (선택사항)
+    """
     if collector:
         collector.collect(error, account_id, account_name, region, operation, severity, resource_id)
     else:
@@ -288,8 +386,23 @@ def try_or_default(
 ) -> T:
     """함수 실행, 실패 시 기본값 반환 + 에러 수집
 
-    Usage:
-        # 태그 조회 - 실패해도 기본값 반환
+    부수적인 API 호출(태그 조회 등)에서 실패해도 전체 로직을 중단하지 않고
+    기본값으로 대체하면서 에러를 수집합니다.
+
+    Args:
+        func: 실행할 함수 (인자 없음)
+        default: 실패 시 반환할 기본값
+        collector: ErrorCollector 인스턴스 (None이면 로깅만)
+        account_id: AWS 계정 ID
+        account_name: 계정 이름 또는 프로파일명
+        region: AWS 리전
+        operation: API 작업 이름
+        severity: 에러 심각도 (기본: DEBUG)
+
+    Returns:
+        함수 실행 결과 또는 실패 시 default 값
+
+    Example:
         tags = try_or_default(
             lambda: client.list_tags(Resource=arn)["Tags"],
             default={},
@@ -297,7 +410,7 @@ def try_or_default(
             account_name=account_name,
             region=region,
             operation="list_tags",
-            severity=ErrorSeverity.DEBUG,  # 태그는 옵션이라 DEBUG
+            severity=ErrorSeverity.DEBUG,
         )
     """
     try:

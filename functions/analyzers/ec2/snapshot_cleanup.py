@@ -60,7 +60,21 @@ REQUIRED_PERMISSIONS = {
 
 @dataclass
 class CleanupOperationLog:
-    """개별 삭제 작업 로그"""
+    """개별 스냅샷 삭제 작업의 실행 로그.
+
+    Attributes:
+        snapshot_id: EBS Snapshot ID.
+        snapshot_name: 스냅샷 이름.
+        volume_size_gb: 원본 볼륨 크기 (GB).
+        monthly_cost: 월 예상 비용 (USD).
+        usage_status: 대상 유형 (orphan, old).
+        operation: 수행한 작업 (delete 또는 delete (dry-run)).
+        result: 작업 결과 (SUCCESS, FAILED, SKIPPED).
+        error_message: 실패 시 에러 메시지.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+    """
 
     snapshot_id: str
     snapshot_name: str
@@ -77,7 +91,20 @@ class CleanupOperationLog:
 
 @dataclass
 class SnapshotCleanupResult:
-    """계정/리전별 정리 결과"""
+    """단일 계정/리전의 스냅샷 정리 결과 집계.
+
+    Attributes:
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        total_targeted: 정리 대상 스냅샷 수.
+        deleted_count: 삭제 성공 수.
+        failed_count: 삭제 실패 수.
+        skipped_count: 스킵 수 (dry-run).
+        total_size_freed_gb: 해제된 총 용량 (GB).
+        total_cost_saved: 절감 예상 월 비용 (USD).
+        operation_logs: 개별 작업 로그 목록.
+    """
 
     account_id: str
     account_name: str
@@ -97,7 +124,14 @@ class SnapshotCleanupResult:
 
 
 def collect_options(ctx: ExecutionContext) -> None:
-    """사용자 입력 수집 (timeline 밖에서 실행)"""
+    """사용자 입력을 수집하여 ctx.options에 저장한다.
+
+    최소 경과일, 대상 유형(고아/오래된/둘 다), dry-run 모드를 대화형으로 입력받는다.
+    dry-run을 해제하면 이중 확인을 요구한다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. options 딕셔너리에 설정이 저장된다.
+    """
     console.print("\n[bold cyan]EBS Snapshot 정리 설정[/bold cyan]")
 
     # 1. 경과일 기준
@@ -139,7 +173,17 @@ def collect_options(ctx: ExecutionContext) -> None:
 
 
 def _generate_report(results: list[SnapshotCleanupResult], output_dir: str) -> str:
-    """Excel 보고서 생성"""
+    """Excel 보고서를 생성한다.
+
+    Summary 시트(정리 결과 통계)와 Operation Logs 시트(개별 작업 로그)로 구성된다.
+
+    Args:
+        results: 계정/리전별 정리 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     from core.shared.io.excel import ColumnDef, Styles, Workbook
 
     wb = Workbook()
@@ -220,7 +264,15 @@ def _generate_report(results: list[SnapshotCleanupResult], output_dir: str) -> s
 
 
 def run(ctx: ExecutionContext) -> None:
-    """미사용 EBS Snapshot 정리 실행"""
+    """도구의 메인 실행 함수.
+
+    고아/오래된 EBS 스냅샷을 병렬 수집하고, 설정에 따라 삭제를 수행한다.
+    dry-run 모드에서는 실제 삭제 없이 대상만 식별한다.
+    AMI에 연결된 스냅샷은 삭제하지 않는다.
+
+    Args:
+        ctx: CLI 실행 컨텍스트. options에 age_threshold, target_type, dry_run 포함.
+    """
     age_threshold = ctx.options.get("age_threshold", 90)
     target_type = ctx.options.get("target_type", "both")
     dry_run = ctx.options.get("dry_run", True)
@@ -307,7 +359,24 @@ def _collect_and_cleanup(
     target_type: str,
     dry_run: bool,
 ) -> SnapshotCleanupResult | None:
-    """단일 계정/리전의 스냅샷 수집 및 정리 (병렬 실행용)"""
+    """parallel_collect 콜백: 단일 계정/리전의 미사용 스냅샷을 수집하고 정리한다.
+
+    snapshot_audit.py의 분석 로직을 재사용하여 고아/오래된 스냅샷을 식별하고,
+    age_threshold와 target_type 조건에 맞는 스냅샷을 삭제한다.
+    AMI에 연결된 스냅샷은 안전 가드로 삭제하지 않는다.
+
+    Args:
+        session: boto3 Session.
+        account_id: AWS 계정 ID.
+        account_name: AWS 계정 별칭.
+        region: AWS 리전 코드.
+        age_threshold: 최소 경과일.
+        target_type: 대상 유형 (orphan, old, both).
+        dry_run: dry-run 모드 여부.
+
+    Returns:
+        정리 결과 집계 객체. 대상이 없으면 None.
+    """
     from botocore.exceptions import ClientError
 
     # 1. 기존 분석 로직 재사용

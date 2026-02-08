@@ -1,5 +1,5 @@
 """
-plugins/health/reporter.py - AWS Health 패치 보고서 생성기
+core/shared/aws/health/reporter.py - AWS Health 패치 보고서 생성기
 
 수집된 패치/유지보수 이벤트를 Excel 형식으로 출력합니다.
 - 요약 시트: 긴급도별, 서비스별 현황
@@ -112,7 +112,13 @@ class PatchReporter:
         return output_path
 
     def _create_summary_sheet(self, wb: Workbook) -> None:
-        """요약 시트 생성"""
+        """요약 시트 생성
+
+        전체 현황, 긴급도별, 서비스별, 월별 통계를 포함하는 요약 시트를 생성합니다.
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         summary = wb.new_summary_sheet("분석 요약")
 
         summary.add_title("AWS 필수 패치 분석 보고서")
@@ -231,7 +237,13 @@ class PatchReporter:
         summary.add_item("데이터 소스", "AWS Personal Health Dashboard")
 
     def _create_urgent_patches_sheet(self, wb: Workbook) -> None:
-        """긴급 패치 시트 생성"""
+        """긴급 패치 시트 생성
+
+        critical 또는 high 긴급도의 패치만 별도 시트로 생성합니다.
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         urgent_patches = [p for p in self.result.patches if p.urgency in ["critical", "high"]]
 
         if not urgent_patches:
@@ -261,7 +273,11 @@ class PatchReporter:
         )
 
     def _create_all_patches_sheet(self, wb: Workbook) -> None:
-        """전체 패치 목록 시트"""
+        """전체 패치 목록 시트
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         sheet = wb.new_sheet(name="전체 패치", columns=COLUMNS_PATCHES)
 
         for patch in self.result.patches:
@@ -286,7 +302,13 @@ class PatchReporter:
         )
 
     def _create_affected_resources_sheet(self, wb: Workbook) -> None:
-        """영향받는 리소스 시트"""
+        """영향받는 리소스 시트
+
+        각 패치의 영향받는 리소스를 개별 행으로 나열하는 시트를 생성합니다.
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         # 영향받는 리소스가 있는 패치만
         patches_with_resources = [p for p in self.result.patches if p.affected_resources]
 
@@ -310,7 +332,13 @@ class PatchReporter:
                 sheet.add_row(row, style=style)
 
     def _create_calendar_sheets(self, wb: Workbook) -> None:
-        """월별 일정표 시트 생성"""
+        """월별 일정표 시트 생성
+
+        최대 3개월까지 달력 형태의 시트를 생성합니다.
+
+        Args:
+            wb: Workbook 인스턴스
+        """
         if not self.result.summary_by_month:
             return
 
@@ -390,7 +418,14 @@ class PatchReporter:
             sheet.add_row(row)
 
     def _patch_to_row(self, patch: PatchItem) -> list[Any]:
-        """PatchItem을 행 데이터로 변환"""
+        """PatchItem을 행 데이터로 변환
+
+        Args:
+            patch: PatchItem 객체
+
+        Returns:
+            COLUMNS_PATCHES 순서에 맞는 셀 값 리스트
+        """
         days_until = patch.event.days_until_start
         d_day = f"D-{days_until}" if days_until is not None else "-"
 
@@ -409,7 +444,14 @@ class PatchReporter:
         ]
 
     def _urgency_display(self, urgency: str) -> str:
-        """긴급도 표시"""
+        """긴급도 영문 코드를 한글 표시명으로 변환
+
+        Args:
+            urgency: 긴급도 코드 ("critical", "high", "medium", "low")
+
+        Returns:
+            한글 긴급도 문자열 ("긴급", "높음", "중간", "낮음")
+        """
         return {
             "critical": "긴급",
             "high": "높음",
@@ -418,7 +460,14 @@ class PatchReporter:
         }.get(urgency, urgency)
 
     def _get_row_style(self, patch: PatchItem) -> dict | None:
-        """패치에 따른 행 스타일 결정"""
+        """패치에 따른 행 스타일 결정
+
+        Args:
+            patch: PatchItem 객체
+
+        Returns:
+            critical이면 danger 스타일, high이면 warning 스타일, 그 외 None
+        """
         if patch.urgency == "critical":
             return Styles.danger()
         if patch.urgency == "high":

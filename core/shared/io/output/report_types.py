@@ -147,30 +147,63 @@ TOOL_TYPE_DESCRIPTIONS = {
 
 # 편의 함수
 def get_all_types() -> list[str]:
-    """모든 타입 문자열 반환"""
+    """모든 타입 문자열 반환 (ReportType + ToolType)
+
+    Returns:
+        ReportType과 ToolType의 모든 값을 합친 문자열 리스트
+    """
     return [t.value for t in ReportType] + [t.value for t in ToolType]
 
 
 def get_report_types() -> list[str]:
-    """Report 타입만 반환"""
+    """Report 타입만 반환
+
+    Returns:
+        ReportType 열거형의 모든 값 문자열 리스트
+    """
     return [t.value for t in ReportType]
 
 
 def get_tool_types() -> list[str]:
-    """Tool 타입만 반환"""
+    """Tool 타입만 반환
+
+    Returns:
+        ToolType 열거형의 모든 값 문자열 리스트
+    """
     return [t.value for t in ToolType]
 
 
 def is_valid_type(type_str: str) -> bool:
-    """유효한 타입인지 확인"""
+    """유효한 타입인지 확인
+
+    Args:
+        type_str: 확인할 타입 문자열
+
+    Returns:
+        ReportType 또는 ToolType에 포함되면 True
+    """
     return type_str in get_all_types()
 
 
 def is_report_type(type_str: str) -> bool:
-    """Report 타입인지 확인"""
+    """Report 타입인지 확인
+
+    Args:
+        type_str: 확인할 타입 문자열
+
+    Returns:
+        ReportType에 포함되면 True
+    """
     return type_str in get_report_types()
 
 
 def is_tool_type(type_str: str) -> bool:
-    """Tool 타입인지 확인"""
+    """Tool 타입인지 확인
+
+    Args:
+        type_str: 확인할 타입 문자열
+
+    Returns:
+        ToolType에 포함되면 True
+    """
     return type_str in get_tool_types()

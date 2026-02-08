@@ -1,5 +1,5 @@
 """
-plugins/tag_editor/report.py - MAP 태그 Excel 리포트 생성
+functions/analyzers/tag_editor/report.py - MAP 태그 Excel 리포트 생성
 
 분석 및 적용 결과를 Excel 파일로 출력
 """
@@ -28,7 +28,19 @@ def generate_audit_report(
     output_dir: str,
     untagged_only: bool = False,
 ) -> str:
-    """MAP 태그 분석 Excel 리포트 생성"""
+    """MAP 태그 분석 결과를 Excel 보고서로 생성한다.
+
+    Summary, By Account, By Resource Type, Untagged Resources, Tagged Resources(선택),
+    All Resources 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 MAP 태그 분석 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+        untagged_only: True이면 Tagged Resources 시트를 생략.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     wb = Workbook()
 
     # ===== Summary 시트 =====
@@ -210,7 +222,17 @@ def generate_apply_report(
     results: list[MapTagApplyResult],
     output_dir: str,
 ) -> str:
-    """MAP 태그 적용 결과 Excel 리포트 생성"""
+    """MAP 태그 적용 결과를 Excel 보고서로 생성한다.
+
+    Summary, By Account, Operation Log 시트를 포함한다.
+
+    Args:
+        results: 계정/리전별 MAP 태그 적용 결과 목록.
+        output_dir: 보고서 저장 디렉토리 경로.
+
+    Returns:
+        생성된 Excel 파일 경로.
+    """
     wb = Workbook()
 
     # ===== Summary 시트 =====

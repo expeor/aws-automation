@@ -1,11 +1,14 @@
-"""
-reports/log_analyzer - ALB 로그 분석 핵심 모듈
+"""functions/reports/log_analyzer/__init__.py - ALB 로그 분석 패키지.
+
+S3에 저장된 ALB 액세스 로그를 DuckDB 기반으로 초고속 분석하고
+종합 Excel 보고서를 생성합니다.
 
 모듈:
-    alb_log_analyzer.py     - DuckDB 기반 분석기
-    alb_log_downloader.py   - S3 로그 다운로드
-    alb_excel_reporter.py   - Excel 보고서 생성
-    ip_intelligence.py      - IP 인텔리전스 (국가 매핑 + 악성 IP)
+    - alb_log_analyzer.py: DuckDB 기반 SQL 분석기 (로그 파싱, 통계 산출).
+    - alb_log_downloader.py: S3 로그 다운로드 (병렬 다운로드, 압축 해제).
+    - alb_excel_reporter.py: Excel 보고서 생성 (요약, 상태코드, 응답시간 등).
+    - ip_intelligence.py: IP 인텔리전스 (GeoIP 국가 매핑 + AbuseIPDB 악성 IP 탐지).
+    - reporter/: 시트별 Excel Writer 모듈 (summary, status_code, abuse, tps 등).
 """
 
 CATEGORY = {

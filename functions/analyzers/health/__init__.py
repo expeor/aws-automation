@@ -1,5 +1,14 @@
 """
-plugins/health - AWS Health Dashboard Tools
+functions/analyzers/health - AWS Health 이벤트 및 패치 관리 도구
+
+AWS Personal Health Dashboard의 이벤트를 분석하고, 예정된
+패치/유지보수 이벤트 및 현재 진행 중인 서비스 장애를 조회합니다.
+모든 도구는 글로벌 서비스로 리전 선택이 불필요합니다.
+
+도구 목록:
+    - analysis: AWS Personal Health Dashboard 전체 이벤트 분석 및 보고서 생성
+    - patch_analysis: 예정된 패치/유지보수 이벤트 분석 및 보고서 생성
+    - issues: 현재 진행 중인 AWS 서비스 장애 조회
 """
 
 CATEGORY = {

@@ -1,5 +1,5 @@
 """
-plugins/resource_explorer/common/services/devops.py - DevOps 리소스 수집
+core/shared/aws/inventory/services/devops.py - DevOps 리소스 수집
 
 CloudFormation Stack, CodePipeline, CodeBuild Project 수집.
 """
@@ -18,7 +18,20 @@ logger = logging.getLogger(__name__)
 def collect_cloudformation_stacks(
     session, account_id: str, account_name: str, region: str
 ) -> list[CloudFormationStack]:
-    """CloudFormation Stack 수집"""
+    """CloudFormation Stack 리소스를 수집합니다.
+
+    Stack 목록 조회 후 각 Stack의 상태, Drift 정보, Termination Protection,
+    부모/루트 스택 관계 등 상세 정보와 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        CloudFormationStack 데이터 클래스 목록
+    """
     cfn = get_client(session, "cloudformation", region_name=region)
     stacks = []
 
@@ -53,7 +66,20 @@ def collect_cloudformation_stacks(
 
 
 def collect_codepipelines(session, account_id: str, account_name: str, region: str) -> list[CodePipeline]:
-    """CodePipeline 수집"""
+    """CodePipeline 리소스를 수집합니다.
+
+    Pipeline 목록 조회 후 각 Pipeline의 상세 정보(스테이지 수, 실행 모드, 버전 등)와
+    태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        CodePipeline 데이터 클래스 목록
+    """
     codepipeline = get_client(session, "codepipeline", region_name=region)
     pipelines = []
 
@@ -105,7 +131,20 @@ def collect_codepipelines(session, account_id: str, account_name: str, region: s
 
 
 def collect_codebuild_projects(session, account_id: str, account_name: str, region: str) -> list[CodeBuildProject]:
-    """CodeBuild Project 수집"""
+    """CodeBuild Project 리소스를 수집합니다.
+
+    프로젝트 이름 목록 조회 후 batch_get_projects API로 100개씩 배치로 상세 정보를 수집합니다.
+    소스 타입/위치, 빌드 환경(컴퓨트 타입, 이미지), 타임아웃 설정 등과 태그를 함께 수집합니다.
+
+    Args:
+        session: boto3 Session 객체
+        account_id: AWS 계정 ID
+        account_name: AWS 계정 이름
+        region: AWS 리전 코드
+
+    Returns:
+        CodeBuildProject 데이터 클래스 목록
+    """
     codebuild = get_client(session, "codebuild", region_name=region)
     projects: list[CodeBuildProject] = []
 

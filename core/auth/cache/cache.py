@@ -1,16 +1,21 @@
-# internal/auth/cache/cache.py
+# core/auth/cache/cache.py
 """
-AWS 인증 캐시 관리 구현
+core/auth/cache/cache.py - AWS 인증 캐시 관리 구현
 
-- TokenCache: SSO 토큰 데이터 구조
-- TokenCacheManager: 토큰 캐시 파일 관리
-- AccountCache: 메모리 기반 계정 캐시
-- CredentialsCache: 메모리 기반 자격증명 캐시
+SSO 토큰, 계정 정보, 임시 자격증명의 캐시를 관리합니다.
+
+포함 클래스:
+    - TokenEncryption: PBKDF2 + Fernet 기반 토큰 암호화/복호화 (싱글톤)
+    - CacheEntry: 제네릭 캐시 항목 (TTL 만료 관리)
+    - TokenCache: SSO 토큰 데이터 구조 (AWS CLI 호환 JSON 직렬화)
+    - TokenCacheManager: 토큰 캐시 파일 관리 (~/.aws/sso/cache/)
+    - AccountCache: 메모리 기반 계정 캐시 (Thread-safe, 기본 TTL 1시간)
+    - CredentialsCache: 메모리 기반 자격증명 캐시 (Thread-safe, 기본 TTL 30분)
 
 설계 원칙:
-- 파일 캐시는 SSO 토큰만 (AWS CLI 호환 필수)
-- 나머지는 메모리 캐시로 단순화
-- 토큰 만료 시간은 IAM Identity Center 설정을 따름
+    - 파일 캐시는 SSO 토큰만 (AWS CLI 호환 필수)
+    - 나머지는 메모리 캐시로 단순화
+    - 토큰 만료 시간은 IAM Identity Center 설정을 따름
 """
 
 import base64
@@ -45,6 +50,7 @@ class TokenEncryption:
     _initialized: bool
 
     def __new__(cls) -> "TokenEncryption":
+        """Double-checked locking 패턴으로 싱글톤 인스턴스를 반환합니다."""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -53,6 +59,11 @@ class TokenEncryption:
         return cls._instance
 
     def __init__(self) -> None:
+        """TokenEncryption 초기화
+
+        최초 호출 시에만 암호화 모듈을 초기화합니다.
+        cryptography 모듈이 없으면 암호화를 비활성화하고 평문으로 동작합니다.
+        """
         if self._initialized:
             return
         self._initialized = True
@@ -61,7 +72,11 @@ class TokenEncryption:
         self._init_encryption()
 
     def _init_encryption(self) -> None:
-        """암호화 모듈 초기화"""
+        """암호화 모듈을 초기화합니다.
+
+        PBKDF2HMAC으로 머신 고유 키를 유도하고 Fernet 암호화 객체를 생성합니다.
+        cryptography 모듈이 없거나 초기화 실패 시 평문 모드로 전환합니다.
+        """
         try:
             from cryptography.fernet import Fernet
             from cryptography.hazmat.primitives import hashes
@@ -93,7 +108,11 @@ class TokenEncryption:
 
     @staticmethod
     def _load_or_create_salt() -> bytes:
-        """~/.aws/sso/cache/.salt에서 랜덤 솔트를 로드하거나 새로 생성"""
+        """~/.aws/sso/cache/.salt에서 랜덤 솔트를 로드하거나 새로 생성합니다.
+
+        Returns:
+            32바이트 솔트 (기존 파일에서 로드 또는 새로 생성)
+        """
         salt_path = Path.home() / ".aws" / "sso" / "cache" / ".salt"
         try:
             if salt_path.exists():
@@ -157,7 +176,11 @@ class TokenEncryption:
 
 
 def get_token_encryption() -> TokenEncryption:
-    """TokenEncryption 싱글톤 인스턴스 반환"""
+    """TokenEncryption 싱글톤 인스턴스를 반환합니다.
+
+    Returns:
+        TokenEncryption 인스턴스 (항상 동일한 객체)
+    """
     return TokenEncryption()
 
 
@@ -260,7 +283,11 @@ class TokenCache:
             return True
 
     def get_expires_at_datetime(self) -> datetime | None:
-        """만료 시간을 datetime 객체로 반환"""
+        """만료 시간을 datetime 객체로 반환합니다.
+
+        Returns:
+            UTC timezone-aware datetime 또는 None (파싱 실패 시)
+        """
         try:
             return datetime.strptime(self.expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
@@ -307,9 +334,16 @@ class TokenCache:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TokenCache":
-        """딕셔너리에서 생성 (JSON 로드용)
+        """딕셔너리에서 TokenCache 인스턴스를 생성합니다 (JSON 로드용).
 
-        암호화된 필드는 자동으로 복호화됩니다.
+        ``_encrypted`` 플래그가 True이고 암호화 모듈이 사용 가능하면
+        민감한 필드(accessToken, clientSecret, refreshToken)를 자동으로 복호화합니다.
+
+        Args:
+            data: JSON에서 로드한 딕셔너리
+
+        Returns:
+            TokenCache 인스턴스
         """
         encryption = get_token_encryption()
         is_encrypted = data.get("_encrypted", False)
@@ -370,9 +404,12 @@ class TokenCacheManager:
         self._cache_key = self._generate_cache_key()
 
     def _generate_cache_key(self) -> str:
-        """캐시 파일명에 사용할 해시 키 생성
+        """캐시 파일명에 사용할 SHA-1 해시 키를 생성합니다.
 
-        AWS CLI와 동일한 방식으로 해시를 생성합니다.
+        AWS CLI와 동일한 방식으로 session_name 또는 start_url을 해싱합니다.
+
+        Returns:
+            40자리 SHA-1 해시 문자열
         """
         # session_name이 있으면 session_name 사용, 없으면 start_url 사용
         input_str = self.session_name if self.session_name else self.start_url
@@ -447,7 +484,11 @@ class TokenCacheManager:
             return False
 
     def exists(self) -> bool:
-        """캐시 파일 존재 여부"""
+        """캐시 파일 존재 여부를 확인합니다.
+
+        Returns:
+            캐시 파일이 존재하면 True
+        """
         return self.cache_path.exists()
 
 
@@ -459,7 +500,8 @@ class TokenCacheManager:
 class AccountCache:
     """메모리 기반 계정 캐시
 
-    Thread-safe 구현.
+    AccountInfo 객체를 TTL과 함께 캐시하여 SSO ListAccounts API 호출을 줄입니다.
+    RLock 기반 Thread-safe 구현입니다.
     """
 
     def __init__(self, default_ttl_seconds: int = 3600):
@@ -647,7 +689,15 @@ class CredentialsCache:
             )
 
     def invalidate(self, account_id: str, role_name: str) -> bool:
-        """특정 자격증명 캐시 무효화"""
+        """특정 계정/역할의 자격증명 캐시를 무효화합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+            role_name: 역할 이름
+
+        Returns:
+            캐시가 존재하여 삭제되었으면 True
+        """
         key = self._make_key(account_id, role_name)
 
         with self._lock:

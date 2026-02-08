@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/kinesis.py - Amazon Kinesis Data Streams 가격 조회
+functions/analyzers/cost/pricing/kinesis.py - Amazon Kinesis Data Streams 가격 조회
 
 Kinesis 비용 계산:
 - Provisioned: Shard-hour당 $0.015
@@ -74,7 +74,19 @@ DEFAULT_PRICES = {
 
 
 def get_kinesis_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:
-    """Pricing API를 통해 Kinesis 가격 조회"""
+    """AWS Pricing API를 통해 Kinesis Data Streams 가격 조회
+
+    Shard-hour, PUT payload, extended retention 가격을 조회합니다.
+    API에서 조회된 값은 DEFAULT_PRICES에 병합됩니다.
+
+    Args:
+        session: boto3 Session 객체
+        region: 가격을 조회할 AWS 리전 코드
+
+    Returns:
+        가격 항목별 딕셔너리 (USD).
+        조회 실패 시 빈 딕셔너리.
+    """
     try:
         pricing = get_client(session, "pricing", region_name=PRICING_API_REGION)
         response = pricing.get_products(
@@ -116,7 +128,19 @@ def get_kinesis_prices_from_api(session: boto3.Session, region: str) -> dict[str
 
 
 def get_kinesis_prices(region: str = "ap-northeast-2", session: boto3.Session | None = None) -> dict[str, float]:
-    """Kinesis 가격 조회"""
+    """Kinesis Data Streams 가격 항목별 조회
+
+    API 조회 실패 시 하드코딩된 기본값을 반환합니다.
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        가격 항목별 딕셔너리 (USD).
+        키: shard_hour, put_payload_unit, extended_retention_hour,
+        on_demand_stream_hour, on_demand_data_in_gb, on_demand_data_out_gb
+    """
     if session:
         api_prices = get_kinesis_prices_from_api(session, region)
         if api_prices:
@@ -129,7 +153,15 @@ def get_kinesis_shard_hour_price(
     region: str = "ap-northeast-2",
     session: boto3.Session | None = None,
 ) -> float:
-    """Kinesis Shard-hour 가격 (Provisioned)"""
+    """Kinesis Provisioned 모드 Shard-hour 가격 조회
+
+    Args:
+        region: AWS 리전 코드
+        session: boto3 Session (None이면 API 조회 생략)
+
+    Returns:
+        Shard-hour당 가격 (USD)
+    """
     prices = get_kinesis_prices(region, session)
     return prices.get("shard_hour", 0.015)
 

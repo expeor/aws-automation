@@ -1,5 +1,5 @@
 """
-plugins/cost/pricing/elb.py - Elastic Load Balancer 가격 조회
+functions/analyzers/cost/pricing/elb.py - Elastic Load Balancer 가격 조회
 
 ELB 비용 계산 (리전별 상이):
 - ALB: ~$0.0225/시간 = ~$16.43/월

@@ -1,5 +1,13 @@
 """
-plugins/tag_editor - Resource Tag Management Tools
+functions/analyzers/tag_editor - 리소스 태그 관리 도구
+
+MAP 2.0 마이그레이션 태그(map-migrated) 현황 분석 및 일괄 적용,
+EC2 인스턴스 태그를 연결된 EBS 볼륨에 동기화하는 기능을 제공합니다.
+
+도구 목록:
+    - map_audit: MAP 2.0 마이그레이션 태그(map-migrated) 현황 분석
+    - map_apply: 리소스에 MAP 2.0 마이그레이션 태그 일괄 적용
+    - ec2_to_ebs (run_sync): EC2 인스턴스의 태그를 연결된 EBS 볼륨에 일괄 적용
 """
 
 CATEGORY = {

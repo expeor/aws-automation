@@ -1,10 +1,14 @@
-# internal/auth/provider/sso_session.py
+# core/auth/provider/sso_session.py
 """
-SSO Session Provider 구현
+core/auth/provider/sso_session.py - SSO Session Provider 구현
 
-- AWS SSO 세션 기반 인증
-- 멀티 계정 지원
-- 토큰 캐시 관리 (AWS CLI 호환)
+AWS IAM Identity Center(SSO) 세션 기반 인증 Provider입니다.
+멀티 계정 지원, 디바이스 인증 흐름, AWS CLI 호환 토큰 캐시 관리를 제공합니다.
+
+인증 흐름:
+    1. 캐시된 토큰 확인 (유효하면 재사용)
+    2. refresh_token으로 토큰 갱신 시도
+    3. 디바이스 인증 흐름 시작 (브라우저 인증)
 """
 
 import contextlib
@@ -139,7 +143,13 @@ class SSOSessionProvider(BaseProvider):
         self._authenticated = True
 
     def _start_device_authorization(self) -> None:
-        """디바이스 인증 흐름 시작"""
+        """OIDC 디바이스 인증 흐름을 시작합니다.
+
+        클라이언트 등록 -> 디바이스 인증 시작 -> 브라우저 열기 -> 토큰 폴링 순서로 진행합니다.
+
+        Raises:
+            ProviderError: 디바이스 인증 실패 시
+        """
         try:
             # 클라이언트 등록
             client_creds = self._sso_oidc_client.register_client(
@@ -187,7 +197,19 @@ class SSOSessionProvider(BaseProvider):
         interval: int,
         expires_in: int,
     ) -> None:
-        """토큰 폴링"""
+        """사용자가 브라우저에서 인증을 완료할 때까지 토큰을 폴링합니다.
+
+        Args:
+            client_id: OIDC 클라이언트 ID
+            client_secret: OIDC 클라이언트 시크릿
+            device_code: 디바이스 인증 코드
+            interval: 폴링 간격 (초)
+            expires_in: 인증 제한 시간 (초)
+
+        Raises:
+            TokenExpiredError: 디바이스 인증 시간 초과
+            ProviderError: 토큰 생성 실패
+        """
         max_attempts = expires_in // interval
 
         for _ in range(max_attempts):
@@ -228,7 +250,13 @@ class SSOSessionProvider(BaseProvider):
         client_id: str,
         client_secret: str,
     ) -> None:
-        """토큰 캐시 저장"""
+        """토큰 응답을 파일 캐시에 저장합니다.
+
+        Args:
+            token_response: OIDC create_token 응답 딕셔너리
+            client_id: OIDC 클라이언트 ID
+            client_secret: OIDC 클라이언트 시크릿
+        """
         # 만료 시간 계산 (기존 aws_sso_helper.py 방식)
         expires_in = token_response.get("expiresIn", 28800)  # 기본 8시간
         expires_at_str = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() + expires_in).strftime(
@@ -250,7 +278,11 @@ class SSOSessionProvider(BaseProvider):
         logger.debug(f"토큰 캐시 저장 완료: 만료 {expires_at_str}")
 
     def _refresh_token(self) -> None:
-        """토큰 갱신"""
+        """refresh_token을 사용하여 액세스 토큰을 갱신합니다.
+
+        Raises:
+            TokenExpiredError: refresh_token이 없거나 갱신 실패 시
+        """
         if not self._token_cache or not self._token_cache.refresh_token:
             raise TokenExpiredError("갱신 토큰이 없습니다")
 
@@ -272,7 +304,11 @@ class SSOSessionProvider(BaseProvider):
             raise TokenExpiredError(f"토큰 갱신 실패: {e}", cause=e) from e
 
     def refresh(self) -> None:
-        """자격 증명 갱신"""
+        """자격 증명을 갱신합니다.
+
+        refresh_token이 있으면 토큰 갱신을 시도하고,
+        없으면 새로운 디바이스 인증 흐름을 시작합니다.
+        """
         if self._token_cache and self._token_cache.refresh_token:
             self._refresh_token()
         else:
@@ -365,7 +401,16 @@ class SSOSessionProvider(BaseProvider):
         role_name: str | None = None,
         region: str | None = None,
     ) -> dict[str, Any]:
-        """AWS 설정 정보 반환"""
+        """지정된 계정/역할/리전에 대한 AWS 설정 정보를 반환합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+            role_name: 역할 이름
+            region: AWS 리전
+
+        Returns:
+            {"region_name": str, "credentials": ...} 딕셔너리
+        """
         session = self.get_session(account_id, role_name, region)
         return {
             "region_name": session.region_name,
@@ -437,7 +482,14 @@ class SSOSessionProvider(BaseProvider):
             ) from e
 
     def _list_account_roles(self, account_id: str) -> list[str]:
-        """특정 계정의 역할 목록 조회"""
+        """특정 계정에서 사용 가능한 역할 목록을 조회합니다.
+
+        Args:
+            account_id: AWS 계정 ID
+
+        Returns:
+            역할 이름 리스트 (API 실패 시 빈 리스트)
+        """
         if self._access_token is None:
             return []
         try:
@@ -451,5 +503,9 @@ class SSOSessionProvider(BaseProvider):
             return []  # Return empty list on API failure
 
     def supports_multi_account(self) -> bool:
-        """멀티 계정 지원 여부"""
+        """멀티 계정 지원 여부를 반환합니다.
+
+        Returns:
+            항상 True (SSO Session은 멀티 계정 지원)
+        """
         return True

@@ -25,7 +25,15 @@ from .analyzer import (
 
 
 class IAMExcelReporter:
-    """IAM Audit Excel 보고서 생성기"""
+    """IAM Audit Excel 보고서 생성기.
+
+    Summary, Critical Issues, Users, Access Keys, Roles, Groups,
+    Password Policy, User Changes 8개 시트로 구성된 보고서를 생성한다.
+
+    Args:
+        results: 계정별 IAM 분석 결과 목록.
+        summary_stats: 계정별 통계 요약 딕셔너리 목록.
+    """
 
     def __init__(
         self,
@@ -36,7 +44,14 @@ class IAMExcelReporter:
         self.summary_stats = summary_stats
 
     def generate(self, output_dir: str) -> str:
-        """Excel 보고서 생성"""
+        """Excel 보고서를 생성한다.
+
+        Args:
+            output_dir: 보고서 저장 디렉토리 경로.
+
+        Returns:
+            생성된 Excel 파일 경로.
+        """
 
         wb = Workbook()
 
