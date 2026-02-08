@@ -30,9 +30,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    import boto3
-
     from typing import TypeAlias
+
+    import boto3
 
     Boto3Session: TypeAlias = boto3.Session
 
