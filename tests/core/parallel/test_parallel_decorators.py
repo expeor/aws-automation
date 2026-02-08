@@ -2,7 +2,6 @@
 tests/test_parallel_decorators.py - core/parallel/decorators.py 테스트
 """
 
-import pytest
 from botocore.exceptions import ClientError
 
 from core.parallel.decorators import (
@@ -12,10 +11,8 @@ from core.parallel.decorators import (
     categorize_error,
     get_error_code,
     is_retryable,
-    safe_aws_call,
-    with_retry,
 )
-from core.parallel.types import ErrorCategory, TaskError
+from core.parallel.types import ErrorCategory
 
 
 class TestRetryConfig:
@@ -270,178 +267,3 @@ class TestIsRetryable:
         """ValueError는 재시도 불가"""
         error = ValueError("Invalid value")
         assert is_retryable(error) is False
-
-
-class TestSafeAwsCall:
-    """safe_aws_call 데코레이터 테스트"""
-
-    def test_successful_call(self):
-        """성공적인 호출"""
-
-        @safe_aws_call(service="ec2", operation="test")
-        def successful_func():
-            return ["result1", "result2"]
-
-        result = successful_func()
-        assert result == ["result1", "result2"]
-
-    def test_non_retryable_error_returns_task_error(self):
-        """재시도 불가 에러는 TaskError 반환"""
-
-        @safe_aws_call(
-            service="ec2",
-            operation="test",
-            identifier="test-account",
-            region="us-east-1",
-        )
-        def access_denied_func():
-            raise ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "Not authorized"}},
-                "describe_instances",
-            )
-
-        result = access_denied_func()
-
-        assert isinstance(result, TaskError)
-        assert result.category == ErrorCategory.ACCESS_DENIED
-        assert result.error_code == "AccessDenied"
-        assert result.identifier == "test-account"
-        assert result.region == "us-east-1"
-
-    def test_retryable_error_retries(self):
-        """재시도 가능 에러는 재시도 수행"""
-        call_count = {"value": 0}
-
-        @safe_aws_call(
-            service="ec2",
-            operation="test",
-            retry_config=RetryConfig(max_retries=2, base_delay=0.01, jitter=False),
-        )
-        def throttling_func():
-            call_count["value"] += 1
-            if call_count["value"] < 3:
-                raise ClientError(
-                    {"Error": {"Code": "Throttling", "Message": "Rate exceeded"}},
-                    "describe_instances",
-                )
-            return "success"
-
-        result = throttling_func()
-
-        assert result == "success"
-        assert call_count["value"] == 3  # 1 + 2 재시도
-
-    def test_max_retries_exceeded(self):
-        """최대 재시도 초과"""
-
-        @safe_aws_call(
-            service="ec2",
-            operation="test",
-            retry_config=RetryConfig(max_retries=2, base_delay=0.01, jitter=False),
-            identifier="test",
-            region="test-region",
-        )
-        def always_throttling():
-            raise ClientError(
-                {"Error": {"Code": "Throttling", "Message": "Rate exceeded"}},
-                "describe_instances",
-            )
-
-        result = always_throttling()
-
-        assert isinstance(result, TaskError)
-        assert "최대 재시도 횟수 초과" in result.message
-        assert result.retries == 2
-
-    def test_unexpected_error_handling(self):
-        """예상치 못한 에러 처리"""
-
-        @safe_aws_call(
-            service="ec2",
-            operation="test",
-            identifier="test",
-            region="test-region",
-        )
-        def unexpected_error():
-            raise ValueError("Unexpected!")
-
-        result = unexpected_error()
-
-        assert isinstance(result, TaskError)
-        assert result.error_code == "ValueError"
-
-
-class TestWithRetry:
-    """with_retry 데코레이터 테스트"""
-
-    def test_successful_call(self):
-        """성공적인 호출"""
-
-        @with_retry(max_retries=3)
-        def successful_func():
-            return "success"
-
-        result = successful_func()
-        assert result == "success"
-
-    def test_retry_on_client_error(self):
-        """ClientError 발생 시 재시도"""
-        call_count = {"value": 0}
-
-        @with_retry(max_retries=3, base_delay=0.01)
-        def retry_func():
-            call_count["value"] += 1
-            if call_count["value"] < 2:
-                raise ClientError(
-                    {"Error": {"Code": "Throttling", "Message": "msg"}},
-                    "operation",
-                )
-            return "success"
-
-        result = retry_func()
-
-        assert result == "success"
-        assert call_count["value"] == 2
-
-    def test_non_retryable_error_raises(self):
-        """재시도 불가 에러는 즉시 raise"""
-
-        @with_retry(max_retries=3)
-        def access_denied():
-            raise ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "msg"}},
-                "operation",
-            )
-
-        with pytest.raises(ClientError):
-            access_denied()
-
-    def test_max_retries_exceeded_raises(self):
-        """최대 재시도 초과 시 raise"""
-
-        @with_retry(max_retries=2, base_delay=0.01)
-        def always_fails():
-            raise ClientError(
-                {"Error": {"Code": "Throttling", "Message": "msg"}},
-                "operation",
-            )
-
-        with pytest.raises(ClientError):
-            always_fails()
-
-    def test_custom_retryable_exceptions_network_error(self):
-        """커스텀 재시도 가능 예외 (네트워크 에러)"""
-        call_count = {"value": 0}
-
-        # ConnectionError는 is_retryable에서 True를 반환하므로 재시도됨
-        @with_retry(max_retries=3, base_delay=0.01, retryable_exceptions=(ConnectionError,))
-        def retry_connection_error():
-            call_count["value"] += 1
-            if call_count["value"] < 2:
-                raise ConnectionError("Connection failed")
-            return "success"
-
-        result = retry_connection_error()
-
-        assert result == "success"
-        assert call_count["value"] == 2

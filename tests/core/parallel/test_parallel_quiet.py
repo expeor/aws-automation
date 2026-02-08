@@ -8,7 +8,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from core.parallel.quiet import (
-    inherit_quiet_state,
     is_quiet,
     quiet_mode,
     set_quiet,
@@ -117,21 +116,6 @@ class TestQuietMode:
             assert is_quiet() is True
 
         assert is_quiet() is False
-
-
-class TestInheritQuietState:
-    """inherit_quiet_state 함수 테스트"""
-
-    def test_returns_current_quiet_state_true(self):
-        """현재 quiet 상태가 True일 때"""
-        set_quiet(True)
-        assert inherit_quiet_state() is True
-        set_quiet(False)
-
-    def test_returns_current_quiet_state_false(self):
-        """현재 quiet 상태가 False일 때"""
-        set_quiet(False)
-        assert inherit_quiet_state() is False
 
 
 class TestQuietModeWithThreadPool:

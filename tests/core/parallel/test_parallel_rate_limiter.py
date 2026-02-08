@@ -5,11 +5,12 @@ tests/test_parallel_rate_limiter.py - core/parallel/rate_limiter.py 테스트
 import threading
 import time
 
+import pytest
+
 from core.parallel.rate_limiter import (
     SERVICE_RATE_LIMITS,
     RateLimiterConfig,
     TokenBucketRateLimiter,
-    create_rate_limiter,
     get_rate_limiter,
     reset_rate_limiters,
 )
@@ -271,28 +272,18 @@ class TestGetRateLimiter:
         assert len(set(instances)) == 1
 
 
-class TestCreateRateLimiter:
-    """create_rate_limiter 팩토리 함수 테스트"""
+class TestRateLimiterConfigValidation:
+    """RateLimiterConfig 검증 테스트"""
 
-    def test_creates_new_instance(self):
-        """새 인스턴스 생성"""
-        limiter1 = create_rate_limiter()
-        limiter2 = create_rate_limiter()
+    def test_zero_requests_per_second_raises(self):
+        """requests_per_second=0이면 ValueError"""
+        with pytest.raises(ValueError, match="requests_per_second must be > 0"):
+            RateLimiterConfig(requests_per_second=0)
 
-        # 다른 인스턴스여야 함 (싱글톤 아님)
-        assert limiter1 is not limiter2
-
-    def test_custom_parameters(self):
-        """커스텀 파라미터 적용"""
-        limiter = create_rate_limiter(
-            requests_per_second=50.0,
-            burst_size=100,
-            wait_timeout=60.0,
-        )
-
-        assert limiter.config.requests_per_second == 50.0
-        assert limiter.config.burst_size == 100
-        assert limiter.config.wait_timeout == 60.0
+    def test_negative_requests_per_second_raises(self):
+        """requests_per_second < 0이면 ValueError"""
+        with pytest.raises(ValueError, match="requests_per_second must be > 0"):
+            RateLimiterConfig(requests_per_second=-1.0)
 
 
 class TestResetRateLimiters:

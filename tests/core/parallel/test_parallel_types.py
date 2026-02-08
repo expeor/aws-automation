@@ -253,7 +253,7 @@ class TestParallelExecutionResult:
             duration_ms=30.0,
         )
 
-        return ParallelExecutionResult(results=[success1, success2, failure1, failure2])
+        return ParallelExecutionResult(results=(success1, success2, failure1, failure2))
 
     def test_empty_result(self):
         """빈 결과 테스트"""
@@ -302,7 +302,7 @@ class TestParallelExecutionResult:
 
         # 모두 실패인 경우
         all_failed = ParallelExecutionResult(
-            results=[
+            results=(
                 TaskResult(
                     identifier="a",
                     region="r",
@@ -314,8 +314,8 @@ class TestParallelExecutionResult:
                         error_code="Error",
                         message="msg",
                     ),
-                )
-            ]
+                ),
+            )
         )
         assert all_failed.has_failures_only() is True
 
@@ -329,7 +329,7 @@ class TestParallelExecutionResult:
     def test_get_data_excludes_none(self):
         """None 데이터 제외"""
         result = ParallelExecutionResult(
-            results=[
+            results=(
                 TaskResult(
                     identifier="a",
                     region="r",
@@ -342,7 +342,7 @@ class TestParallelExecutionResult:
                     success=True,
                     data="valid",
                 ),
-            ]
+            )
         )
         data = result.get_data()
         assert data == ["valid"]
@@ -355,7 +355,7 @@ class TestParallelExecutionResult:
     def test_get_flat_data_non_list(self):
         """리스트가 아닌 데이터 평탄화"""
         result = ParallelExecutionResult(
-            results=[
+            results=(
                 TaskResult(
                     identifier="a",
                     region="r",
@@ -368,7 +368,7 @@ class TestParallelExecutionResult:
                     success=True,
                     data=["list1", "list2"],
                 ),
-            ]
+            )
         )
         flat = result.get_flat_data()
         assert flat == ["single", "list1", "list2"]
@@ -422,7 +422,7 @@ class TestParallelExecutionResult:
             for i in range(5)
         ]
 
-        result = ParallelExecutionResult(results=errors)
+        result = ParallelExecutionResult(results=tuple(errors))
         summary = result.get_error_summary(max_per_category=2)
 
         assert "총 5개 작업 실패" in summary
