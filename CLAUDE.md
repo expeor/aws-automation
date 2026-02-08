@@ -47,10 +47,9 @@ aws-automation/
 ```
 core/
 ├── auth/           # 인증 (SSO Session, SSO Profile, Static)
-├── parallel/       # 병렬 실행 (Map-Reduce, Rate Limiting, Quotas)
+├── parallel/       # 병렬 실행 (Map-Reduce, Rate Limiting)
 │   ├── executor.py       # ParallelSessionExecutor, parallel_collect
-│   ├── rate_limiter.py   # Token Bucket Rate Limiting
-│   └── quotas.py         # Service Quotas 확인
+│   └── rate_limiter.py   # Token Bucket Rate Limiting
 ├── tools/          # 도구 관리, 캐시, 히스토리
 │   ├── discovery.py      # 플러그인/리포트 발견
 │   ├── history/          # 사용 기록, 즐겨찾기
@@ -199,9 +198,6 @@ from core.parallel import (
     safe_aws_call,          # 재시도 + Rate limiting 데코레이터
     quiet_mode,             # 로그 출력 억제
     ErrorCollector,         # 에러 수집/분류
-    # Service Quotas 확인
-    get_quota_checker,      # 쿼터 체커 싱글톤
-    QuotaStatus,            # 쿼터 상태 (OK, WARNING, CRITICAL, EXCEEDED)
 )
 
 # 기본 사용
@@ -219,11 +215,6 @@ def get_instances(session, region):
     ec2 = session.client("ec2", region_name=region)
     return ec2.describe_instances()["Reservations"]
 
-# 쿼터 확인
-checker = get_quota_checker(session, "ap-northeast-2")
-quota = checker.get_quota("ec2", "Running On-Demand")
-if quota and quota.usage_percent > 80:
-    print(f"경고: {quota.quota_name} 사용률 {quota.usage_percent:.1f}%")
 ```
 
 ### 리전 가용성 확인 (core.region)

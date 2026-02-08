@@ -8,7 +8,7 @@ CLI 기반 인프라 전체를 포함하는 최상위 패키지입니다.
 아키텍처:
     core/
     ├── auth/           # AWS 인증 서브시스템
-    ├── parallel/       # 병렬 처리 (executor, rate limiter, quotas)
+    ├── parallel/       # 병렬 처리 (executor, rate limiter)
     ├── tools/          # 도구 관리 (discovery, history, cache)
     ├── region/         # 리전 데이터 및 가용성
     ├── cli/            # Click CLI, 대화형 메뉴, i18n
