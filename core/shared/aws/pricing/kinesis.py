@@ -34,8 +34,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+from .constants import HOURS_PER_MONTH
+
 PRICING_API_REGION = "us-east-1"
-HOURS_PER_MONTH = 730
 
 # Kinesis Data Streams 리전별 가격 (USD) - 2025년 기준
 # https://aws.amazon.com/kinesis/data-streams/pricing/

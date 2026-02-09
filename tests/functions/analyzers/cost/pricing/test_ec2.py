@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from functions.analyzers.cost.pricing.constants import HOURS_PER_MONTH
+from core.shared.aws.pricing.constants import HOURS_PER_MONTH
 
 
 class TestEC2Pricing:
@@ -15,13 +15,13 @@ class TestEC2Pricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_ec2_prices):
         """Mock PricingService"""
-        with patch("functions.analyzers.cost.pricing.ec2.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.ec2.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_ec2_prices
             yield mock_service
 
     def test_get_ec2_price(self, mock_pricing_service, sample_ec2_prices):
         """EC2 인스턴스 가격 조회"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_price
+        from core.shared.aws.pricing.ec2 import get_ec2_price
 
         price = get_ec2_price("t3.micro", "ap-northeast-2")
 
@@ -30,7 +30,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_price_unknown_instance(self, mock_pricing_service):
         """알 수 없는 인스턴스 타입 가격 조회"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_price
+        from core.shared.aws.pricing.ec2 import get_ec2_price
 
         price = get_ec2_price("unknown.instance", "ap-northeast-2")
 
@@ -38,7 +38,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_monthly_cost(self, mock_pricing_service, sample_ec2_prices):
         """EC2 월간 비용 계산"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_monthly_cost
+        from core.shared.aws.pricing.ec2 import get_ec2_monthly_cost
 
         monthly_cost = get_ec2_monthly_cost("t3.micro", "ap-northeast-2")
 
@@ -47,7 +47,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_monthly_cost_custom_hours(self, mock_pricing_service, sample_ec2_prices):
         """커스텀 시간으로 EC2 월간 비용 계산"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_monthly_cost
+        from core.shared.aws.pricing.ec2 import get_ec2_monthly_cost
 
         custom_hours = 168  # 1주일
         monthly_cost = get_ec2_monthly_cost("t3.micro", "ap-northeast-2", hours_per_month=custom_hours)
@@ -57,7 +57,7 @@ class TestEC2Pricing:
 
     def test_get_ec2_prices(self, mock_pricing_service, sample_ec2_prices):
         """모든 EC2 가격 조회"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_prices
+        from core.shared.aws.pricing.ec2 import get_ec2_prices
 
         prices = get_ec2_prices("ap-northeast-2")
 
@@ -65,13 +65,13 @@ class TestEC2Pricing:
 
     def test_get_ec2_prices_bulk_alias(self, mock_pricing_service, sample_ec2_prices):
         """get_ec2_prices_bulk가 get_ec2_prices의 alias인지 확인"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_prices, get_ec2_prices_bulk
+        from core.shared.aws.pricing.ec2 import get_ec2_prices, get_ec2_prices_bulk
 
         assert get_ec2_prices_bulk is get_ec2_prices
 
     def test_get_ec2_price_with_refresh(self, mock_pricing_service, sample_ec2_prices):
         """refresh=True로 EC2 가격 조회"""
-        from functions.analyzers.cost.pricing.ec2 import get_ec2_price
+        from core.shared.aws.pricing.ec2 import get_ec2_price
 
         _ = get_ec2_price("t3.micro", "ap-northeast-2", refresh=True)
 

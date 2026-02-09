@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from core.parallel import parallel_collect
-from core.shared.aws.health import REQUIRED_PERMISSIONS, HealthCollector, HealthEvent  # noqa: F401
+from core.shared.aws.health import HealthCollector, HealthEvent
 
 if TYPE_CHECKING:
     from core.cli.flow.context import ExecutionContext

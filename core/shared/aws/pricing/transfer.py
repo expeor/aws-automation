@@ -70,8 +70,7 @@ TRANSFER_PRICES: dict[str, dict[str, float]] = {
 # 기본 가격 (알 수 없는 리전용)
 DEFAULT_PRICES = {"hourly": 0.30}
 
-# 월 평균 시간 (24 * 30)
-HOURS_PER_MONTH = 730
+from .constants import HOURS_PER_MONTH
 
 
 def get_transfer_prices_from_api(session: boto3.Session, region: str) -> dict[str, float]:

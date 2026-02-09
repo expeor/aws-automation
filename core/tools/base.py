@@ -18,10 +18,12 @@ Example:
                 ...
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
     from core.cli.flow.context import ExecutionContext
 
 
-def _get_console() -> "Console":
+def _get_console() -> Console:
     """Rich Console 인스턴스를 lazy하게 생성하여 반환합니다.
 
     Returns:
@@ -60,9 +62,9 @@ class BaseToolRunner(ABC):
                     # ... 작업 수행
     """
 
-    ctx: Optional["ExecutionContext"] = None
+    ctx: ExecutionContext | None = None
 
-    # 하위 호환성을 위한 필드 (deprecated)
+    # ExecutionContext에서 자동 복사되는 편의 필드
     profiles: list[str] = field(default_factory=list)
     regions: list[str] = field(default_factory=list)
 

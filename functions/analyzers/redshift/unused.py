@@ -108,7 +108,7 @@ class RedshiftClusterInfo:
         Returns:
             월간 예상 비용 (USD).
         """
-        from functions.analyzers.cost.pricing.redshift import get_redshift_monthly_cost
+        from core.shared.aws.pricing.redshift import get_redshift_monthly_cost
 
         return get_redshift_monthly_cost(
             region=self.region,

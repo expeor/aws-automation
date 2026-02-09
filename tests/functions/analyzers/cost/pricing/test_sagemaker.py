@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from functions.analyzers.cost.pricing.constants import DEFAULT_PRICES, HOURS_PER_MONTH
+from core.shared.aws.pricing.constants import DEFAULT_PRICES, HOURS_PER_MONTH
 
 
 class TestSageMakerPricing:
@@ -15,13 +15,13 @@ class TestSageMakerPricing:
     @pytest.fixture
     def mock_pricing_service(self, sample_sagemaker_prices):
         """Mock PricingService"""
-        with patch("functions.analyzers.cost.pricing.sagemaker.pricing_service") as mock_service:
+        with patch("core.shared.aws.pricing.sagemaker.pricing_service") as mock_service:
             mock_service.get_prices.return_value = sample_sagemaker_prices
             yield mock_service
 
     def test_get_sagemaker_price(self, mock_pricing_service, sample_sagemaker_prices):
         """SageMaker 인스턴스 가격 조회"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_price
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_price
 
         price = get_sagemaker_price("ml.t3.medium", "ap-northeast-2")
 
@@ -29,7 +29,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_price_from_defaults(self, mock_pricing_service):
         """API에 없는 경우 기본값에서 조회"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_price
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_price
 
         # mock에서 반환하지 않는 인스턴스 타입
         mock_pricing_service.get_prices.return_value = {}
@@ -41,7 +41,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_price_unknown_instance(self, mock_pricing_service):
         """알 수 없는 인스턴스 타입은 기본값 0.50 반환"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_price
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_price
 
         mock_pricing_service.get_prices.return_value = {}
 
@@ -51,7 +51,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_monthly_cost(self, mock_pricing_service, sample_sagemaker_prices):
         """SageMaker 월간 비용 계산"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_monthly_cost
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
 
         monthly_cost = get_sagemaker_monthly_cost("ml.t3.medium", "ap-northeast-2")
 
@@ -60,7 +60,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_monthly_cost_multiple_instances(self, mock_pricing_service, sample_sagemaker_prices):
         """여러 인스턴스의 SageMaker 월간 비용 계산"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_monthly_cost
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
 
         instance_count = 3
         monthly_cost = get_sagemaker_monthly_cost("ml.t3.medium", "ap-northeast-2", instance_count=instance_count)
@@ -70,7 +70,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_prices(self, mock_pricing_service, sample_sagemaker_prices):
         """모든 SageMaker 가격 조회"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_prices
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_prices
 
         prices = get_sagemaker_prices("ap-northeast-2")
 
@@ -81,7 +81,7 @@ class TestSageMakerPricing:
 
     def test_get_sagemaker_prices_bulk_alias(self):
         """get_sagemaker_prices_bulk가 get_sagemaker_prices의 alias인지 확인"""
-        from functions.analyzers.cost.pricing.sagemaker import get_sagemaker_prices, get_sagemaker_prices_bulk
+        from core.shared.aws.pricing.sagemaker import get_sagemaker_prices, get_sagemaker_prices_bulk
 
         assert get_sagemaker_prices_bulk is get_sagemaker_prices
 

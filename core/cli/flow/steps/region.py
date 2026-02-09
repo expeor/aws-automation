@@ -9,7 +9,7 @@ from rich.console import Console
 
 from core.cli.i18n import t
 from core.cli.ui.console import clear_screen, print_box_end, print_box_line, print_box_start
-from core.region.data import ALL_REGIONS, COMMON_REGIONS, REGION_NAMES
+from core.region.data import ALL_REGIONS, REGION_NAMES
 
 from ..context import ExecutionContext
 
@@ -116,10 +116,8 @@ class RegionStep:
         """단일 리전 선택 UI (단일 리전만 지원하는 도구용)"""
         console.print()
 
-        # 자주 사용하는 리전을 우선 표시
-        common_region_codes = [region for region, _ in COMMON_REGIONS]
-        other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
-        all_regions_for_selection = common_region_codes + other_regions
+        # 알파벳순 정렬 (같은 prefix끼리 자연 그룹핑)
+        all_regions_for_selection = sorted(ALL_REGIONS)
 
         print_box_start(t("flow.region_count", count=len(all_regions_for_selection)))
 
@@ -159,10 +157,8 @@ class RegionStep:
         """리전 선택 UI (1개 이상 선택 가능)"""
         console.print()
 
-        # 자주 사용하는 리전 우선 표시
-        common_region_codes = [region for region, _ in COMMON_REGIONS]
-        other_regions = [r for r in ALL_REGIONS if r not in common_region_codes]
-        all_regions = common_region_codes + other_regions
+        # 알파벳순 정렬 (같은 prefix끼리 자연 그룹핑)
+        all_regions = sorted(ALL_REGIONS)
 
         print_box_start(t("flow.region_count", count=len(all_regions)))
 
@@ -190,15 +186,28 @@ class RegionStep:
             if not choice:
                 continue
 
-            # 번호 파싱
+            # 번호 파싱 (1,2,3 / 1-5 / 1-3,5,7-9 지원)
             try:
-                nums = [int(n) for n in choice.replace(",", " ").split()]
-                selected = []
-                for num in nums:
-                    if 1 <= num <= len(all_regions):
-                        region = all_regions[num - 1]
-                        if region not in selected:
-                            selected.append(region)
+                indices: set[int] = set()
+                parts = choice.replace(" ", ",").split(",")
+                for part in parts:
+                    part = part.strip()
+                    if not part:
+                        continue
+                    if "-" in part and not part.startswith("-"):
+                        range_parts = part.split("-", 1)
+                        start, end = int(range_parts[0]), int(range_parts[1])
+                        if start > end:
+                            start, end = end, start
+                        for i in range(start, end + 1):
+                            if 1 <= i <= len(all_regions):
+                                indices.add(i)
+                    else:
+                        num = int(part)
+                        if 1 <= num <= len(all_regions):
+                            indices.add(num)
+
+                selected = [all_regions[i - 1] for i in sorted(indices)]
 
                 if selected:
                     return selected

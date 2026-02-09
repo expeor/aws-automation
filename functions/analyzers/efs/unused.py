@@ -124,7 +124,7 @@ class EFSInfo:
         Returns:
             추정 월간 비용 (USD)
         """
-        from functions.analyzers.cost.pricing.efs import get_efs_monthly_cost
+        from core.shared.aws.pricing.efs import get_efs_monthly_cost
 
         return get_efs_monthly_cost(self.region, self.size_gb, session=session)
 

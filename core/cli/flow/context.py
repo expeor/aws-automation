@@ -18,9 +18,6 @@
         - ExecutionContext: 통합 실행 컨텍스트 (하위 호환성)
         - FlowResult: Flow 실행 결과
 
-    예외 클래스:
-        - BackToMenu: 이전 메뉴 복귀 예외 (BackToMenuError 상속)
-
 Context 분리 설계:
     AuthContext + ToolContext → ExecutionContext
 
@@ -73,22 +70,6 @@ if TYPE_CHECKING:
     from core.region.filter import AccountFilter
     from core.shared.aws.inventory import InventoryCollector
     from core.shared.io.config import OutputConfig
-
-# core.exceptions에서 BackToMenuError 재사용
-from core.exceptions import BackToMenuError
-
-
-class BackToMenu(BackToMenuError):
-    """이전 메뉴로 돌아가기 예외
-
-    각 Step에서 사용자가 '0'을 입력하면 발생.
-    runner에서 이를 catch하여 이전 단계로 돌아감.
-
-    Deprecated: core.exceptions.BackToMenuError 사용 권장
-    """
-
-    def __init__(self, step_name: str = "unknown"):
-        super().__init__(step_name)
 
 
 class ProviderKind(Enum):
