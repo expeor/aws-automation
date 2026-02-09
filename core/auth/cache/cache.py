@@ -1,6 +1,5 @@
 # core/auth/cache/cache.py
-"""
-core/auth/cache/cache.py - AWS 인증 캐시 관리 구현
+"""core/auth/cache/cache.py - AWS 인증 캐시 관리 구현
 
 SSO 토큰, 계정 정보, 임시 자격증명의 캐시를 관리합니다.
 
@@ -18,6 +17,8 @@ SSO 토큰, 계정 정보, 임시 자격증명의 캐시를 관리합니다.
     - 토큰 만료 시간은 IAM Identity Center 설정을 따름
 """
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import json
@@ -27,7 +28,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from ..types import AccountInfo
 
@@ -45,11 +46,11 @@ class TokenEncryption:
     암호화 키는 머신 고유 정보를 기반으로 생성됩니다.
     """
 
-    _instance: Optional["TokenEncryption"] = None
+    _instance: TokenEncryption | None = None
     _lock = threading.Lock()
     _initialized: bool
 
-    def __new__(cls) -> "TokenEncryption":
+    def __new__(cls) -> TokenEncryption:
         """Double-checked locking 패턴으로 싱글톤 인스턴스를 반환합니다."""
         if cls._instance is None:
             with cls._lock:
@@ -333,7 +334,7 @@ class TokenCache:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TokenCache":
+    def from_dict(cls, data: dict[str, Any]) -> TokenCache:
         """딕셔너리에서 TokenCache 인스턴스를 생성합니다 (JSON 로드용).
 
         ``_encrypted`` 플래그가 True이고 암호화 모듈이 사용 가능하면

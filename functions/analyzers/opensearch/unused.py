@@ -112,7 +112,7 @@ class OpenSearchDomainInfo:
         Returns:
             월간 예상 비용 (USD).
         """
-        from functions.analyzers.cost.pricing.opensearch import get_opensearch_monthly_cost
+        from core.shared.aws.pricing.opensearch import get_opensearch_monthly_cost
 
         return get_opensearch_monthly_cost(
             region=self.region,

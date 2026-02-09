@@ -202,7 +202,7 @@ def get_version() -> str:
 
         return pkg_version("aa")
     except Exception:
-        return "0.0.1"
+        return ""
 
 
 # =============================================================================

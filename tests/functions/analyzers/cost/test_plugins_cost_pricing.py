@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from functions.analyzers.cost.pricing.cache import (
+from core.shared.aws.pricing.cache import (
     DEFAULT_TTL_DAYS,
     PriceCache,
 )

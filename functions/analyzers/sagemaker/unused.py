@@ -28,8 +28,8 @@ from rich.console import Console
 
 from core.parallel import get_client, parallel_collect
 from core.shared.aws.metrics import MetricQuery, batch_get_metrics, sanitize_metric_id
+from core.shared.aws.pricing.sagemaker import get_sagemaker_monthly_cost
 from core.shared.io.output import OutputPath, get_context_identifier, open_in_explorer
-from functions.analyzers.cost.pricing import get_sagemaker_monthly_cost
 
 if TYPE_CHECKING:
     from core.cli.flow.context import ExecutionContext

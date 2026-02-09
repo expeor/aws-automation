@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from functions.analyzers.cost.pricing.cache import PriceCache
+from core.shared.aws.pricing.cache import PriceCache
 
 
 class TestPriceCache:

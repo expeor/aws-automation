@@ -7,10 +7,7 @@ ExecutionContext, RoleSelection 등 컨텍스트 클래스 테스트.
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from core.cli.flow.context import (
-    BackToMenu,
     ExecutionContext,
     FallbackStrategy,
     FlowResult,
@@ -18,24 +15,6 @@ from core.cli.flow.context import (
     RoleSelection,
     ToolInfo,
 )
-
-# =============================================================================
-# BackToMenu 예외 테스트
-# =============================================================================
-
-
-class TestBackToMenu:
-    """BackToMenu 예외 테스트"""
-
-    def test_is_exception(self):
-        """Exception 상속 확인"""
-        assert issubclass(BackToMenu, Exception)
-
-    def test_can_be_raised(self):
-        """raise 가능 확인"""
-        with pytest.raises(BackToMenu):
-            raise BackToMenu()
-
 
 # =============================================================================
 # ProviderKind Enum 테스트

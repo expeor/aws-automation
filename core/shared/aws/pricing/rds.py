@@ -37,8 +37,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+from .constants import HOURS_PER_MONTH
+
 PRICING_API_REGION = "us-east-1"
-HOURS_PER_MONTH = 730
 
 # RDS 인스턴스 클래스별 시간당 가격 (USD, MySQL 기준) - 2025년 기준
 # https://aws.amazon.com/rds/pricing/

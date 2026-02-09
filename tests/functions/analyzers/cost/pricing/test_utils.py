@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from functions.analyzers.cost.pricing.constants import DEFAULT_PRICES
+from core.shared.aws.pricing.constants import DEFAULT_PRICES
 
 
 class TestPricingService:
@@ -30,7 +30,7 @@ class TestPricingService:
 
     def test_get_prices_cache_hit(self, mock_cache, sample_ec2_prices):
         """캐시 히트 시 캐시 데이터 반환"""
-        from functions.analyzers.cost.pricing.utils import PricingService
+        from core.shared.aws.pricing.utils import PricingService
 
         mock_cache.get.return_value = sample_ec2_prices
 
@@ -59,7 +59,7 @@ class TestPricingService:
 
     def test_metrics_increment(self):
         """메트릭 증가 테스트"""
-        from functions.analyzers.cost.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
 
@@ -77,7 +77,7 @@ class TestPricingService:
 
     def test_metrics_hit_rate(self):
         """캐시 히트율 계산 테스트"""
-        from functions.analyzers.cost.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
 
@@ -96,7 +96,7 @@ class TestPricingService:
 
     def test_metrics_to_dict(self):
         """메트릭을 딕셔너리로 변환"""
-        from functions.analyzers.cost.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
         metrics.api_calls = 5
@@ -116,7 +116,7 @@ class TestPricingService:
 
     def test_metrics_reset(self):
         """메트릭 초기화"""
-        from functions.analyzers.cost.pricing.utils import PricingMetrics
+        from core.shared.aws.pricing.utils import PricingMetrics
 
         metrics = PricingMetrics()
         metrics.api_calls = 5
@@ -134,12 +134,12 @@ class TestGetPricesFunction:
 
     def test_get_prices_function_exists(self):
         """get_prices 함수가 존재하는지 확인"""
-        from functions.analyzers.cost.pricing.utils import get_prices
+        from core.shared.aws.pricing.utils import get_prices
 
         assert callable(get_prices)
 
     def test_pricing_service_singleton(self):
         """pricing_service가 싱글톤인지 확인"""
-        from functions.analyzers.cost.pricing.utils import pricing_service
+        from core.shared.aws.pricing.utils import pricing_service
 
         assert pricing_service is not None

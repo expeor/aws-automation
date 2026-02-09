@@ -26,26 +26,20 @@ def get_tool_count() -> int:
 
 
 def get_version() -> str:
-    """버전 문자열 반환"""
+    """버전 문자열 반환 (project root의 version.txt)"""
     try:
-        current = Path(__file__).resolve()
-        candidate_dirs = [
-            current.parent.parent.parent,  # cli/ui/banner.py → project root
-        ]
-        for base in candidate_dirs:
-            version_file = base / "version.txt"
-            if version_file.exists():
-                with open(version_file, encoding="utf-8") as f:
-                    return f.read().strip()
+        version_file = Path(__file__).resolve().parent.parent.parent.parent / "version.txt"
+        if version_file.exists():
+            return version_file.read_text(encoding="utf-8").strip()
     except Exception as e:
         logger.debug("Failed to read version file: %s", e)
-    return "0.0.1"
+    return ""
 
 
 # 컴팩트한 배너 (ASCII 호환)
 # (style, ascii_art, suffix) 형식
 COMPACT_LOGO_LINES: list[tuple[str, str, str]] = [
-    ("#FF9900", "    /\\  /\\", "    [bold white]AWS Automation CLI[/] [dim]v{version}[/]"),
+    ("#FF9900", "    /\\  /\\", "    [bold white]AWS Automation CLI[/] {version_display}"),
     ("#FF9900", "   /  \\/  \\", "   {context}"),
     ("#CC7700", "  / /\\  /\\ \\", ""),
     ("#995500", " /_/  \\/  \\_\\", "  [dim]{hint}[/]"),
@@ -55,7 +49,7 @@ COMPACT_LOGO_LINES: list[tuple[str, str, str]] = [
 # (style, ascii_art, suffix) 형식
 FULL_LOGO_LINES: list[tuple[str, str, str]] = [
     ("#FF9900", "    /\\      /\\", ""),
-    ("#FF9900", "   /  \\    /  \\", "     [bold white]AWS Automation CLI[/]  [dim]v{version}[/]"),
+    ("#FF9900", "   /  \\    /  \\", "     [bold white]AWS Automation CLI[/]  {version_display}"),
     ("#CC7700", "  / /\\ \\  / /\\ \\", "    [dim cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━[/]"),
     ("#CC7700", " / ____ \\/ ____ \\", "   [cyan]⚡ {tool_count}+ Tools Ready[/]"),
     ("#995500", "/_/    \\_\\/    \\_\\", ""),
@@ -98,6 +92,12 @@ def _render_logo_lines(console: Console, lines: list[tuple[str, str, str]], form
             console.print(text)
 
 
+def _version_display() -> str:
+    """버전 표시 문자열 반환 (버전 없으면 빈 문자열)"""
+    version = get_version()
+    return f"[dim]v{version}[/]" if version else ""
+
+
 def print_banner(console: Console, compact: bool = False) -> None:
     """배너 출력
 
@@ -106,23 +106,27 @@ def print_banner(console: Console, compact: bool = False) -> None:
         compact: True면 간소화된 배너
     """
     console.print()
+    version_display = _version_display()
     if compact:
         format_vars = {
-            "version": get_version(),
+            "version_display": version_display,
             "context": get_current_context(),
             "hint": t("common.help_quit_hint"),
         }
         _render_logo_lines(console, COMPACT_LOGO_LINES, format_vars)
     else:
-        format_vars = {"tool_count": str(get_tool_count()), "version": get_version()}
+        format_vars = {"tool_count": str(get_tool_count()), "version_display": version_display}
         _render_logo_lines(console, FULL_LOGO_LINES, format_vars)
     console.print()
 
 
 def print_simple_banner(console: Console) -> None:
     """간단한 배너 출력 (서브 메뉴용)"""
-    version = get_version()
+    version_display = _version_display()
     context = get_current_context()
     console.print()
-    console.print(f"[bold #FF9900]AA[/] [dim]v{version}[/] [dim]|[/] {context}")
+    if version_display:
+        console.print(f"[bold #FF9900]AA[/] {version_display} [dim]|[/] {context}")
+    else:
+        console.print(f"[bold #FF9900]AA[/] {context}")
     console.print()

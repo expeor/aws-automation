@@ -61,8 +61,7 @@ NAT_GATEWAY_PRICES: dict[str, dict[str, float]] = {
 # 기본 가격 (알 수 없는 리전용)
 DEFAULT_PRICES = {"hourly": 0.045, "per_gb": 0.045}
 
-# 월 평균 시간 (24 * 30)
-HOURS_PER_MONTH = 730
+from .constants import HOURS_PER_MONTH
 
 
 def get_nat_prices(region: str = "ap-northeast-2") -> dict[str, float]:

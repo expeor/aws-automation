@@ -307,8 +307,8 @@ FLOW_MESSAGES = {
         "en": "Range: 1-{max}",
     },
     "number_comma_hint": {
-        "ko": "번호 입력 (예: 1 또는 1,2,3)",
-        "en": "Enter numbers (e.g., 1 or 1,2,3)",
+        "ko": "번호 입력 (예: 1 또는 1,2,3 또는 1-5)",
+        "en": "Enter numbers (e.g., 1 or 1,2,3 or 1-5)",
     },
     "back": {
         "ko": "뒤로",

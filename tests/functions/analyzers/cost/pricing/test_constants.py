@@ -2,7 +2,7 @@
 tests/plugins/cost/pricing/test_constants.py - 상수 및 기본값 테스트
 """
 
-from functions.analyzers.cost.pricing.constants import (
+from core.shared.aws.pricing.constants import (
     DEFAULT_PRICES,
     HOURS_PER_MONTH,
     LAMBDA_FREE_TIER_GB_SECONDS,

@@ -4,7 +4,6 @@ CLI Flow Module - 통합 CLI Flow
 """
 
 from .context import (
-    BackToMenu,
     ExecutionContext,
     FallbackStrategy,
     FlowResult,
@@ -26,8 +25,6 @@ __all__: list[str] = [
     "FallbackStrategy",
     "RoleSelection",
     "ToolInfo",
-    # Exceptions
-    "BackToMenu",
     # Steps
     "CategoryStep",
     "ProfileStep",

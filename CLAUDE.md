@@ -64,10 +64,9 @@ core/
 │   ├── flow/             # 플로우 관리
 │   ├── ui/               # 터미널 UI
 │   └── i18n/             # 국제화
-├── shared/         # 공유 유틸리티
-│   ├── aws/              # AWS (metrics, pricing, inventory, ip_ranges, health)
-│   └── io/               # I/O (excel, html, csv, output)
-└── filter.py       # DEPRECATED: core.region.filter re-export shim
+└── shared/         # 공유 유틸리티
+    ├── aws/              # AWS (metrics, pricing, inventory, ip_ranges, health)
+    └── io/               # I/O (excel, html, csv, output)
 ```
 
 ### Reports 모듈 구조

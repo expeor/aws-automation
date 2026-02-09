@@ -304,7 +304,7 @@ def _build_help_text(lang: str = "ko") -> str:
 
 
 @click.group(cls=GroupedCommandsGroup, invoke_without_command=True)
-@click.version_option(VERSION, prog_name="aa")
+@click.version_option(VERSION or "unknown", prog_name="aa")
 @click.option(
     "--lang",
     type=click.Choice(["ko", "en"]),

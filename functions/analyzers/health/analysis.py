@@ -16,7 +16,6 @@ from rich.console import Console
 
 from core.parallel import parallel_collect
 from core.shared.aws.health import (
-    REQUIRED_PERMISSIONS,  # noqa: F401
     CollectionResult,
     HealthCollector,
     PatchReporter,
