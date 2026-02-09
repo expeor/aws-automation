@@ -187,7 +187,7 @@ aa ec2/ebs_audit -p prod -f console -q             # 콘솔만, 최소 출력
 | `--role` | Role 이름 (SSO Session용) |
 | `-g, --profile-group` | 저장된 프로파일 그룹 이름 |
 | `-r, --region` | 리전 (다중 가능, `all` 또는 패턴) |
-| `-f, --format` | `both` (기본), `excel`, `html`, `console`, `json`, `csv` |
+| `-f, --format` | `both` (기본 = Excel + HTML), `excel`, `html` |
 | `-o, --output` | 출력 파일 경로 |
 | `-q, --quiet` | 최소 출력 모드 |
 
@@ -277,11 +277,10 @@ aa report/inventory -p prod -r ap-northeast-2
 aa ip 10.0.1.50
 ```
 
-## 언제 AA를 쓰면 안 되나
+## AA의 한계
 
-- **실시간 모니터링이 필요할 때** — AA는 주기적 점검 도구이며, CloudWatch/Datadog 대체가 아닙니다
-- **리소스를 생성/삭제할 때** — 대부분의 도구는 읽기 전용 분석입니다 (일부 정리 도구 제외)
-- **단일 리소스 디버깅** — AWS Console이나 CLI가 더 적합합니다
+- **실시간 모니터링** — AA는 주기적 점검 도구이며, CloudWatch/Datadog 같은 상시 모니터링을 대체하지 않습니다
+- **단일 리소스 디버깅** — 특정 리소스 하나를 상세 조사할 때는 AWS Console이나 CLI가 더 적합합니다
 
 <details>
 <summary>아키텍처 (기여자용)</summary>
