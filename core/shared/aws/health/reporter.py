@@ -488,13 +488,13 @@ class PatchReporter:
         """Rich 라이브러리를 사용한 요약 출력"""
         from rich.table import Table
 
-        console.print("\n[bold cyan]AWS 필수 패치 분석 요약[/bold cyan]")
+        console.print("\n[bold #FF9900]AWS 필수 패치 분석 요약[/bold #FF9900]")
         console.print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         console.print()
 
         # 긴급도별 요약
         table = Table(title="긴급도별 현황")
-        table.add_column("긴급도", style="cyan")
+        table.add_column("긴급도", style="#FF9900")
         table.add_column("건수", justify="right")
         table.add_column("서비스")
         table.add_column("영향 리소스", justify="right")

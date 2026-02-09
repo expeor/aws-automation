@@ -430,7 +430,7 @@ class CostOptimizationReporter:
         """
         from rich.table import Table
 
-        console.print("\n[bold cyan]Cost Optimization Hub 권장사항 요약[/bold cyan]")
+        console.print("\n[bold #FF9900]Cost Optimization Hub 권장사항 요약[/bold #FF9900]")
         console.print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         console.print(f"전체 권장사항: {self.result.total_count:,}개 → 필터링 후: {self.result.filtered_count:,}개")
         console.print(f"제외된 계정: {len(self.result.excluded_accounts):,}개")
@@ -438,7 +438,7 @@ class CostOptimizationReporter:
 
         # 액션 타입별 요약
         table = Table(title="액션 타입별 요약")
-        table.add_column("액션 타입", style="cyan")
+        table.add_column("액션 타입", style="#FF9900")
         table.add_column("개수", justify="right", style="green")
         table.add_column("예상 월간 비용", justify="right")
         table.add_column("예상 월간 절약액", justify="right", style="yellow")
@@ -467,7 +467,7 @@ class CostOptimizationReporter:
         # 리소스 타입별 요약
         console.print()
         res_table = Table(title="리소스 타입별 요약")
-        res_table.add_column("리소스 타입", style="cyan")
+        res_table.add_column("리소스 타입", style="#FF9900")
         res_table.add_column("개수", justify="right", style="green")
         res_table.add_column("예상 월간 절약액", justify="right", style="yellow")
 

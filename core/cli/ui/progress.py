@@ -150,7 +150,7 @@ class BaseTracker:
                     else:
                         self._progress.advance(self._task_id)
                 if message:
-                    self._progress.update(self._task_id, description=f"[cyan]{message}")
+                    self._progress.update(self._task_id, description=f"[#FF9900]{message}")
 
             return status_callback
         else:
@@ -295,7 +295,7 @@ class StepTracker(BaseTracker):
             description: Description of the current step
         """
         self._current_step += 1
-        step_desc = f"[cyan]({self._current_step}/{self._total_steps}) {description}"
+        step_desc = f"[#FF9900]({self._current_step}/{self._total_steps}) {description}"
         self._progress.update(self._task_id, description=step_desc, completed=self._current_step - 1)
 
     def complete_step(self) -> None:
@@ -322,7 +322,7 @@ class StepTracker(BaseTracker):
                     parallel_collect(ctx, ec2_collector, progress_tracker=tracker)
         """
         # Create a nested parallel tracker within the same Progress context
-        sub_task_id = self._progress.add_task(f"[cyan]  {description}", total=None)
+        sub_task_id = self._progress.add_task(f"[#FF9900]  {description}", total=None)
         tracker = ParallelTracker(self._progress, sub_task_id, description)
 
         # Add success/fail column for sub tracker
@@ -375,7 +375,7 @@ class DownloadTracker(BaseTracker):
 
     def update_description(self, description: str) -> None:
         """Update the progress description."""
-        self._progress.update(self._task_id, description=f"[cyan]{description}")
+        self._progress.update(self._task_id, description=f"[#FF9900]{description}")
 
     @property
     def completed(self) -> int:
@@ -409,7 +409,7 @@ class StatusTracker(BaseTracker):
         Args:
             description: New status message
         """
-        self._progress.update(self._task_id, description=f"[cyan]{description}")
+        self._progress.update(self._task_id, description=f"[#FF9900]{description}")
 
     def complete(self, message: str = "완료") -> None:
         """Mark as complete.
@@ -482,7 +482,7 @@ def parallel_progress(
     )
 
     with progress:
-        task_id = progress.add_task(f"[cyan]{description}", total=None)
+        task_id = progress.add_task(f"[#FF9900]{description}", total=None)
         tracker = ParallelTracker(progress, task_id, description)
 
         # Replace placeholder column with actual SuccessFailColumn
@@ -542,7 +542,7 @@ def step_progress(
     )
 
     with progress:
-        task_id = progress.add_task(f"[cyan]{description}", total=total_steps)
+        task_id = progress.add_task(f"[#FF9900]{description}", total=total_steps)
         tracker = StepTracker(progress, task_id, description, total_steps, cons)
 
         try:
@@ -589,7 +589,7 @@ def download_progress(
     )
 
     with progress:
-        task_id = progress.add_task(f"[cyan]{description}", total=total)
+        task_id = progress.add_task(f"[#FF9900]{description}", total=total)
         tracker = DownloadTracker(progress, task_id, description, total)
 
         try:
@@ -634,7 +634,7 @@ def indeterminate_progress(
     )
 
     with progress:
-        task_id = progress.add_task(f"[cyan]{description}", total=None)
+        task_id = progress.add_task(f"[#FF9900]{description}", total=None)
         tracker = StatusTracker(progress, task_id, description)
 
         try:

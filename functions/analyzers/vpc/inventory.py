@@ -213,7 +213,7 @@ def run(ctx: ExecutionContext) -> None:
     if stats.status_counts:
         console.print()
         table = Table(title="ENI 상태별 현황")
-        table.add_column("상태", style="cyan")
+        table.add_column("상태", style="#FF9900")
         table.add_column("수량", justify="right", style="green")
         for status, count in sorted(stats.status_counts.items()):
             table.add_row(status, str(count))

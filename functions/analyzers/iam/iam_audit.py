@@ -83,7 +83,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]IAM 종합 점검 시작...[/bold]")
 
     # 1. 데이터 수집 (IAM은 글로벌이지만 병렬 처리 프레임워크 사용)
-    console.print("[cyan]Step 1: IAM 데이터 수집 중...[/cyan]")
+    console.print("[#FF9900]Step 1: IAM 데이터 수집 중...[/#FF9900]")
 
     # 병렬 수집 및 분석
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="iam")
@@ -109,11 +109,11 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"[green]{len(all_results)}개 계정 데이터 수집 완료[/green]")
 
     # 2. 분석 결과 출력
-    console.print("[cyan]Step 2: 분석 결과 요약[/cyan]")
+    console.print("[#FF9900]Step 2: 분석 결과 요약[/#FF9900]")
     _print_summary(all_stats)
 
     # 3. Excel 보고서 생성
-    console.print("[cyan]Step 3: Excel 보고서 생성 중...[/cyan]")
+    console.print("[#FF9900]Step 3: Excel 보고서 생성 중...[/#FF9900]")
 
     output_path = _create_output_directory(ctx)
     reporter = IAMExcelReporter(all_results, all_stats)

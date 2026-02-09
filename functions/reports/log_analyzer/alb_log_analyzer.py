@@ -372,10 +372,10 @@ class ALBLogAnalyzer:
                 TaskProgressColumn(),
                 console=self.console,
             ) as progress:
-                task = progress.add_task("[cyan]분석 중...", total=7)
+                task = progress.add_task("[#FF9900]분석 중...", total=7)
 
                 # 1) 로그 파일들을 DuckDB로 로드
-                progress.update(task, description="[cyan]로그 파일 로드 중...")
+                progress.update(task, description="[#FF9900]로그 파일 로드 중...")
                 table_name = self._load_logs_to_duckdb(log_directory)
                 if not table_name:
                     logger.warning("분석할 로그가 없습니다.")
@@ -386,7 +386,7 @@ class ALBLogAnalyzer:
                 analysis_results = self._analyze_with_duckdb(progress=progress, task_id=task)
 
             # AbuseIPDB 데이터 추가 (IPIntelligence 통합 API 사용)
-            progress.update(task, description="[cyan]AbuseIPDB 데이터 다운로드 중...")
+            progress.update(task, description="[#FF9900]AbuseIPDB 데이터 다운로드 중...")
             abuseipdb_result = self.ip_intel.download_abuse_data()
 
             # AbuseIPDB 결과에서 실제 IP 리스트와 상세 정보 추출
@@ -596,7 +596,7 @@ class ALBLogAnalyzer:
 
             # 1) 요약 통계
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]요약 통계 계산 중...")
+                progress.update(task_id, description="[#FF9900]요약 통계 계산 중...")
             summary_result = self.conn.execute(summary_query).fetchone()
             if summary_result is None:
                 raise ValueError("Failed to get summary statistics from database")
@@ -605,7 +605,7 @@ class ALBLogAnalyzer:
 
             # 2) 카운트 계산
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]IP/URL/User Agent 카운트 중...")
+                progress.update(task_id, description="[#FF9900]IP/URL/User Agent 카운트 중...")
             client_ip_query = """
             SELECT client_ip, COUNT(*) as count
             FROM alb_logs
@@ -699,7 +699,7 @@ class ALBLogAnalyzer:
             user_agent_results = self.conn.execute(user_agent_query).fetchall()
             user_agent_counts = {ua: count for ua, count in user_agent_results}
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]IP/URL/User Agent 카운트 완료...")
+                progress.update(task_id, description="[#FF9900]IP/URL/User Agent 카운트 완료...")
                 progress.advance(task_id)
 
             # URL 별 상세 통계 (Top 100 URL 대상)
@@ -819,7 +819,7 @@ class ALBLogAnalyzer:
 
             # 3) 느린 응답/바이트 계산
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]느린 응답/바이트 분석 중...")
+                progress.update(task_id, description="[#FF9900]느린 응답/바이트 분석 중...")
             long_response_query = """
             SELECT timestamp,
                    client_ip,
@@ -1385,12 +1385,12 @@ class ALBLogAnalyzer:
                 classification_stats = {}
 
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]느린 응답/바이트 분석 완료...")
+                progress.update(task_id, description="[#FF9900]느린 응답/바이트 분석 완료...")
                 progress.advance(task_id)
 
             # 4) 상태 코드별 로그 수집
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]ELB 상태 코드별 로그 수집 중...")
+                progress.update(task_id, description="[#FF9900]ELB 상태 코드별 로그 수집 중...")
             status_code_logs = {}
             for status_prefix, log_key in [
                 ("2", "ELB 2xx Count"),
@@ -1473,7 +1473,7 @@ class ALBLogAnalyzer:
 
             # Backend 상태 코드별 로그
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]Backend 상태 코드별 로그 수집 중...")
+                progress.update(task_id, description="[#FF9900]Backend 상태 코드별 로그 수집 중...")
             for status_prefix, log_key in [
                 ("4", "Backend 4xx Count"),
                 ("5", "Backend 5xx Count"),
@@ -1555,7 +1555,7 @@ class ALBLogAnalyzer:
                 progress.advance(task_id)
 
             if progress is not None and task_id is not None:
-                progress.update(task_id, description="[cyan]국가 정보 매핑 중...")
+                progress.update(task_id, description="[#FF9900]국가 정보 매핑 중...")
 
             # 시작/종료 시간 포맷팅 - 사용자가 설정한 분석 기간 사용
             start_time = self.start_datetime.strftime("%Y-%m-%d %H:%M:%S")

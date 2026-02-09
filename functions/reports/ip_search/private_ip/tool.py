@@ -49,7 +49,7 @@ def _display_cache_table(caches: list[CacheInfo], selected: set[int]) -> None:
     table = Table(show_header=True, header_style="bold magenta", box=None)
     table.add_column("#", style="dim", width=3)
     table.add_column("", width=3)  # Selection checkbox
-    table.add_column(t("cache_profile"), style="cyan")
+    table.add_column(t("cache_profile"), style="#FF9900")
     table.add_column(t("cache_account"), style="green")
     table.add_column(t("cache_eni_count"), style="yellow", justify="right")
     table.add_column(t("cache_regions"), style="blue")
@@ -86,7 +86,7 @@ def _select_caches(caches: list[CacheInfo]) -> list[CacheInfo]:
     selected: set[int] = set(range(len(caches)))  # Select all by default
 
     while True:
-        console.print(f"\n[bold cyan]{t('cache_available')}[/bold cyan]")
+        console.print(f"\n[bold #FF9900]{t('cache_available')}[/bold #FF9900]")
         _display_cache_table(caches, selected)
 
         console.print(
@@ -174,7 +174,7 @@ def _create_cache(ctx) -> ENICache | None:
         identity = sts.get_caller_identity()
         account_id = identity["Account"]
 
-        console.print(f"\n[cyan]{t('cache_creating_for', profile=profile_name, account=account_id)}[/cyan]")
+        console.print(f"\n[#FF9900]{t('cache_creating_for', profile=profile_name, account=account_id)}[/#FF9900]")
         console.print(f"  [dim]Regions: {', '.join(regions)}[/dim]")
 
         # Build cache with progress
@@ -243,7 +243,7 @@ def _show_help() -> None:
         "",
         f"[dim]{t('help_note_cache')}[/dim]",
     ]
-    console.print(Panel("\n".join(help_lines), title=t("help_title"), border_style="cyan"))
+    console.print(Panel("\n".join(help_lines), title=t("help_title"), border_style="#FF9900"))
 
 
 # =============================================================================
@@ -387,13 +387,13 @@ def _enrich_with_details(
 def _display_results_table(results: list[PrivateIPResult]) -> None:
     """Display search results in a table."""
     table = Table(show_header=True, header_style="bold magenta", box=None)
-    table.add_column(t("header_ip"), style="cyan")
+    table.add_column(t("header_ip"), style="#FF9900")
     table.add_column(t("header_account"), style="green")
     table.add_column(t("header_region"), style="blue")
     table.add_column(t("header_resource"), style="magenta")
     table.add_column(t("header_eni_id"), style="yellow")
     table.add_column(t("header_vpc_id"), style="white")
-    table.add_column(t("header_public_ip"), style="cyan")
+    table.add_column(t("header_public_ip"), style="#FF9900")
 
     for r in results:
         table.add_row(
@@ -413,7 +413,7 @@ def _show_export_menu(results: list[PrivateIPResult], session_name: str) -> bool
     """Show export options menu. Returns True to continue, False to exit."""
     lang = get_lang()
 
-    console.print(f"\n[bold cyan]{t('export_title')}[/bold cyan]")
+    console.print(f"\n[bold #FF9900]{t('export_title')}[/bold #FF9900]")
     console.print(f"  (1) {t('export_csv')}")
     console.print(f"  (2) {t('export_excel')}")
     console.print(f"  (3) {t('export_clipboard')}")
@@ -479,7 +479,7 @@ def _run_search_loop(
         )
         console.print(f"[dim]{detail_hint} | {t('hint_help')} | {t('hint_back')}[/dim]")
 
-        query = Prompt.ask(f"[bold cyan]{t('menu_search')}[/bold cyan]").strip()
+        query = Prompt.ask(f"[bold #FF9900]{t('menu_search')}[/bold #FF9900]").strip()
 
         # Handle commands
         if not query or query == "0":
@@ -557,7 +557,7 @@ def _run_search_loop(
                 results = _enrich_with_details(results, caches, session)
 
         # Display results
-        console.print(f"\n[bold cyan]{t('result_title')} ({t('result_count', count=len(results))})[/bold cyan]")
+        console.print(f"\n[bold #FF9900]{t('result_title')} ({t('result_count', count=len(results))})[/bold #FF9900]")
         _display_results_table(results)
 
         # Export menu

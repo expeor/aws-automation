@@ -554,7 +554,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"  [dim]AWS 관리형: {totals['aws_managed']}개[/dim]")
 
     # 보고서
-    console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
+    console.print("\n[#FF9900]Excel 보고서 생성 중...[/#FF9900]")
 
     identifier = get_context_identifier(ctx)
 

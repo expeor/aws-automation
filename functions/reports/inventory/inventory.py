@@ -138,7 +138,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print()
     for stats in all_stats:
         table = Table(title=stats.name)
-        table.add_column("리소스", style="cyan")
+        table.add_column("리소스", style="#FF9900")
         table.add_column("수량", justify="right", style="green")
         for name, count in stats.counts.items():
             table.add_row(name, f"{count:,}")

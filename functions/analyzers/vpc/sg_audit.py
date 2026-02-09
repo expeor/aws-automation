@@ -63,7 +63,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]Security Group Audit 시작...[/bold]")
 
     # 1. 데이터 수집
-    console.print("[cyan]Step 1: Security Group 데이터 수집 중...[/cyan]")
+    console.print("[#FF9900]Step 1: Security Group 데이터 수집 중...[/#FF9900]")
 
     # 병렬 수집
     result = parallel_collect(ctx, _collect_sgs, max_workers=20, service="ec2")
@@ -86,7 +86,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"[green]총 {len(all_sgs)}개 Security Group 수집 완료[/green]")
 
     # 2. 분석
-    console.print("[cyan]Step 2: 미사용 SG 및 Stale Rule 분석 중...[/cyan]")
+    console.print("[#FF9900]Step 2: 미사용 SG 및 Stale Rule 분석 중...[/#FF9900]")
 
     analyzer = SGAnalyzer(all_sgs)
     sg_results, rule_results = analyzer.analyze()
@@ -109,7 +109,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print(f"  - [dim]LOW 규칙: {low_count}개[/dim] (웹 포트 - 일반적 허용)")
 
     # 3. Excel 보고서 생성
-    console.print("[cyan]Step 3: Excel 보고서 생성 중...[/cyan]")
+    console.print("[#FF9900]Step 3: Excel 보고서 생성 중...[/#FF9900]")
 
     output_path = _create_output_directory(ctx)
     reporter = SGExcelReporter(sg_results, rule_results, summary)

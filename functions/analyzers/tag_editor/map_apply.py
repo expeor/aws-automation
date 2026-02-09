@@ -371,7 +371,7 @@ def collect_options(ctx: ExecutionContext) -> None:
     Args:
         ctx: 실행 컨텍스트 (options 딕셔너리에 설정값이 저장됨).
     """
-    console.print("\n[bold cyan]MAP 태그 적용 설정[/bold cyan]")
+    console.print("\n[bold #FF9900]MAP 태그 적용 설정[/bold #FF9900]")
 
     # 1. MAP 태그 값 입력
     console.print("\n[bold]태그 설정[/bold]")
@@ -543,7 +543,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("\n[bold]적용 결과[/bold]")
 
     table = Table(show_header=True)
-    table.add_column("항목", style="cyan")
+    table.add_column("항목", style="#FF9900")
     table.add_column("개수", justify="right")
 
     table.add_row("대상 리소스", str(total_targeted))

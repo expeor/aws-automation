@@ -53,12 +53,12 @@ def _select_alb_with_pagination(
 
         # 테이블 출력
         table = Table(
-            title=f"[bold cyan]ALB 목록[/bold cyan] (페이지 {current_page + 1}/{max(1, (len(filtered_list) + page_size - 1) // page_size)}, 총 {len(filtered_list)}개)",
+            title=f"[bold #FF9900]ALB 목록[/bold #FF9900] (페이지 {current_page + 1}/{max(1, (len(filtered_list) + page_size - 1) // page_size)}, 총 {len(filtered_list)}개)",
             show_header=True,
             header_style="bold blue",
         )
         table.add_column("No.", style="dim", width=5, justify="right")
-        table.add_column("ALB 이름", style="cyan", min_width=30)
+        table.add_column("ALB 이름", style="#FF9900", min_width=30)
         table.add_column("Scheme", width=16, justify="center")
         table.add_column("로그", width=4, justify="center")
 
@@ -196,7 +196,7 @@ def _get_lb_and_build_path(session, ctx) -> str | None:
 
     # ALB 목록 조회
     try:
-        console.print("[cyan]Application Load Balancer 목록을 조회하는 중...[/cyan]")
+        console.print("[#FF9900]Application Load Balancer 목록을 조회하는 중...[/#FF9900]")
         response = elbv2_client.describe_load_balancers()
 
         albs = [lb for lb in response["LoadBalancers"] if lb["Type"] == "application"]
@@ -304,9 +304,9 @@ def _get_bucket_input_manual() -> str | None:
     """
     console.print(
         Panel(
-            "[bold cyan]S3 버킷 경로 형식:[/bold cyan]\n"
+            "[bold #FF9900]S3 버킷 경로 형식:[/bold #FF9900]\n"
             "s3://bucket-name/prefix\n\n"
-            "[bold cyan]예시:[/bold cyan]\n"
+            "[bold #FF9900]예시:[/bold #FF9900]\n"
             "s3://my-alb-logs/AWSLogs/123456789012/elasticloadbalancing/ap-northeast-2",
             title="[bold]버킷 경로 안내[/bold]",
         )
@@ -357,7 +357,7 @@ def _get_time_range_input() -> tuple[datetime, datetime]:
     now = datetime.now()
     yesterday = now - timedelta(days=1)
 
-    console.print("\n[bold cyan]분석 시간 범위 설정[/bold cyan]")
+    console.print("\n[bold #FF9900]분석 시간 범위 설정[/bold #FF9900]")
     console.print(f"[dim]기본값: {yesterday.strftime('%Y-%m-%d %H:%M')} ~ {now.strftime('%Y-%m-%d %H:%M')}[/dim]")
 
     # 빠른 선택 (기본값인 24시간을 첫 번째에 배치)

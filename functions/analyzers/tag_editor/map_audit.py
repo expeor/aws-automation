@@ -357,7 +357,7 @@ def _print_summary_table(results: list[MapTagAnalysisResult]) -> None:
     if type_totals:
         console.print("\n[bold]리소스 타입별 현황[/bold]")
         table = Table(show_header=True)
-        table.add_column("리소스 타입", style="cyan")
+        table.add_column("리소스 타입", style="#FF9900")
         table.add_column("전체", justify="right")
         table.add_column("태그됨", justify="right", style="green")
         table.add_column("미태그", justify="right", style="red")
@@ -405,7 +405,7 @@ def collect_options(ctx: ExecutionContext) -> None:
     """
     from rich.prompt import Confirm
 
-    console.print("\n[bold cyan]MAP 태그 분석 설정[/bold cyan]")
+    console.print("\n[bold #FF9900]MAP 태그 분석 설정[/bold #FF9900]")
 
     # 리소스 타입 선택 옵션 (향후 확장)
     # 현재는 전체 리소스 분석

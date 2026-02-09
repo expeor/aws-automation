@@ -201,7 +201,7 @@ class ProfileStep:
         # 저장된 그룹이 있으면 맨 위에 표시
         if saved_groups:
             print_box_line(
-                f" {menu_idx}) [cyan]★ {t('flow.saved_profile_groups')}[/cyan] [dim]({len(saved_groups)})[/dim]"
+                f" {menu_idx}) [#FF9900]★ {t('flow.saved_profile_groups')}[/#FF9900] [dim]({len(saved_groups)})[/dim]"
             )
             menu_idx += 1
             print_box_line(" ────────────────────────")

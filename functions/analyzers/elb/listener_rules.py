@@ -769,7 +769,7 @@ class ToolRunner(BaseToolRunner):
         if high_findings:
             console.print()
             findings_table = Table(title="주요 발견 항목 (HIGH 이상)", show_header=True)
-            findings_table.add_column("LB", style="cyan")
+            findings_table.add_column("LB", style="#FF9900")
             findings_table.add_column("심각도")
             findings_table.add_column("제목")
             findings_table.add_column("설명", max_width=40)

@@ -62,7 +62,7 @@ class TestAreaRegistry:
         security = next(a for a in AREA_REGISTRY if a["key"] == "security")
         assert security["command"] == "/security"
         assert security["label"] == "보안"
-        assert security["color"] == "magenta"
+        assert security["color"] == "#DD344C"
 
     def test_unused_area(self):
         """미사용 영역 상세"""
@@ -76,7 +76,7 @@ class TestAreaRegistry:
         cost = next(a for a in AREA_REGISTRY if a["key"] == "cost")
         assert cost["command"] == "/cost"
         assert cost["label"] == "비용"
-        assert cost["color"] == "cyan"
+        assert cost["color"] == "#FF9900"
 
 
 class TestAreaCommands:
@@ -186,7 +186,7 @@ class TestAreaDisplayByKey:
     def test_security_display(self):
         """보안 디스플레이"""
         assert AREA_DISPLAY_BY_KEY["security"]["label"] == "보안"
-        assert AREA_DISPLAY_BY_KEY["security"]["color"] == "magenta"
+        assert AREA_DISPLAY_BY_KEY["security"]["color"] == "#DD344C"
 
     def test_unused_display(self):
         """미사용 디스플레이"""
@@ -196,7 +196,7 @@ class TestAreaDisplayByKey:
     def test_cost_display(self):
         """비용 디스플레이"""
         assert AREA_DISPLAY_BY_KEY["cost"]["label"] == "비용"
-        assert AREA_DISPLAY_BY_KEY["cost"]["color"] == "cyan"
+        assert AREA_DISPLAY_BY_KEY["cost"]["color"] == "#FF9900"
 
 
 class TestToolMeta:

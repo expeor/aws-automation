@@ -203,7 +203,7 @@ def _show_help() -> None:
         f"  {t('help_filter_set')}",
         f"  {t('help_filter_clear')}",
         "",
-        f"[bold cyan]{t('help_examples')}[/bold cyan]",
+        f"[bold #FF9900]{t('help_examples')}[/bold #FF9900]",
         f"  {t('help_example_basic')}",
         f"  {t('help_example_multi')}",
         f"  {t('help_example_cidr')}",
@@ -213,7 +213,7 @@ def _show_help() -> None:
         f"  {t('help_example_service')}",
         f"  {t('help_example_combined')}",
         "",
-        f"[bold cyan]{t('help_interactive_example')}[/bold cyan]",
+        f"[bold #FF9900]{t('help_interactive_example')}[/bold #FF9900]",
         f"  {t('help_interactive_step1')}",
         f"  {t('help_interactive_step2')}",
         "",
@@ -224,7 +224,7 @@ def _show_help() -> None:
         "",
         f"[dim]{t('help_providers')}[/dim]",
     ]
-    console.print(Panel("\n".join(help_lines), title=t("help_title"), border_style="cyan"))
+    console.print(Panel("\n".join(help_lines), title=t("help_title"), border_style="#FF9900"))
 
 
 # =============================================================================
@@ -235,7 +235,7 @@ def _show_help() -> None:
 def _display_results_table(results: list[PublicIPResult]) -> None:
     """Display search results in a table."""
     table = Table(show_header=True, header_style="bold magenta", box=None)
-    table.add_column(t("header_ip"), style="cyan")
+    table.add_column(t("header_ip"), style="#FF9900")
     table.add_column(t("header_provider"), style="green")
     table.add_column(t("header_service"), style="blue")
     table.add_column(t("header_ip_range"), style="yellow")
@@ -245,7 +245,7 @@ def _display_results_table(results: list[PublicIPResult]) -> None:
         provider_style = {
             "AWS": "bold yellow",
             "GCP": "bold blue",
-            "Azure": "bold cyan",
+            "Azure": "bold #FF9900",
             "Oracle": "bold red",
             "Cloudflare": "bold bright_yellow",
             "Fastly": "bold magenta",
@@ -293,7 +293,7 @@ def _show_cache_status() -> None:
     """Display cache status for all providers."""
     status = get_public_cache_status()
 
-    console.print(f"\n[bold cyan]{t('cache_status_title')}[/bold cyan]")
+    console.print(f"\n[bold #FF9900]{t('cache_status_title')}[/bold #FF9900]")
 
     for provider, info in status["providers"].items():
         if info.get("cached"):
@@ -331,7 +331,7 @@ def _show_cache_menu() -> None:
     """Show cache management menu."""
     status = get_public_cache_status()
 
-    console.print(f"\n[bold cyan]{t('cache_status_title')}[/bold cyan]")
+    console.print(f"\n[bold #FF9900]{t('cache_status_title')}[/bold #FF9900]")
 
     # Display each provider with number
     for i, provider in enumerate(ALL_PROVIDERS, 1):
@@ -546,7 +546,7 @@ def _interactive_filter_setup() -> dict[str, str | list[str] | None]:
         "service": None,
     }
 
-    console.print(f"\n[bold cyan]{t('help_interactive_filter')}[/bold cyan]")
+    console.print(f"\n[bold #FF9900]{t('help_interactive_filter')}[/bold #FF9900]")
 
     # CSP filter
     csp_input = Prompt.ask(f"  {t('filter_prompt_csp')}", default="").strip()
@@ -595,7 +595,7 @@ def _search_by_ip(session_name: str) -> None:
             console.print(f"\n[bold magenta]{t('filter_current', filters=filter_display)}[/bold magenta]")
 
         console.print(f"\n[dim]{t('prompt_enter_ip')} | ?=help | f=filter | fc=clear | 0=back[/dim]")
-        ip_input = Prompt.ask(f"[bold cyan]{t('header_ip')}[/bold cyan]").strip()
+        ip_input = Prompt.ask(f"[bold #FF9900]{t('header_ip')}[/bold #FF9900]").strip()
 
         if not ip_input:
             return
@@ -649,7 +649,7 @@ def _search_by_ip(session_name: str) -> None:
         # If there were some errors but also valid inputs, inform user
         total_valid = len(valid_ips) + len(valid_cidrs)
         if errors and total_valid > 0:
-            console.print(f"[cyan]{t('validation_valid_ips', count=total_valid)}[/cyan]")
+            console.print(f"[#FF9900]{t('validation_valid_ips', count=total_valid)}[/#FF9900]")
 
         # Prepare search parameters
         providers_list = effective_filters.get("providers")
@@ -698,7 +698,9 @@ def _search_by_ip(session_name: str) -> None:
 
         display_results = known_results + truly_unknown
 
-        console.print(f"\n[bold cyan]{t('result_title')} ({t('result_count', count=len(display_results))})[/bold cyan]")
+        console.print(
+            f"\n[bold #FF9900]{t('result_title')} ({t('result_count', count=len(display_results))})[/bold #FF9900]"
+        )
         _display_results_table(display_results)
 
         if display_results:
@@ -708,7 +710,7 @@ def _search_by_ip(session_name: str) -> None:
 def _search_by_filter(session_name: str) -> None:
     """Search IP ranges by region/service filter."""
     # Provider selection
-    console.print(f"\n[bold cyan]{t('prompt_select_provider')}[/bold cyan]")
+    console.print(f"\n[bold #FF9900]{t('prompt_select_provider')}[/bold #FF9900]")
     console.print("  (1) AWS")
     console.print("  (2) GCP")
     console.print("  (3) Azure")
@@ -729,7 +731,7 @@ def _search_by_filter(session_name: str) -> None:
     with console.status(f"[bold yellow]{t('loading')}[/bold yellow]"):
         filters = get_available_filters(provider)
 
-    console.print(f"\n[cyan]{t('filter_regions', count=len(filters['regions']))}:[/cyan]")
+    console.print(f"\n[#FF9900]{t('filter_regions', count=len(filters['regions']))}:[/#FF9900]")
     for i, region in enumerate(filters["regions"][:15], 1):
         console.print(f"  {region}", end="  ")
         if i % 5 == 0:
@@ -738,7 +740,7 @@ def _search_by_filter(session_name: str) -> None:
         console.print(f"\n  [dim]{t('filter_more', count=len(filters['regions']) - 15)}[/dim]")
     console.print()
 
-    console.print(f"\n[cyan]{t('filter_services', count=len(filters['services']))}:[/cyan]")
+    console.print(f"\n[#FF9900]{t('filter_services', count=len(filters['services']))}:[/#FF9900]")
     for i, service in enumerate(filters["services"][:12], 1):
         console.print(f"  {service}", end="  ")
         if i % 4 == 0:
@@ -776,7 +778,7 @@ def _search_by_filter(session_name: str) -> None:
         console.print(f"  [dim]• {provider.upper()}: {filter_str} 필터와 일치하는 IP 범위 없음[/dim]")
         return
 
-    console.print(f"\n[bold cyan]{t('result_title')} ({t('result_count', count=len(results))})[/bold cyan]")
+    console.print(f"\n[bold #FF9900]{t('result_title')} ({t('result_count', count=len(results))})[/bold #FF9900]")
     _display_results_table(results[:100])  # Limit display to 100
 
     if len(results) > 100:

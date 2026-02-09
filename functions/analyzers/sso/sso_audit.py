@@ -60,7 +60,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]IAM Identity Center 종합 점검 시작...[/bold]")
 
     # 1. 데이터 수집
-    console.print("[cyan]Step 1: SSO 데이터 수집 중...[/cyan]")
+    console.print("[#FF9900]Step 1: SSO 데이터 수집 중...[/#FF9900]")
 
     collector = SSOCollector()
     all_results = []
@@ -138,11 +138,11 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[green]SSO 데이터 수집 완료[/green]")
 
     # 2. 분석 결과 출력
-    console.print("[cyan]Step 2: 분석 결과 요약[/cyan]")
+    console.print("[#FF9900]Step 2: 분석 결과 요약[/#FF9900]")
     _print_summary(all_stats)
 
     # 3. Excel 보고서 생성
-    console.print("[cyan]Step 3: Excel 보고서 생성 중...[/cyan]")
+    console.print("[#FF9900]Step 3: Excel 보고서 생성 중...[/#FF9900]")
 
     output_path = _create_output_directory(ctx)
     reporter = SSOExcelReporter(all_results, all_stats)

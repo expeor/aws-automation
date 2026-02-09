@@ -68,7 +68,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Security",
         "desc": "취약점, 암호화 점검",
         "desc_en": "Vulnerability and encryption audit",
-        "color": "magenta",
+        "color": "#DD344C",
         "icon": "🔒",
     },
     {
@@ -78,7 +78,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Cost",
         "desc": "비용 최적화 기회",
         "desc_en": "Cost optimization opportunities",
-        "color": "cyan",
+        "color": "#FF9900",
         "icon": "💰",
     },
     {
@@ -109,7 +109,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Backup",
         "desc": "백업 체계 점검",
         "desc_en": "Backup system audit",
-        "color": "blue",
+        "color": "#0972D3",
         "icon": "💾",
     },
     {
@@ -119,7 +119,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Compliance",
         "desc": "규정 준수 검증",
         "desc_en": "Regulatory compliance verification",
-        "color": "bright_magenta",
+        "color": "#8C4FFF",
         "icon": "✅",
     },
     {
@@ -129,7 +129,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Performance",
         "desc": "성능 최적화",
         "desc_en": "Performance optimization",
-        "color": "purple",
+        "color": "#E7157B",
         "icon": "⚡",
     },
     {
@@ -139,7 +139,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Network",
         "desc": "네트워크 구조 분석",
         "desc_en": "Network architecture analysis",
-        "color": "bright_blue",
+        "color": "#8C4FFF",
         "icon": "🌐",
     },
     {
@@ -149,7 +149,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Quota",
         "desc": "서비스 한도 모니터링",
         "desc_en": "Service limit monitoring",
-        "color": "bright_yellow",
+        "color": "#EC7211",
         "icon": "📊",
     },
     # === ToolType - Analysis (2) ===
@@ -170,7 +170,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Search",
         "desc": "리소스 역추적",
         "desc_en": "Resource tracing",
-        "color": "bright_cyan",
+        "color": "#0972D3",
         "icon": "🔍",
     },
     # === ToolType - Actions (3) ===
@@ -181,7 +181,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Cleanup",
         "desc": "리소스 정리/삭제",
         "desc_en": "Resource cleanup/deletion",
-        "color": "bright_red",
+        "color": "#D91515",
         "icon": "🧹",
     },
     {
@@ -191,7 +191,7 @@ AREA_REGISTRY: list[AreaInfo] = [
         "label_en": "Tag",
         "desc": "태그 일괄 적용",
         "desc_en": "Bulk tag application",
-        "color": "bright_green",
+        "color": "#067D68",
         "icon": "🏷️",
     },
     {

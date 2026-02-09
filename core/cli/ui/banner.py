@@ -50,8 +50,8 @@ COMPACT_LOGO_LINES: list[tuple[str, str, str]] = [
 FULL_LOGO_LINES: list[tuple[str, str, str]] = [
     ("#FF9900", "    /\\      /\\", ""),
     ("#FF9900", "   /  \\    /  \\", "     [bold white]AWS Automation CLI[/]  {version_display}"),
-    ("#CC7700", "  / /\\ \\  / /\\ \\", "    [dim cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━[/]"),
-    ("#CC7700", " / ____ \\/ ____ \\", "   [cyan]⚡ {tool_count}+ Tools Ready[/]"),
+    ("#CC7700", "  / /\\ \\  / /\\ \\", "    [dim #FF9900]━━━━━━━━━━━━━━━━━━━━━━━━━━[/]"),
+    ("#CC7700", " / ____ \\/ ____ \\", "   [#FF9900]⚡ {tool_count}+ Tools Ready[/]"),
     ("#995500", "/_/    \\_\\/    \\_\\", ""),
 ]
 
@@ -66,7 +66,7 @@ def get_current_context() -> str:
             mode = info.get("mode", "")
             profile = info.get("profile", "")
             if mode == "multi":
-                return f"[cyan]Multi-Account[/] [dim]|[/] [white]{profile}[/]"
+                return f"[#FF9900]Multi-Account[/] [dim]|[/] [white]{profile}[/]"
             elif mode == "single":
                 return f"[green]Single[/] [dim]|[/] [white]{profile}[/]"
             elif profile:

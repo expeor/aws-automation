@@ -399,7 +399,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]Security Group 정책 내역 추출 시작...[/bold]")
 
     # 1. 데이터 수집
-    console.print("[cyan]Step 1: Security Group 데이터 수집 중...[/cyan]")
+    console.print("[#FF9900]Step 1: Security Group 데이터 수집 중...[/#FF9900]")
 
     result = parallel_collect(ctx, _collect_sgs, max_workers=20, service="ec2")
 
@@ -421,17 +421,17 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"[green]총 {len(all_sgs)}개 Security Group 수집 완료[/green]")
 
     # 2. 규칙 평탄화
-    console.print("[cyan]Step 2: 규칙 데이터 변환 중...[/cyan]")
+    console.print("[#FF9900]Step 2: 규칙 데이터 변환 중...[/#FF9900]")
     rows = _flatten_rules(all_sgs)
     console.print(f"[green]총 {len(rows)}개 규칙 행 생성[/green]")
 
     # 3. 연결된 리소스 추출
-    console.print("[cyan]Step 3: 연결된 리소스 분석 중...[/cyan]")
+    console.print("[#FF9900]Step 3: 연결된 리소스 분석 중...[/#FF9900]")
     resource_rows = _flatten_resources(all_sgs)
     console.print(f"[green]총 {len(resource_rows)}개 리소스 연결 확인[/green]")
 
     # 4. Excel 보고서 생성
-    console.print("[cyan]Step 4: Excel 보고서 생성 중...[/cyan]")
+    console.print("[#FF9900]Step 4: Excel 보고서 생성 중...[/#FF9900]")
 
     output_path = _create_output_directory(ctx)
     filepath = _create_excel_report(rows, resource_rows, output_path)

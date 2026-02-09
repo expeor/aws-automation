@@ -137,7 +137,7 @@ def collect_options(ctx: ExecutionContext) -> None:
     Args:
         ctx: CLI 실행 컨텍스트. options 딕셔너리에 설정이 저장된다.
     """
-    console.print("\n[bold cyan]미사용 AMI 정리 설정[/bold cyan]")
+    console.print("\n[bold #FF9900]미사용 AMI 정리 설정[/bold #FF9900]")
 
     # 1. 최소 경과일
     age_str = Prompt.ask("\n최소 경과일 (이 기간보다 오래된 AMI만 대상)", default="14")
@@ -329,7 +329,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("\n[bold]정리 결과[/bold]")
 
     table = Table(show_header=True)
-    table.add_column("항목", style="cyan")
+    table.add_column("항목", style="#FF9900")
     table.add_column("수량", justify="right")
 
     table.add_row("대상 AMI", str(total_targeted))
@@ -351,7 +351,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print("[dim]실제 삭제하려면 dry-run 모드를 해제하고 다시 실행하세요.[/dim]")
 
     # Excel 보고서
-    console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
+    console.print("\n[#FF9900]Excel 보고서 생성 중...[/#FF9900]")
 
     identifier = get_context_identifier(ctx)
 
