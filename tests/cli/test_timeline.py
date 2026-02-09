@@ -8,6 +8,7 @@ Timeline progress component tests.
 import time
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
+from unittest.mock import patch
 
 from rich.console import Console
 
@@ -101,11 +102,12 @@ class TestTimelineTracker:
     def test_complete_phase(self):
         """phase 완료"""
         tracker = TimelineTracker(["수집", "보고서"])
-        tracker.activate_phase(0)
-        time.sleep(0.01)
-        tracker.complete_phase(0)
+        # Mock time.monotonic to avoid flaky results on Windows (GetTickCount64 ~15ms resolution)
+        with patch("core.cli.ui.timeline.time.monotonic", side_effect=[100.0, 102.5]):
+            tracker.activate_phase(0)
+            tracker.complete_phase(0)
         assert tracker._phases[0].state == PhaseState.COMPLETED
-        assert tracker._phases[0].elapsed > 0
+        assert tracker._phases[0].elapsed == 2.5
 
     def test_complete_phase_failed(self):
         """phase 실패"""
