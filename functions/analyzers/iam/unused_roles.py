@@ -62,7 +62,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]미사용 IAM Role 탐지 중...[/bold]")
 
     # 1. 데이터 수집
-    console.print("[cyan]Step 1: IAM 데이터 수집 중...[/cyan]")
+    console.print("[#FF9900]Step 1: IAM 데이터 수집 중...[/#FF9900]")
 
     result = parallel_collect(ctx, _collect_role_data, max_workers=20, service="iam")
 
@@ -84,11 +84,11 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"[green]{len(iam_data_list)}개 계정 데이터 수집 완료[/green]")
 
     # 2. 통계 요약 출력
-    console.print("[cyan]Step 2: 분석 결과 요약[/cyan]")
+    console.print("[#FF9900]Step 2: 분석 결과 요약[/#FF9900]")
     _print_summary(iam_data_list)
 
     # 3. 보고서 생성
-    console.print("[cyan]Step 3: Excel 보고서 생성 중...[/cyan]")
+    console.print("[#FF9900]Step 3: Excel 보고서 생성 중...[/#FF9900]")
 
     output_path = _create_output_directory(ctx)
     reporter = UnusedRolesReporter(iam_data_list, threshold_days=UNUSED_ROLE_THRESHOLD_DAYS)

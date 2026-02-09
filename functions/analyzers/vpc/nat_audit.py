@@ -78,7 +78,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]NAT Gateway 미사용 분석 시작...[/bold]")
 
     # 병렬 수집 및 분석
-    console.print("[cyan]Step 1: NAT Gateway 데이터 수집 중...[/cyan]")
+    console.print("[#FF9900]Step 1: NAT Gateway 데이터 수집 중...[/#FF9900]")
     result = parallel_collect(ctx, _collect_and_analyze, max_workers=20, service="ec2")
 
     # None 필터링 및 결과 분리
@@ -100,11 +100,11 @@ def run(ctx: ExecutionContext) -> None:
         return
 
     # 2. 분석 결과 요약
-    console.print("[cyan]Step 2: 분석 결과 요약[/cyan]")
+    console.print("[#FF9900]Step 2: 분석 결과 요약[/#FF9900]")
     _print_summary(all_stats)
 
     # 3. 보고서 생성
-    console.print("[cyan]Step 3: 보고서 생성 중...[/cyan]")
+    console.print("[#FF9900]Step 3: 보고서 생성 중...[/#FF9900]")
 
     # HTML용 flat 데이터
     flat_data = []

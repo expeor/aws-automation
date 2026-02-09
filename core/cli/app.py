@@ -392,7 +392,7 @@ def tools_command(category: str | None, as_json: bool) -> None:
         console = Console()
 
         table = Table(title=t("cli.available_tools"), show_header=True)
-        table.add_column(t("cli.col_path"), style="cyan")
+        table.add_column(t("cli.col_path"), style="#FF9900")
         table.add_column(t("cli.col_name"), style="white")
         table.add_column(t("cli.col_permission"), style="yellow")
 
@@ -487,7 +487,7 @@ def group_list(as_json: bool) -> None:
 
         table = Table(title=t("cli.profile_groups_title"), show_header=True)
         table.add_column("#", style="dim", width=3)
-        table.add_column(t("cli.col_name"), style="cyan")
+        table.add_column(t("cli.col_name"), style="#FF9900")
         table.add_column(t("cli.col_type"), style="yellow", width=5)
         table.add_column(t("cli.col_profiles"), style="white")
 
@@ -522,11 +522,11 @@ def group_show(name: str) -> None:
     kind_label = kind_labels.get(group.kind, group.kind)
 
     lines = [
-        f"[cyan]{t('cli.label_name')}[/cyan] {group.name}",
-        f"[cyan]{t('cli.label_type')}[/cyan] {kind_label}",
-        f"[cyan]{t('cli.label_created')}[/cyan] {group.added_at[:10]}",
+        f"[#FF9900]{t('cli.label_name')}[/#FF9900] {group.name}",
+        f"[#FF9900]{t('cli.label_type')}[/#FF9900] {kind_label}",
+        f"[#FF9900]{t('cli.label_created')}[/#FF9900] {group.added_at[:10]}",
         "",
-        f"[cyan]{t('cli.label_profiles')}[/cyan]",
+        f"[#FF9900]{t('cli.label_profiles')}[/#FF9900]",
     ]
     for p in group.profiles:
         lines.append(f"  - {p}")
@@ -546,8 +546,8 @@ def group_create():
     # 1. 인증 타입 선택
     console.print(f"\n[bold]{t('cli.create_group_title')}[/bold]\n")
     console.print(t("cli.select_auth_type"))
-    console.print(f"  [cyan]1)[/cyan] {t('cli.sso_profile')}")
-    console.print(f"  [cyan]2)[/cyan] {t('cli.iam_access_key')}")
+    console.print(f"  [#FF9900]1)[/#FF9900] {t('cli.sso_profile')}")
+    console.print(f"  [#FF9900]2)[/#FF9900] {t('cli.iam_access_key')}")
     console.print()
 
     choice = click.prompt(t("cli.select_prompt"), type=click.IntRange(1, 2))
@@ -564,7 +564,7 @@ def group_create():
     # 3. 프로파일 선택 (멀티, 2개 이상)
     console.print(f"\n[bold]{t('cli.select_profiles_title', type=type_label)}[/bold] {t('cli.select_2_or_more')}\n")
     for i, profile in enumerate(available, 1):
-        console.print(f"  [cyan]{i:2})[/cyan] {profile}")
+        console.print(f"  [#FF9900]{i:2})[/#FF9900] {profile}")
     console.print()
     console.print(f"[dim]{t('cli.selection_hint')}[/dim]")
 
@@ -986,7 +986,7 @@ def fav_list(as_json: bool) -> None:
 
         for i, item in enumerate(items, 1):
             if item.item_type == "category":
-                table.add_row(str(i), "[cyan]Category[/cyan]", item.tool_name, item.category)
+                table.add_row(str(i), "[#FF9900]Category[/#FF9900]", item.tool_name, item.category)
             else:
                 table.add_row(str(i), "[green]Tool[/green]", item.tool_name, item.ref)
 

@@ -438,7 +438,7 @@ class FlowRunner:
 
         if required_permissions:
             console.print()
-            console.print(f"[cyan]{t('runner.tool_required_permissions')}[/cyan]")
+            console.print(f"[#FF9900]{t('runner.tool_required_permissions')}[/#FF9900]")
 
             # read 권한
             read_perms = required_permissions.get("read", [])

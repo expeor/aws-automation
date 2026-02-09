@@ -631,7 +631,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print(f"전체 테이블: {total_tables}개")
     console.print(f"  Provisioned: {total_provisioned}개 / On-Demand: {total_ondemand}개")
     console.print(
-        f"최적화 대상: [cyan]{total_candidates}개[/cyan] (예상 절감: [green]${total_savings:,.2f}/월[/green])"
+        f"최적화 대상: [#FF9900]{total_candidates}개[/#FF9900] (예상 절감: [green]${total_savings:,.2f}/월[/green])"
     )
 
     identifier = get_context_identifier(ctx)

@@ -93,7 +93,7 @@ def run(ctx: ExecutionContext) -> None:
 
     # 테이블로 표시
     table = Table(title="서비스 장애 현황")
-    table.add_column("서비스", style="cyan", width=12)
+    table.add_column("서비스", style="#FF9900", width=12)
     table.add_column("이벤트 유형", width=30)
     table.add_column("리전", width=15)
     table.add_column("시작 시간", width=20)

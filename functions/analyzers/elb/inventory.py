@@ -196,7 +196,7 @@ def run(ctx: ExecutionContext) -> None:
     if stats.type_counts:
         console.print()
         table = Table(title="Load Balancer 유형별 현황")
-        table.add_column("유형", style="cyan")
+        table.add_column("유형", style="#FF9900")
         table.add_column("수량", justify="right", style="green")
         type_names = {"application": "ALB", "network": "NLB", "gateway": "GWLB", "classic": "CLB"}
         for lb_type, count in sorted(stats.type_counts.items()):

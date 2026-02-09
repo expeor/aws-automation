@@ -1323,7 +1323,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print(f"  [blue]LOW: {totals['low']}건[/blue]")
 
     # 보고서 생성
-    console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
+    console.print("\n[#FF9900]Excel 보고서 생성 중...[/#FF9900]")
 
     identifier = get_context_identifier(ctx)
 

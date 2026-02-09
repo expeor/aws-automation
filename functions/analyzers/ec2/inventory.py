@@ -188,7 +188,7 @@ def run(ctx: ExecutionContext) -> None:
     if stats.state_counts:
         console.print()
         table = Table(title="EC2 상태별 현황")
-        table.add_column("상태", style="cyan")
+        table.add_column("상태", style="#FF9900")
         table.add_column("수량", justify="right", style="green")
         for state, count in sorted(stats.state_counts.items()):
             table.add_row(state, str(count))

@@ -248,7 +248,7 @@ class MainMenu:
             item_type = getattr(item, "item_type", "tool")
             if item_type == "category":
                 # 카테고리: 폴더 아이콘 표시
-                self.console.print(f"  {i}. [cyan]📁[/cyan] {item.tool_name}")
+                self.console.print(f"  {i}. [#FF9900]📁[/#FF9900] {item.tool_name}")
             else:
                 # 도구: 도구 아이콘 표시
                 self.console.print(f"  {i}. [green]🔧[/green] {item.tool_name} [dim]{item.category}[/dim]")
@@ -260,7 +260,7 @@ class MainMenu:
         from rich.table import Table
 
         self.console.print()
-        self.console.print(f"[bold cyan]🔍[/] [bold]{t('menu.tool_navigation')}[/bold]")
+        self.console.print(f"[bold #FF9900]🔍[/] [bold]{t('menu.tool_navigation')}[/bold]")
 
         # Rich Table로 정렬
         cmd_table = Table(
@@ -277,19 +277,19 @@ class MainMenu:
         cmd_table.add_column(width=16)
 
         cmd_table.add_row(
-            "[cyan]a[/]",
+            "[#FF9900]a[/]",
             t("menu.all_tools"),
-            "[cyan]s[/]",
+            "[#FF9900]s[/]",
             t("menu.by_service"),
-            "[cyan]t[/]",
+            "[#FF9900]t[/]",
             t("menu.by_purpose"),
         )
         cmd_table.add_row(
-            "[cyan]c[/]",
+            "[#FF9900]c[/]",
             t("menu.by_category"),
-            "[cyan]r[/]",
+            "[#FF9900]r[/]",
             t("menu.reports"),
-            "[cyan]d[/]",
+            "[#FF9900]d[/]",
             t("menu.scheduled_operations"),
         )
         self.console.print(cmd_table)
@@ -309,11 +309,11 @@ class MainMenu:
         cmd_table2.add_column(width=3)
         cmd_table2.add_column(width=16)
         cmd_table2.add_row(
-            "[cyan]f[/]",
+            "[#FF9900]f[/]",
             t("menu.favorites"),
-            "[cyan]p[/]",
+            "[#FF9900]p[/]",
             t("menu.profiles"),
-            "[cyan]g[/]",
+            "[#FF9900]g[/]",
             t("menu.profile_groups"),
         )
         self.console.print(cmd_table2)
@@ -340,7 +340,7 @@ class MainMenu:
             (action, data) 튜플
         """
         self.console.print()
-        user_input = self.console.input("[bold cyan]❯[/] ").strip()
+        user_input = self.console.input("[bold #FF9900]❯[/] ").strip()
 
         if not user_input:
             return ("show_menu", None)
@@ -841,50 +841,52 @@ class MainMenu:
     def _show_help(self) -> None:
         """도움말 표시"""
         self.console.print()
-        self.console.print(f"[bold cyan]=== {t('menu.help_title')} ===[/bold cyan]")
+        self.console.print(f"[bold #FF9900]=== {t('menu.help_title')} ===[/#FF9900]")
         self.console.print()
 
         # 메뉴 탐색
-        self.console.print(f"[bold yellow]{t('menu.tool_navigation')}[/bold yellow]")
-        self.console.print(f"  [cyan]a[/cyan]  {t('menu.all_tools'):14} {t('menu.help_all_tools_desc')}")
-        self.console.print(f"  [cyan]t[/cyan]  {t('menu.by_purpose'):14} {t('menu.help_check_types_desc')}")
-        self.console.print(f"  [cyan]c[/cyan]  {t('menu.by_category'):14} {t('menu.help_categories_desc')}")
-        self.console.print(f"  [cyan]r[/cyan]  {t('menu.reports'):14} {t('menu.help_reports_desc')}")
-        self.console.print(f"  [cyan]d[/cyan]  {t('menu.scheduled_operations'):14} {t('menu.help_scheduled_desc')}")
-        self.console.print(f"  [cyan]f[/cyan]  {t('menu.favorites'):14} {t('menu.help_favorites_desc')}")
+        self.console.print(f"[bold #FF9900]{t('menu.tool_navigation')}[/bold #FF9900]")
+        self.console.print(f"  [#FF9900]a[/#FF9900]  {t('menu.all_tools'):14} {t('menu.help_all_tools_desc')}")
+        self.console.print(f"  [#FF9900]t[/#FF9900]  {t('menu.by_purpose'):14} {t('menu.help_check_types_desc')}")
+        self.console.print(f"  [#FF9900]c[/#FF9900]  {t('menu.by_category'):14} {t('menu.help_categories_desc')}")
+        self.console.print(f"  [#FF9900]r[/#FF9900]  {t('menu.reports'):14} {t('menu.help_reports_desc')}")
+        self.console.print(
+            f"  [#FF9900]d[/#FF9900]  {t('menu.scheduled_operations'):14} {t('menu.help_scheduled_desc')}"
+        )
+        self.console.print(f"  [#FF9900]f[/#FF9900]  {t('menu.favorites'):14} {t('menu.help_favorites_desc')}")
         self.console.print()
-        self.console.print(f"[bold yellow]{t('menu.settings')}[/bold yellow]")
-        self.console.print(f"  [cyan]g[/cyan]  {t('menu.profile_groups'):14} {t('menu.help_groups_desc')}")
-        self.console.print(f"  [cyan]p[/cyan]  {t('menu.profiles'):14} {t('menu.help_profiles_desc')}")
-        self.console.print(f"  [cyan]h[/cyan]  {t('common.help'):14} {t('menu.help_help_desc')}")
-        self.console.print(f"  [cyan]q[/cyan]  {t('common.exit'):14} {t('menu.help_quit_desc')}")
-        self.console.print(f"  [cyan]1-5[/cyan]               {t('menu.help_favorites_quick_desc')}")
+        self.console.print(f"[bold #FF9900]{t('menu.settings')}[/bold #FF9900]")
+        self.console.print(f"  [#FF9900]g[/#FF9900]  {t('menu.profile_groups'):14} {t('menu.help_groups_desc')}")
+        self.console.print(f"  [#FF9900]p[/#FF9900]  {t('menu.profiles'):14} {t('menu.help_profiles_desc')}")
+        self.console.print(f"  [#FF9900]h[/#FF9900]  {t('common.help'):14} {t('menu.help_help_desc')}")
+        self.console.print(f"  [#FF9900]q[/#FF9900]  {t('common.exit'):14} {t('menu.help_quit_desc')}")
+        self.console.print(f"  [#FF9900]1-5[/#FF9900]               {t('menu.help_favorites_quick_desc')}")
         self.console.print()
 
         # 검색
-        self.console.print(f"[bold yellow]{t('common.search')}[/bold yellow]")
+        self.console.print(f"[bold #FF9900]{t('common.search')}[/bold #FF9900]")
         self.console.print(f"  [white]rds, ec2, iam ...[/white]     {t('menu.help_search_services')}")
         self.console.print(f"  [white]snapshot, backup[/white]      {t('menu.help_search_keyword_en')}")
         self.console.print()
 
         # /command 필터 (AREA_REGISTRY에서 생성)
-        self.console.print(f"[bold yellow]{t('menu.help_domain_filter')}[/bold yellow]")
+        self.console.print(f"[bold #FF9900]{t('menu.help_domain_filter')}[/bold #FF9900]")
         for area in AREA_REGISTRY:
             cmd = area["command"].ljust(12)
             label = area.get("label_en", area["label"]) if self.lang == "en" else area["label"]
             desc = area.get("desc_en", area["desc"]) if self.lang == "en" else area["desc"]
-            self.console.print(f"  [green]{cmd}[/green] {label}, {desc}")
+            self.console.print(f"  [#FF9900]{cmd}[/#FF9900] {label}, {desc}")
         self.console.print()
 
         # CLI 직접 실행
-        self.console.print(f"[bold yellow]{t('menu.help_cli_direct')}[/bold yellow]")
+        self.console.print(f"[bold #FF9900]{t('menu.help_cli_direct')}[/bold #FF9900]")
         self.console.print(f"  [dim]$[/dim] aa                   {t('menu.help_cli_interactive')}")
         self.console.print(f"  [dim]$[/dim] aa rds                {t('menu.help_cli_tool_list')}")
         self.console.print(f"  [dim]$[/dim] aa ec2 --help         {t('menu.help_cli_service_help')}")
         self.console.print()
 
         # 출력
-        self.console.print(f"[bold yellow]{t('menu.help_output_path')}[/bold yellow]")
+        self.console.print(f"[bold #FF9900]{t('menu.help_output_path')}[/bold #FF9900]")
         self.console.print(f"  {t('menu.help_output_location')}: [dim]~/aa-output/<account>/<date>/[/dim]")
         self.console.print()
 
@@ -907,7 +909,7 @@ class MainMenu:
                 for i, item in enumerate(fav_items, 1):
                     item_type = getattr(item, "item_type", "tool")
                     if item_type == "category":
-                        self.console.print(f"  {i:>2}. [cyan]📁[/cyan] {item.tool_name}")
+                        self.console.print(f"  {i:>2}. [#FF9900]📁[/#FF9900] {item.tool_name}")
                     else:
                         self.console.print(f"  {i:>2}. [green]🔧[/green] {item.tool_name} [dim]{item.category}[/dim]")
                 self.console.print()
@@ -1222,7 +1224,7 @@ class MainMenu:
     def _show_profiles(self) -> None:
         """사용 가능한 AWS 프로필 목록 표시"""
         self.console.print()
-        self.console.print(f"[bold cyan]=== {t('menu.aws_auth_profiles')} ===[/bold cyan]")
+        self.console.print(f"[bold #FF9900]=== {t('menu.aws_auth_profiles')} ===[/#FF9900]")
         self.console.print()
 
         try:
@@ -1245,9 +1247,9 @@ class MainMenu:
                 for session in sso_sessions:
                     session_config = config.sessions.get(session)
                     if session_config:
-                        self.console.print(f"  [cyan]●[/cyan] {session} [dim]({session_config.region})[/dim]")
+                        self.console.print(f"  [#FF9900]●[/#FF9900] {session} [dim]({session_config.region})[/dim]")
                     else:
-                        self.console.print(f"  [cyan]●[/cyan] {session}")
+                        self.console.print(f"  [#FF9900]●[/#FF9900] {session}")
                 self.console.print()
 
             # 프로파일 목록 (타입별 그룹화)
@@ -1801,8 +1803,8 @@ class MainMenu:
 
         # 1. 인증 타입 선택
         self.console.print(f"{t('cli.select_auth_type')}")
-        self.console.print(f"  [cyan]1)[/cyan] {t('cli.sso_profile')}")
-        self.console.print(f"  [cyan]2)[/cyan] {t('cli.iam_access_key')}")
+        self.console.print(f"  [#FF9900]1)[/#FF9900] {t('cli.sso_profile')}")
+        self.console.print(f"  [#FF9900]2)[/#FF9900] {t('cli.iam_access_key')}")
         self.console.print(f"  [dim]0) {t('menu.cancel')}[/dim]")
         self.console.print()
 
@@ -1830,7 +1832,7 @@ class MainMenu:
         )
         self.console.print()
         for i, p in enumerate(available, 1):
-            self.console.print(f"  [cyan]{i:2})[/cyan] {p}")
+            self.console.print(f"  [#FF9900]{i:2})[/#FF9900] {p}")
         self.console.print()
         self.console.print(f"[dim]{t('cli.selection_hint')}[/dim]")
         self.console.print(f"[dim]0) {t('menu.cancel')}[/dim]")
@@ -1954,7 +1956,7 @@ class MainMenu:
             self.console.print()
             for i, p in enumerate(available, 1):
                 marker = " *" if p in group.profiles else ""
-                self.console.print(f"  [cyan]{i:2})[/cyan] {p}{marker}")
+                self.console.print(f"  [#FF9900]{i:2})[/#FF9900] {p}{marker}")
             self.console.print()
             self.console.print(f"[dim]{t('menu.selection_hint')}[/dim]")
 

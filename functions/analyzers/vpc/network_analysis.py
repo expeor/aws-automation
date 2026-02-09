@@ -286,7 +286,7 @@ def run(ctx: ExecutionContext) -> None:
     console.print("[bold]Network Resource Analysis (NAT/Endpoint/ENI)[/bold]\n")
 
     # Parallel collection
-    console.print("[cyan]Step 1: Collecting network resources...[/cyan]")
+    console.print("[#FF9900]Step 1: Collecting network resources...[/#FF9900]")
     result_data = parallel_collect(ctx, _collect_all, max_workers=20, service="ec2")
 
     # Process results
@@ -346,11 +346,11 @@ def run(ctx: ExecutionContext) -> None:
         return
 
     # Print summary
-    console.print("\n[cyan]Step 2: Analysis Summary[/cyan]")
+    console.print("\n[#FF9900]Step 2: Analysis Summary[/#FF9900]")
     _print_summary(analysis_result)
 
     # Generate reports
-    console.print("\n[cyan]Step 3: Generating reports...[/cyan]")
+    console.print("\n[#FF9900]Step 3: Generating reports...[/#FF9900]")
 
     identifier = get_context_identifier(ctx)
 

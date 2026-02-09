@@ -649,7 +649,7 @@ class ALBLogDownloader:
                 console=self.console,
             ) as progress:
                 download_task = progress.add_task(
-                    f"[cyan]로그 파일 다운로드 중 (0/{total_files})...",
+                    f"[#FF9900]로그 파일 다운로드 중 (0/{total_files})...",
                     total=total_files,
                 )
 
@@ -745,7 +745,7 @@ class ALBLogDownloader:
                 file_size = os.path.getsize(local_path)
                 progress.update(
                     task_id,
-                    description="[cyan]다운로드 진행중...",
+                    description="[#FF9900]다운로드 진행중...",
                 )
 
             except Exception as e:

@@ -107,7 +107,7 @@ def show_scheduled_menu(
         console.print()
 
         # 회사명 표시
-        console.print(f"[dim]📁 {t('menu.current_config')}: [cyan]{company_display}[/cyan][/dim]")
+        console.print(f"[dim]📁 {t('menu.current_config')}: [#FF9900]{company_display}[/#FF9900][/dim]")
         console.print()
 
         if view_mode == "collapsed":
@@ -139,7 +139,7 @@ def show_scheduled_menu(
             continue
 
         if choice.lower() == "h":
-            _show_history_view(console, lang)
+            _show_history_view(console, lang, current_company)
             continue
 
         if choice.lower() == "p":
@@ -289,32 +289,33 @@ def _render_collapsed_view(
         title_justify="left",
     )
     table.add_column("#", style="dim", width=3, justify="right")
-    table.add_column(t("menu.header_cycle"), width=24)
+    table.add_column(t("menu.header_cycle"), no_wrap=True)
+    table.add_column(t("menu.next_run"), width=7, style="dim", justify="center")
     table.add_column("[green]" + t("menu.task_check") + "[/green]", width=4, justify="right")
     table.add_column("[yellow]" + t("menu.task_apply") + "[/yellow]", width=4, justify="right")
     table.add_column("[red]" + t("menu.task_cleanup") + "[/red]", width=4, justify="right")
 
     for i, group in enumerate(groups, 1):
-        # 다음 실행일 계산 (그룹 내 첫 번째 작업 기준)
-        next_run_info = ""
+        # 다음 실행일 계산 (그룹 내 첫 번째 작업 기준, 이력 없으면 "-")
+        next_run_str = "-"
         if group.tasks:
             first_task = group.tasks[0]
             last_run_record = history.get_last_run(first_task.id)
-            last_run = None
             if last_run_record:
                 import contextlib
                 from datetime import datetime
 
+                last_run = None
                 with contextlib.suppress(ValueError, TypeError):
                     last_run = datetime.fromisoformat(last_run_record.run_at)
-            next_run = get_next_run_date(group.cycle, last_run)
-            next_run_str = format_next_run_date(next_run, lang)
-            next_label = t("menu.next_run") if lang == "ko" else "Next"
-            next_run_info = f" [dim]({next_label}: {next_run_str})[/dim]"
+                if last_run:
+                    next_run = get_next_run_date(group.cycle, last_run)
+                    next_run_str = format_next_run_date(next_run, lang)
 
         table.add_row(
             str(i),
-            f"[{group.color}]{group.icon} {group.display_name}[/{group.color}]{next_run_info}",
+            f"[{group.color}]{group.icon} {group.display_name}[/{group.color}]",
+            next_run_str,
             str(group.read_count) if group.read_count else "-",
             str(group.write_count) if group.write_count else "-",
             str(group.delete_count) if group.delete_count else "-",
@@ -485,7 +486,7 @@ def _show_config_selector(console: Console, current: str, lang: str) -> str | No
             "config_name" if lang == "ko" else "config_name_en",
             config.get("company_name" if lang == "ko" else "company_name_en", cfg),
         )
-        marker = " [cyan]◀[/cyan]" if cfg == current else ""
+        marker = " [#FF9900]◀[/#FF9900]" if cfg == current else ""
         console.print(f"  [dim]{i}[/dim] {display_name} [dim]({cfg})[/dim]{marker}")
 
     console.print()
@@ -517,10 +518,10 @@ def _toggle_permission_filter(console: Console, current: str | None, lang: str) 
     """
     console.print()
     console.print(f"[bold]{t('menu.filter_permission')}[/bold]")
-    console.print(f"  [dim]0[/dim] {t('menu.filter_all')}" + (" [cyan]◀[/cyan]" if current is None else ""))
-    console.print("  [dim]1[/dim] [green]read[/green]" + (" [cyan]◀[/cyan]" if current == "read" else ""))
-    console.print("  [dim]2[/dim] [yellow]write[/yellow]" + (" [cyan]◀[/cyan]" if current == "write" else ""))
-    console.print("  [dim]3[/dim] [red]delete[/red]" + (" [cyan]◀[/cyan]" if current == "delete" else ""))
+    console.print(f"  [dim]0[/dim] {t('menu.filter_all')}" + (" [#FF9900]◀[/#FF9900]" if current is None else ""))
+    console.print("  [dim]1[/dim] [green]read[/green]" + (" [#FF9900]◀[/#FF9900]" if current == "read" else ""))
+    console.print("  [dim]2[/dim] [yellow]write[/yellow]" + (" [#FF9900]◀[/#FF9900]" if current == "write" else ""))
+    console.print("  [dim]3[/dim] [red]delete[/red]" + (" [#FF9900]◀[/#FF9900]" if current == "delete" else ""))
 
     choice = console.input("> ").strip()
 
@@ -528,15 +529,45 @@ def _toggle_permission_filter(console: Console, current: str | None, lang: str) 
     return filter_map.get(choice, current)
 
 
-def _show_history_view(console: Console, lang: str) -> None:
+# Task ID prefix → (icon, ko_name, en_name) — 레지스트리 조회 실패 시 폴백
+_CYCLE_PREFIX_INFO: dict[str, tuple[str, str, str]] = {
+    "D": ("🕕", "일간", "Daily"),
+    "W": ("📆", "주간", "Weekly"),
+    "1M": ("📅", "월간", "Monthly"),
+    "3M": ("📊", "분기", "Quarterly"),
+    "6M": ("📋", "반기", "Biannual"),
+    "12M": ("📆", "연간", "Annual"),
+}
+
+
+def _cycle_from_task_id(task_id: str, lang: str) -> str:
+    """task_id 접두어에서 주기 표시 문자열 생성 (레지스트리 폴백용)"""
+    prefix = task_id.rsplit("-", 1)[0] if "-" in task_id else ""
+    info = _CYCLE_PREFIX_INFO.get(prefix)
+    if info:
+        icon, ko, en = info
+        return f"{icon}{ko if lang == 'ko' else en}"
+    return ""
+
+
+def _show_history_view(console: Console, lang: str, company: str | None = None) -> None:
     """실행 이력 표시
 
     Args:
         console: Rich Console
         lang: 언어
+        company: 설정 프로필명 (주기/권한 조회용)
     """
     history = ScheduledRunHistory()
-    records = history.get_recent(limit=10)
+    records = history.get_recent(limit=15)
+
+    # task_id → (group, task) 매핑 (주기/권한 표시용)
+    current_company = resolve_company(company)
+    groups = get_schedule_groups(company=current_company, lang=lang)
+    task_lookup: dict[str, tuple[ScheduleGroup, ScheduledTask]] = {}
+    for group in groups:
+        for task in group.tasks:
+            task_lookup[task.id] = (group, task)
 
     clear_screen()
     console.print()
@@ -556,8 +587,10 @@ def _show_history_view(console: Console, lang: str) -> None:
         )
         table.add_column("#", style="dim", width=3, justify="right")
         table.add_column(t("menu.header_datetime"), width=12)
-        table.add_column(t("menu.header_name"), width=24)
-        table.add_column(t("menu.header_status"), width=6, justify="center")
+        table.add_column(t("menu.header_cycle"), no_wrap=True)
+        table.add_column(t("menu.header_name"), no_wrap=True)
+        table.add_column(t("menu.header_permission"), width=6)
+        table.add_column(t("menu.header_status"), width=4, justify="center")
         table.add_column(t("menu.header_duration"), width=8, justify="right")
 
         for i, record in enumerate(records, 1):
@@ -565,10 +598,24 @@ def _show_history_view(console: Console, lang: str) -> None:
             status_color = "green" if record.status == "success" else "red"
             duration = record.get_duration_display()
 
+            # 주기/권한 조회 (레지스트리 → task_id 접두어 폴백)
+            cycle_str = ""
+            perm_str = ""
+            if record.task_id in task_lookup:
+                grp, tsk = task_lookup[record.task_id]
+                short = grp.display_name.replace(" 작업", "").replace(" Operations", "")
+                cycle_str = f"[{grp.color}]{grp.icon}{short}[/{grp.color}]"
+                perm_color = PERMISSION_COLORS.get(tsk.permission, "dim")
+                perm_str = f"[{perm_color}]{tsk.permission}[/{perm_color}]"
+            else:
+                cycle_str = _cycle_from_task_id(record.task_id, lang)
+
             table.add_row(
                 str(i),
                 record.get_formatted_datetime(),
-                record.task_name[:22],
+                cycle_str,
+                record.task_name,
+                perm_str,
                 f"[{status_color}]{status_icon}[/{status_color}]",
                 duration,
             )

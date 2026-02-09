@@ -46,7 +46,7 @@ def _warn_legacy_sso(profile_name: str) -> None:
 
 [bold red]⚠️  Legacy SSO는 더 이상 권장되지 않습니다.[/bold red]
 
-[cyan]AWS 권장 방식 (sso-session)으로 마이그레이션하세요:[/cyan]
+[#FF9900]AWS 권장 방식 (sso-session)으로 마이그레이션하세요:[/#FF9900]
 
 [dim]# ~/.aws/config 수정 방법[/dim]
 

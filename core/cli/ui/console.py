@@ -144,7 +144,7 @@ def print_info(message: str) -> None:
     Args:
         message: 출력할 메시지
     """
-    console.print(f"[blue]{SYMBOL_INFO} {message}[/blue]")
+    console.print(f"[#0972D3]{SYMBOL_INFO} {message}[/#0972D3]")
 
 
 def print_header(title: str) -> None:
@@ -154,7 +154,7 @@ def print_header(title: str) -> None:
         title: 헤더 제목
     """
     console.print()
-    console.print(f"[bold underline cyan]{title}[/bold underline cyan]")
+    console.print(f"[bold underline #FF9900]{title}[/bold underline #FF9900]")
     console.print()
 
 
@@ -176,7 +176,7 @@ def print_step_header(step: int, message: str) -> None:
         step: Step 번호
         message: Step 설명
     """
-    console.print(f"[bold cyan]Step {step}: {message}[/bold cyan]")
+    console.print(f"[bold #FF9900]Step {step}: {message}[/bold #FF9900]")
 
 
 INDENT = "   "  # Step 내 부작업 들여쓰기 (3칸)
@@ -211,7 +211,7 @@ def print_sub_info(message: str) -> None:
     Args:
         message: 정보 메시지
     """
-    console.print(f"{INDENT}[blue]{message}[/blue]")
+    console.print(f"{INDENT}[#0972D3]{message}[/#0972D3]")
 
 
 def print_sub_warning(message: str) -> None:
@@ -242,16 +242,16 @@ def print_panel_header(title: str, subtitle: str | None = None) -> None:
     if subtitle:
         console.print(
             Panel(
-                f"[bold blue]{title}[/]\n[dim]{subtitle}[/]",
-                border_style="blue",
+                f"[bold #0972D3]{title}[/]\n[dim]{subtitle}[/]",
+                border_style="#0972D3",
                 padding=(1, 2),
             )
         )
     else:
         console.print(
             Panel(
-                f"[bold blue]{title}[/]",
-                border_style="blue",
+                f"[bold #0972D3]{title}[/]",
+                border_style="#0972D3",
                 padding=(1, 2),
             )
         )
@@ -269,7 +269,7 @@ def print_table(
         columns: 컬럼 헤더 리스트
         rows: 행 데이터 리스트
     """
-    table = Table(title=title, show_header=True, header_style="bold magenta")
+    table = Table(title=title, show_header=True, header_style="bold #FF9900")
 
     for column in columns:
         table.add_column(column)
@@ -302,6 +302,7 @@ def print_legend(items: list[tuple]) -> None:
         "cyan": t("common.color_cyan"),
         "magenta": t("common.color_magenta"),
         "orange": t("common.color_orange"),
+        "#FF9900": t("common.color_orange"),
         "gray": t("common.color_gray"),
         "dim": t("common.color_gray"),
     }
@@ -462,7 +463,7 @@ def print_result_tree(title: str, sections: list[dict]) -> None:
     """
     tree = Tree(f"[bold]{title}[/bold]")
     for section in sections:
-        branch = tree.add(f"[cyan]{section['label']}[/cyan]")
+        branch = tree.add(f"[#FF9900]{section['label']}[/#FF9900]")
         for item in section.get("items", []):
             label, value, style = item
             branch.add(f"[{style}]{label}: {value}[/{style}]")
@@ -523,7 +524,7 @@ def print_execution_summary(
         accounts: 계정 수
     """
     table = Table(show_header=False, box=None, padding=(0, 2))
-    table.add_column(style="bold cyan", width=12)
+    table.add_column(style="bold #FF9900", width=12)
     table.add_column()
     table.add_row(
         t("runner.summary_tool") if t("runner.summary_tool") != "runner.summary_tool" else "도구",

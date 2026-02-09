@@ -204,18 +204,20 @@ class CategoryStep:
 
         # 전체 옵션
         total_count = len(tools)
-        print_box_line(f" [cyan]1[/cyan]  {t('menu.all_items')} ({t('menu.count_suffix', count=total_count)})")
+        print_box_line(f" [#FF9900]1[/#FF9900]  {t('menu.all_items')} ({t('menu.count_suffix', count=total_count)})")
 
         # 공통 도구가 있으면 표시
         if common_count > 0:
-            print_box_line(f" [cyan]2[/cyan]  {t('menu.common_items')} ({t('menu.count_suffix', count=common_count)})")
+            print_box_line(
+                f" [#FF9900]2[/#FF9900]  {t('menu.common_items')} ({t('menu.count_suffix', count=common_count)})"
+            )
             offset = 2
         else:
             offset = 1
 
         # 하위 서비스 옵션
         for i, (sub_svc, count) in enumerate(sub_svc_with_tools, offset + 1):
-            print_box_line(f" [cyan]{i}[/cyan]  {sub_svc.upper()} ({t('menu.count_suffix', count=count)})")
+            print_box_line(f" [#FF9900]{i}[/#FF9900]  {sub_svc.upper()} ({t('menu.count_suffix', count=count)})")
 
         print_box_line()
         print_box_line(f" [dim]0[/dim] {t('menu.go_back')}")

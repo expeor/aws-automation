@@ -978,7 +978,7 @@ def run(ctx: ExecutionContext) -> None:
         console.print(f"\n  [green]예상 비용 절감: ${abs(cost_diff):.2f}/월[/green]")
 
     # 보고서 생성
-    console.print("\n[cyan]Excel 보고서 생성 중...[/cyan]")
+    console.print("\n[#FF9900]Excel 보고서 생성 중...[/#FF9900]")
 
     identifier = get_context_identifier(ctx)
 

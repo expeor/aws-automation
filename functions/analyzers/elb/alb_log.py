@@ -58,7 +58,7 @@ def collect_options(ctx) -> None:
     Args:
         ctx: ExecutionContext
     """
-    console.print("\n[bold cyan]ALB 로그 분석 설정[/bold cyan]")
+    console.print("\n[bold #FF9900]ALB 로그 분석 설정[/bold #FF9900]")
 
     # 세션 획득 (첫 번째 리전 사용)
     region = ctx.regions[0] if ctx.regions else "ap-northeast-2"
